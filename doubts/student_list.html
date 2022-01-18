@@ -28,7 +28,7 @@
 
 
 
-    function select2() {
+    function select2(multiple=false) {
       return {
         items: [],
         selectedItems: [],
@@ -36,6 +36,7 @@
         showLoading: false,
         searchUrl: 'https://jsonplaceholder.typicode.com/users',
         csrf_token: '',
+        multiple: multiple,
 
         fetchItems(search_string) {
           this.showLoading = true;
@@ -61,6 +62,9 @@
           if (this.selectedItems.some(item => item.id === selectedItem.id)) {
             this.selectedItems = this.selectedItems.filter(item => item.id !== selectedItem.id)
           } else {
+            if (!this.multiple) {
+              this.selectedItems.pop();
+            }
             this.selectedItems.push(selectedItem)
           }
         },
@@ -81,9 +85,10 @@
 
     function app() {
       return {
-        step: 1,
-        open: false,
-        showCreate: false,
+        step: 2,
+        open: true,
+        showCreate: true,
+        selectedTopic: null
       }
     }
 
@@ -678,70 +683,9 @@
                   </div>
                 </div>
                 <div class="h-72" x-show="step==2" x-transition>
-                  <div x-data="select2" x-init="fetchItems">
-
-                    <div class="relative inline-block text-left w-full">
-                      <div>
-                        <ul role="list" class="mt-2 leading-8">
-                          <template x-for="item in selectedItems">
-                            <li class="inline">
-                              <a href="#"
-                                class="relative inline-flex items-center rounded-full border border-gray-300 px-3 py-0.5">
-                                <svg @click="removeItem(item)" class="h-1.5 w-1.5" stroke="currentColor" fill="none"
-                                  viewBox="0 0 8 8">
-                                  <path stroke-linecap="round" stroke-width="1.5" d="M1 1l6 6m0-6L1 7" />
-                                </svg>
-                                <div class="ml-3.5 text-sm font-medium text-gray-900" x-text="item.name"></div>
-                              </a>
-                            </li>
-                          </template>
-                        </ul>
-                        <div class="mt-2 relative rounded-md shadow-sm">
-                          <input type="text" @click="showSearchResults = true" type="text"
-                            @keyup.debounce="showSearchResults=true;fetchItems($event.target.value)"
-                            class="focus:ring-indigo-500 focus:border-indigo-500 block w-full pr-10 sm:text-sm border-gray-300 rounded-md border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left">
-                          <div x-show="showLoading"
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-500"
-                              xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
-                              </circle>
-                              <path class="opacity-75" fill="currentColor"
-                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                              </path>
-                            </svg>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div x-show="showSearchResults" @click.away="showSearchResults = false"
-                        class="origin-top-right z-20 w-full absolute z-20 right-0 mt-2 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
-                        role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
-                        <ul class="py-1 h-48 overflow-y-scroll" role="none">
-                          <li x-show="items.length === 0" class="my-8 flex items-center justify-center">
-                            <p class="px-4 text-gray-700 text-sm">Type to search</p>
-                          </li>
-                          <template x-for="user in items">
-                            <li :class="{ 'bg-green-100': selectedItems.some(e => e.id === user.id) }"
-                              @click="onItemSelect(user)"
-                              class="text-gray-700 hover:bg-gray-50 hover:cursor-pointer flex justify-between px-4 py-2 text-sm"
-                              role="menuitem" tabindex="-1" id="menu-item-0">
-                              <span x-text="user.name"></span>
-                              <svg x-show="selectedItems.some(e => e.id === user.id)" xmlns="http://www.w3.org/2000/svg"
-                                class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M5 13l4 4L19 7" />
-                              </svg>
-                            </li>
-                          </template>
-                        </ul>
-                      </div>
-                    </div>
-
-
-                  </div>
-                  <div x-data="select2" x-init="fetchItems">
-
+                  <div x-data="select2(false)" 
+                  x-init="fetchItems(); $watch('selectedItems', val => {if(val.length) {$dispatch('topic2', val[0]);}})">
+                
                     <!-- This example requires Tailwind CSS v2.0+ -->
                     <div>
                       <label id="listbox-label" class="block text-sm font-medium text-gray-700">
@@ -750,12 +694,14 @@
                       <div class="mt-1 relative">
                         <button type="button"
                           class="bg-white relative w-full border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                          @click="showSearchResults = true" type="text"
-                          aria-haspopup="listbox" aria-expanded="true" aria-labelledby="listbox-label">
-                          <span x-text="getFirstSelectedItem()['name']" class="block truncate">
+                          @click="showSearchResults = true" type="text" aria-haspopup="listbox" aria-expanded="true"
+                          aria-labelledby="listbox-label">
+                          <span x-show="selectedTopic === null" class="block truncate text-gray-500">
+                            Select a topic
+                          </span>
+                          <span x-on:on-topic-select.window="console.log('HELLO');selectedTopic=$event.detail" x-text="selectedTopic ? selectedTopic.name : ''" class="block truncate">
                           </span>
                           <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                            <!-- Heroicon name: solid/selector -->
                             <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
                               fill="currentColor" aria-hidden="true">
                               <path fill-rule="evenodd"
@@ -764,57 +710,161 @@
                             </svg>
                           </span>
                         </button>
-
+                
                         <!--
-      Select popover, show/hide based on select state.
-
-      Entering: ""
-        From: ""
-        To: ""
-      Leaving: "transition ease-in duration-100"
-        From: "opacity-100"
-        To: "opacity-0"
-    -->
-                        <ul
-                          x-show="showSearchResults" @click.away="showSearchResults = false"
+                      Select popover, show/hide based on select state.
+                
+                      Entering: ""
+                        From: ""
+                        To: ""
+                      Leaving: "transition ease-in duration-100"
+                        From: "opacity-100"
+                        To: "opacity-0"
+                    -->
+                        <ul x-show="showSearchResults"
                           class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
-                          tabindex="-1" role="listbox" aria-labelledby="listbox-label"
-                          aria-activedescendant="listbox-option-3">
+                          tabindex="-1" role="listbox" aria-labelledby="listbox-label" aria-activedescendant="listbox-option-3">
                           <!--
-        Select option, manage highlight styles based on mouseenter/mouseleave and keyboard navigation.
-
-        Highlighted: "text-white bg-indigo-600", Not Highlighted: "text-gray-900"
-      -->
+                        Select option, manage highlight styles based on mouseenter/mouseleave and keyboard navigation.
+                
+                        Highlighted: "text-white bg-indigo-600", Not Highlighted: "text-gray-900"
+                      -->
                           <template x-for="item in items">
+                
+                            <li @click="onItemSelect(item);"
+                              class="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9" id="listbox-option-0"
+                              role="option">
+                              <!-- Selected: "font-semibold", Not Selected: "font-normal" -->
+                              <span class="font-normal block truncate"
+                                :class="{'font-semibold': isItemSelected(item.id), 'font-normal': !isItemSelected(item.id)}"
+                                x-text="item.name">
+                              </span>
+                
+                              <!--
+                          Checkmark, only display for selected option.
+                
+                          Highlighted: "text-white", Not Highlighted: "text-indigo-600"
+                        -->
+                              <span class="text-gray-400 absolute inset-y-0 right-0 flex items-center pr-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                  stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                              </span>
+                              <!-- <span x-show="isItemSelected(item.id)" class="text-indigo-600 absolute inset-y-0 right-0 flex items-center pr-4">
+                                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
+                                                  fill="currentColor" aria-hidden="true">
+                                                  <path fill-rule="evenodd"
+                                                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                    clip-rule="evenodd" />
+                                                </svg> 
+                                              </span>-->
+                            </li>
+                          </template>
+                
+                
+                        </ul>
+                        <ul x-data="select2(false)" 
+                        x-show="showSearchResults"
+                        x-init="$watch('selectedItems', val => {if(val.length) {$dispatch('topic3', val[0]); }})"
+                        x-on:topic2.window="fetchItems(); showSearchResults = true;" @click.away=""
+                          class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
+                          tabindex="-1" role="listbox" aria-labelledby="listbox-label" aria-activedescendant="listbox-option-3">
+                           <div x-show="showLoading" class="flex justify-center py-4">
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
+                          <li x-show="!showLoading" class="cursor-default flex justify-between pl-3 pr-6 py-2 relative select-none text-gray-500 text-xs">
+                            <p>Choose Subtopic</p>
+                            <p class="flex items-center" @click="showSearchResults=false;">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                              </svg>
+                               Back
+                            </p>
+                          </li>
+                          <template x-for="item in items">
+                
+                            <li @click="onItemSelect(item);"
+                              class="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9" id="listbox-option-0"
+                              role="option">
+                              <!-- Selected: "font-semibold", Not Selected: "font-normal" -->
+                              <span class="font-normal block truncate"
+                                :class="{'font-semibold': isItemSelected(item.id), 'font-normal': !isItemSelected(item.id)}"
+                                x-text="item.id">
+                              </span>
+                
+                              <!--
+                        Checkmark, only display for selected option.
+                
+                        Highlighted: "text-white", Not Highlighted: "text-indigo-600"
+                      -->
+                
+                              <span class="text-gray-400 absolute inset-y-0 right-0 flex items-center pr-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                                  stroke="currentColor">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                </svg>
+                              </span>
+                              </span>
+                            </li>
+                          </template>
+                
+                
+                        </ul>
+                        <ul x-data="select2(false)"
+                          x-show="showSearchResults"
+                          x-init="$watch('selectedItems', val => {if(val.length) {$dispatch('on-topic-select', val[0]); showSearchResults=false;items=[];}})"
+                          x-on:topic3.window="fetchItems(); showSearchResults = true; items=[]"
+                         @click.away="showSearchResults = false; items=[]"
+                          class="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm"
+                          tabindex="-1" role="listbox" aria-labelledby="listbox-label" aria-activedescendant="listbox-option-3">
+                          
+                          <div x-show="showLoading" class="flex justify-center py-4">
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
 
-                            <li class="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9"
+                          <li x-show="!showLoading" class="cursor-default flex justify-between pl-3 pr-6 py-2 relative select-none text-gray-500 text-xs">
+                            <p>Choose Subtopic</p>
+                            <p class="flex items-center" @click="showSearchResults=false;items=[]">
+                              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                              </svg>
+                               Back
+                            </p>
+                          </li>
+
+                          <template x-for="item in items">
+                
+                            <li @click="onItemSelect(item)" class="text-gray-900 cursor-default select-none relative py-2 pl-3 pr-9"
                               id="listbox-option-0" role="option">
                               <!-- Selected: "font-semibold", Not Selected: "font-normal" -->
-                              <span class="font-normal block truncate" :class="{'font-semibold': isItemSelected(item.id), 'font-normal': !isItemSelected(item.id)}" x-text="item.name">
+                              <span class="font-normal block truncate"
+                                :class="{'font-semibold': isItemSelected(item.id), 'font-normal': !isItemSelected(item.id)}"
+                                x-text="item.email">
                               </span>
-
-                              <!--
-          Checkmark, only display for selected option.
-
-          Highlighted: "text-white", Not Highlighted: "text-indigo-600"
-        -->
-                              <span x-show="isItemSelected(item.id)" class="text-indigo-600 absolute inset-y-0 right-0 flex items-center pr-4">
-                                <!-- Heroicon name: solid/check -->
-                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"
-                                  fill="currentColor" aria-hidden="true">
+                
+                              <span x-show="isItemSelected(item.id)"
+                                class="text-indigo-600 absolute inset-y-0 right-0 flex items-center pr-4">
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"
+                                  aria-hidden="true">
                                   <path fill-rule="evenodd"
                                     d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                                     clip-rule="evenodd" />
                                 </svg>
                               </span>
+                
                             </li>
                           </template>
-
-                          <!-- More items... -->
                         </ul>
                       </div>
                     </div>
-
+                
                   </div>
                 </div>
                 <div x-show="step==3" x-transition>
