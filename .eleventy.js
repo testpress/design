@@ -1,5 +1,6 @@
 module.exports = config => {
     config.addPassthroughCopy("img");
+    config.addPassthroughCopy("CNAME");
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
