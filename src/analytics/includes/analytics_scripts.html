@@ -10,10 +10,30 @@
   }
 
   function getAnalyticsData() {
+    let initialTabs = [
+      {"order": 0, "label": "Tabular Reports", "active": true},
+      {"order": 1, "label": "Graphical Reports", "active": false},
+    ];
+
     return {
+      headerTabs: initialTabs,
+      activeTab: initialTabs[0],
+
       allStats: JSON.parse(`{% include "../../_data/subject_analytics.json" %}`),
       filteredStats: [],
       breadcrumbSubjects: [],
+
+      activateTab(tabOrder) {
+        this.headerTabs.forEach((tab) => {
+          if(tab.order == tabOrder) {
+            tab.active = true;
+            this.activeTab = tab;
+          }
+          else {
+            tab.active = false;
+          }
+        });
+      },
 
       filterByParentId(parentId) {
         if (!parentId) {
@@ -45,5 +65,46 @@
         }
       }
     }
+  }
+
+  function getPercentage(value, total) {
+    return ((value / total) * 100).toFixed(2)
+  };
+
+  function createChartForSubject(data, chartId) {
+    let totalQuestions = data.correct_answers_count + data.incorrect_answers_count + data.unanswered_count;
+    let percentages = [
+      getPercentage(data.correct_answers_count, totalQuestions),
+      getPercentage(data.incorrect_answers_count, totalQuestions),
+      getPercentage(data.unanswered_count, totalQuestions),
+    ]
+
+    let chartConfig = {
+      type: 'doughnut',
+      data: {
+        labels: ['Correct', 'Incorrect', 'Unanswered'],
+        datasets: [
+          {
+            data: percentages,
+            backgroundColor: ['#22c55e', '#ef4444', '#f59e0b'], // Tailwind colours of strength 500
+            label: 'Percentage',
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: true,
+            labels: {
+              boxWidth: 10,
+            }
+          }
+        }
+      }
+    };
+
+    let ctx = document.getElementById(chartId).getContext('2d');
+    new Chart(ctx, chartConfig);
   }
 </script>
