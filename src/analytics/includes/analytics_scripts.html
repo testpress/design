@@ -15,13 +15,28 @@
       {"order": 1, "label": "Graphical Reports", "active": false},
     ];
 
+    function filterByParentId(parentId) {
+      console.log("parent", parentId);
+
+      let allStats = JSON.parse(`{% include "../../_data/subject_analytics.json" %}`);
+      if (!parentId) {
+        return allStats.filter(item => item.parent_id == null);
+      }
+      else {
+        return allStats.filter(item => item.parent_id == parentId);
+      }
+    };
+
+    function getParamValue(param) {
+      var searchParams = new URLSearchParams(window.location.search);
+      return searchParams.get(param);
+    };
+
     return {
       headerTabs: initialTabs,
       activeTab: initialTabs[0],
 
-      allStats: JSON.parse(`{% include "../../_data/subject_analytics.json" %}`),
-      filteredStats: [],
-      breadcrumbSubjects: [],
+      subjectStats: filterByParentId(getParamValue("parent")),
 
       activateTab(tabOrder) {
         this.headerTabs.forEach((tab) => {
@@ -37,32 +52,23 @@
 
       filterByParentId(parentId) {
         if (!parentId) {
-          this.filteredStats = this.allStats.filter(item => item.parent_id == null);
+          this.subjectStats = this.subjectStats.filter(item => item.parent_id == null);
         }
         else {
-          this.filteredStats = this.allStats.filter(item => item.parent_id == parentId);
+          this.subjectStats = this.subjectStats.filter(item => item.parent_id == parentId);
         }
       },
 
       parentSubjectChanged(parentId) {
-        this.filterByParentId(parentId);
-        this.updateBreadcrumbs(parentId);
-      },
-
-      updateBreadcrumbs(parentId) {
-        if(!parentId) {
-          this.breadcrumbSubjects = [];
-          return;
-        }
-
-        let breadcrumbSubjectsIds = this.breadcrumbSubjects.map(subject => subject.id);
-        if (breadcrumbSubjectsIds.includes(parentId)) {
-          this.breadcrumbSubjects = this.breadcrumbSubjects.slice(0, breadcrumbSubjectsIds.indexOf(parentId) + 1);
+        let newURL = new URL(window.location.href);
+        
+        if (!parentId) {
+          newURL.searchParams.delete('parent');
         }
         else {
-          let parentSubject = this.allStats.filter(item => item.id == parentId)[0];
-          this.breadcrumbSubjects.push({"name": parentSubject.subject, "id": parentSubject.id});
+          newURL.searchParams.set('parent', parentId);
         }
+        window.location = newURL;
       }
     }
   }
