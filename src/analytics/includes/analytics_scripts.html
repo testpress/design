@@ -1,46 +1,17 @@
 <script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        fontFamily: {
-          sans: ['Inter var',],
-        },
-      }
-    }
-  }
-
-  function getAnalyticsData() {
-    let initialTabs = [
-      {"order": 0, "label": "Tabular Reports", "active": true},
-      {"order": 1, "label": "Graphical Reports", "active": false},
-    ];
-
-    function filterByParentId(parentId) {
-      let allStats = JSON.parse(`{% include "../../_data/subject_analytics.json" %}`);
-      if (!parentId) {
-        return allStats.filter(item => item.parent_id == null);
-      }
-      else {
-        return allStats.filter(item => item.parent_id == parentId);
-      }
-    };
-
-    function getParamValue(param) {
-      var searchParams = new URLSearchParams(window.location.search);
-      return searchParams.get(param);
-    };
-
+  function getAnalyticsUIData() {
     return {
-      headerTabs: initialTabs,
-      activeTab: initialTabs[0],
-
-      subjectStats: filterByParentId(getParamValue("parent")),
+      headerTabs: [
+        {"order": 0, "label": "Tabular Reports", "active": true},
+        {"order": 1, "label": "Graphical Reports", "active": false},
+      ],
+      activeTabOrder: 0,
 
       activateTab(tabOrder) {
         this.headerTabs.forEach((tab) => {
           if(tab.order == tabOrder) {
             tab.active = true;
-            this.activeTab = tab;
+            this.activeTabOrder = tab.order;
           }
           else {
             tab.active = false;
@@ -48,25 +19,17 @@
         });
       },
 
-      filterByParentId(parentId) {
-        if (!parentId) {
-          this.subjectStats = this.subjectStats.filter(item => item.parent_id == null);
-        }
-        else {
-          this.subjectStats = this.subjectStats.filter(item => item.parent_id == parentId);
-        }
+      isFilteredByParent() {
+        let url = new URL(window.location.href);
+        return url.searchParams.get('parent') != null;
       },
 
-      parentSubjectChanged(parentId) {
-        let newURL = new URL(window.location.href);
-        
-        if (!parentId) {
-          newURL.searchParams.delete('parent');
+      canShowSubjectStats(parentSubjectId) {
+        if (parentSubjectId) {
+          console.log(parentSubjectId, this.isFilteredByParent())
+          return this.isFilteredByParent();
         }
-        else {
-          newURL.searchParams.set('parent', parentId);
-        }
-        window.location = newURL;
+        return !this.isFilteredByParent();
       }
     }
   }
@@ -75,12 +38,12 @@
     return ((value / total) * 100).toFixed(2)
   };
 
-  function createChartForSubject(data, chartId) {
-    let totalQuestions = data.correct_answers_count + data.incorrect_answers_count + data.unanswered_count;
+  function createChartForSubject(correct, incorrect, unanswered, chartId) {
+    let totalQuestions = correct + incorrect + unanswered;
     let percentages = [
-      getPercentage(data.correct_answers_count, totalQuestions),
-      getPercentage(data.incorrect_answers_count, totalQuestions),
-      getPercentage(data.unanswered_count, totalQuestions),
+      getPercentage(correct, totalQuestions),
+      getPercentage(incorrect, totalQuestions),
+      getPercentage(unanswered, totalQuestions),
     ]
 
     let chartConfig = {
