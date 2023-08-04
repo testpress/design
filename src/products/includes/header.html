@@ -1,20 +1,21 @@
+<!--
+  This example requires some changes to your config:
+  
+  ```
+  // tailwind.config.js
+  module.exports = {
+    // ...
+    plugins: [
+      // ...
+      require('@tailwindcss/forms'),
+    ],
+  }
+  ```
+-->
 <div class="sm:flex-auto" x-data="{showSearchProductDropdown:false}">
     <div class="sm:flex sm:items-center">
         <div class="sm:flex-auto">
-            <h1 class="text-xl font-semibold text-gray-900">
-                <span x-show="is_coupon">Coupon Offers</span>
-                <span x-show="!is_coupon">Repeat Offers</span>
-            </h1>
-            <p @click="is_coupon=!is_coupon" class="text-gray-700 text-xs">Show results for
-                <span class="underline">
-                    <a x-show="is_coupon" href="#">
-                        Repeat offers
-                    </a>
-                    <a x-show="!is_coupon" href="#">
-                        Coupon offers
-                    </a>
-                </span>
-            </p>
+            <h1 class="text-xl font-semibold text-gray-900">Product Offers</h1>
         </div>
         <div class="relative">
             <button @click="showSearchProductDropdown=!showSearchProductDropdown" 
@@ -27,7 +28,7 @@
                 </svg>
                 Filter by products
             </button>
-            <div x-show="showSearchProductDropdown"
+            <div x-cloak x-show="showSearchProductDropdown"
                 class="absolute left-5 z-10 w-64 top-14 sm:top-10 bg-white overflow-hidden shadow rounded-lg shadow-lg rounded-md ring-1 ring-black ring-opacity-5 opacity-100 transition ease-in duration-100">
                 <div class="px-2 py-3">
                     <input @click="showSearchProductDropdown=true" @click.away="showSearchProductDropdown=false" type="text" name="name" id="name" autocomplete="off"
@@ -81,7 +82,7 @@
                 </div>
             </div>
         </div>
-        <div class="relative inline-block text-left" x-data="{ isOpen: false}">
+        <div class="relative inline-block text-left" x-data="{isOpen: false}">
             <div>
                 <button @click="isOpen = !isOpen" @click.away="isOpen = false" type="button"
                     class="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-emerald-700"
@@ -95,16 +96,109 @@
                     </svg>
                 </button>
             </div>
-            <div x-show="isOpen"
-                class="absolute right-0 z-10 mt-2 w-40 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
+            <div x-cloak x-show="isOpen"
+                class="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none"
                 role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
                 <div class="py-1" role="none">
                     <!-- Active: " text-gray-900", Not Active: "text-gray-700" -->
                     <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem"
                         tabindex="-1" id="menu-item-0">Create Coupon</a>
                     <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100" role="menuitem"
-                        tabindex="-1" id="menu-item-1">Create Repeat</a>
+                        tabindex="-1" id="menu-item-1">Create Repeat Purchase</a>
                 </div>
             </div>
         </div>
     </div>
+  
+<div x-data="selectedoffers()" x-init="init()">
+    <div class="sm:hidden">
+      <label for="tabs" class="sr-only">Select a tab</label>
+      <!-- Use an "onChange" listener to redirect the user to the selected tab URL. -->
+      <select id="tabs" name="tabs" class="block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm">
+        <option>All Offers</option>
+        <option>Coupon Offers</option>
+        <option selected>Repeat Purchase Offers</option>
+      </select>
+    </div>
+    <div class="hidden sm:block">
+      <div class="border-b border-gray-200 relative">
+        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+          <!-- Current: "border-indigo-500 text-indigo-600", Default: "border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-700" -->
+          <a href="#" @click="selectedall=true,selectedcoupon=false,selectedrepeat=false,removefilters()"
+          :class="selectedall ? 'border-emerald-500 text-emerald-600 flex whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium' : 'border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-700 flex whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium'">
+            All Offers
+            <!-- Current: "bg-indigo-100 text-indigo-600", Default: "bg-gray-100 text-gray-900" -->
+            <span :class="selectedall ? 'bg-emerald-100 text-emerald-600 ml-3 hidden rounded-full py-0.5 px-2.5 text-xs font-medium md:inline-block' : 'bg-gray-100 text-gray-900 ml-3 hidden rounded-full py-0.5 px-2.5 text-xs font-medium md:inline-block'">20</span>
+          </a>
+          <a href="#" @click="selectedall=false,selectedcoupon=true,selectedrepeat=false,filterCouponOffers()"
+          :class="selectedcoupon ? 'border-emerald-500 text-emerald-600 flex whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium' : 'border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-700 flex whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium'">
+            Coupon Offers
+            <!-- Current: "bg-indigo-100 text-indigo-600", Default: "bg-gray-100 text-gray-900" -->
+            <span :class="selectedcoupon ? 'bg-emerald-100 text-emerald-600 ml-3 hidden rounded-full py-0.5 px-2.5 text-xs font-medium md:inline-block' : 'bg-gray-100 text-gray-900 ml-3 hidden rounded-full py-0.5 px-2.5 text-xs font-medium md:inline-block'">10</span>
+          </a>
+          <a href="#" @click="selectedall=false,selectedcoupon=false,selectedrepeat=true,filterRepeatOffers()"
+          :class="selectedrepeat ? 'border-emerald-500 text-emerald-600 flex whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium' : 'border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-700 flex whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium'">
+            Repeat Purchase Offers
+            <!-- Current: "bg-indigo-100 text-indigo-600", Default: "bg-gray-100 text-gray-900" -->
+            <span :class="selectedrepeat ? 'bg-emerald-100 text-emerald-600 ml-3 hidden rounded-full py-0.5 px-2.5 text-xs font-medium md:inline-block' : 'bg-gray-100 text-gray-900 ml-3 hidden rounded-full py-0.5 px-2.5 text-xs font-medium md:inline-block'">10</span>
+          </a>  
+        </nav>
+      </div>
+    </div>
+  </div>
+
+
+  
+  
+  <script>
+    function filterCouponOffers() {
+        let newURL = new URL(window.location);
+        newURL.searchParams.set("condition_type", "Voucher");
+        window.location.href = newURL;
+    }
+    function filterRepeatOffers() {
+        let newURL = new URL(window.location);
+        newURL.searchParams.set("condition_type", "Repeat");
+        window.location.href = newURL;
+    }
+    function removefilters() {
+        let newURL = new URL(window.location);
+        newURL.searchParams.delete("condition_type");
+        window.location = newURL;
+    }
+
+    function selectedoffers() {
+        let selectedall = false;
+        let selectedcoupon = false;
+        let selectedrepeat = false;
+        let urlParams = new URLSearchParams(window.location.search);
+
+        if (urlParams.get('condition_type') === 'Voucher') {
+            selectedcoupon = true;
+        } else if (urlParams.get('condition_type') === 'Repeat') {
+            selectedrepeat = true;
+        } else {
+            selectedall = true;
+        }
+
+        return {
+            selectedall: selectedall,
+            selectedcoupon: selectedcoupon,
+            selectedrepeat: selectedrepeat,
+            init() {
+                if (selectedall) {
+                    this.selectedall = true;
+                } else if (selectedcoupon) {
+                    this.selectedcoupon = true;
+                } else if (selectedrepeat) {
+                    this.selectedrepeat = true;
+                }
+            }
+        };
+    }
+
+    function SortByPopular(){
+        
+    }
+
+</script>
