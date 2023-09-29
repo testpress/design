@@ -3,8 +3,8 @@ module.exports = config => {
     config.addPassthroughCopy("CNAME");
     config.addPassthroughCopy("css/prism.css");
     config.addPassthroughCopy("js/prism.js");
-    config.addWatchTarget("./tailwind.css")
-    config.addWatchTarget('./tailwind.config.js')
+    config.addPassthroughCopy("./tailwind.css")
+    config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
     return {
         markdownTemplateEngine: 'njk',
