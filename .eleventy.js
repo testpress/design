@@ -6,6 +6,7 @@ module.exports = config => {
     config.addWatchTarget("./tailwind.css")
     config.addWatchTarget('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
+    config.addPassthroughCopy("fonts");
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
