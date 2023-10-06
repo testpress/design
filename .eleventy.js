@@ -6,6 +6,7 @@ module.exports = config => {
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
+    config.addPassthroughCopy("fonts");
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
