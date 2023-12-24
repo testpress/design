@@ -71,7 +71,9 @@
   
   function doubtsComponent() {
     return {
-        open: false, 
+        open: false,
+        showLoading:false,
+        fetchingDoubtDetail:false,
         showAddAssigneeInputBox: false,
         showsimilarQs:false,
         showRelatedDoubtsList: false,
@@ -85,35 +87,50 @@
                 this.showRelatedDoubtsList = true;
                 return;
             }
-
-            fetch('/doubts/partials/related_doubts_list_modal/')
-                .then(response => response.text())
-                .then(html => {
-                    this.$refs.relatedDoubtList.innerHTML = html;
-                    this.showsimilarQs = true;
-                    this.showRelatedDoubtsList = true;
-                    this.isContentFetched = true;
-                });
+            this.showLoading = true;
+            setTimeout(() => {
+                fetch('/doubts/partials/related_doubts_list_modal/')
+                    .then(response => response.text())
+                    .then(html => {
+                        this.$refs.relatedDoubtList.innerHTML = html;
+                        this.showsimilarQs = true;
+                        this.showRelatedDoubtsList = true;
+                        this.isContentFetched = true;
+                    })
+                    .finally(() => {
+                        this.showLoading = false;
+                    });
+            }, 1000);
         },
 
         fetchAndShowDoubtDetail(id) {
             if (this.fetchedDetailIds[id]) {
                 this.showsimilarQs = true;
                 this.showRelatedDoubtsList = false;
-                this.selectedDoubtId = true;
+                this.selectedDoubtId = id;
                 return;
             }
+            this.showsimilarQs = false;
+            this.showRelatedDoubtsList = false;
+            this.showLoading = true;
+            this.fetchingDoubtDetail = true;
+
+            setTimeout(() => {
             fetch('/doubts/partials/related_doubt_detail_modal/')
                 .then(response => response.text())
                 .then(html => {
-                    const refName = 'relatedDoubtDetail_'+ id
+                    const refName = 'relatedDoubtDetail_'+ id;
                     this.$refs[refName].innerHTML = html;
                     this.showsimilarQs = true;
-                    this.showRelatedDoubtsList = false;
                     this.selectedDoubtId = id;
                     this.fetchedDetailIds[id] = true;
+                })
+                .finally(() => {
+                    this.showLoading = false;
+                    this.fetchingDoubtDetail = false;
                 });
-        },
+        }, 1000);
+    },
 
         getDoubtById(id){
             let doubts = JSON.parse('{{ related_doubts |dump |safe }}');
