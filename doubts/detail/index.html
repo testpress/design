@@ -210,8 +210,7 @@
   </header>
   <main class="">
     <div class="sm:px-6 lg:px-8 pb-6 bg-white border-b border-gray-200 shadow sm:rounded-lg">
-      <div x-data="{open:false, showAddAssigneeInputBox:false}" class="sm:py-2">
-
+      <div x-data="doubtsComponent" class="sm:py-2">
         <section aria-labelledby="filter-heading"
           class="px-4 sticky top-0 bg-white z-10 border-b border-gray-200 py-4 flex items-center justify-between">
           <div class="">
@@ -493,11 +492,18 @@
                               <form action="#">
                                 <div>
                                   <label for="comment" class="sr-only">Comment</label>
-                                  <textarea id="comment" name="comment" rows="3"
-                                    class="shadow-sm block w-full focus:ring-gray-900 focus:border-gray-900 sm:text-sm border border-gray-300 rounded-md bg-gray-100 focus:bg-white"
-                                    placeholder="Leave a comment"></textarea>
+                                  <div id="commentTextarea" name="comment" contenteditable="true" placeholder="Leave a comment"
+                                  class="shadow-sm block w-full focus:ring-black focus:border-black text-sm border border-gray-300 rounded-md bg-gray-100 focus:bg-white p-2 min-h-[100px] overflow-auto text-gray-700"
+                                  >
+                                 </div>                                                       
                                 </div>
-                                <div class="mt-6 flex items-center justify-end space-x-4">
+                                <div class="mt-6 flex items-center justify-end space-x-2">
+                                  <span @click="fetchAndShowRelatedDoubtsList()"class="cursor-pointer inline-flex justify-center px-2 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor" data-slot="icon" class="w-5 h-5">
+                                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+                                    </svg>
+                                    <span class="hidden lg:inline-block ml-1">Similar Qs</span>
+                                  </span>                                                        
                                   <button type="button"
                                     class="inline-flex justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900">
                                     <svg class="-ml-1 mr-2 h-5 w-5 text-green-500"
@@ -511,7 +517,7 @@
                                     <span>Resolve</span>
                                   </button>
                                   <button type="submit"
-                                    class="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900">
+                                    class="inline-flex items-center justify-center px-2 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-900 hover:bg-black focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900">
                                     Ask more info
                                   </button>
                                 </div>
@@ -943,6 +949,199 @@
             </div>
           </aside>
         </div>
+        <div x-ref="relatedDoubtList" x-cloak x-show="showsimilarQs"></div>
+        <div x-cloak x-show="showLoading">
+          <div class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <!--
+  Background backdrop, show/hide based on modal state.
+  Entering: "ease-out duration-300"
+  From: "opacity-0"
+  To: "opacity-100"
+  Leaving: "ease-in duration-200"
+  From: "opacity-100"
+  To: "opacity-0"
+-->
+  <div class="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75"></div>
+
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+      <div class="flex items-end justify-center min-h-full p-4 text-center sm:items-center sm:p-0">
+          <!--
+      Modal panel, show/hide based on modal state.
+      Entering: "ease-out duration-300"
+      From: "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+      To: "opacity-100 translate-y-0 sm:scale-100"
+      Leaving: "ease-in duration-200"
+      From: "opacity-100 translate-y-0 sm:scale-100"
+      To: "opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+  -->
+          <div
+              class="relative px-4 pt-5 pb-4 overflow-hidden text-left transition-all transform bg-white rounded-lg shadow-xl sm:my-8 sm:w-full sm:max-w-lg sm:p-6 min-h-[80vh] w-full">
+              <div class="flex animate-pulse">
+                <h3 class="rounded bg-slate-200 h-5 w-28"></h3>
+              </div>
+              <div class="mt-3">
+                  <ul role="list" class="">
+                      
+                      <li x-show="!fetchingDoubtDetail" class="relative justify-between py-5 gap-x-6">
+                        <div class="flex min-w-0 gap-x-4">
+                          <div class="flex-auto min-w-0">
+                            <p class="bg-slate-200 rounded h-5 w-2/4"></p>
+                            <p class="flex mt-2 h-4 w-5/6 bg-slate-200 rounded col-span-1"></p>
+                          </div>
+                        </div>
+                        <div class="flex items-center shrink-0 gap-x-4">
+                        </div>
+                      </li>
+                    
+                      <li x-show="!fetchingDoubtDetail" class="relative justify-between py-5 gap-x-6">
+                        <div class="flex min-w-0 gap-x-4">
+                          <div class="flex-auto min-w-0">
+                            <p class="bg-slate-200 rounded h-5 w-2/4"></p>
+                            <p class="flex mt-2 h-4 w-5/6 bg-slate-200 rounded col-span-1"></p>
+                          </div>
+                        </div>
+                        <div class="flex items-center shrink-0 gap-x-4">
+                        </div>
+                      </li>
+                    
+                      <li x-show="!fetchingDoubtDetail" class="relative justify-between py-5 gap-x-6">
+                        <div class="flex min-w-0 gap-x-4">
+                          <div class="flex-auto min-w-0">
+                            <p class="bg-slate-200 rounded h-5 w-2/4"></p>
+                            <p class="flex mt-2 h-4 w-5/6 bg-slate-200 rounded col-span-1"></p>
+                          </div>
+                        </div>
+                        <div class="flex items-center shrink-0 gap-x-4">
+                        </div>
+                      </li>
+                    
+                      <li x-show="!fetchingDoubtDetail" class="relative justify-between py-5 gap-x-6">
+                        <div class="flex min-w-0 gap-x-4">
+                          <div class="flex-auto min-w-0">
+                            <p class="bg-slate-200 rounded h-5 w-2/4"></p>
+                            <p class="flex mt-2 h-4 w-5/6 bg-slate-200 rounded col-span-1"></p>
+                          </div>
+                        </div>
+                        <div class="flex items-center shrink-0 gap-x-4">
+                        </div>
+                      </li>
+                    
+                      <li x-show="!fetchingDoubtDetail" class="relative justify-between py-5 gap-x-6">
+                        <div class="flex min-w-0 gap-x-4">
+                          <div class="flex-auto min-w-0">
+                            <p class="bg-slate-200 rounded h-5 w-2/4"></p>
+                            <p class="flex mt-2 h-4 w-5/6 bg-slate-200 rounded col-span-1"></p>
+                          </div>
+                        </div>
+                        <div class="flex items-center shrink-0 gap-x-4">
+                        </div>
+                      </li>
+                    
+                      <li x-show="!fetchingDoubtDetail" class="relative justify-between py-5 gap-x-6">
+                        <div class="flex min-w-0 gap-x-4">
+                          <div class="flex-auto min-w-0">
+                            <p class="bg-slate-200 rounded h-5 w-2/4"></p>
+                            <p class="flex mt-2 h-4 w-5/6 bg-slate-200 rounded col-span-1"></p>
+                          </div>
+                        </div>
+                        <div class="flex items-center shrink-0 gap-x-4">
+                        </div>
+                      </li>
+                    
+
+                    
+                    <li x-show="fetchingDoubtDetail"class="relative flex justify-between py-5 gap-x-6 animate-pulse">
+                      <div class="relative">
+                        <span class="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-100" aria-hidden="true"></span>
+                        <div class="relative flex items-start space-x-3">
+                          <div class="relative h-10 w-10 rounded-full flex items-center justify-center bg-slate-200"></div>
+                          <div>
+                              <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></a>
+                            <div class="flex mt-2">
+                              <p class="mt-0.5">
+                                <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></p>
+                                <p class="ml-2 h-2 w-20 bg-slate-200 rounded col-span-1"></p>
+                              </p>
+                            </div>
+                            <div class="mt-2">
+                              <p class="w-64 sm:w-80 h-10 bg-slate-200 rounded col-span-1"></p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                    
+                    <li x-show="fetchingDoubtDetail"class="relative flex justify-between py-5 gap-x-6 animate-pulse">
+                      <div class="relative">
+                        <span class="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-100" aria-hidden="true"></span>
+                        <div class="relative flex items-start space-x-3">
+                          <div class="relative h-10 w-10 rounded-full flex items-center justify-center bg-slate-200"></div>
+                          <div>
+                              <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></a>
+                            <div class="flex mt-2">
+                              <p class="mt-0.5">
+                                <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></p>
+                                <p class="ml-2 h-2 w-20 bg-slate-200 rounded col-span-1"></p>
+                              </p>
+                            </div>
+                            <div class="mt-2">
+                              <p class="w-64 sm:w-80 h-10 bg-slate-200 rounded col-span-1"></p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                    
+                    <li x-show="fetchingDoubtDetail"class="relative flex justify-between py-5 gap-x-6 animate-pulse">
+                      <div class="relative">
+                        <span class="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-100" aria-hidden="true"></span>
+                        <div class="relative flex items-start space-x-3">
+                          <div class="relative h-10 w-10 rounded-full flex items-center justify-center bg-slate-200"></div>
+                          <div>
+                              <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></a>
+                            <div class="flex mt-2">
+                              <p class="mt-0.5">
+                                <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></p>
+                                <p class="ml-2 h-2 w-20 bg-slate-200 rounded col-span-1"></p>
+                              </p>
+                            </div>
+                            <div class="mt-2">
+                              <p class="w-64 sm:w-80 h-10 bg-slate-200 rounded col-span-1"></p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                    
+                    <li x-show="fetchingDoubtDetail"class="relative flex justify-between py-5 gap-x-6 animate-pulse">
+                      <div class="relative">
+                        <span class="absolute top-5 left-5 -ml-px h-full w-0.5 bg-gray-100" aria-hidden="true"></span>
+                        <div class="relative flex items-start space-x-3">
+                          <div class="relative h-10 w-10 rounded-full flex items-center justify-center bg-slate-200"></div>
+                          <div>
+                              <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></a>
+                            <div class="flex mt-2">
+                              <p class="mt-0.5">
+                                <p class="h-2 w-20 bg-slate-200 rounded col-span-2"></p>
+                                <p class="ml-2 h-2 w-20 bg-slate-200 rounded col-span-1"></p>
+                              </p>
+                            </div>
+                            <div class="mt-2">
+                              <p class="w-64 sm:w-80 h-10 bg-slate-200 rounded col-span-1"></p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </li>
+                    
+                  </ul>
+              </div>
+          </div>
+      </div>
+  </div>
+</div>
+
+        </div>
       </div>
     </div>
   </main>
@@ -951,77 +1150,148 @@
     </div>
 
     
-<script>
+  <script>
   function assigneeData(multiple = true) {
   return {
-    selectedItems: [],
-    showSearchResults: true,
-    showAddAssigneeInputBox: false,
-    multiple: multiple,
-
-    isItemSelected(item) {
+      selectedItems: [],
+      showSearchResults: true,
+      showAddAssigneeInputBox: false,
+      multiple: multiple,
+  
+      isItemSelected(item) {
       return this.selectedItems.some(e => e.id === item.id)
-    },
-
-    onItemSelect(selectedItem) {
+      },
+  
+      onItemSelect(selectedItem) {
       if (this.isItemSelected(selectedItem)) {
-        this.removeItem(selectedItem)
+          this.removeItem(selectedItem)
       } else {
-        if (!this.multiple) {
+          if (!this.multiple) {
           this.selectedItems.pop();
-        }
-        this.selectedItems.push(selectedItem)
+          }
+          this.selectedItems.push(selectedItem)
       }
-    },
-
-    removeItem(itemToRemove) {
+      },
+  
+      removeItem(itemToRemove) {
       this.selectedItems = this.selectedItems.filter(item => item.id !== itemToRemove.id)
-    },
-
-    items: [
+      },
+  
+      items: [
       {
-        id: 1,
-        display_name: "John Corlos",
-        image_url: "https://i.pravatar.cc/256?img=1"
+          id: 1,
+          display_name: "John Corlos",
+          image_url: "https://i.pravatar.cc/256?img=1"
       },
       {
-        id: 2,
-        display_name: "Karthik",
-        image_url: "https://i.pravatar.cc/256?img=2"
+          id: 2,
+          display_name: "Karthik",
+          image_url: "https://i.pravatar.cc/256?img=2"
       },
       {
-        id: 3,
-        display_name: "Logesh",
-        image_url: "https://i.pravatar.cc/256?img=3"
+          id: 3,
+          display_name: "Logesh",
+          image_url: "https://i.pravatar.cc/256?img=3"
       },
       {
-        id: 4,
-        display_name: "Hari",
-        image_url: "https://i.pravatar.cc/256?img=4"
+          id: 4,
+          display_name: "Hari",
+          image_url: "https://i.pravatar.cc/256?img=4"
       },
       {
-        id: 5,
-        display_name: "Dinesh",
-        image_url: "https://i.pravatar.cc/256?img=5"
+          id: 5,
+          display_name: "Dinesh",
+          image_url: "https://i.pravatar.cc/256?img=5"
       },
       {
-        id: 6,
-        display_name: "Sarath",
-        image_url: "https://i.pravatar.cc/256?img=6"
+          id: 6,
+          display_name: "Sarath",
+          image_url: "https://i.pravatar.cc/256?img=6"
       },
       {
-        id: 7,
-        display_name: "Bharath",
-        image_url: "https://i.pravatar.cc/256?img=7"
+          id: 7,
+          display_name: "Bharath",
+          image_url: "https://i.pravatar.cc/256?img=7"
       },
       {
-        id: 8,
-        display_name: "Dominic",
-        image_url: "https://i.pravatar.cc/256?img=8"
+          id: 8,
+          display_name: "Dominic",
+          image_url: "https://i.pravatar.cc/256?img=8"
       }],
   }
-}
+  }
+  
+  function doubtsComponent() {
+    return {
+        open: false,
+        showLoading:false,
+        fetchingDoubtDetail:false,
+        showAddAssigneeInputBox: false,
+        showsimilarQs:false,
+        showRelatedDoubtsList: false,
+        selectedDoubtId: null,
+        isContentFetched: false,
+        fetchedDetailIds: {},
+
+        fetchAndShowRelatedDoubtsList() {
+            if (this.isContentFetched) {
+                this.showsimilarQs = true;
+                this.showRelatedDoubtsList = true;
+                return;
+            }
+            this.showLoading = true;
+            setTimeout(() => {
+                fetch('/doubts/partials/related_doubts_list_modal/')
+                    .then(response => response.text())
+                    .then(html => {
+                        this.$refs.relatedDoubtList.innerHTML = html;
+                        this.showsimilarQs = true;
+                        this.showRelatedDoubtsList = true;
+                        this.isContentFetched = true;
+                    })
+                    .finally(() => {
+                        this.showLoading = false;
+                    });
+            }, 1000);
+        },
+
+        fetchAndShowDoubtDetail(id) {
+            if (this.fetchedDetailIds[id]) {
+                this.showsimilarQs = true;
+                this.showRelatedDoubtsList = false;
+                this.selectedDoubtId = id;
+                return;
+            }
+            this.showsimilarQs = false;
+            this.showRelatedDoubtsList = false;
+            this.showLoading = true;
+            this.fetchingDoubtDetail = true;
+
+            setTimeout(() => {
+            fetch('/doubts/partials/related_doubt_detail_modal/')
+                .then(response => response.text())
+                .then(html => {
+                    const refName = 'relatedDoubtDetail_'+ id;
+                    this.$refs[refName].innerHTML = html;
+                    this.showsimilarQs = true;
+                    this.selectedDoubtId = id;
+                    this.fetchedDetailIds[id] = true;
+                })
+                .finally(() => {
+                    this.showLoading = false;
+                    this.fetchingDoubtDetail = false;
+                });
+        }, 1000);
+    },
+
+        getDoubtById(id){
+            let doubts = JSON.parse('[{"id":1,"title":"Basic Maths","description":"Is there any other way to do this or is this the right way?","reported_by":"Nisma Abdul Azeez","time_created":"7 minutes ago","image_src":"https://images.unsplash.com/photo-1550525811-e5869dd03032?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","follow_ups":[{"id":101,"comment":"No we can do it in alternative ways but make sure it does not affect the expected result","image_src":"https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","commented_by":"admin"},{"id":110,"comment":"The Pythagorean Theorem states that in a right-angled triangle, the square of the length of the hypotenuse (the side opposite the right angle) is equal to the sum of the squares of the lengths of the other two sides.","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","commented_by":"Suresh"}]},{"id":2,"title":"Current Electricity Study Material","description":"Level 1 Q.no 15 - Answer option 2 is correct, but can you explain the steps?","reported_by":"Arsha R G","time_created":"14 minutes ago","image_src":"https://d1j3vi2u94ebt0.cloudfront.net/institute/brilliantpalalms/user_profiles/102547/8ae89c3a6f0445ad9a8ea2827c307090.jpeg","follow_ups":[{"id":101,"comment":"How is the ratio of velocity of red colour light to velocity of violet colour of light in vaccum equal to 1?","commented_by":"Math Expert","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}]},{"id":3,"title":"Organism and Population","description":"Why is biotic community the answer and not ecological niche?","reported_by":"Shamseena Ali","time_created":"22 minutes ago","image_src":"https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","follow_ups":[{"id":101,"comment":"A rod of length 1000mm and coeficient of linear expansion degree celcius is placed symmetrically between two fixed supports srperated by 1001mm. The youngs modulus of rod is10^11N/m2.If the temperature is increased by 20 degree celcius then stress developed in the rod is","commented_by":"Math Expert","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}]},{"id":4,"title":"Geometry Problem","description":"Unable to solve this question about four square lamina.","reported_by":"Naveena Santhosh Reshma Gopi","image_src":"https://d1j3vi2u94ebt0.cloudfront.net/institute/brilliantpalalms/user_profiles/33570/7ffc26423ee54a82bcf247e832c46f8f.jpg","time_created":"22 minutes ago","follow_ups":[{"id":101,"comment":"Benzene is a fundamental building block in organic chemistry, characterized by its simple yet stable ring structure. Comprising six carbon atoms connected in a planar hexagonal ring, it possesses alternating double bonds, a configuration known as aromaticity.","commented_by":"Math Expert","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"},{"id":112,"comment":"A simple pendulum consists of a weight suspended from a pivot so that it can swing freely back and forth, a classic example of harmonic motion. The time it takes to complete one full swing, the period, is dependent on the length of the pendulum and the acceleration due to gravity.","commented_by":"Math Expert","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}]},{"id":5,"title":"Wheatstone Bridge","description":"How to solve an unbalanced wheatstone bridge?","reported_by":"Souparnika R Krishna","time_created":"49 minutes ago","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","follow_ups":[{"id":101,"comment":"monochromatic light of wavelength 500nm is incident on a two parallel slits seperated by a distance of 5 x 10-4. the interference pattern is obtained on a screen at a distance of 1m from the slits. the intensity of the central maximum is Io. when one of the slits is covered by a glass sheet of thickness 1.5x 10-6 m and refractive index 1.5, the intensity at the centre of the screen will be equal to","commented_by":"Akash","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}]},{"id":6,"title":"Biology Query","description":"Discussion on exceptions like hummingbirds in the context of All birds are regulators.","reported_by":"Alfiya J A","time_created":"1 hour ago","image_src":"https://static.testpress.in/static/img/default_medium_small_image.png","follow_ups":[{"id":101,"comment":"Ncert statementaa but humming birds,shrews okke exception ullethallee ..appo generaliseyth parayaan pattillalooo","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","commented_by":"admin"},{"id":101,"comment":"No we can do it in alternative ways but make sure it does not affect the expected result","image_src":"https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","commented_by":"admin"},{"id":110,"comment":"The Pythagorean Theorem states that in a right-angled triangle, the square of the length of the hypotenuse (the side opposite the right angle) is equal to the sum of the squares of the lengths of the other two sides.","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","commented_by":"Suresh"},{"id":101,"comment":"No we can do it in alternative ways but make sure it does not affect the expected result","image_src":"https://images.unsplash.com/photo-1519244703995-f4e0f30006d5?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","commented_by":"admin"},{"id":110,"comment":"The Pythagorean Theorem states that in a right-angled triangle, the square of the length of the hypotenuse (the side opposite the right angle) is equal to the sum of the squares of the lengths of the other two sides.","image_src":"https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80","commented_by":"Suresh"}]}]');
+            return doubts.find(doubt => doubt.id == id);
+        }
+    };
+  }
 </script>
+
 
   </body>
 
