@@ -1,0 +1,169 @@
+{% extends "layouts/tpstreams/sidebar_layout.html" %} {% block head_title %}
+"Upload Video" {% endblock %} {% block main_content %}
+<h1 class="text-2xl font-semibold text-gray-900">Upload Videos</h1>
+
+<div class="" x-data="app" x-init="initializeUppy">
+    {% include "./includes/upload_progress_nav.html" %}
+    {% include "./includes/selected_files.html" %}
+    {% include "./includes/transcoding_options.html" %}
+    {% include "./includes/upload_files_preview.html" %}
+    {% include "./includes/prev_next.html" %}
+</div>
+
+{% endblock main_content %} {% block extra_body %}
+
+<script type="application/javascript" src="https://releases.transloadit.com/uppy/v3.3.1/uppy.min.js"></script>
+<script>
+    class UppyFileUploader {
+        constructor() {
+            this.initialize()
+        }
+
+        initialize() {
+            this.uppy = new Uppy.Uppy({
+                autoProceed: true,
+                allowMultipleUploadBatches: false,
+            })
+        }
+
+        on(event, operation) {
+            this.uppy.on(event, operation)
+        }
+
+        addFile(attachment) {
+            return this.uppy.addFile({
+                data: attachment.file,
+                type: attachment.file.type,
+                name: attachment.name,
+                meta: { id: attachment.id },
+            })
+        }
+
+        addFiles(files) {
+            const filesToAdd = files.map(attachment => {
+                return {
+                    data: attachment.file,
+                    type: attachment.file.type,
+                    name: attachment.name,
+                    meta: { id: attachment.id, asset_id: attachment.asset_id },
+                }
+            })
+            return this.uppy.addFiles(filesToAdd)
+        }
+    }
+
+    function app() {
+        return {
+            step: 1,
+            assets: [],
+            isSelectAllChecked: false,
+            resolutions: [],
+            error: null,
+            uppy: null,
+            showLoading: false,
+            uploadStarted: false,
+            isAllVideosUploaded: false,
+
+    
+            selectFile: function (evt) {
+                evt.preventDefault();
+                const files = evt.dataTransfer ? [...evt.dataTransfer.files] : [...evt.target.files];
+
+                if (files.length === 0) return;
+
+                const validFiles = files
+                const objects = validFiles.map((file) => {
+                    return {
+                        id: crypto.randomUUID(),
+                        name: file.name,
+                        file: file,
+                        isSelected: false,
+                        progress: 0, 
+                        status: "Uploading",
+                    };
+                });
+
+                this.assets = this.assets.concat([...objects]);
+
+                const progressInterval = setInterval(() => {
+                    this.assets.forEach((asset) => {
+                        if (asset.status === "Uploading" && asset.progress < 100) {
+                            asset.progress += 10;
+                        }
+                    });
+                    const allComplete = this.assets.every((asset) => asset.progress === 100);
+                    if (allComplete) {
+                        clearInterval(progressInterval);
+                    }
+                }, 1000); 
+            },
+
+            removeFile: function (id) {
+                this.$refs.assets.value = null;
+                this.assets = this.assets.filter((asset) => asset.id !== id);
+            },
+
+            selectAll() {
+                this.assets = this.assets.map(asset => {
+                    asset.isSelected = true
+                    return asset
+                })
+            },
+
+            unSelectAll() {
+                this.assets = this.assets.map(asset => {
+                    asset.isSelected = false;
+                    return asset
+                })
+            },
+
+            removeSelected() {
+                this.assets = this.assets.filter((asset) => !asset.isSelected);
+                this.isSelectAllChecked = false;
+            },
+
+            selectAllResolutions() {
+                this.resolutions.push("240p", "360p", "480p", "720p","1080p");
+
+            },
+
+            unSelectAllResolutions() {
+                this.resolutions = [];
+
+            },
+
+            preventPageNavigation() {
+                window.onbeforeunload = function (event) {
+                    event.returnValue = "An upload is in progress, are you sure you want to leave this page?";
+                };
+            },
+
+            handleNextButtonClick() {
+                if (this.step === 3) {
+                    this.preventPageNavigation()
+                    this.createAssetsAndStartUpload()
+                } else if (this.step === 2) {
+                    if (!this.resolutions.length) {
+                        this.error = "Please select atleast one resolution"
+                        return;
+                    }
+                    this.error = null
+                    this.gotoNextStep()
+                } else if (this.step === 1) {
+                    this.gotoNextStep()
+                }
+            },
+
+            createAssetsAndStartUpload() {
+                this.showLoading = true;
+                this.uploadStarted = true;
+            },
+
+            gotoNextStep() {
+                this.step += 1
+                console.log(this.step)
+            }
+        }
+    }
+</script>
+{% endblock extra_body %}
