@@ -138,4 +138,117 @@
         }
     };
   }
+
+  function recordAudio() {
+    return {
+      audioUrl: null,
+      recorder: null,
+      beingRecorded: false,
+      micPermissionError: false,
+      uploading: false,
+      action: "",
+      isPaused: false,
+      timerId: null,
+      timerSeconds: 0,
+
+      async init() {
+        this.initializeUppy();
+      },
+
+      async initializeRecorder() {
+        try {
+          this.recorder = await window.audioRecorder();
+          this.micPermissionError = false;
+        } catch (error) {
+          this.micPermissionError = true;
+        }
+      },
+
+      startTimer() {
+        this.timerId = setInterval(() => {
+          this.timerSeconds++;
+        }, 1000)
+      },
+
+      stopTimer() {
+        clearInterval(this.timerId)
+        this.timerId = null;
+      },
+
+      clearTimer() {
+        this.stopTimer();
+        this.timerSeconds = 0;
+      },
+
+      initializeUppy() {
+        // this.uppy_record = new UppyFileUploader()
+        // this.uppy_record.on('upload-success', this.uploadSuccess.bind(this));
+        // this.uppy_record.on('upload-error', this.uploadError.bind(this));
+      },
+
+      uploadSuccess(file, response) {
+        this.uploading = false;
+        this.$dispatch("submit-audio-recording", {comment: response.uploadURL})
+      },
+
+      uploadError(file, error, response) {
+        this.uploading = false;
+      },
+
+      async startRecording() {
+        if (!this.recorder) {
+          await this.initializeRecorder();
+        }
+
+        if (this.micPermissionError) {
+          return;
+        }
+
+        this.audioUrl = null;
+        this.beingRecorded = true;
+        this.startTimer();
+        this.recorder.start();
+      },
+
+      async stopRecording() {
+        this.clearTimer();
+        if (this.recorder.isRecording()) {
+          const audio = await this.recorder.stop();
+          this.audioUrl = audio.audioUrl
+        }
+        this.isPaused = false;
+        this.beingRecorded = false;
+      },
+
+      async uploadRecording() {
+        this.uploading = true;
+        // let file = await fetch(this.audioUrl)
+        //   .then(r => r.blob())
+        //   .then(blobFile => new File([blobFile], "audio.wav", { type: "audio/wav" }))
+        // this.uppy_record.addFile({file: file})
+        
+        // Set a delay before calling uploadSuccess
+        setTimeout(() => {
+          this.uploadSuccess();
+        }, 2000);  
+      },
+
+      async submitRecording() {
+        await this.stopRecording();
+        await this.uploadRecording();
+      },
+
+      async resumeRecording() {
+        this.recorder.resume();
+        this.isPaused = false;
+        this.startTimer();
+      },
+
+      async pauseRecording() {
+        this.stopTimer();
+        this.recorder.pause();
+        this.isPaused = true;
+      },
+  };
+}
 </script>
