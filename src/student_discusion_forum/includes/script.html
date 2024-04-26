@@ -3,6 +3,12 @@
     return {
       showMobileFilterReport:false,
       search_value: null,
+      categories : JSON.parse('{{ categories |dump |safe }}'),
+      activites: [{"id":1,"name":"Posted by me"},{"id":2,"name":"Commented by me"},{"id":3,"name":"Liked by me"},{"id":4,"name":"Bookmarked by me"}],
+      selected_filters:[],
+      showCategoryFilter:false,
+      showActivityFilter:false,
+      active_filters:null,
 
       init() {
       const url = new URL(window.location.href);
@@ -12,6 +18,54 @@
          this.search_value = this.search_value.slice(0, 20) + '...';
       }
     },
+
+    initialize_selected_filter() {
+      const searchParams = new URLSearchParams(window.location.search);
+
+      for (let [key, value] of searchParams) {
+        let filterItem;
+        let type;
+        this.active_filters = Array.from(searchParams.entries()).length;
+
+        switch(key) {
+          case 'category':
+            filterItem = this.categories.find(item => item.id === parseInt(value));
+            type = 'category';
+            break;
+          case 'activity':
+            filterItem = this.activites.find(item => item.id === parseInt(value));
+            type = 'activity';
+            break;
+        }
+        if (filterItem) {
+          filterItem.type = type;
+          this.selected_filters.push(filterItem);
+        }
+      }
+    },
+
+
+      isItemSelected(item,type) {
+        return this.selected_filters.some(e => e.id === item.id && e.type === type);
+      },
+
+      addToSelectedFilter(filter,type){
+        if (this.isItemSelected(filter,type)){
+          return
+        }
+        filter.type = type;
+        this.selected_filters.push(filter)
+      },
+
+      removeSelectedFilter(filter) {
+       this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
+    },
+
+    submitReportFilter(){
+      const params = this.selected_filters.map(filter => `${filter.type}=${filter.id}`).join('&');
+      window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
+    },
+
 
       clear_search() {
       let newURL = new URL(window.location);
