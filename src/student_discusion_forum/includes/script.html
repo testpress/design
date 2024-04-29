@@ -1,0 +1,165 @@
+<script>
+  function dicussionComponents(){
+    return {
+      showMobileFilterReport:false,
+      search_value: null,
+      categories : JSON.parse('{{ categories |dump |safe }}'),
+      activites: [{"id":1,"name":"Posted by me"},{"id":2,"name":"Commented by me"},{"id":3,"name":"Liked by me"},{"id":4,"name":"Bookmarked by me"}],
+      selected_filters:[],
+      showCategoryFilter:false,
+      showActivityFilter:false,
+      showDateRangeFilter:false,
+      active_filters:null,
+      scrolledbottom:false,
+      isloading:false,
+      current_page: 1,
+      fromDate:null,
+      toDate:null,
+
+      init() {
+      const url = new URL(window.location.href);
+      const params = new URLSearchParams(url.search);
+      this.search_value = params.get('search') || null;
+      if (this.search_value && this.search_value.length > 20) {
+         this.search_value = this.search_value.slice(0, 20) + '...';
+      }
+    },
+
+    handleScroll(){
+    if(this.isScrollEnd()){
+      this.loadMorePosts()
+    }
+    },
+
+    loadMorePosts(){
+     let url = "/student_discusion_forum/partial_posts_list/"
+     this.fetchPosts(url)
+    },
+
+    fetchPosts(url){
+      this.isloading = true;
+      fetch(url)
+        .then(response => this.handleResponse(response))
+        .then(html => this.renderPosts(html))
+    },
+
+    handleResponse(response) {
+        if (response.ok) {
+            return response.text();
+        } else {
+            return response.text().then(error => {
+            throw new Error(error);
+        });
+        }
+    },
+
+    renderPosts(html){
+        this.$refs.posts_list.insertAdjacentHTML("beforeend", html);
+        this.isloading = false;
+    },
+
+    isScrollEnd() {
+       return window.innerHeight + window.scrollY >= document.body.scrollHeight-200;
+    },
+
+    initialize_selected_filter() {
+      const searchParams = new URLSearchParams(window.location.search);
+      const fromDate = searchParams.has('start_date') ? searchParams.get('start_date') : null;
+      const toDate = searchParams.has('end_date') ? searchParams.get('end_date') : null;
+
+      for (let [key, value] of searchParams) {
+        let filterItem;
+        let type;
+        this.active_filters = Array.from(searchParams.entries()).length;
+
+        switch(key) {
+          case 'category':
+            filterItem = this.categories.find(item => item.id === parseInt(value));
+            type = 'category';
+            break;
+          case 'activity':
+            filterItem = this.activites.find(item => item.id === parseInt(value));
+            type = 'activity';
+            break;
+        }
+        if (filterItem) {
+          filterItem.type = type;
+          this.selected_filters.push(filterItem);
+        }
+      }
+      if (fromDate && toDate){
+        date_range = {'id': fromDate+ 'to' + toDate,"name": fromDate+ ' to ' + toDate,"type":'date'}
+        this.selected_filters.push(date_range);
+        this.active_filters = this.active_filters - 1;
+      }
+    },
+
+
+      isItemSelected(item,type) {
+        return this.selected_filters.some(e => e.id === item.id && e.type === type);
+      },
+
+      handleDateChange(){
+        console.log(this.fromDate)
+        console.log(this.toDate)
+        if (!(this.fromDate && this.toDate)) {
+          return;
+        }
+        date_range = {'id': this.fromDate+ 'to' + this.toDate,"name": this.fromDate+ ' to ' + this.toDate}
+        this.addToSelectedFilter(date_range,'date')
+      },
+
+      addToSelectedFilter(filter,type){
+        if (this.isItemSelected(filter,type)){
+          return
+        }
+        filter.type = type;
+        if (type == 'date'){
+        this.selected_filters = this.selected_filters.filter(existingFilter => existingFilter.type !== 'date');
+        }
+        this.selected_filters.push(filter)
+      },
+
+      removeSelectedFilter(filter) {
+       this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
+    },
+
+    submitReportFilter() {
+    const params = this.selected_filters.map(filter => {
+        if (filter.type === 'date') {
+            // If the filter type is "date", split the date range and create separate parameters for start_date and end_date
+            const [startDate, endDate] = filter.id.split('to');
+            return `start_date=${startDate}&end_date=${endDate}`;
+        } else {
+            // For other filter types, create a parameter in the format "type=id"
+            return `${filter.type}=${filter.id}`;
+        }
+    }).join('&');
+    
+    window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
+},
+
+
+
+      clear_search() {
+      let newURL = new URL(window.location);
+      newURL.searchParams.delete("search");
+      window.location = newURL;
+    }, 
+
+    formatNumber(num) {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'm';
+    } else if (num >= 100000) {
+        return (num / 100000).toFixed(1) + 'l';
+    } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'k';
+    } else {
+        return num.toString();
+    }
+  },
+
+
+    }
+  }
+</script>
