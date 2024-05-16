@@ -1,0 +1,185 @@
+<script>
+  function headerData() {
+    return {
+      showInstructionDiv: false,
+      showQuestionDiv: false,
+      showPauseButton: false,
+      showExitSectionButton: false,
+      showHelpButton: false,
+      showReviewButton: false,
+      showBackButton: false,
+      showContinueButton: false,
+      showNextButton: false,
+      showReturnButton: false,
+
+      showPauseModal: false,
+
+      resetHeaderTabsVisibility() {
+        this.showPauseButton = false;
+        this.showExitSectionButton = false;
+        this.showHelpButton = false;
+        this.showReviewButton = false;
+        this.showBackButton = false;
+        this.showContinueButton = false;
+        this.showNextButton = false;
+        this.showReturnButton = false;
+      },
+
+      onClickNext() {
+        if (this.instructionPage < 2) {
+          this.instructionPage++;
+        }
+      },
+
+      onClickContinue() {
+        if (this.instructionPage <= 1) {
+          this.instructionPage++;
+        } 
+      },
+
+      onClickReturn() {
+        if (this.instructionPage == 3) {
+          this.instructionPage--;
+        } 
+      },
+
+      onClickPrevious() {
+        if (this.instructionPage >= 2) this.instructionPage--;
+      },
+
+      onClickHelp() {
+        this.instructionPage = 3;
+      },
+    }
+  };
+
+  function instructionsData() {
+    return {
+      instructionPage: parseInt("{{instructionPage}}"),
+
+      instruction: {
+        ["x-html"]() {
+          this.resetHeaderTabsVisibility();
+          switch (this.instructionPage) {
+            case 1:
+              return `{% include "./instructions/exam_instructions.html" %}`;
+            case 2:
+              return `{% include "./instructions/reading_section/instructions.html" %}`;
+            case 3:
+              return `{% include "./instructions/reading_section/help_pages/base.html" %}`;
+            case 4:
+              return `{% include "./instructions/listening_section/put_on_headset.html" %}`;
+            default:
+              return "";
+          }
+        },
+      },
+
+      readingSectionHelpPages: [
+        {"name": "Testing Tools", "id": 1},
+        {"name": "Reading The Passage", "id": 2},
+        {"name": "General Directions", "id": 3},
+        {"name": "Section Directions", "id": 4},
+      ],
+    }
+  };
+
+  function questionsData() {
+    return {
+      userSelectedAnswers: JSON.parse('{{ toefl_user_selected_answers |dump |safe }}'),
+      currentUserSelectedAnswer: {},
+      index: 0,
+
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+      examTimer: "00:00:00",
+      timerObject: null,
+
+      init() {
+        this.currentUserSelectedAnswer = this.userSelectedAnswers[0];
+        this.startTimer()
+      },
+
+      startTimer() {
+        if (this.timerObject) return; // Prevent multiple intervals
+
+        this.timerObject = setInterval(() => {
+          this.seconds++;
+          if (this.seconds === 60) {
+              this.seconds = 0;
+              this.minutes++;
+          }
+          if (this.minutes === 60) {
+              this.minutes = 0;
+              this.hours++;
+          }
+
+          this.examTimer = this.formatTime(this.hours) + ":" + this.formatTime(this.minutes) + ":" + this.formatTime(this.seconds);
+        }, 1000);
+      },
+
+      pauseTimer() {
+        clearInterval(this.timerObject);
+        this.timerObject = null;
+      },
+
+      stopTimer() {
+        this.pauseTimer();
+        this.hours = 0;
+        this.minutes = 0;
+        this.seconds = 0;
+        this.examTimer = "00:00:00";
+      },
+
+      formatTime(unit) {
+        return String(unit).padStart(2, '0');
+      },
+
+      onClickNext() {
+        if (this.index < this.userSelectedAnswers.length - 1) {
+          this.currentUserSelectedAnswer = this.userSelectedAnswers[++this.index];
+        } else {
+          this.endSection()
+        }
+      },
+
+      onClickPrevious() {
+        if (this.index) {
+          this.currentUserSelectedAnswer = this.userSelectedAnswers[--this.index];
+        }
+      },
+
+      showPreviousButton() {
+        return this.index >= 1;
+      },
+
+      showDirection() {
+        return Boolean(this.currentUserSelectedAnswer.question.direction);
+      },
+
+      endSection() {
+        this.instructionPage = 4;
+      },
+    };
+
+    function toeflExamData() {
+      return {
+        ...instructionsData(),
+        ...headerData(),
+        ...questionsData(),
+
+        initializeVisibility() {
+          if (window.location.href.endsWith("/question/")) {
+            this.showQuestionDiv = true;
+            this.showInstructionDiv = false;
+          }
+          else if (window.location.href.endsWith("/toefl/")) {
+            this.showQuestionDiv = false;
+            this.showInstructionDiv = true;
+          }
+        },
+      }
+    }
+  };
+</script>
