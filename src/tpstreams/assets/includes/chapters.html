@@ -1,42 +1,45 @@
-<div class="max-w-4xl">
-  <div class="relative mt-4" x-data="clipboardComponent()">
+<div class="max-w-4xl" x-data="clipboardComponent()">
+  <div class="relative mt-4" >
     <h3 class="mt-4 text-sm font-semibold leading-6 text-gray-900">Chapters</h3>
     <p class="text-gray-500 text-sm leading-6 mb-3">Break up your video into chapters for easier browsing! Add titles and start times (within the 9:58 total video length) to let viewers jump right to what interests them.</p>
   </div>
-  <form method="GET" class="group" novalidate>
-      <div x-data="{ chapters: [
-          {% for chapter in video_chapters %}
-              {  starttime: '{{ chapter.start_time }}', title: '{{ chapter.title }}' ,showError: false},
-          {% endfor %}
-      ] }">        
+  <form method="GET" class="group" novalidate onkeydown="return event.key != 'Enter';">
+      <div>        
       
       <!-- Dynamic input elements -->
           <template x-for="(chapter, index) in chapters" :key="index">   
               <div class="mb-6">
-                  <div class="flex space-x-4">
-                      <div>
-                          <input type="time" 
+                  <div class="flex space-x-4 items-center" x-ref="inputs">
+                      <div class="">
+                          <input type="text"
+                              x-ref="input"
                               max="00:19"
+                              x-init='hey()'
                               :id="'timeInput-' + index"
+                              x-on:input="handleInputEvent($event, index)"
+                              maxlength="8"
                               x-model="chapter.starttime" 
-                              x-on:change="chapter.showError = $event.target.validity.rangeOverflow; handleStartTimeChange(index,chapters)"
-                              class="block appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm focus:outline-none focus:ring-blue-600 sm:text-sm invalid:border-red-500 invalid:text-red-900"
+                              @keyup.enter="$refs.titleInput.focus()"
+                              x-on:change="handleStartTimeChange(index)"
+                              class="w-32 block appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm focus:outline-none focus:ring-blue-600 sm:text-sm invalid:border-red-500 invalid:text-red-900"
                             >
                       </div>
 
                       <div class="">
-                          <input x-model="chapter.title" 
+                          <input x-model="chapter.title"
                               class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm peer" 
                               type="text" 
                               placeholder="Title"
-                              @change="handleStartTimeChange(index,chapters)"
+                              @change="handleStartTimeChange(index)"
+                              x-ref="titleInput"
+                              @keyup.enter="addChapter();$nextTick(() => { $refs.input.focus(); });"
                               required
                           >
                       </div>
 
 
                       <div class="">
-                          <button type="button" @click="deleteChapter(index, chapters)" class="rounded-md border-0 py-1.5 text-gray-900 sm:text-sm sm:leading-6">
+                          <button type="button" @click="deleteChapter(index)" class="rounded-md border-0 py-1.5 text-gray-900 sm:text-sm sm:leading-6">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                               <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                             </svg>
@@ -50,7 +53,7 @@
           </template>
           <div class="flex mt-2 mb-3 space-x-4">
               <button type="button" 
-                  @click="chapters.push({starttime:'00:19'});"
+                  @click="addChapter(); $nextTick(() => { $refs.input.focus(); });"
                   class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-1">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
@@ -66,57 +69,59 @@
   </form>
 </div>
 
-{% block script %}
-  <script>
-  function handleStartTimeChange(index, chapters) {
-    const hasDuplicateStartTimes = checkForDuplicateStartTimes(chapters, index);
-    updateSaveButtonAndInputStyles(hasDuplicateStartTimes, index, chapters);
-  }
-
-  function checkForDuplicateStartTimes(chapters, excludeIndex) {
-    const startTime = chapters[excludeIndex].starttime;
-
-    return chapters.some((chapter, i) => chapter.starttime === startTime && i !== excludeIndex);
-  }
-  
-  function checkDuplicateAndReturnUniqueIndex(chapters, startTime) {
-    let index;
-    for (let i = 0; i < chapters.length; i++) {
-      const chapter = chapters[i];
-  
-      if (chapter.starttime === startTime) {
-        if (index === undefined) { 
-          index = i;
-        } else {
-          return null;
+<script>
+  function clipboardComponent() {
+    return {
+      chapters: [
+        {% for chapter in video_chapters %}
+        { starttime: '{{ chapter.start_time }}', title: '{{ chapter.title }}', showError: false },
+        {% endfor %}
+      ],
+      addChapter() {
+        this.chapters.push({ starttime: '', title: '', showError: false });
+      },
+      handleStartTimeChange(index) {
+        const hasDuplicateStartTimes = this.checkForDuplicateStartTimes(index);
+        this.updateSaveButtonAndInputStyles(hasDuplicateStartTimes, index);
+      },
+      checkForDuplicateStartTimes(excludeIndex) {
+        const startTime = this.chapters[excludeIndex].starttime;
+        return this.chapters.some((chapter, i) => chapter.starttime === startTime && i !== excludeIndex);
+      },
+      updateSaveButtonAndInputStyles(hasDuplicate, index) {
+        const saveButton = document.querySelector('.save-button');
+        saveButton.disabled = hasDuplicate;
+        document.getElementById('starttime-error-' + index).classList.toggle('hidden', !hasDuplicate);
+        const timeInput = document.getElementById('timeInput-' + index);
+        timeInput.classList.toggle('text-red-900', hasDuplicate);
+        timeInput.classList.toggle('border-red-500', hasDuplicate);
+        saveButton.classList.toggle('opacity-50', hasDuplicate);
+        saveButton.classList.toggle('cursor-not-allowed', hasDuplicate);
+        saveButton.classList.toggle('text-red-900', hasDuplicate);
+      },
+      deleteChapter(index) {
+        const deletedStartTime = this.chapters[index].starttime;
+        this.chapters.splice(index, 1);
+        const uniqueIndex = this.checkDuplicateAndReturnUniqueIndex(deletedStartTime);
+        if (uniqueIndex !== undefined)
+          this.updateSaveButtonAndInputStyles(false, uniqueIndex);
+      },
+      checkDuplicateAndReturnUniqueIndex(startTime) {
+        let index;
+        for (let i = 0; i < this.chapters.length; i++) {
+          const chapter = this.chapters[i];
+          if (chapter.starttime === startTime) {
+            if (index === undefined) {
+              index = i;
+            } else {
+              return null;
+            }
+          }
         }
+        return index;
       }
-    }
-    return index;
+    };
   }
 
-  function updateSaveButtonAndInputStyles(hasDuplicate, index, chapters) {
-    const saveButton = document.querySelector('.save-button');
-
-    saveButton.disabled = hasDuplicate;
-    document.getElementById('starttime-error-' + index).classList.toggle('hidden', !hasDuplicate);
-
-    const timeInput = document.getElementById('timeInput-' + index);
-    timeInput.classList.toggle('text-red-900', hasDuplicate);
-    timeInput.classList.toggle('border-red-500', hasDuplicate);
-
-    saveButton.classList.toggle('opacity-50', hasDuplicate);
-    saveButton.classList.toggle('cursor-not-allowed', hasDuplicate);
-    saveButton.classList.toggle('text-red-900', hasDuplicate);
-  }
-
-  function deleteChapter(index, chapters) {
-    const deletedStartTime = chapters[index].starttime; 
-    chapters.splice(index, 1);
-
-    let uniqueIndex = checkDuplicateAndReturnUniqueIndex(chapters, deletedStartTime);
-    if(uniqueIndex !== undefined)
-      updateSaveButtonAndInputStyles(false, uniqueIndex, chapters);
-  }
 </script>
-{% endblock script %}
+
