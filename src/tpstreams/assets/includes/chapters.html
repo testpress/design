@@ -13,12 +13,13 @@
                       <div class="">
                           <input type="text"
                               x-ref="input"
+                              x-model="chapter.starttime"
                               max="00:19"
-                              x-init='hey()'
+                              x-on:input="formatTimeAndValidateInput($event.target,chapter)"
+                              placeholder="MM:SS"
+                              type="text"
                               :id="'timeInput-' + index"
-                              x-on:input="handleInputEvent($event, index)"
                               maxlength="8"
-                              x-model="chapter.starttime" 
                               @keyup.enter="$refs.titleInput.focus()"
                               x-on:change="handleStartTimeChange(index)"
                               class="w-32 block appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm focus:outline-none focus:ring-blue-600 sm:text-sm invalid:border-red-500 invalid:text-red-900"
@@ -121,6 +122,59 @@
         return index;
       }
     };
+  }
+
+  function formatTimeAndValidateInput(input,chapter) {
+    let containsInvalidCharacters = /[^0-9:_]/.test(input.value);
+    const cursorPosition = input.selectionStart;
+
+    if (containsInvalidCharacters) {
+      input.value = input.value.replace(/[^0-9:_]/g, '');
+      chapter.starttime = input.value.replace(/[^0-9:_]/g, '');
+      input.setSelectionRange(cursorPosition-1, cursorPosition-1);
+      return ;
+    }
+
+    let value = input.value.replace(/[^0-9]/g, '');
+    let videoduration = 3200;
+
+    let formattedTime;
+    if(videoduration<3600){
+      formattedTime = formatTimeLessThanOneHour(value);
+      input.setAttribute('maxlength', value.length === 4 ? 5 : 6);
+    }
+    else {
+      formattedTime = formatTimeGreaterThanOneHour(value);
+      input.setAttribute('maxlength', value.length === 6 ? 8 : 9);
+    }
+    
+    input.value = formattedTime;
+    chapter.starttime = formattedTime;
+
+    if (cursorPosition === 2 || cursorPosition === 5 ) {
+        input.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+    } else {
+        input.setSelectionRange(cursorPosition, cursorPosition);
+    }
+  }
+  function formatTimeLessThanOneHour(timeString) {
+    const minute = timeString.slice(0, 2).padEnd(2, '_');
+    const second = timeString.slice(2,4).padEnd(2, '_');
+  
+    const formattedMinute = (parseInt(minute, 10) > 59) ? '0' + minute[0] : minute;
+    const formattedSecond = (parseInt(second, 10) > 59) ? '0' + second[0] : second;
+    
+    return formattedMinute + ':' + formattedSecond;
+  }
+  function formatTimeGreaterThanOneHour(timeString) {
+    const hour = timeString.slice(0, 2).padEnd(2, '_');
+    const minute = timeString.slice(2, 4).padEnd(2, '_');
+    const second = timeString.slice(4,6).padEnd(2, '_');
+  
+    const formattedMinute = (parseInt(minute, 10) > 59) ? '0' + minute[0] : minute;
+    const formattedSecond = (parseInt(second, 10) > 59) ? '0' + second[0] : second;
+    
+    return hour + ':' + formattedMinute + ':' + formattedSecond;
   }
 
 </script>
