@@ -1,8 +1,12 @@
 <script>
+  function getQueryParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get("instructionPage");
+  };
+
+
   function headerData() {
     return {
-      showInstructionDiv: false,
-      showQuestionDiv: false,
       showPauseButton: false,
       showExitSectionButton: false,
       showHelpButton: false,
@@ -11,6 +15,13 @@
       showContinueButton: false,
       showNextButton: false,
       showReturnButton: false,
+      showVolumeButton: false,
+      showVolumeDropdown: false,
+      showOkButton: false,
+      showQuestionHeader: false,
+      userSelectedAnswers: [],
+      index: 0,
+      examTimer: null,
 
       showPauseModal: false,
 
@@ -24,17 +35,59 @@
         this.showNextButton = false;
         this.showReturnButton = false;
       },
+    }
+  };
+
+
+  function instructionsData() {
+    return {
+      instructionPage: getQueryParams("instructionPage") ? parseInt(getQueryParams("instructionPage")) : parseInt("{{instructionPage}}"),
+
+      instruction: {
+        ["x-html"]() {
+          this.resetHeaderTabsVisibility();
+          switch (this.instructionPage) {
+            case 1:
+              return `{% include "./instructions/exam_instructions.html" %}`;
+            case 2:
+              return `{% include "./instructions/reading_section/instructions.html" %}`;
+            case 3:
+              return `{% include "./instructions/reading_section/help_pages/base.html" %}`;
+            case 4:
+              return `{% include "./instructions/listening_section/put_on_headset.html" %}`;
+            case 5:
+              return `{% include "./instructions/listening_section/changing_the_volume.html" %}`;
+            case 6:
+              return `{% include "./instructions/listening_section/section_instructions.html" %}`;
+            default:
+              return "";
+          }
+        },
+      },
+
+      readingSectionHelpPages: [
+        {"name": "Testing Tools", "id": 1},
+        {"name": "Reading The Passage", "id": 2},
+        {"name": "General Directions", "id": 3},
+        {"name": "Section Directions", "id": 4},
+      ],
 
       onClickNext() {
-        if (this.instructionPage < 2) {
+        if (this.instructionPage < 2 || this.instructionPage > 3) {
+          console.log(this.instructionPage)
+          this.resetHeaderTabsVisibility();
           this.instructionPage++;
+        }
+        else {
+          window.location = "{{'/exam_templates/toefl/question/'|url}}";
         }
       },
 
       onClickContinue() {
-        if (this.instructionPage <= 1) {
+        if (this.instructionPage < 2 || this.instructionPage > 3) {
+          this.resetHeaderTabsVisibility();
           this.instructionPage++;
-        } 
+        }
       },
 
       onClickReturn() {
@@ -53,37 +106,6 @@
     }
   };
 
-  function instructionsData() {
-    return {
-      instructionPage: parseInt("{{instructionPage}}"),
-
-      instruction: {
-        ["x-html"]() {
-          this.resetHeaderTabsVisibility();
-          switch (this.instructionPage) {
-            case 1:
-              return `{% include "./instructions/exam_instructions.html" %}`;
-            case 2:
-              return `{% include "./instructions/reading_section/instructions.html" %}`;
-            case 3:
-              return `{% include "./instructions/reading_section/help_pages/base.html" %}`;
-            case 4:
-              return `{% include "./instructions/listening_section/put_on_headset.html" %}`;
-            default:
-              return "";
-          }
-        },
-      },
-
-      readingSectionHelpPages: [
-        {"name": "Testing Tools", "id": 1},
-        {"name": "Reading The Passage", "id": 2},
-        {"name": "General Directions", "id": 3},
-        {"name": "Section Directions", "id": 4},
-      ],
-    }
-  };
-
   function questionsData() {
     return {
       userSelectedAnswers: JSON.parse('{{ toefl_user_selected_answers |dump |safe }}'),
@@ -96,7 +118,11 @@
       examTimer: "00:00:00",
       timerObject: null,
 
+      sections: ["Reading", "Listening"],
+      currentSectionIndex: 0,
+
       init() {
+        this.showQuestionHeader = true;
         this.currentUserSelectedAnswer = this.userSelectedAnswers[0];
         this.startTimer()
       },
@@ -139,9 +165,17 @@
       onClickNext() {
         if (this.index < this.userSelectedAnswers.length - 1) {
           this.currentUserSelectedAnswer = this.userSelectedAnswers[++this.index];
-        } else {
-          this.endSection()
+        } 
+        else if (this.hasNextSection()) {
+          window.location = "{{'/exam_templates/toefl/?instructionPage=4'|url}}";
         }
+        else {
+          window.location = "{{'/exam_templates/toefl/end_exam/'|url}}";
+        }
+      },
+
+      hasNextSection() {
+        return this.currentSectionIndex < this.sections.length - 1;
       },
 
       onClickPrevious() {
@@ -162,24 +196,5 @@
         this.instructionPage = 4;
       },
     };
-
-    function toeflExamData() {
-      return {
-        ...instructionsData(),
-        ...headerData(),
-        ...questionsData(),
-
-        initializeVisibility() {
-          if (window.location.href.endsWith("/question/")) {
-            this.showQuestionDiv = true;
-            this.showInstructionDiv = false;
-          }
-          else if (window.location.href.endsWith("/toefl/")) {
-            this.showQuestionDiv = false;
-            this.showInstructionDiv = true;
-          }
-        },
-      }
-    }
   };
 </script>
