@@ -15,14 +15,18 @@
                               x-ref="input"
                               x-model="chapter.starttime"
                               max="00:19"
-                              x-on:input="formatTimeAndValidateInput($event.target,chapter)"
+                              x-on:input="handleUserInput($event)"
                               placeholder="MM:SS"
                               type="text"
                               :id="'timeInput-' + index"
                               maxlength="8"
-                              @keyup.enter="$refs.titleInput.focus()"
-                              x-on:change="handleStartTimeChange(index)"
+                              @click="handleClickFocus($event)"
+                              @keydown="handleKeydown($event)"
+                              @keyup.enter="handleEnter(index)"
+                              x-on:change="insertAndApplyValidations($event)"
+                              @focus="handleInputFocus($event)" 
                               class="w-32 block appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm focus:outline-none focus:ring-blue-600 sm:text-sm invalid:border-red-500 invalid:text-red-900"
+                              data-hide-seconds
                             >
                       </div>
 
@@ -31,8 +35,9 @@
                               class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm peer" 
                               type="text" 
                               placeholder="Title"
+                              :id="'titleInput-' + index"
                               @change="handleStartTimeChange(index)"
-                              x-ref="titleInput"
+                              :x-ref="index" 
                               @keyup.enter="addChapter();$nextTick(() => { $refs.input.focus(); });"
                               required
                           >
@@ -69,8 +74,17 @@
       </div>
   </form>
 </div>
-
 <script>
+  var controlsElements = document.getElementsByClassName('controls');
+  var videoduration = 3200;
+
+  // Convert the HTMLCollection to an array for easier manipulation
+  var controlsArray = Array.from(controlsElements);
+
+  // Iterate over each controls element and remove it
+  controlsArray.forEach(function(element) {
+      element.remove();
+  });
   function clipboardComponent() {
     return {
       chapters: [
@@ -78,6 +92,18 @@
         { starttime: '{{ chapter.start_time }}', title: '{{ chapter.title }}', showError: false },
         {% endfor %}
       ],
+      previousInput:[],
+      init() {
+        this.$nextTick(() => {
+          this.chapters.forEach((chapter, index) => {
+            const inputBox = document.getElementById('timeInput-' + index);
+            //this.initializeInputBox(inputBox);
+          });
+        });
+      },
+      handleEnter(index){
+        document.getElementById("titleInput-${index}").focus()
+      },
       addChapter() {
         this.chapters.push({ starttime: '', title: '', showError: false });
       },
@@ -120,62 +146,456 @@
           }
         }
         return index;
+      },
+      
+      formatTimeAndValidateInput(input,index) {
+        var chapter = this.chapters[index]
+        let containsInvalidCharacters = /[^0-9:_]/.test(input.value);
+        console.log(this.previousInput[index])
+        const cursorPosition = input.selectionStart;
+        const coloncount = (input.value.match(/:/g) || []).length;
+
+        if(event.inputType == 'deleteContentBackward'){
+           if(coloncount==0 && videoduration<3600){
+              input.value = this.previousInput[index];
+              chapter.starttime = this.previousInput[index];
+              input.setSelectionRange(cursorPosition, cursorPosition);
+              return ;
+           }
+           if(coloncount==1 && videoduration>3600){
+            input.value = this.previousInput[index];
+            chapter.starttime = this.previousInput[index];
+            input.setSelectionRange(cursorPosition, cursorPosition);
+            return ;
+          }
+        }
+    
+        if (containsInvalidCharacters) {
+          input.value = input.value.replace(/[^0-9:_]/g, '');
+          chapter.starttime = input.value.replace(/[^0-9:_]/g, '');
+          input.setSelectionRange(cursorPosition-1, cursorPosition-1);
+          return ;
+        }
+    
+        let value = input.value.replace(/[^0-9]/g, '');
+    
+        let formattedTime;
+        if(videoduration<3600){
+          formattedTime = this.formatTimeLessThanOneHour(value);
+          input.setAttribute('maxlength', value.length === 4 ? 5 : 6);
+        }
+        else {
+          formattedTime = this.formatTimeGreaterThanOneHour(value);
+          input.setAttribute('maxlength', value.length === 6 ? 8 : 9);
+        }
+        
+        input.value = formattedTime;
+        this.previousInput[index]=formattedTime;
+        chapter.starttime = formattedTime;
+    
+        if (cursorPosition === 2 || cursorPosition === 5 ) {
+            input.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+        } else {
+            input.setSelectionRange(cursorPosition, cursorPosition);
+        }
+      },
+
+      formatTimeLessThanOneHour(timeString) {
+        const minute = timeString.slice(0, 2).padEnd(2, '_');
+        const second = timeString.slice(2,4).padEnd(2, '_');
+
+        const formattedMinute = (parseInt(minute, 10) > 59) ? '0' + minute[0] : minute;
+        const formattedSecond = (parseInt(second, 10) > 59) ? '0' + second[0] : second;
+
+        return formattedMinute + ':' + formattedSecond;
+      },
+
+      formatTimeGreaterThanOneHour(timeString) {
+        const hour = timeString.slice(0, 2).padEnd(2, '_');
+        const minute = timeString.slice(2, 4).padEnd(2, '_');
+        const second = timeString.slice(4,6).padEnd(2, '_');
+
+        const formattedMinute = (parseInt(minute, 10) > 59) ? '0' + minute[0] : minute;
+        const formattedSecond = (parseInt(second, 10) > 59) ? '0' + second[0] : second;
+
+        return hour + ':' + formattedMinute + ':' + formattedSecond;
+      },
+
+      getCursorSelection(event, hideSeconds) {
+        const { target: { selectionStart, selectionEnd, value } } = event;
+        const hourMarker = value.indexOf(':');
+        const minuteMarker = value.lastIndexOf(':');
+        let cursorSelection;
+        if (selectionStart <= hourMarker) {
+          cursorSelection = 'hours';
+        } else if (hideSeconds || selectionStart <= minuteMarker) {
+          cursorSelection = 'minutes';
+        } else if (!hideSeconds && selectionStart > minuteMarker) {
+          cursorSelection = 'seconds';
+        }
+        const content = value.slice(selectionStart, selectionEnd);
+        this.cursorSelection = cursorSelection;
+        return { cursorSelection, hideSeconds, hourMarker, minuteMarker, content };
+      },
+
+      shouldHideSeconds(inputBox) {
+        return false;
+      },
+
+      updateActiveAdjustmentFactor(inputBox, adjustmentFactor) {
+        inputBox.setAttribute('data-adjustment-factor', adjustmentFactor);
+      },
+      getAdjustmentFactor(inputBox) {
+        let adjustmentFactor = 1;
+        if (Number(inputBox.getAttribute('data-adjustment-factor')) > 0) {
+          adjustmentFactor = Number(inputBox.getAttribute('data-adjustment-factor'));
+        }
+        return adjustmentFactor;
+      },
+      highlightTimeUnitArea(inputBox, adjustmentFactor) {
+        console.log('inside highlightTimeUnitArea',adjustmentFactor)
+        const hourMarker = inputBox.value.indexOf(':');
+        const minuteMarker = inputBox.value.lastIndexOf(':');
+        const hideSeconds = this.shouldHideSeconds(inputBox);
+        const sectioned = inputBox.value.split(':');
+        if (adjustmentFactor >= 60 * 60) {
+          inputBox.selectionStart = 0; // hours mode
+          inputBox.selectionEnd = hourMarker;
+        } else if (!hideSeconds && adjustmentFactor < 60) {
+          inputBox.selectionStart = minuteMarker + 1; // seconds mode
+          inputBox.selectionEnd = minuteMarker + 1 + sectioned[2].length;
+        } else {
+          inputBox.selectionStart = hourMarker + 1; // minutes mode
+          inputBox.selectionEnd = hourMarker + 1 + sectioned[1].length;
+          adjustmentFactor = 60;
+        }
+
+        if (adjustmentFactor >= 1 && adjustmentFactor <= 3600) {
+          inputBox.setAttribute('data-adjustment-factor', adjustmentFactor);
+        }
+      },
+      handleKeydown(event) {
+        const changeValueKeys = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter'];
+        const adjustmentFactor = this.getAdjustmentFactor(event.target);
+        console.log(adjustmentFactor,'adjustmentFactor')
+
+        if (changeValueKeys.includes(event.key)) {
+          switch (event.key) {
+            case 'ArrowLeft':
+              this.shiftTimeUnitAreaFocus(event.target, 'left');
+              break;
+            case 'ArrowRight':
+              this.shiftTimeUnitAreaFocus(event.target, 'right');
+              break;
+            case 'Enter':
+              this.insertAndApplyValidations(event);
+              event.target.blur();
+              break;
+            default:
+          }
+          event.preventDefault();
+        }
+      },
+      shiftTimeUnitAreaFocus(inputBox, direction){
+        const adjustmentFactor = this.getAdjustmentFactor(inputBox);
+        switch (direction) {
+          case 'left':
+            this.highlightTimeUnitArea(inputBox, adjustmentFactor < 3600 ? adjustmentFactor * 60 : 3600);
+            break;
+          case 'right':
+            this.highlightTimeUnitArea(inputBox, adjustmentFactor > 60 ? adjustmentFactor / 60 : 1);
+            break;
+          default:
+        }
+      },
+      handleClickFocus(event) {
+        const inputBox = event.target;
+        const hideSeconds = this.shouldHideSeconds(inputBox);
+        const { cursorSelection, hourMarker, minuteMarker } = this.getCursorSelection(event, hideSeconds);
+
+        if (!cursorSelection) {
+          return;
+        }
+
+        const cursorAdjustmentFactor = hideSeconds ? 3 : 0;
+        switch (cursorSelection) {
+          case 'hours':
+            this.updateActiveAdjustmentFactor(inputBox, 3600);
+            event.target.setSelectionRange(0, hourMarker);
+            return;
+          case 'minutes':
+            this.updateActiveAdjustmentFactor(inputBox, 60);
+            event.target.setSelectionRange(hourMarker + 1, minuteMarker + cursorAdjustmentFactor);
+            return;
+          case 'seconds':
+            this.updateActiveAdjustmentFactor(inputBox, 1);
+            event.target.setSelectionRange(minuteMarker + 1, minuteMarker + 3);
+            return;
+          default:
+            this.updateActiveAdjustmentFactor(inputBox, 1);
+            event.target.setSelectionRange(minuteMarker + 1, minuteMarker + 3);
+            return;
+        }
+      },
+
+      //handling input
+
+      createEvent(type, option = { bubbles: false, cancelable: false }) {
+        const event = document.createEvent('Event');
+        event.initEvent(type, option.bubbles, option.cancelable);
+        return event;
+      },
+      getMinMaxConstraints(inputBox){
+        const minDuration = this.getDurationAttributeValue(inputBox, 'durationMin', 0);
+        const maxDuration = this.getDurationAttributeValue(
+          inputBox,
+          'durationMax',
+          99 * 3600 + 59 * 60 + 59,
+        ); // by default 99:99:99 is now new max
+        return {
+          minDuration,
+          maxDuration,
+        }
+      },
+      applyMinMaxConstraints(inputBox, value){
+        const { maxDuration, minDuration } = this.getMinMaxConstraints(inputBox);
+        return Math.min(Math.max(value, minDuration), maxDuration);
+      },
+      
+      durationToSeconds(value){
+        if (!/:/.test(value)) {
+          return 0;
+        }
+        const sectioned = value.split(':');
+        if (sectioned.length < 2) {
+          return 0;
+        } else {
+          return (
+            Number(sectioned[2] ? (sectioned[2] > 59 ? 59 : sectioned[2]) : 0) +
+            Number((sectioned[1] > 59 ? 59 : sectioned[1]) * 60) +
+            Number(sectioned[0] * 60 * 60)
+          );
+        }
+      },
+      insertAndApplyValidations(event){
+        const inputBox = event.target;
+        const duration = inputBox.value || inputBox.dataset.duration;
+        const secondsValue = this.durationToSeconds(duration);
+        this.insertFormatted(inputBox, this.applyMinMaxConstraints(inputBox, secondsValue));
+      },
+      getDurationAttributeValue(inputBox, name, defaultValue){
+        const value = inputBox.dataset[name];
+        if (value && isValidDurationFormat(value, shouldHideSeconds(inputBox))) {
+          return durationToSeconds(value);
+        } else {
+          return defaultValue;
+        }
+      },
+      getInitialDuration(inputBox){
+        const duration = this.getDurationAttributeValue(inputBox, 'duration', 0);
+        const secondsValue = this.durationToSeconds(duration);
+        return this.applyMinMaxConstraints(inputBox, secondsValue);
+      },
+      handleInputFocus(event){
+        // get input selection
+        console.log('--------inside focus----------',event.target.selectionEnd, event.target.selectionStart)
+
+        const inputBox = event.target;
+        const {maxDuration} = this.getMinMaxConstraints(inputBox);
+        const maxHourInput = Math.floor(maxDuration / 3600);
+        const charsForHours = maxHourInput < 1 ? 0 : maxHourInput.toString().length;
+    
+        /* this is for firefox and safari, when you focus using tab key, both selectionStart
+        and selectionEnd are 0, so manually trigger hour seleciton. */
+        if (
+          (event.target.selectionEnd === 0 && event.target.selectionStart === 0) ||
+          event.target.selectionEnd - event.target.selectionStart > charsForHours ||
+          charsForHours === 0
+        ) {
+          setTimeout(() => {
+            inputBox.focus();
+            inputBox.select();
+            this.highlightTimeUnitArea(inputBox, 3600);
+          }, 1);
+        }
+      },
+      validateValue(value, hideSeconds, constraints){
+        console.log('inside validateValue',constraints)
+        const sectioned = value.split(':');
+        if (sectioned.length < 2) {
+          return hideSeconds ? '00:00' : '00:00:00';
+        }
+        let mustUpdateValue;
+        if (hideSeconds) {
+          // if the input does not have a single ":" or is like "01:02:03:04:05", then reset the input
+          if (!hideSeconds && sectioned.length !== 2) {
+            return '00:00'; // fallback to default
+          }
+          // if hour (hh) input is not a number or negative set it to 0
+          if (isNaN(sectioned[0])) {
+            sectioned[0] = '00';
+            mustUpdateValue = true;
+          }
+          // if hour (mm) input is not a number or negative set it to 0
+          if (isNaN(sectioned[1]) || sectioned[1] < 0) {
+            sectioned[1] = '00';
+            mustUpdateValue = true;
+          }
+          // if minutes (mm) more than 59, set it to 59
+          if (sectioned[1] > 59 || sectioned[1].length > 2) {
+            sectioned[1] = '59';
+            mustUpdateValue = true;
+          }
+          if (mustUpdateValue) {
+            return sectioned.join(':');
+          }
+        } else {
+          // if the input does not have 2 ":" or is like "01:02:03:04:05", then reset the input
+          if (!hideSeconds && sectioned.length !== 3) {
+            return '00:00:00'; // fallback to default
+          }
+          // if hour (hh) input is not a number or negative set it to 0
+          if (isNaN(sectioned[0])) {
+            sectioned[0] = '00';
+            mustUpdateValue = true;
+          }
+          // if minutes (mm) input is not a number or negative set it to 0
+          if (isNaN(sectioned[1]) || sectioned[1] < 0) {
+            sectioned[1] = '00';
+            mustUpdateValue = true;
+          }
+          // if minutes (mm) more than 59, set it to 59
+          if (sectioned[1] > 59 || sectioned[1].length > 2) {
+            sectioned[1] = '59';
+            mustUpdateValue = true;
+          }
+          // if seconds(ss) input is not a number or negative set it to 0
+          if (isNaN(sectioned[2]) || sectioned[2] < 0) {
+            sectioned[2] = '00';
+            mustUpdateValue = true;
+          }
+          // if seconds (ss) more than 59, set it to 59
+          if (sectioned[2] > 59 || sectioned[2].length > 2) {
+            sectioned[2] = '59';
+            mustUpdateValue = true;
+          }
+          if (mustUpdateValue) {
+            return sectioned.join(':');
+          }
+        }
+        return false;
+      },
+      secondsToDuration(value, hideHours){
+        let secondsValue = value;
+        console.log('inside',value)
+        const hours = Math.floor(secondsValue / 3600);
+        if(!hideHours)
+          secondsValue %= 3600;
+        const minutes = Math.floor(secondsValue / 60);
+        const seconds = secondsValue % 60;
+        const formattedHours = String(hours).padStart(2, '0');
+        const formattedMinutes = String(minutes).padStart(2, '0');
+        const formattedSeconds = String(seconds).padStart(2, '0');
+        return hideHours
+          ? `${formattedMinutes}:${formattedSeconds}`
+          : `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+      },
+      insertFormatted(inputBox, secondsValue, dispatchSyntheticEvents, adjustmentFactor = 1){
+        const hideSeconds = this.shouldHideSeconds(inputBox);
+        const formattedValue = this.secondsToDuration(secondsValue, hideSeconds);
+        const existingValue = inputBox.value;
+        // Don't use setValue method here because
+        // it breaks the arrow keys and arrow buttons control over the input
+        inputBox.value = formattedValue;
+        // save current cursor location for automatic increase
+
+        // manually trigger an "input" event for other event listeners
+        if (dispatchSyntheticEvents !== false) {
+          if (existingValue != formattedValue) {
+            inputBox.dispatchEvent(this.createEvent('change', {bubbles: true, cancelable: true}));
+          }
+          inputBox.dispatchEvent(this.createEvent('input'));
+        }
+        inputBox.setAttribute('data-adjustment-factor', adjustmentFactor);
+        console.log({adjustmentFactor});
+        this.highlightTimeUnitArea(inputBox, adjustmentFactor);
+      },
+
+      handleUserInput(event){
+        const inputBox = event.target;
+        const sectioned = inputBox.value.split(':');
+        const hideSeconds = this.shouldHideSeconds(inputBox);
+        const {cursorSelection} = this.getCursorSelection(event, hideSeconds);
+        if (sectioned.length < 2) {
+          const constrainedValue = this.applyMinMaxConstraints(inputBox, this.getInitialDuration(inputBox));
+          console.log(constrainedValue)
+          this.insertFormatted(inputBox, constrainedValue, false,3600);
+          return;
+        }
+    
+        const {maxDuration} = this.getMinMaxConstraints(inputBox);
+        const maxHourInput = Math.floor(maxDuration / 3600);
+        const charsForHours = maxHourInput < 1 ? 0 : maxHourInput.toString().length;
+    
+        // MODE :  seconds hidden
+        if (hideSeconds){
+          const mustUpdateValue = this.validateValue(event.target.value, true);
+          if (mustUpdateValue !== false) {
+            const constrainedValue = this.applyMinMaxConstraints(
+              event.target,
+              this.durationToSeconds(mustUpdateValue),
+            );
+            this.insertFormatted(event.target, constrainedValue, false);
+          }
+          // done entering hours, so shift highlight to minutes
+          if (
+            (charsForHours < 1 && cursorSelection === 'hours') ||
+            (sectioned[0].length >= charsForHours && cursorSelection === 'hours')
+          ) {
+            if (charsForHours < 1) {
+              sectioned[0] = '00';
+            }
+            this.shiftTimeUnitAreaFocus(inputBox, 'right');
+            }
+          // done entering minutes, so just highlight minutes
+          if (sectioned[1].length >= 2 && cursorSelection === 'minutes') {
+            this.highlightTimeUnitArea(inputBox, 60);
+          }
+    
+          // MODE :  Default (seconds not hidden)
+        } 
+        else {
+          const mustUpdateValue = this.validateValue(event.target.value, false);
+    
+          if (mustUpdateValue !== false) {
+            const constrainedValue = this.applyMinMaxConstraints(
+              event.target,
+              this.durationToSeconds(mustUpdateValue),
+            );
+            this.insertFormatted(event.target, constrainedValue, false);
+          }
+          // done entering hours, so shift highlight to minutes
+          if (
+            (charsForHours < 1 && cursorSelection === 'hours') ||
+            (sectioned[0].length >= charsForHours && cursorSelection === 'hours')
+          ) {
+            if (charsForHours < 1) {
+              sectioned[0] = '00';
+            }
+            this.shiftTimeUnitAreaFocus(inputBox, 'right');
+          }
+    
+          // done entering minutes, so shift highlight to seconds
+          if (sectioned[1].length >= 2 && cursorSelection === 'minutes') {
+            this.shiftTimeUnitAreaFocus(inputBox, 'right');
+          }
+          // done entering seconds, just highlight seconds
+          if (sectioned[2].length >= 2 && cursorSelection === 'seconds') {
+            this.highlightTimeUnitArea(inputBox, 1);
+          }
+        }
       }
-    };
-  }
-
-  function formatTimeAndValidateInput(input,chapter) {
-    let containsInvalidCharacters = /[^0-9:_]/.test(input.value);
-    const cursorPosition = input.selectionStart;
-
-    if (containsInvalidCharacters) {
-      input.value = input.value.replace(/[^0-9:_]/g, '');
-      chapter.starttime = input.value.replace(/[^0-9:_]/g, '');
-      input.setSelectionRange(cursorPosition-1, cursorPosition-1);
-      return ;
-    }
-
-    let value = input.value.replace(/[^0-9]/g, '');
-    let videoduration = 3200;
-
-    let formattedTime;
-    if(videoduration<3600){
-      formattedTime = formatTimeLessThanOneHour(value);
-      input.setAttribute('maxlength', value.length === 4 ? 5 : 6);
-    }
-    else {
-      formattedTime = formatTimeGreaterThanOneHour(value);
-      input.setAttribute('maxlength', value.length === 6 ? 8 : 9);
-    }
-    
-    input.value = formattedTime;
-    chapter.starttime = formattedTime;
-
-    if (cursorPosition === 2 || cursorPosition === 5 ) {
-        input.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
-    } else {
-        input.setSelectionRange(cursorPosition, cursorPosition);
     }
   }
-  function formatTimeLessThanOneHour(timeString) {
-    const minute = timeString.slice(0, 2).padEnd(2, '_');
-    const second = timeString.slice(2,4).padEnd(2, '_');
-  
-    const formattedMinute = (parseInt(minute, 10) > 59) ? '0' + minute[0] : minute;
-    const formattedSecond = (parseInt(second, 10) > 59) ? '0' + second[0] : second;
-    
-    return formattedMinute + ':' + formattedSecond;
-  }
-  function formatTimeGreaterThanOneHour(timeString) {
-    const hour = timeString.slice(0, 2).padEnd(2, '_');
-    const minute = timeString.slice(2, 4).padEnd(2, '_');
-    const second = timeString.slice(4,6).padEnd(2, '_');
-  
-    const formattedMinute = (parseInt(minute, 10) > 59) ? '0' + minute[0] : minute;
-    const formattedSecond = (parseInt(second, 10) > 59) ? '0' + second[0] : second;
-    
-    return hour + ':' + formattedMinute + ':' + formattedSecond;
-  }
-
 </script>
 
