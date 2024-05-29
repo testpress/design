@@ -1,7 +1,7 @@
 <script>
-  function getQueryParams() {
+  function getQueryParams(paramName) {
     const urlParams = new URLSearchParams(window.location.search);
-    return urlParams.get("instructionPage");
+    return urlParams.get(paramName);
   };
 
 
@@ -18,6 +18,8 @@
       showVolumeButton: false,
       showVolumeDropdown: false,
       showOkButton: false,
+      showViewTextButton: false,
+      showViewQuestionButton: false,
       showQuestionHeader: false,
       userSelectedAnswers: [],
       activeSectionName: "Reading",
@@ -26,6 +28,7 @@
       audioVolume: 0.3,
 
       showPauseModal: false,
+      showExitSectionModal: false,
 
       resetHeaderTabsVisibility() {
         this.showPauseButton = false;
@@ -36,6 +39,8 @@
         this.showContinueButton = false;
         this.showNextButton = false;
         this.showReturnButton = false;
+        this.showOkButton = false;
+        this.showVolumeButton = false;
       },
 
       setVolume() {
@@ -44,6 +49,10 @@
         elements.forEach((element) => {
           element.volume = this.audioVolume
         })
+      },
+
+      onClickHelp() {
+        this.instructionPage = 3;
       },
     }
   };
@@ -78,10 +87,13 @@
               this.activeSectionName = "Listening";
               return `{% include "./instructions/listening_section/put_on_headset.html" %}`;
             case 5:
+              this.activeSectionName = "Listening";
               return `{% include "./instructions/listening_section/changing_the_volume.html" %}`;
             case 6:
+              this.activeSectionName = "Listening";
               return `{% include "./instructions/listening_section/section_instructions.html" %}`;
             case 7:
+              this.activeSectionName = "Listening";
               return `{% include "./instructions/listening_section/lectures/1.html" %}`;
             default:
               return "";
@@ -97,8 +109,8 @@
       ],
 
       onClickNext() {
-        if (this.instructionPage < 2 || this.instructionPage > 3) {
-          console.log(this.instructionPage)
+        console.log(this.instructionPage)
+        if ((this.instructionPage < 2) || (3 < this.instructionPage && this.instructionPage < 7)) {
           this.resetHeaderTabsVisibility();
           this.instructionPage++;
         }
@@ -108,7 +120,7 @@
       },
 
       onClickContinue() {
-        if (this.instructionPage < 2 || this.instructionPage > 3) {
+        if ((this.instructionPage < 2) || (3 < this.instructionPage && this.instructionPage < 7)) {
           this.resetHeaderTabsVisibility();
           this.instructionPage++;
         }
@@ -123,16 +135,19 @@
       onClickPrevious() {
         if (this.instructionPage >= 2) this.instructionPage--;
       },
-
-      onClickHelp() {
-        this.instructionPage = 3;
-      },
     }
   };
 
+
+  function getUserSelectedAnswersForSection(section) {
+    const all_questions = JSON.parse(JSON.stringify({{ toefl_user_selected_answers |dump |safe }}));
+    return all_questions.filter((question) => question["section"] == section);
+  };
+
+
   function questionsData() {
     return {
-      userSelectedAnswers: JSON.parse('{{ toefl_user_selected_answers |dump |safe }}'),
+      userSelectedAnswers: [],
       currentUserSelectedAnswer: {},
       index: 0,
 
@@ -143,12 +158,16 @@
       timerObject: null,
 
       sections: ["Reading", "Listening"],
-      currentSectionIndex: 0,
+      currentSectionIndex: getQueryParams("section") ? parseInt(getQueryParams("section")) : 0,
+      showDirection: true,
 
       init() {
         this.showQuestionHeader = true;
+        this.userSelectedAnswers = getUserSelectedAnswersForSection(this.currentSectionIndex);
         this.currentUserSelectedAnswer = this.userSelectedAnswers[0];
-        this.startTimer()
+        this.activeSectionName = this.sections[this.currentSectionIndex];
+        this.showDirection = Boolean(this.currentUserSelectedAnswer.question.direction && this.currentUserSelectedAnswer.question.type != "drag_and_drop");
+        this.startTimer();
       },
 
       startTimer() {
@@ -212,13 +231,104 @@
         return this.index >= 1;
       },
 
-      showDirection() {
-        return Boolean(this.currentUserSelectedAnswer.question.direction);
-      },
-
       endSection() {
         this.instructionPage = 4;
       },
+
+      questionChanged() {
+        this.displayQuestionActionButtons();
+        this.markParagraphIfNeeded();
+        this.scrollDirectionToTop();
+      },
+
+      displayQuestionActionButtons() {
+        this.showDirection = Boolean(this.currentUserSelectedAnswer.question.direction && this.currentUserSelectedAnswer.question.type != "drag_and_drop");
+        console.log(this.showDirection)
+
+        this.showPauseButton=true;
+        this.showExitSectionButton=true;
+        this.showHelpButton=true;
+        this.showNextButton=true;
+      
+        if (this.currentSectionIndex == 1) {
+          this.showVolumeButton=true;
+          this.showOkButton=true;
+        }
+        else {
+          this.showReviewButton=true;
+          this.showBackButton=true;
+
+          if (this.currentUserSelectedAnswer.question.type == "drag_and_drop") {
+            this.showViewTextButton = true;
+          }
+        }
+      },
+
+      markParagraphIfNeeded() {
+        const direction = document.getElementById("direction_div");
+        if (!direction) return;
+
+        if (this.currentSectionIndex == 0 && this.currentUserSelectedAnswer.question.direction) {
+          if (this.currentUserSelectedAnswer.question.target_paragraph_id) {
+            const paragraph = document.getElementById(this.currentUserSelectedAnswer.question.target_paragraph_id);
+            if (paragraph) {
+              paragraph.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="inline-block w-6 h-6 mr-1"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm4.28 10.28a.75.75 0 0 0 0-1.06l-3-3a.75.75 0 1 0-1.06 1.06l1.72 1.72H8.25a.75.75 0 0 0 0 1.5h5.69l-1.72 1.72a.75.75 0 1 0 1.06 1.06l3-3Z" clip-rule="evenodd" /></svg>` + paragraph.innerHTML;
+              setTimeout(() => paragraph.scrollIntoView({ behavior: 'instant' }), 500);
+            } 
+          }
+
+          else if (document.getElementById("highlighted_excerpt")) {
+            const highlightedText = document.getElementById("highlighted_excerpt").textContent;
+            this.highlightDirectionText(highlightedText);
+          }
+
+          else if (this.currentUserSelectedAnswer.question.highlighted_text) {
+            this.highlightDirectionText(this.currentUserSelectedAnswer.question.highlighted_text);
+          }
+
+          else if (this.currentUserSelectedAnswer.question.type == "insert_sentence") {
+            this.currentUserSelectedAnswer.question.question_html = this.currentUserSelectedAnswer.question.question_html.replaceAll("[]", `[<span class='inline-block w-4 h-4 bg-black dark:bg-gray-700'></span>]`);
+            direction.innerHTML = direction.innerHTML.replaceAll("[]", `<span class='inline-block w-4 h-4 bg-black dark:bg-gray-700' @click="insertTextInPassage($el)"></span>`);
+          }
+        }
+      },
+
+      highlightDirectionText(text) {
+        const direction = document.getElementById("direction_div");
+        if (direction.innerHTML.includes(text)) {
+          direction.innerHTML = direction.innerHTML.replace(text, `<span class='bg-black text-white pt-1'>${text}</span>`);
+        }
+      },
+
+      scrollDirectionToTop() {
+        const direction = document.getElementById("direction_div");
+        if (direction) {
+          direction.scrollTo({top: 0});
+        }
+      },
+
+      insertTextInPassage(element) {
+        for (span of document.querySelectorAll(".inserted-sentence")) {
+          span.outerHTML = `<span class='inline-block w-4 h-4 bg-black dark:bg-gray-700' @click="insertTextInPassage($el)"></span>`;
+        }
+        element.outerHTML = `<span class="inserted-sentence font-bold">${this.currentUserSelectedAnswer.question.sentence_to_add}</span>`;
+      },
     };
   };
+
+  function dragAndDropData() {
+    return {
+      textDragStarted(event) {
+        console.log("Drag started")
+        event.dataTransfer.setData('text/plain', event.target.textContent);
+      },
+
+      textDroppedInBox(event, droppedInBox) {
+        console.log("Drag dropped")
+        event.preventDefault();
+        const data = event.dataTransfer.getData('text/plain');
+        droppedInBox.textContent = data;
+      },
+    };
+  }
 </script>
