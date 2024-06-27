@@ -391,7 +391,7 @@
       <option value="watch_metrics">Watch Metrics</option>
       <option value="thumbnails">Thumbnails</option>
       <option value="captions">Captions</option>
-      <!-- <option value="chapters">Chapters</option> -->
+      <option value="chapters">Chapters</option>
       <option value="analytics">Analytics</option>
     </select>
 
@@ -432,7 +432,7 @@
           <span>Captions</span>
         </button>
        
-        <!--
+        
         <button @click.prevent="active_tab = 'chapters'"
           class="inline-flex items-center px-1 py-4 text-sm font-medium border-b-2 group"
           :class="active_tab === 'chapters' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'">
@@ -444,7 +444,6 @@
           </svg>
           <span>Chapters</span>
         </button>
-        -->
 
         <button @click.prevent="active_tab = 'watch_metrics'"
           class="inline-flex items-center px-1 py-4 text-sm font-medium border-b-2 group"
@@ -966,7 +965,643 @@
   </div>
   </template>
   <template x-if="active_tab === 'chapters'">
-    Chapters
+    <div>
+      <div class="max-w-4xl" x-data="clipboardComponent()">
+  <div class="relative mt-4" >
+    <h3 class="mt-4 text-sm font-semibold leading-6 text-gray-900">Chapters</h3>
+    <p class="text-gray-500 text-sm leading-6 mb-3">Break up your video into chapters for easier browsing! Add titles and start times (within the 9:58 total video length) to let viewers jump right to what interests them.</p>
+  </div>
+  <form method="GET" class="group" novalidate onkeydown="return event.key != 'Enter';">
+      <div>        
+      
+      <!-- Dynamic input elements -->
+          <template x-for="(chapter, index) in chapters" :key="index">   
+              <div class="mb-6">
+                  <div class="flex space-x-4 items-center" x-ref="inputs">
+                      <div class="">
+                          <input type="text"
+                              x-ref="input"
+                              x-model="chapter.starttime"
+                              max="00:19"
+                              x-on:input="handleUserInput($event)"
+                              placeholder="MM:SS"
+                              type="text"
+                              :id="'timeInput-' + index"
+                              maxlength="8"
+                              @click="handleClickFocus($event)" 
+                              @keydown="handleKeydown($event,index)"
+                              @change="insertAndApplyValidations($event);checkForErrors($event,chapter);handleStartTimeChange(index,chapters)"
+                              @focus="handleInputFocus($event)" 
+                              class="w-32 block appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm focus:outline-none focus:ring-blue-600 sm:text-sm invalid:border-red-500 invalid:text-red-900"
+                              data-hide-seconds
+                            >
+                      </div>
+
+                      <div class="">
+                          <input 
+                              x-model="chapter.title"
+                              class="block w-full appearance-none rounded-md border border-gray-300 px-3 py-2 placeholder-gray-400 shadow-sm focus:border-blue-600 focus:outline-none focus:ring-blue-600 sm:text-sm peer" 
+                              type="text" 
+                              placeholder="Title"
+                              :id="'titleInput-' + index"
+                              @change="handleStartTimeChange(index)"
+                              x-ref="titleInput"
+                              @keydown.enter="handletitleEnter(index);"
+                              required
+                          >
+                      </div>
+
+
+                      <div class="">
+                          <button type="button" @click="deleteChapter(index)" class="rounded-md border-0 py-1.5 text-gray-900 sm:text-sm sm:leading-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                              <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                            </svg>
+                          </button>
+                      </div>  
+
+                  </div>
+                  <p :id="'starttime-error-' + index" class="mt-2 mb-2 text-sm text-red-600 hidden">Duplicate start time found.</p>
+                 <div class="mt-2 mb-2 text-sm text-red-600" x-show="chapter.showError">Chapter time doesn't fit the video length.</div>
+              </div>
+          </template>
+          <div class="flex mt-2 mb-3 space-x-4">
+              <button type="button" 
+                  @click="addChapter(); $nextTick(() => { $refs.input.focus(); });"
+                  class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-1">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  <span>Add Chapter</span>
+              </button>
+
+              <button type="submit" class="save-button inline-flex items-center rounded-md bg-blue-700 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 group-invalid:pointer-events-none group-invalid:opacity-30">
+                  <span>Save Chapter</span>
+              </button> 
+          </div>
+      </div>
+  </form>
+</div>
+<script>
+  var controlsElements = document.getElementsByClassName('controls');
+  var videoduration = 598;
+
+  // Convert the HTMLCollection to an array for easier manipulation
+  var controlsArray = Array.from(controlsElements);
+
+  // Iterate over each controls element and remove it
+  controlsArray.forEach(function(element) {
+      element.remove();
+  });
+  function clipboardComponent() {
+    return {
+      chapters: [
+        
+        { starttime: '00:00', title: 'chapter 1', showError: false },
+        
+        { starttime: '00:05', title: 'chapter 2', showError: false },
+        
+        { starttime: '00:15', title: 'chapter 3', showError: false },
+        
+      ],
+      previousInput:[],
+      init() {
+        this.$nextTick(() => {
+          this.chapters.forEach((chapter, index) => {
+            const inputBox = document.getElementById('timeInput-' + index);
+            //this.initializeInputBox(inputBox);
+          });
+        });
+      },
+      handletitleEnter(index) {
+        const nextIndex = index + 1;
+        const nextInputId = 'timeInput-' + nextIndex;
+        const nextInput = document.getElementById(nextInputId);
+  
+        if (nextInput) {
+          nextInput.focus();
+        }
+        else{
+          this.addChapter();
+          setTimeout(() => {
+            const nextInput = document.getElementById(nextInputId);
+            nextInput.focus();
+          }); 
+        }
+      },  
+      checkForErrors(event,chapter) {
+        const eventDuration = this.durationToSeconds(event.target.value);
+        const input = event.target;
+        if(videoduration<eventDuration){
+          chapter.showError = true;
+          input.setCustomValidity("No Duplicate");
+          //input.reportValidity();
+        }
+        else{
+          input.setCustomValidity("");
+          chapter.showError = false;
+        }
+      },
+      addChapter() {
+        this.chapters.push({ starttime: '', title: '', showError: false });
+      },
+      handleStartTimeChange(index) {
+        const hasDuplicateStartTimes = this.checkForDuplicateStartTimes(index);
+        this.updateSaveButtonAndInputStyles(hasDuplicateStartTimes, index);
+      },
+      checkForDuplicateStartTimes(excludeIndex) {
+        const startTime = this.chapters[excludeIndex].starttime;
+        return this.chapters.some((chapter, i) => chapter.starttime === startTime && i !== excludeIndex);
+      },
+      updateSaveButtonAndInputStyles(hasDuplicate, index) {
+        const saveButton = document.querySelector('.save-button');
+        saveButton.disabled = hasDuplicate;
+        document.getElementById('starttime-error-' + index).classList.toggle('hidden', !hasDuplicate);
+        const timeInput = document.getElementById('timeInput-' + index);
+        timeInput.classList.toggle('text-red-900', hasDuplicate);
+        timeInput.classList.toggle('border-red-500', hasDuplicate);
+        saveButton.classList.toggle('opacity-50', hasDuplicate);
+        saveButton.classList.toggle('cursor-not-allowed', hasDuplicate);
+        saveButton.classList.toggle('text-red-900', hasDuplicate);
+      },
+      deleteChapter(index) {
+        const deletedStartTime = this.chapters[index].starttime;
+        this.chapters.splice(index, 1);
+        const uniqueIndex = this.checkDuplicateAndReturnUniqueIndex(deletedStartTime);
+        if (uniqueIndex !== undefined)
+          this.updateSaveButtonAndInputStyles(false, uniqueIndex);
+      },
+      checkDuplicateAndReturnUniqueIndex(startTime) {
+        let index;
+        for (let i = 0; i < this.chapters.length; i++) {
+          const chapter = this.chapters[i];
+          if (chapter.starttime === startTime) {
+            if (index === undefined) {
+              index = i;
+            } else {
+              return null;
+            }
+          }
+        }
+        return index;
+      },
+
+      getCursorSelection(event, hideHours) {
+        const { target: { selectionStart, selectionEnd, value } } = event;
+        const hourMarker = value.indexOf(':');
+        const minuteMarker = value.lastIndexOf(':');
+        let cursorSelection;
+        if (selectionStart <= hourMarker) {
+          cursorSelection = 'hours';
+        } else if (hideHours || selectionStart <= minuteMarker) {
+          cursorSelection = 'minutes';
+        } else if (!hideHours && selectionStart > minuteMarker) {
+          cursorSelection = 'seconds';
+        }
+        const content = value.slice(selectionStart, selectionEnd);
+        this.cursorSelection = cursorSelection;
+        return { cursorSelection, hideHours, hourMarker, minuteMarker, content };
+      },
+      checkForErrors(event,chapter) {
+        const eventDuration = this.durationToSeconds(event.target.value);
+        const input = event.target;
+        if(videoduration<eventDuration){
+          chapter.showError = true;
+          input.setCustomValidity("No Duplicate");
+          //input.reportValidity();
+        }
+        else{
+          input.setCustomValidity("");
+          chapter.showError = false;
+        }
+      },
+
+      updateActiveAdjustmentFactor(inputBox, adjustmentFactor) {
+        inputBox.setAttribute('data-adjustment-factor', adjustmentFactor);
+      },
+      getAdjustmentFactor(inputBox) {
+        let adjustmentFactor = 1;
+        if (Number(inputBox.getAttribute('data-adjustment-factor')) > 0) {
+          adjustmentFactor = Number(inputBox.getAttribute('data-adjustment-factor'));
+        }
+        return adjustmentFactor;
+      },
+      shouldHideHours(){
+        return true;
+      },
+      focusNextInputField(inputBox){
+        const index = parseInt(inputBox.id.split('-')[1], 10);
+        const nextInputId = 'titleInput-' + index;
+        const nextInput = document.getElementById(nextInputId);
+        nextInput.focus()
+      },
+      handleKeydown(event) {
+        const changeValueKeys = ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter'];
+        const adjustmentFactor = this.getAdjustmentFactor(event.target);
+
+        if (changeValueKeys.includes(event.key)) {
+          switch (event.key) {
+            case 'ArrowLeft':
+              this.shiftTimeUnitAreaFocus(event.target, 'left');
+              break;
+            case 'ArrowRight':
+              this.shiftTimeUnitAreaFocus(event.target, 'right');
+              break;
+            case 'Enter':
+              this.insertAndApplyValidations(event);
+              this.focusNextInputField(event.target)
+              event.target.blur();
+              break;
+            default:
+          }
+          event.preventDefault();
+        }
+      },
+      highlightTimeUnitArea(inputBox, adjustmentFactor) {
+        const hourMarker = inputBox.value.indexOf(':');
+        const minuteMarker = inputBox.value.lastIndexOf(':');
+        const hideHours = this.shouldHideHours(inputBox);
+        const sectioned = inputBox.value.split(':');
+        if (adjustmentFactor >= 60 * 60) {
+          inputBox.selectionStart = 0; // hours mode
+          inputBox.selectionEnd = hourMarker;
+        } else if (!hideHours && adjustmentFactor < 60) {
+          inputBox.selectionStart = minuteMarker + 1; // seconds mode
+          inputBox.selectionEnd = minuteMarker + 1 + sectioned[2].length;
+        } else {
+          inputBox.selectionStart = hourMarker + 1; // minutes mode
+          inputBox.selectionEnd = hourMarker + 1 + sectioned[1].length;
+          adjustmentFactor = 60;
+        }
+
+        if (adjustmentFactor >= 1 && adjustmentFactor <= 3600) {
+          inputBox.setAttribute('data-adjustment-factor', adjustmentFactor);
+        }
+      },
+      shiftTimeUnitAreaFocus(inputBox, direction){
+        const adjustmentFactor = this.getAdjustmentFactor(inputBox);
+        switch (direction) {
+          case 'left':
+            this.highlightTimeUnitArea(inputBox, adjustmentFactor < 3600 ? adjustmentFactor * 60 : 3600);
+            break;
+          case 'right':
+            this.highlightTimeUnitArea(inputBox, adjustmentFactor > 60 ? adjustmentFactor / 60 : 1);
+            break;
+          default:
+        }
+      },
+      handleClickFocus(event) {
+        const inputBox = event.target;
+        const hideHours = this.shouldHideHours(inputBox);
+        const { cursorSelection, hourMarker, minuteMarker } = this.getCursorSelection(event, hideHours);
+
+        if (!cursorSelection) {
+          return;
+        }
+
+        const cursorAdjustmentFactor = hideHours ? 3 : 0;
+        switch (cursorSelection) {
+          case 'hours':
+            this.updateActiveAdjustmentFactor(inputBox, 3600);
+            event.target.setSelectionRange(0, hourMarker);
+            return;
+          case 'minutes':
+            this.updateActiveAdjustmentFactor(inputBox, 60);
+            event.target.setSelectionRange(hourMarker + 1, minuteMarker + cursorAdjustmentFactor);
+            return;
+          case 'seconds':
+            this.updateActiveAdjustmentFactor(inputBox, 1);
+            event.target.setSelectionRange(minuteMarker + 1, minuteMarker + 3);
+            return;
+          default:
+            this.updateActiveAdjustmentFactor(inputBox, 1);
+            event.target.setSelectionRange(minuteMarker + 1, minuteMarker + 3);
+            return;
+        }
+      },
+
+      //handling input
+
+      createEvent(type, option = { bubbles: false, cancelable: false }) {
+        const event = document.createEvent('Event');
+        event.initEvent(type, option.bubbles, option.cancelable);
+        return event;
+      },
+      getMinMaxConstraints(inputBox){
+        const minDuration = this.getDurationAttributeValue(inputBox, 'durationMin', 0);
+        const maxDuration = this.getDurationAttributeValue(
+          inputBox,
+          'durationMax',
+          99 * 3600 + 59 * 60 + 59,
+        ); // by default 99:99:99 is now new max
+        return {
+          minDuration,
+          maxDuration,
+        }
+      },
+      applyMinMaxConstraints(inputBox, value){
+        const { maxDuration, minDuration } = this.getMinMaxConstraints(inputBox);
+        return Math.min(Math.max(value, minDuration), maxDuration);
+      },
+      insertAndApplyValidations(event){
+        const inputBox = event.target;
+        const duration = inputBox.value || inputBox.dataset.duration;
+        const secondsValue = this.durationToSeconds(duration);
+        this.insertFormatted(inputBox, this.applyMinMaxConstraints(inputBox, secondsValue));
+      },
+      getDurationAttributeValue(inputBox, name, defaultValue){
+        const value = inputBox.dataset[name];
+        if (value && isValidDurationFormat(value, shouldHideHours(inputBox))) {
+          return durationToSeconds(value);
+        } else {
+          return defaultValue;
+        }
+      },
+      getInitialDuration(inputBox){
+        const duration = this.getDurationAttributeValue(inputBox, 'duration', 0);
+        const secondsValue = this.durationToSeconds(duration);
+        return this.applyMinMaxConstraints(inputBox, secondsValue);
+      },
+      handleInputFocus(event){
+        // get input selection
+        const inputBox = event.target;
+        const {maxDuration} = this.getMinMaxConstraints(inputBox);
+        const maxHourInput = Math.floor(maxDuration / 3600);
+        const charsForHours = maxHourInput < 1 ? 0 : maxHourInput.toString().length;
+
+        if(inputBox.value==''){
+          const index = parseInt(inputBox.id.split('-')[1], 10);
+            if(this.shouldHideHours()){
+              inputBox.value = "00:00"
+            }
+            else{
+              inputBox.value = "00:00:00"
+            }
+            this.previousInput[index]=inputBox.value
+            this.highlightTimeUnitArea(inputBox, 3600);
+        }
+    
+        /* this is for firefox and safari, when you focus using tab key, both selectionStart
+        and selectionEnd are 0, so manually trigger hour seleciton. */
+        if (
+          (event.target.selectionEnd === 0 && event.target.selectionStart === 0) ||
+          event.target.selectionEnd - event.target.selectionStart > charsForHours ||
+          charsForHours === 0
+        ) {
+          setTimeout(() => {
+            inputBox.focus();
+            inputBox.select();
+            this.highlightTimeUnitArea(inputBox, 3600);
+          }, 1);
+        }
+      },
+      validateValue(value, hideHours, constraints){
+        const sectioned = value.split(':');
+        const colonCount = (value.match(/:/g) || []).length;
+        if (sectioned.length < 2) {
+          return hideHours ? '00:00' : '00:00:00';
+        }
+        let mustUpdateValue;
+        if (hideHours) {
+          // if the input does not have a single ":" or is like "01:02:03:04:05", then reset the input
+          if (!hideHours && sectioned.length !== 2) {
+            return '00:00'; // fallback to default
+          }
+          // if hour (hh) input is not a number or negative set it to 0
+          if (isNaN(sectioned[0])) {
+            sectioned[0] = '00';
+            mustUpdateValue = true;
+          }
+
+          // if minture (ss) input is not a number or negative set it to 0
+          if(sectioned[0]==''){
+            sectioned[0] = '00';
+            mustUpdateValue = true;
+          }
+          if (isNaN(sectioned[1]) || sectioned[1] < 0 || sectioned[1]=='') {
+            sectioned[1] = '00';
+            mustUpdateValue = true;
+          }
+          // if minutes (mm) more than 5, include 0 at begining to 06 0r 07 
+          
+          if (sectioned[1][0] > 5) {
+            sectioned[1] = '0'+sectioned[1][0];
+            mustUpdateValue = true;
+          }
+          if (sectioned[0][0] > 5) {
+            sectioned[0] = '0'+sectioned[0][0];
+            mustUpdateValue = true;
+          }
+          if (mustUpdateValue) {
+            return sectioned.join(':');
+          }
+        } else {
+          // if the input does not have 2 ":" or is like "01:02:03:04:05", then reset the input
+          if (!hideHours && sectioned.length !== 3) {
+            return '00:00:00'; // fallback to default
+          }
+          // if hour (hh) input is not a number or negative set it to 0
+          if (isNaN(sectioned[0])) {
+            sectioned[0] = '00';
+            mustUpdateValue = true;
+          }
+          // if minutes (mm) input is not a number or negative set it to 0
+          if (isNaN(sectioned[1]) || sectioned[1] < 0) {
+            sectioned[1] = '00';
+            mustUpdateValue = true;
+          }
+          if(sectioned[1]==''){
+            sectioned[1] = '00';
+            mustUpdateValue = true;
+          }
+          if(sectioned[0]==''){
+            sectioned[0] = '00';
+            mustUpdateValue = true;
+          }
+          if(sectioned[2]==''){
+            sectioned[2] = '00';
+            mustUpdateValue = true;
+          }
+          // if minutes (mm) more than 59, set it to 59
+          if (sectioned[1][0] > 5) {
+            sectioned[1][0] = '0'+sectioned[1][0];
+            mustUpdateValue = true;
+          }
+          // if seconds(ss) input is not a number or negative set it to 0
+          if (isNaN(sectioned[2]) || sectioned[2] < 0) {
+            sectioned[2] = '00';
+            mustUpdateValue = true;
+          }
+          // if seconds (ss) more than 59, set it to 59
+          if (sectioned[2][0] > 5) {
+            sectioned[2] = '0'+sectioned[2][0];
+            mustUpdateValue = true;
+          }
+          if (mustUpdateValue) {
+            return sectioned.join(':');
+          }
+        }
+        return false;
+      },
+      durationToSeconds(value){
+        if (!/:/.test(value)) {
+          return 0;
+        }
+        const sectioned = value.split(':');
+        if (sectioned.length < 2) {
+          return 0;
+        } else if(!this.shouldHideHours()){
+          return (
+            Number(sectioned[2] ? (sectioned[2] > 59 ? 59 : sectioned[2]) : 0) +
+            Number((sectioned[1] > 59 ? 59 : sectioned[1]) * 60) +
+            Number(sectioned[0] * 60 * 60)
+          );
+        }
+        else{
+          return (
+            Number(sectioned[1] ? (sectioned[2] > 59 ? 59 : sectioned[1]) : 0) +
+            Number((sectioned[0] > 59 ? 59 : sectioned[0]) * 60)
+          );
+        }
+      },
+      secondsToDuration(value, hideHours){
+        let secondsValue = value;
+        const hours = Math.floor(secondsValue / 3600);
+        if(!hideHours)
+          secondsValue %= 3600;
+        const minutes = Math.floor(secondsValue / 60);
+        const seconds = secondsValue % 60;
+        const formattedHours = String(hours).padStart(2, '0');
+        const formattedMinutes = String(minutes).padStart(2, '0');
+        const formattedSeconds = String(seconds).padStart(2, '0');
+        return hideHours
+          ? `${formattedMinutes}:${formattedSeconds}`
+          : `${formattedHours}:${formattedMinutes}:${formattedSeconds}`;
+      },
+      insertFormatted(inputBox, secondsValue, dispatchSyntheticEvents, adjustmentFactor = 1){
+        const hideHours = this.shouldHideHours(inputBox);
+        const formattedValue = this.secondsToDuration(secondsValue, hideHours);
+        const existingValue = inputBox.value;
+        const index = parseInt(inputBox.id.split('-')[1], 10);
+        // Don't use setValue method here because
+        // it breaks the arrow keys and arrow buttons control over the input
+        inputBox.value = formattedValue;
+        this.chapters[index].starttime=formattedValue
+
+        // save current cursor location for automatic increase
+
+        // manually trigger an "input" event for other event listeners
+        if (dispatchSyntheticEvents !== false) {
+          if (existingValue != formattedValue) {
+            inputBox.dispatchEvent(this.createEvent('change', {bubbles: true, cancelable: true}));
+          }
+          inputBox.dispatchEvent(this.createEvent('input'));
+        }
+        inputBox.setAttribute('data-adjustment-factor', adjustmentFactor);
+        this.highlightTimeUnitArea(inputBox, adjustmentFactor);
+      },
+      handleUserInput(event){
+        const inputBox = event.target;
+        const sectioned = inputBox.value.split(':');
+        const index = parseInt(inputBox.id.split('-')[1], 10);
+
+        const hideHours = this.shouldHideHours(inputBox);
+        const {cursorSelection} = this.getCursorSelection(event, hideHours);
+
+        if ((sectioned.length < 2) ||(sectioned.length < 3 && !hideHours)) {
+          const constrainedValue = this.applyMinMaxConstraints(inputBox, this.getInitialDuration(inputBox));
+          let value = inputBox.value
+          value = value.replace(/[^0-9]/g, ''); // Remove all non-numeric characters
+          value = value.replace(/(\d{2})(?=\d)/g, '$1:');
+          value = this.durationToSeconds(value)
+          if(inputBox.value[2]!=':'){
+            this.insertFormatted(inputBox, value, false,60);
+          }
+          else{
+            this.insertFormatted(inputBox, value, false,1);
+          }
+          this.shiftTimeUnitAreaFocus(inputBox, 'left');
+          return;
+        }
+    
+        const {maxDuration} = this.getMinMaxConstraints(inputBox);
+        const maxHourInput = Math.floor(maxDuration / 3600);
+        const charsForHours = maxHourInput < 1 ? 0 : maxHourInput.toString().length;
+    
+        // MODE :  Hours hidden
+        if (hideHours){
+          const mustUpdateValue = this.validateValue(event.target.value, true);
+          if (mustUpdateValue !== false) {
+            const constrainedValue = this.applyMinMaxConstraints(
+              event.target,
+              this.durationToSeconds(mustUpdateValue),
+            );
+            this.insertFormatted(event.target, constrainedValue, false);
+          }
+          if(event.inputType!='deleteContentBackward'){
+          // done entering hours, so shift highlight to minutes
+            if (
+              (charsForHours < 1 && cursorSelection === 'hours') ||
+              (sectioned[0].length >= charsForHours && cursorSelection === 'hours')
+              ){
+                if (charsForHours < 1) {
+                  sectioned[0] = '00';
+                }
+                this.shiftTimeUnitAreaFocus(inputBox, 'right');
+            }
+            // done entering minutes, so just highlight minutes
+            if (sectioned[1].length >= 2 && cursorSelection === 'minutes') {
+              this.highlightTimeUnitArea(inputBox, 60);
+            }
+          }
+          else{
+            if(cursorSelection === 'minutes'){
+              this.highlightTimeUnitArea(inputBox, 60);
+            }
+            if(cursorSelection === 'hours'){
+              this.highlightTimeUnitArea(inputBox, 3600);
+            }
+          }
+        } 
+            // MODE :  Default (hours not hidden)
+
+        else {
+          const mustUpdateValue = this.validateValue(event.target.value, false);
+    
+          if (mustUpdateValue !== false) {
+            const constrainedValue = this.applyMinMaxConstraints(
+              event.target,
+              this.durationToSeconds(mustUpdateValue),
+            );
+            this.insertFormatted(event.target, constrainedValue, false);
+          }
+          // done entering hours, so shift highlight to minutes
+          if (
+            (charsForHours < 1 && cursorSelection === 'hours') ||
+            (sectioned[0].length >= charsForHours && cursorSelection === 'hours')
+          ) {
+            if (charsForHours < 1) {
+              sectioned[0] = '00';
+            }
+            this.shiftTimeUnitAreaFocus(inputBox, 'right');
+          }
+    
+          // done entering minutes, so shift highlight to seconds
+          if (sectioned[1].length >= 2 && cursorSelection === 'minutes') {
+            this.shiftTimeUnitAreaFocus(inputBox, 'right');
+          }
+          // done entering seconds, just highlight seconds
+          if (sectioned[2].length >= 2 && cursorSelection === 'seconds') {
+            this.highlightTimeUnitArea(inputBox, 1);
+          }
+        }
+      }
+    }
+  }
+</script>
+
+
+    </div>
   </template>
   <template x-if="active_tab === 'captions'">
     <div>
