@@ -14,9 +14,11 @@ module.exports = config => {
     config.addPassthroughCopy("js/videojs-sprite-thumbnails.js");
     config.addPassthroughCopy("js/prism.js");
     config.addPassthroughCopy("js/chapter-plugin.min.js");
+    config.addPassthroughCopy('js/jscolor.js')
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
+    config.addPassthroughCopy("src/tpstreams/player/includes/player.html");
     config.addPassthroughCopy("fonts");
     return {
         markdownTemplateEngine: 'njk',
