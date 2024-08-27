@@ -21,6 +21,9 @@ module.exports = config => {
     config.addPassthroughCopy("css/tailwind.css");
     config.addPassthroughCopy("fonts");
     config.addFilter("groupBy", groupBy);
+    config.addNunjucksFilter('toLetter', function(index) {
+        return String.fromCharCode(97 + index); // 97 is the ASCII code for 'a'
+      });
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
