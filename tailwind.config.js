@@ -3,7 +3,8 @@
 const defaultTheme = require('tailwindcss/defaultTheme')
 
 module.exports = {
-  content: ["./src/**/*.{html,js}"],
+  content: ["./src/**/*.{html,js}","node_modules/preline/dist/*.js"],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -37,6 +38,7 @@ module.exports = {
     require('@tailwindcss/line-clamp'),
     require('@tailwindcss/forms'),
     require('@tailwindcss/aspect-ratio'),
+    require('preline/plugin'),
   ],
 }
 

@@ -1,3 +1,4 @@
+const groupBy = require("./js/groupBy");
 module.exports = config => {
     config.addPassthroughCopy("img");
     config.addPassthroughCopy("CNAME");
@@ -14,10 +15,12 @@ module.exports = config => {
     config.addPassthroughCopy("js/videojs-sprite-thumbnails.js");
     config.addPassthroughCopy("js/prism.js");
     config.addPassthroughCopy("js/chapter-plugin.min.js");
+    config.addPassthroughCopy("node_modules/preline/dist/preline.js");
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
     config.addPassthroughCopy("fonts");
+    config.addFilter("groupBy", groupBy);
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
