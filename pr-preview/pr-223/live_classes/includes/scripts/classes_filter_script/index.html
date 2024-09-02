@@ -1,0 +1,118 @@
+<script>
+  function classes_filter_components(){
+    return {
+      showMobileFilter:false,
+      hosts : JSON.parse('[{"id":1,"name":"John Doe"},{"id":2,"name":"Jane Smith"},{"id":3,"name":"Alice Johnson"},{"id":4,"name":"Bob Brown"},{"id":5,"name":"Sarah Davis"},{"id":6,"name":"Michael Wilson"},{"id":7,"name":"Emily Moore"},{"id":8,"name":"David Taylor"},{"id":9,"name":"Emma Anderson"},{"id":10,"name":"James Martinez"}]'),
+      courses : JSON.parse('[{"id":1,"name":"General Courses"},{"id":2,"name":"Free Learning Path"},{"id":3,"name":"UPSC Comprehensive Program"},{"id":4,"name":"2023 Mains Preparation"},{"id":1,"title":"Introduction to Programming"},{"id":2,"title":"Data Structures and Algorithms"},{"id":3,"title":"Web Development"},{"id":4,"title":"Machine Learning"},{"id":5,"title":"Database Management"},{"id":6,"title":"Computer Networks"},{"id":7,"title":"Software Engineering"},{"id":8,"title":"Artificial Intelligence"},{"id":9,"title":"Cybersecurity"},{"id":10,"title":"Mobile App Development"}]'),
+      selected_filters:[],
+      showHostFilter:false,
+      showCourseFilter:false,
+      showDateFilter: false,
+      active_filters: null,
+      isCalendarVisible: false,
+
+      initialize_selected_filter() {
+        const searchParams = new URLSearchParams(window.location.search);
+
+        for (let [key, value] of searchParams) {
+          let filterItem;
+          let type;
+          this.active_filters = Array.from(searchParams.entries()).length;
+
+          switch(key) {
+            case 'host':
+              filterItem = this.hosts.find(item => item.id === parseInt(value));
+              type = 'host';
+              break;
+            case 'course':
+              filterItem = this.courses.find(item => item.id === parseInt(value));
+              type = 'course';
+              break;
+            case 'date':
+              filterItem = {name: value};
+              type = 'date';
+              break;
+          }
+          if (filterItem) {
+            filterItem.type = type;
+            this.selected_filters.push(filterItem);
+          }
+        }
+      },
+
+
+      isItemSelected(item, type) {
+        return this.selected_filters.some(e => e.id === item.id && e.type === type);
+      },
+
+      addToSelectedFilter(filter, type){
+        if (this.isItemSelected(filter,type)){
+          return
+        }
+    
+        filter.type = type;
+        this.selected_filters.push(filter)
+      },
+
+      removeSelectedFilter(filter) {
+        this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
+      },
+
+      submitClassesFilter(){
+        const params = this.selected_filters.map(filter => `${filter.type}=${filter.id}`).join('&');
+        window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
+      },
+
+      initializeDatePicker() {
+        const self = this;
+        for (element of document.querySelectorAll(".date_filter_input")) {
+          let picker = flatpickr(element, {
+            mode: 'multiple',
+            inline: 'true',
+            enableTime: false,
+            dateFormat: 'd/m/Y',
+            onChange: function(selectedDates, dateStr, instance) {
+              self.clearDateFilter()
+              self.addDateFilter(selectedDates)
+            },
+          });
+        }
+        // this.toggleDatePicker(false);
+      },
+
+      addDateFilter(dates) {
+        for (let date of dates) {
+          const dateStr = this.formatDate(date);
+          this.addToSelectedFilter({name: dateStr, id: dateStr, type: "date"}, "date");
+        }
+      },
+
+      clearDateFilter() {
+        this.selected_filters = this.selected_filters.filter(item => item.type !== "date");
+      },
+
+      formatDate(date) {
+        const day = date.getDate();
+        const month = date.getMonth() + 1; // Month is zero-based, so add 1
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
+      },
+
+      toggleDatePicker(show) {
+        if (show) {
+          document.querySelectorAll(".flatpickr-calendar").forEach(element => {
+            element.style.display = 'block';
+          });
+          this.isCalendarVisible = true;
+        }
+        else {
+          document.querySelectorAll(".flatpickr-calendar").forEach(element => {
+            element.style.display = 'none';
+          });
+
+          this.isCalendarVisible = false;
+        }
+      },
+    }
+  };
+</script>
