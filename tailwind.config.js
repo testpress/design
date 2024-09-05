@@ -3,7 +3,7 @@
 const defaultTheme = require('tailwindcss/defaultTheme')
 
 module.exports = {
-  content: ["./src/**/*.{html,js}","node_modules/preline/dist/*.js"],
+  content: ["./src/**/*.{html,js}","node_modules/preline/dist/*.js","node_modules/@themesberg/tailwind-datepicker/dist/js/*.js"],
   darkMode: 'class',
   theme: {
     extend: {
