@@ -18,6 +18,9 @@ module.exports = config => {
     config.addPassthroughCopy("node_modules/preline/dist/preline.js");
     config.addPassthroughCopy("node_modules/@themesberg/tailwind-datepicker/dist/js/datepicker-full.js");
     config.addPassthroughCopy("node_modules/@themesberg/tailwind-datepicker/dist/css/datepicker.min.css");
+    config.addPassthroughCopy("node_modules/jquery/dist/jquery.min.js");
+    config.addPassthroughCopy("node_modules/datatables.net/js/dataTables.min.js");
+    config.addPassthroughCopy("node_modules/datatables.net-colreorder/js/dataTables.colReorder.min.js");
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");

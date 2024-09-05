@@ -1,0 +1,137 @@
+---
+tags: simba
+view: "Franchise Members"
+date: 2024-08-20
+parent_page: Members
+current_page: Overview
+---
+
+{% extends "../../base.html" %} {% block title %} Members | Simba {% endblock title %} {% block content %}
+<div class="max-w-[85rem] px-4 sm:px-6 lg:px-8 mx-auto">
+  {% include '../../partials/breadcrumb.html' %}
+  <div class="py-2 sm:pb-0 sm:pt-5 space-y-5">
+    {% include './includes/header.html' %}
+    {% include './includes/table/layout.html' %}
+  </div>
+</div>
+
+<!-- Models -->
+{% include './includes/filters/overlay.html' %}
+{% include './includes/modals/export.html' %}
+{% include './includes/modals/import.html' %}
+{% include './includes/modals/delete.html' %}
+{% include './includes/modals/bulk_delete.html' %}
+{% include './includes/modals/bulk_assign_batches.html' %}
+<!-- End Models -->
+{% endblock content %}
+{% block extra_head %}
+<link href="{{'/node_modules/@themesberg/tailwind-datepicker/dist/css/datepicker.min.css'|url}}" rel="stylesheet">
+<style>
+  .datepicker{
+    z-index: 80 !important
+  }
+</style>
+{% endblock extra_head %}
+
+{% block extra_scripts %}
+<script src="{{'/node_modules/jquery/dist/jquery.min.js'|url}}"></script>
+<script src="{{'/node_modules/datatables.net/js/dataTables.min.js'|url}}"></script>
+<script src="{{'/node_modules/datatables.net-colreorder/js/dataTables.colReorder.min.js'|url}}"></script>
+<script src="{{'/node_modules/preline/dist/preline.js'|url}}"></script>
+<script src="{{'/node_modules/@themesberg/tailwind-datepicker/dist/js/datepicker-full.js'|url}}"></script>
+<script>
+   document.addEventListener("DOMContentLoaded", function() {
+    const createdFromDatePicker = document.getElementById('created-from-datepicker');
+    const createdToDatePicker = document.getElementById('created-to-datepicker');
+    const option = {
+      autohide:true,
+      format: 'dd/mm/yyyy',
+    }
+    new Datepicker(createdFromDatePicker, option);
+    new Datepicker(createdToDatePicker, option);
+  });
+  window.addEventListener('load', () => {
+    initializeDataTableWithCustomActions();
+  });
+
+  function initializeDataTableWithCustomActions() {
+    const { dataTable } = new HSDataTable('#hs-datatable-with-column-actions');
+
+    setupColumnActionListeners(dataTable);
+    setupColumnSortingListeners(dataTable);
+    updateColumnIndices(dataTable);
+  }
+
+  function setupColumnActionListeners(dataTable) {
+    const directionButtons = document.querySelectorAll('#hs-datatable-with-column-actions thead [data-hs-datatable-col-reorder]');
+
+    directionButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        handleColumnReorder(dataTable, button);
+      });
+    });
+  }
+
+  function setupColumnSortingListeners(dataTable) {
+    const sortingButtons = document.querySelectorAll('#hs-datatable-with-column-actions thead [data-hs-datatable-col-sorting]');
+
+    sortingButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        handleColumnSorting(dataTable, button);
+      });
+    });
+  }
+
+  function handleColumnReorder(dataTable, button) {
+    const th = button.closest('th');
+    const dropdown = HSDropdown.getInstance(button.closest('.hs-dropdown'), true);
+    const currentColumnIndex = Array.from(th.parentNode.children).indexOf(th);
+    const direction = button.getAttribute('data-hs-datatable-col-reorder') === 'left' ? -1 : 1;
+
+    moveColumn(dataTable, currentColumnIndex, direction);
+    dropdown.element.el._popper.update();
+  }
+
+  function handleColumnSorting(dataTable, button) {
+    const th = button.closest('th');
+    const columnIndex = Array.from(th.parentNode.children).indexOf(th);
+    const order = button.getAttribute('data-hs-datatable-col-sorting');
+
+    sortColumn(dataTable, columnIndex, order);
+  }
+
+  function moveColumn(dataTable, currentIndex, direction) {
+    const headers = document.querySelectorAll('#hs-datatable-with-column-actions thead th');
+    const th = headers[currentIndex];
+    const currentColIndex = parseInt(th.getAttribute('data-hs-datatable-col-index'), 10);
+    const newColIndex = currentColIndex + direction;
+
+    if (newColIndex >= 1 && newColIndex < headers.length - 1) {
+      dataTable.colReorder.move(currentColIndex, newColIndex);
+      updateColumnIndices(dataTable);
+    }
+  }
+
+  function sortColumn(dataTable, columnIndex, order) {
+    dataTable.order([columnIndex, order]).draw();
+  }
+
+  function updateColumnIndices(dataTable) {
+    const headers = document.querySelectorAll('#hs-datatable-with-column-actions thead th');
+
+    headers.forEach((th, index) => {
+      th.setAttribute('data-hs-datatable-col-index', dataTable.column(index).index());
+      setupHideColumnButton(dataTable, th, index);
+    });
+  }
+
+  function setupHideColumnButton(dataTable, th, columnIndex) {
+    const hideButton = th.querySelector('button[data-hs-datatable-col-hide]');
+    if (hideButton) {
+      hideButton.addEventListener('click', () => {
+        dataTable.column(columnIndex).visible(false);
+      });
+    }
+  }
+</script>
+{% endblock extra_scripts %}
