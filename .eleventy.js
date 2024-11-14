@@ -23,6 +23,11 @@ module.exports = config => {
     config.addPassthroughCopy("node_modules/jquery/dist/jquery.min.js");
     config.addPassthroughCopy("node_modules/datatables.net/js/dataTables.min.js");
     config.addPassthroughCopy("node_modules/datatables.net-colreorder/js/dataTables.colReorder.min.js");
+    config.addPassthroughCopy("node_modules/apexcharts/dist/apexcharts.css");
+    config.addPassthroughCopy("node_modules/preline/dist/helper-apexcharts.js");
+    config.addPassthroughCopy("node_modules/lodash/lodash.min.js");
+    config.addPassthroughCopy("node_modules/apexcharts/dist/apexcharts.min.js");
+    
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
