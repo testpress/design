@@ -16,6 +16,8 @@ module.exports = config => {
     config.addPassthroughCopy("js/prism.js");
     config.addPassthroughCopy("js/chapter-plugin.min.js");
     config.addPassthroughCopy("node_modules/preline/dist/preline.js");
+    config.addPassthroughCopy("node_modules/clipboard/dist/clipboard.min.js");
+    config.addPassthroughCopy("node_modules/preline/dist/helper-clipboard.js");
     config.addPassthroughCopy("node_modules/@themesberg/tailwind-datepicker/dist/js/datepicker-full.js");
     config.addPassthroughCopy("node_modules/@themesberg/tailwind-datepicker/dist/css/datepicker.min.css");
     config.addPassthroughCopy("node_modules/jquery/dist/jquery.min.js");
