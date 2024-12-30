@@ -1,4 +1,5 @@
 const groupBy = require("./js/groupBy");
+const filter = require("./js/filter");
 module.exports = config => {
     config.addPassthroughCopy("img");
     config.addPassthroughCopy("CNAME");
@@ -33,6 +34,7 @@ module.exports = config => {
     config.addPassthroughCopy("css/tailwind.css");
     config.addPassthroughCopy("fonts");
     config.addFilter("groupBy", groupBy);
+    config.addFilter("filter", filter);
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
