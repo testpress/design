@@ -1,0 +1,293 @@
+<script src="https://preline.co/assets/vendor/lodash/lodash.min.js"></script>
+<script src="https://preline.co/assets/vendor/apexcharts/dist/apexcharts.min.js"></script>
+<script src="https://preline.co/assets/vendor/preline/dist/helper-apexcharts.js"></script>
+
+<script>
+  function chart() {
+    return {
+      time_frame: 'This Week',
+      selectedOption: 'Exam Attempts',
+      chartInstance: null, 
+      init() {
+        window.addEventListener('load', () => {
+          this.renderChart(); // Render chart when window is loaded
+        });
+
+        // Whenever time_frame changes, re-render the chart
+        this.$watch('time_frame', () => {
+          document.getElementById('hs-sales-line-chart').innerHTML = '';
+          this.renderChart();
+        });
+
+        this.$watch('selectedOption', () => {
+          document.getElementById('hs-sales-line-chart').innerHTML = '';
+          this.renderChart();
+        });
+      },
+
+    renderChart()  {  
+    const categories = this.getCategories();
+    const seriesData = this.getSeriesData();
+    const TooltipTitle = this.selectedOption === 'Video Watch Time' ? 'Watch Minutes' :
+           this.selectedOption === 'Live Session Attendance' ? 'Live Attendance' :
+           'Exam Attempts';
+    const showInMinutes = this.selectedOption === 'Video Watch Time';
+    // Apex Line Chart
+    (function () {
+      buildChart('#hs-sales-line-chart', (mode) => ({
+        chart: {
+          height: 400,
+          type: 'area',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series:seriesData,
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'straight',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            type: 'vertical',
+            shadeIntensity: 1,
+            opacityFrom: 0.2,
+            opacityTo: 0.8
+          }
+        },
+        xaxis: {
+          type: 'category',
+          tickPlacement: 'on',
+          categories:categories,
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          crosshairs: {
+            stroke: {
+              dashArray: 0
+            },
+            dropShadow: {
+              show: false
+            }
+          },
+          tooltip: {
+            enabled: false
+          },
+          labels: {
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (title) => {
+              let t = title;
+
+
+
+              return t;
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#9ca3af',
+              fontSize: '12px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => {
+  // Check if `showInMinutes` is true
+  if (showInMinutes) {
+    return value;  // Show value in minutes
+  } else {
+    // Format with 'k' if value is greater than or equal to 1000
+    return value >= 1000 ? `${value / 1000}k` : value;
+  }
+},
+
+          }
+        },
+        tooltip: {
+          x: {
+            format: 'MMMM yyyy'
+          },
+          y: {
+            formatter: (value) => `$${value >= 1000 ? `${value / 1000}k` : value}`
+          },
+          custom: function (props) {
+            return buildTooltipCompareTwo(props, {
+              title: TooltipTitle,
+              mode,
+              valuePrefix: '',
+              valuePostfix : showInMinutes ? ' mins' : '',
+              hasTextLabel: true,
+              wrapperExtClasses: 'min-w-48',
+            });
+          }
+        },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: {
+              height: 300
+            },
+            labels: {
+              style: {
+                colors: '#9ca3af',
+                fontSize: '11px',
+                fontFamily: 'Inter, ui-sans-serif',
+                fontWeight: 400
+              },
+              offsetX: -2,
+              formatter: (title) => title.slice(0, 3)
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: 0,
+                maxWidth: 140,
+                style: {
+                  colors: '#9ca3af',
+                  fontSize: '11px',
+                  fontFamily: 'Inter, ui-sans-serif',
+                  fontWeight: 400
+                },
+                formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+              }
+            },
+          },
+        }]
+      }), {
+        colors: ['#2563eb', '#9333ea'],
+        fill: {
+          gradient: {
+            stops: [0, 90, 100]
+          }
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af'
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af'
+            }
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e5e7eb'
+        }
+      }, {
+        colors: ['#3b82f6', '#a855f7'],
+        fill: {
+          gradient: {
+            stops: [100, 90, 0]
+          }
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#404040'
+        }
+      });
+    })();
+},
+formatTime(valueInMinutes, showInHours) {
+  if (showInHours) {
+    const hours = Math.floor(valueInMinutes / 60);
+    const minutes = valueInMinutes % 60;
+    return `${hours} hours ${minutes} minutes`;
+  } else {
+    return `${valueInMinutes} minutes`;
+  }
+},
+getCategories() {
+      if (this.time_frame === 'This Week') {
+        return [
+          "Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"
+        ];
+      } else if (this.time_frame === 'This Month') {
+        return Array.from({ length: 15 }, (_, i) => ((i + 1) * 2).toString());  // Days 1 to 30 as strings
+
+      } else if (this.time_frame === 'This Year') {
+        return [
+          "January", "February", "March", "April", "May", "June", "July", "August", 
+          "September", "October", "November", "December"
+        ];
+      }
+    },
+    getSeriesData() {
+      if (this.time_frame === 'This Week') {
+        return [
+          {
+            name: 'Last Week',
+            data: Array.from({ length: 7 }, () => Math.floor(Math.random() * 1000))
+          },
+          {
+            name: 'This Week',
+            data: Array.from({ length: 7 }, () => Math.floor(Math.random() * 1000))
+          }
+        ];
+      } else if (this.time_frame === 'This Month') {
+        return [
+          {
+            name: 'Last Month',
+            data: Array.from({ length: 15 }, () => Math.floor(Math.random() * 1000))
+          },
+          {
+            name: 'This Month',
+            data: Array.from({ length: 15 }, () => Math.floor(Math.random() * 1000))
+          }
+        ];
+      } else if (this.time_frame === 'This Year') {
+        return [
+          {
+            name: 'Last Year',
+            data: Array.from({ length: 12 }, () => Math.floor(Math.random() * 1000))
+          },
+          {
+            name: 'This Year',
+            data: Array.from({ length: 12 }, () => Math.floor(Math.random() * 1000))
+          }
+        ];
+      }
+    }
+  }
+}
+</script>
