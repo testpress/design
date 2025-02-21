@@ -69,9 +69,12 @@ current_page: Create
   function generatebatchComponent() {
     return {
       selectedCourse: '',
+      selectedBranch:'',
       startDate: '',
       selectedSlots: [],
       batches: [],
+      selecteddays: '',
+      selectedSection :'',
       timeSlots: [
       { name: "Early Morning", code: "EM", slot: "07:00 AM - 09:00 AM" },
       { name: "Morning", code: "MOR", slot: "09:00 AM - 11:00 AM" },
@@ -79,17 +82,41 @@ current_page: Create
       { name: "Evening", code: "EVE", slot: "01:00 PM - 03:00 PM" }
       ],
 
+
+      updateSelectedDays(date) {
+        let selectedDate = new Date(date);
+        let day = selectedDate.getDay(); // Get day index (0 = Sunday, 6 = Saturday)
+
+        if (day >= 1 && day <= 5) { 
+          this.selecteddays = "Weekdays"; // Monday-Friday
+        } else if (day === 6) { 
+          this.selecteddays = "Saturday & Sunday"; // Saturday
+        } else { 
+          this.selecteddays = "Sunday Only"; // Sunday
+        }
+      },
       
 
+      
       generateBatches() {
-        console.log('called')
-        console.log(this.selectedCourse )
-        console.log(this.startDate)
-        console.log(this.selectedSlots.length)
-        if (!this.selectedCourse || !this.startDate || this.selectedSlots.length === 0) {
+
+        if (this.selecteddays == "Saturday & Sunday") {
+          this.selectedSlots = ["SS"]; 
+        } else if (this.selecteddays == "Sunday Only") {
+          this.selectedSlots = ["SL"];
+        }
+
+        
+        if (!this.selectedCourse ||!this.selectedBranch || !this.startDate || this.selectedSlots.length === 0) {
           this.batches = [];
           return;
         }
+
+        let branchInitials = this.selectedBranch
+          .split(' ')
+          .map(word => word.replace(/[^A-Za-z]/g, '').charAt(0))
+          .join('')
+          .toUpperCase();
 
         // Get initials of the selected course
         let courseInitials = this.selectedCourse
@@ -104,7 +131,16 @@ current_page: Create
                             (dateObj.getMonth() + 1).toString().padStart(2, '0') +
                             dateObj.getFullYear().toString().slice(-2);
 
-        this.batches = this.selectedSlots.map(slotCode => `${courseInitials}${formattedDate}-${slotCode}`);
+                            this.batches = this.selectedSlots.map(slotCode => {
+  let batchCode = `${branchInitials}-${courseInitials}-${formattedDate}-${slotCode}`;
+  
+  if (this.selectedSection) {
+    batchCode += `-${this.selectedSection}`;
+  }
+  
+  return `${batchCode}-001`;
+});
+
       }
     };
   }
@@ -118,7 +154,8 @@ current_page: Create
       let selectedTime = picker.startDate.format("YYYY-MM-DD"); // Extracts the time in HH:mm format
       document.querySelector("#id_start_date").value = selectedTime;
 
-      alpineComponent.startDate = picker.startDate.format("YYYY-MM-DD"); // Set date
+      alpineComponent.startDate = picker.startDate.format("YYYY-MM-DD");
+      alpineComponent.updateSelectedDays(selectedTime); // Set date
       alpineComponent.generateBatches(); // Call function
     } else {
       console.error("Alpine component not found!");
