@@ -4,7 +4,28 @@ title: Create Assignment Content
 date: 2024-11-27
 ---
 
-{% extends "layouts/admin_base.html" %} {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %} {% block content %}
+{% extends "layouts/admin_base.html" %} 
+{% block extra_head %} 
+<style>
+  .ProseMirror:focus {
+    outline: none;
+  }
+
+  .tiptap ul p,
+  .tiptap ol p {
+    display: inline;
+  }
+
+  .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+</style>
+{% endblock extra_head %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
+{% block content %}
 <div class="max-w-6xl mx-auto xl:px-8 py-8">
   <div class="lg:px-0 lg:col-span-9 px-4">
     <div>
@@ -30,4 +51,101 @@ date: 2024-11-27
 <!-- {{ '/css/tailwind.css' | url }} -->
 <script src="/node_modules/lodash/lodash.min.js"></script>
 <script src="/node_modules/dropzone/dist/dropzone-min.js"></script>
+<script type="module">
+  import { Editor, Node } from 'https://esm.sh/@tiptap/core';
+  import StarterKit from 'https://esm.sh/@tiptap/starter-kit';
+  import Placeholder from 'https://esm.sh/@tiptap/extension-placeholder';
+  import Paragraph from 'https://esm.sh/@tiptap/extension-paragraph';
+  import Bold from 'https://esm.sh/@tiptap/extension-bold';
+  import Underline from 'https://esm.sh/@tiptap/extension-underline';
+  import Link from 'https://esm.sh/@tiptap/extension-link';
+  import BulletList from 'https://esm.sh/@tiptap/extension-bullet-list';
+  import OrderedList from 'https://esm.sh/@tiptap/extension-ordered-list';
+  import ListItem from 'https://esm.sh/@tiptap/extension-list-item';
+  
+  // Define a function to create editors dynamically
+  function initializeEditor(editorElement) {
+    const editor = new Editor({
+      element: editorElement.querySelector('[data-hs-editor-field]'),
+      editorProps: {
+        attributes: {
+          class: 'relative min-h-40 p-3'
+        }
+      },
+      extensions: [
+        StarterKit.configure({
+          blockquote: false,
+          history: false
+        }),
+        Placeholder.configure({
+          placeholder: 'Add your content here...',
+          emptyNodeClass: 'before:text-gray-400'
+        }),
+        Paragraph.configure({
+          HTMLAttributes: {
+            class: 'text-sm text-gray-800'
+          }
+        }),
+        Bold.configure({
+          HTMLAttributes: {
+            class: 'font-bold'
+          }
+        }),
+        Underline,
+        Link.configure({
+          HTMLAttributes: {
+            class: 'inline-flex items-center gap-x-1 text-blue-600 decoration-2 hover:underline focus:outline-none focus:underline font-medium'
+          }
+        }),
+        BulletList.configure({
+          HTMLAttributes: {
+            class: 'list-disc list-inside text-gray-800'
+          }
+        }),
+        OrderedList.configure({
+          HTMLAttributes: {
+            class: 'list-decimal list-inside text-gray-800'
+          }
+        }),
+        ListItem.configure({
+          HTMLAttributes: {
+            class: 'marker:text-sm'
+          }
+        })
+      ]
+    });
+  
+    // Assign toolbar actions dynamically for this specific editor
+    const actions = [
+      { selector: '[data-hs-editor-bold]', fn: () => editor.chain().focus().toggleBold().run() },
+      { selector: '[data-hs-editor-italic]', fn: () => editor.chain().focus().toggleItalic().run() },
+      { selector: '[data-hs-editor-underline]', fn: () => editor.chain().focus().toggleUnderline().run() },
+      { selector: '[data-hs-editor-strike]', fn: () => editor.chain().focus().toggleStrike().run() },
+      {
+        selector: '[data-hs-editor-link]',
+        fn: () => {
+          const url = window.prompt('URL');
+          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+        }
+      },
+      { selector: '[data-hs-editor-ol]', fn: () => editor.chain().focus().toggleOrderedList().run() },
+      { selector: '[data-hs-editor-ul]', fn: () => editor.chain().focus().toggleBulletList().run() }
+    ];
+  
+    // Attach event listeners to buttons inside this editor container
+    actions.forEach(({ selector, fn }) => {
+      const button = editorElement.querySelector(selector);
+      if (button) button.addEventListener('click', fn);
+    });
+  
+    return editor;
+  }
+  
+  // Initialize all editors on the page
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.wysiwyg-editor').forEach((editorContainer) => {
+      initializeEditor(editorContainer);
+    });
+  });  
+</script>
 {% endblock script %}
