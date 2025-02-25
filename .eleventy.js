@@ -27,6 +27,7 @@ module.exports = config => {
     config.addPassthroughCopy("node_modules/apexcharts/dist/apexcharts.css");
     config.addPassthroughCopy("node_modules/preline/dist/helper-apexcharts.js");
     config.addPassthroughCopy("node_modules/lodash/lodash.min.js");
+    config.addPassthroughCopy("node_modules/dropzone/dist/dropzone-min.js");
     config.addPassthroughCopy("node_modules/apexcharts/dist/apexcharts.min.js");
     
     config.addPassthroughCopy("./tailwind.css")
