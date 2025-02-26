@@ -1,0 +1,195 @@
+---
+permalink: "content_detail_page/assignments/{{ pagination.pageNumber + 1 }}/"
+pagination:
+  data: assignment_contents
+  size: 1
+  alias: assignment
+---
+
+{% extends "layouts/student_base.html" %}
+
+{% block extra_head %} 
+<style>
+  .ProseMirror:focus {
+    outline: none;
+  }
+
+  .tiptap ul p,
+  .tiptap ol p {
+    display: inline;
+  }
+
+  .tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+</style>
+	<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+	{% include "./includes/content_scripts.html" %}
+  {% include "./includes/search_script.html" %}
+{% endblock extra_head %}
+
+{% block content %}
+<div x-data="contents">
+	{% include "./includes/mobile_sidebar.html" %}  
+	{% include "./includes/desktop_sidebar.html" %}  
+	<main class="lg:pl-96">
+		{% include "./includes/navigate_content.html" %}
+    <div class="lg:px-8" x-data="{toggleSVG : true, isBookmarked:false}">
+      {% include "./includes/assignment_heading.html" %}
+      
+      {% if assignment.instructions %}
+        {% include "./includes/assignment_instructions.html" %}
+      {% endif %}
+      {% if assignment.attachments.length > 0 %}
+        {% include "./includes/assignment_attachments.html" %}
+      {% endif %}
+      {% if assignment.is_online_submission_required %}
+        {% include "./includes/assignment_submission.html" %}
+      {% endif %}
+    </div>
+  </main>
+
+  {% include "./includes/confirm_file_submittion_modal.html" %}
+  {% include "./includes/confirm_online_text_submittion_modal.html" %}
+</div>
+{% endblock %}
+{% block script %}
+<script src="/node_modules/lodash/lodash.min.js"></script>
+<script src="/node_modules/dropzone/dist/dropzone-min.js"></script>
+<script type="importmap">
+  {
+    "imports": {
+      "https://esm.sh/v135/prosemirror-model@1.19.3/es2022/prosemirror-model.mjs": "https://esm.sh/v135/prosemirror-model@1.20.0/es2022/prosemirror-model.mjs",
+      "https://esm.sh/v135/prosemirror-model@1.19.4/es2022/prosemirror-model.mjs": "https://esm.sh/v135/prosemirror-model@1.20.0/es2022/prosemirror-model.mjs",
+      "https://esm.sh/v135/prosemirror-model@1.20.0/es2022/prosemirror-model.mjs": "https://esm.sh/v135/prosemirror-model@1.20.0/es2022/prosemirror-model.mjs",
+      "https://esm.sh/v135/prosemirror-model@1.21.0/es2022/prosemirror-model.mjs": "https://esm.sh/v135/prosemirror-model@1.20.0/es2022/prosemirror-model.mjs",
+      "https://esm.sh/v135/prosemirror-model@1.22.1/es2022/prosemirror-model.mjs": "https://esm.sh/v135/prosemirror-model@1.20.0/es2022/prosemirror-model.mjs",
+      "https://esm.sh/v135/prosemirror-model@1.23.0/es2022/prosemirror-model.mjs": "https://esm.sh/v135/prosemirror-model@1.20.0/es2022/prosemirror-model.mjs"
+    }
+  }
+</script>
+<script type="module">
+  import { Editor } from 'https://esm.sh/@tiptap/core';
+  import Placeholder from 'https://esm.sh/@tiptap/extension-placeholder';
+  import StarterKit from 'https://esm.sh/@tiptap/starter-kit';
+  import Paragraph from 'https://esm.sh/@tiptap/extension-paragraph';
+  import Bold from 'https://esm.sh/@tiptap/extension-bold';
+  import Underline from 'https://esm.sh/@tiptap/extension-underline';
+  import Link from 'https://esm.sh/@tiptap/extension-link';
+  import BulletList from 'https://esm.sh/@tiptap/extension-bullet-list';
+  import OrderedList from 'https://esm.sh/@tiptap/extension-ordered-list';
+  import ListItem from 'https://esm.sh/@tiptap/extension-list-item';
+  import Blockquote from 'https://esm.sh/@tiptap/extension-blockquote';
+
+  const ids = '#hs-editor-tiptap';
+  const editors = ids.split(' ');
+
+  editors.forEach((id) => {
+    const editor = new Editor({
+      element: document.querySelector(`${id} [data-hs-editor-field]`),
+      editorProps: {
+        attributes: {
+          class: 'relative min-h-40 p-3'
+        }
+      },
+      extensions: [
+        StarterKit.configure({
+          history: false
+        }),
+        Placeholder.configure({
+          placeholder: 'Add your response here.',
+          emptyNodeClass: 'before:text-gray-400'
+        }),
+        Paragraph.configure({
+          HTMLAttributes: {
+            class: 'text-sm text-gray-800'
+          }
+        }),
+        Bold.configure({
+          HTMLAttributes: {
+            class: 'font-bold'
+          }
+        }),
+        Underline,
+        Link.configure({
+          HTMLAttributes: {
+            class: 'inline-flex items-center gap-x-1 text-green-600 decoration-2 hover:underline font-medium'
+          }
+        }),
+        BulletList.configure({
+          HTMLAttributes: {
+            class: 'list-disc list-inside text-gray-800'
+          }
+        }),
+        OrderedList.configure({
+          HTMLAttributes: {
+            class: 'list-decimal list-inside text-gray-800'
+          }
+        }),
+        ListItem.configure({
+          HTMLAttributes: {
+            class: 'marker:text-sm'
+          }
+        }),
+        Blockquote.configure({
+          HTMLAttributes: {
+            class: 'relative border-s-4 ps-4 sm:ps-6 [&>p]:sm:text-lg text-gray-800'
+          }
+        })
+      ]
+    });
+    const actions = [
+      {
+        id: `${id} [data-hs-editor-bold]`,
+        fn: () => editor.chain().focus().toggleBold().run()
+      },
+      {
+        id: `${id} [data-hs-editor-italic]`,
+        fn: () => editor.chain().focus().toggleItalic().run()
+      },
+      {
+        id: `${id} [data-hs-editor-underline]`,
+        fn: () => editor.chain().focus().toggleUnderline().run()
+      },
+      {
+        id: `${id} [data-hs-editor-strike]`,
+        fn: () => editor.chain().focus().toggleStrike().run()
+      },
+      {
+        id: `${id} [data-hs-editor-link]`,
+        fn: () => {
+          const url = window.prompt('URL');
+          editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+        }
+      },
+      {
+        id: `${id} [data-hs-editor-ol]`,
+        fn: () => editor.chain().focus().toggleOrderedList().run()
+      },
+      {
+        id: `${id} [data-hs-editor-ul]`,
+        fn: () => editor.chain().focus().toggleBulletList().run()
+      },
+      {
+        id: `${id} [data-hs-editor-blockquote]`,
+        fn: () => editor.chain().focus().toggleBlockquote().run()
+      },
+      {
+        id: `${id} [data-hs-editor-code]`,
+        fn: () => editor.chain().focus().toggleCode().run()
+      }
+    ];
+
+    actions.forEach(({ id, fn }) => {
+      const action = document.querySelector(id);
+
+      if (action === null) return;
+
+      action.addEventListener('click', fn);
+    });
+  });
+</script>
+{% endblock script %}
