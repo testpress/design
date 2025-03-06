@@ -555,14 +555,56 @@
     <main class="py-10 bg-stone-50 min-h-[92vh]">
       <div class="mx-auto px-4 sm:px-6 lg:px-8">
         
-<div class="space-y-5">
+<div class="space-y-5" x-data="bulkUploadComponent()">
     <div class="flex flex-wrap justify-between items-center gap-2">
   <div>
     <h1 class="text-lg md:text-xl font-semibold text-stone-800 dark:text-neutral-200">Bulk Upload Assets</h1>
   </div>
 </div>
 
-    <div class="flex flex-col bg-white border border-stone-200 overflow-hidden rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
+    <div class="rounded-md bg-green-50 p-4" x-cloak x-show="isUploaded">
+  <div class="flex">
+    <div class="shrink-0">
+      <svg class="size-5 text-green-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clip-rule="evenodd" />
+      </svg>
+    </div>
+    <div class="ml-3">
+      <p class="text-sm font-medium text-green-800">All files have been successfully uploaded and queued for transcoding.</p>
+    </div>
+  </div>
+</div>
+
+    <div x-cloak  x-show="invalidFiles.length && !isUploading" class="rounded-md bg-red-50 p-4">
+  <div class="flex">
+    <div class="shrink-0">
+      <svg class="size-5 text-red-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
+        <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16ZM8.28 7.22a.75.75 0 0 0-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 1 0 1.06 1.06L10 11.06l1.72 1.72a.75.75 0 1 0 1.06-1.06L11.06 10l1.72-1.72a.75.75 0 0 0-1.06-1.06L10 8.94 8.28 7.22Z" clip-rule="evenodd" />
+      </svg>
+    </div>
+    <div class="ml-3">
+      <h3 class="text-sm font-medium text-red-800">The following files cannot be uploaded as they are not video, audio, or e-book files.</h3>
+      <div class="mt-2 text-sm text-red-700">
+        <template x-for="file in invalidFiles" :key="file">
+          <li x-text="file"></li>
+        </template>
+      </div>
+    </div>
+    <div class="ml-auto pl-3">
+      <div class="-mx-1.5 -my-1.5">
+        <button type="button" @click="clearInvalidFiles"
+        class="inline-flex rounded-md bg-red-50 p-1.5 text-red-500 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-red-50">
+          <span class="sr-only">Dismiss</span>
+          <svg class="size-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
+            <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    <div class="flex flex-col bg-white border border-stone-200 overflow-hidden rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700" x-cloak x-show="!isUploading">
   <!-- Header -->
   <div class="py-3 px-5 flex justify-between items-center gap-x-5 border-b border-stone-200 dark:border-neutral-700">
     <h2 class="inline-block font-semibold text-stone-800 dark:text-neutral-200">
@@ -572,7 +614,7 @@
   <!-- End Header -->
 
   <!-- Body -->
-  <div class="p-5 space-y-4">
+  <div class="p-5 space-y-4" @drop.prevent="handleFiles($event)" @dragover.prevent>
 
     <!-- Drag 'n Drop -->
     <div class="space-y-2">
@@ -595,7 +637,7 @@
             </span>
             <label for="hs-pro-epdupb" class="relative cursor-pointer bg-white font-semibold text-green-600 hover:text-green-700 rounded-lg decoration-2 hover:underline focus-within:outline-hidden focus-within:ring-2 focus-within:ring-green-600 focus-within:ring-offset-2 dark:bg-neutral-800 dark:text-green-500 dark:hover:text-green-600">
               <span>browse</span>
-              <input id="hs-pro-epdupb" type="file" class="sr-only" name="hs-pro-deuuf">
+              <input id="hs-pro-epdupb" type="file" class="sr-only" name="hs-pro-deuuf" multiple hidden @change="handleFiles($event)"> 
             </label>
           </div>
 
@@ -614,17 +656,17 @@
   <!-- End Body -->
 </div>
     <!-- Discounts Table Card -->
-<div class="p-5 space-y-4 flex flex-col bg-white border border-stone-200 shadow-2xs rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+<div class="p-5 space-y-4 flex flex-col bg-white border border-stone-200 shadow-2xs rounded-xl dark:bg-neutral-800 dark:border-neutral-700" x-cloak x-show="!isUploadDisabled && !isUploading">
   <!-- Filter Group -->
   <div class="flex justify-between items-center gap-x-5">
     <h2 class="inline-block font-semibold text-lg text-gray-800 dark:text-neutral-200">
       Files to Upload
     </h2>
 
-    <div class="flex justify-end items-center gap-x-2">
+    <div class="flex justify-end items-center gap-x-2" x-cloak x-show="!isRemoveDisabled">
       <!-- Button -->
-      <button id="hs-pro-dupfind" type="button" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-3.5"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      <button id="hs-pro-dupfind" type="button" @click="removeSelectedFiles" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"  class="shrink-0 size-3.5"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
         Remove
       </button>
       <!-- End Button -->
@@ -638,1095 +680,86 @@
       <!-- Table -->
       <table class="min-w-full divide-y divide-stone-200 dark:divide-neutral-700">
         <thead>
-          <tr class="border-t border-stone-200 dark:border-neutral-700">
-            <th scope="col" class="px-3 py-2.5 text-start">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
+          <tr>
+            <th scope="col" class="ps-3 text-start">
+              <input type="checkbox"  x-model="selectAll" @change="toggleSelectAll"
+                class="shrink-0 border-stone-300 rounded text-green-600 focus:ring-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
             </th>
-
-            <th scope="col" class="min-w-48">
+        
+            <th scope="col" class="min-w-[250px] ">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button id="hs-pro-eptnms" type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button id="hs-pro-eptits" type="button"
+                  class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Name
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
-
-                <!-- Dropdown -->
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                      Move left
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                      Move right
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                      Hide in view
-                    </button>
-                  </div>
-                </div>
-                <!-- End Dropdown -->
               </div>
               <!-- End Sort Dropdown -->
             </th>
-
-            <th scope="col" class="min-w-36">
-              <!-- Sort Dropdown -->
-              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button id="hs-pro-eptcds" type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  Code
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
-                </button>
-
-                <!-- Dropdown -->
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptcds">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                      Move left
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                      Move right
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                      Hide in view
-                    </button>
-                  </div>
-                </div>
-                <!-- End Dropdown -->
-              </div>
-              <!-- End Sort Dropdown -->
-            </th>
-
-            <th scope="col" class="min-w-42.5">
-              <!-- Sort Dropdown -->
-              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button id="hs-pro-eptsts" type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  Status
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
-                </button>
-
-                <!-- Dropdown -->
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptsts">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                      Move left
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                      Move right
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                      Hide in view
-                    </button>
-                  </div>
-                </div>
-                <!-- End Dropdown -->
-              </div>
-              <!-- End Sort Dropdown -->
-            </th>
-
-            <th scope="col" class="min-w-[270px] ">
-              <!-- Sort Dropdown -->
-              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button id="hs-pro-eptprs" type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  Products
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
-                </button>
-
-                <!-- Dropdown -->
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptprs">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                      Move left
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                      Move right
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                      Hide in view
-                    </button>
-                  </div>
-                </div>
-                <!-- End Dropdown -->
-              </div>
-              <!-- End Sort Dropdown -->
-            </th>
-
+        
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button id="hs-pro-eptams" type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  Amount
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+                <button id="hs-pro-epttys" type="button"
+                  class="px-4 py-3 text-start w-full flex items-center whitespace-nowrap gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                  Type
                 </button>
-
-                <!-- Dropdown -->
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptams">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                      Move left
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                      Move right
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                      Hide in view
-                    </button>
-                  </div>
-                </div>
-                <!-- End Dropdown -->
               </div>
               <!-- End Sort Dropdown -->
             </th>
-
+        
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button id="hs-pro-eptrds" type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  Redemption
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+                <button id="hs-pro-eptsts" type="button"
+                  class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                  Size
                 </button>
-
-                <!-- Dropdown -->
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptrds">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-                      Move left
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-                      Move right
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                      Hide in view
-                    </button>
-                  </div>
-                </div>
-                <!-- End Dropdown -->
               </div>
               <!-- End Sort Dropdown -->
             </th>
-
+        
             <th scope="col"></th>
           </tr>
         </thead>
-
         <tbody class="divide-y divide-stone-200 dark:divide-neutral-700">
+          <template x-for="(file, index) in files" :key="index">
           <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
+            <td class="size-px whitespace-nowrap ps-3 py-4">
+              <input type="checkbox" :checked="selectedFiles.has(index)" @change="toggleFileSelection(index)"
+                class="shrink-0 border-stone-300 rounded text-green-600 focus:ring-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
             </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Social Fun
+            <td class="size-px whitespace-nowrap px-4 py-3">
+              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200" x-text="file.name.split('.').slice(0, -1).join('.')">
               </span>
             </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-socialfun"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-socialfun" class="uppercase">socialfun</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
+            <td class="size-px whitespace-nowrap">
+              <div class="px-5 py-2">
+                <span class="text-sm text-stone-600 dark:text-neutral-400"  x-text="file.type">
                 </span>
-              </span>
+              </div>
             </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-stone-100 text-stone-800 rounded-full dark:bg-neutral-700 dark:text-neutral-200">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                Draft
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                All products
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                Up to 70%
-              </span>
+            <td class="size-px whitespace-nowrap">
+              <div class="px-5 py-2">
+                <span class="text-sm text-stone-600 dark:text-neutral-400" x-text="(file.size / 1024).toFixed(2) + ' KB'">
+                </span>
+              </div>
             </td>
             <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-              0
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd1" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+              <div class="col-span-full md:col-span-1 md:text-end">
+                <button @click="removeFile(index)" type="button" class="py-1 px-3 md:px-1 inline-flex justify-center items-center gap-x-1.5 font-medium text-sm rounded-full bg-stone-100 border border-transparent text-stone-600 hover:bg-stone-200 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-200 dark:bg-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-600 dark:focus:bg-neutral-600" data-hs-copy-markup-delete-item="">
+                  <svg class="hidden md:block shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                  </svg>
+                  <span class="md:hidden">Delete</span>
                 </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd1">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
+              </div></td>
           </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Cyber Monday
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-cybermonday"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-cybermonday" class="uppercase">cybermonday</span>
-                  <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-red-100 text-red-800 rounded-full dark:bg-red-500/10 dark:text-red-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-                Expired
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                All products
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                50%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                328
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd2" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd2">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                iPhone 15
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-iphone15"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-iphone15" class="uppercase">iphone15</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-green-100 text-green-800 rounded-full dark:bg-green-500/10 dark:text-green-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-                Active
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="flex items-center gap-x-3">
-                <img class="shrink-0 size-8 rounded-md" src="https://images.unsplash.com/photo-1611911813383-67769b37a149?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=320&h=320&q=80" alt="Product Image">
-                <div class="grow">
-                  <span class="text-sm text-stone-600 dark:text-neutral-400">
-                    Pattern Winter Sweater
-                  </span>
-                </div>
-              </div>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                iPhone 15
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                1
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd3" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd3">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                30% Off
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-30off"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-30off" class="uppercase">30%off</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-green-100 text-green-800 rounded-full dark:bg-green-500/10 dark:text-green-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-                Active
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="flex items-center gap-x-3">
-                <img class="shrink-0 size-8 rounded-md" src="https://images.unsplash.com/photo-1611911813383-67769b37a149?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=320&h=320&q=80" alt="Product Image">
-                <div class="grow">
-                  <span class="text-sm text-stone-600 dark:text-neutral-400">
-                    Pattern Winter Sweater
-                  </span>
-                </div>
-              </div>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                30%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                82
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd4" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd4">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Welcome Offer
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-thankyou"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-thankyou" class="uppercase">thankyou</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-red-100 text-red-800 rounded-full dark:bg-red-500/10 dark:text-red-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-                Expired
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                All products
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                $10
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                129
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd5" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd5">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Upgrade
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-upgrade"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-upgrade" class="uppercase">upgrade</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-green-100 text-green-800 rounded-full dark:bg-green-500/10 dark:text-green-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-                Active
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                All products
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                $30
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                7
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd6" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd6">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Late Winter
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-late5"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-late5" class="uppercase">late5</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-stone-100 text-stone-800 rounded-full dark:bg-neutral-700 dark:text-neutral-200">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                Draft
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="flex items-center gap-x-3">
-                <img class="shrink-0 size-8 rounded-md" src="https://images.unsplash.com/photo-1610398752800-146f269dfcc8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=320&h=320&q=80" alt="Product Image">
-                <div class="grow">
-                  <span class="text-sm text-stone-600 dark:text-neutral-400">
-                    Mango Women's shoe
-                  </span>
-                </div>
-              </div>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                $5
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-              0
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd7" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd7">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                We're 5 yrs old
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-5for5"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-5for5" class="uppercase">5for5</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-stone-100 text-stone-800 rounded-full dark:bg-neutral-700 dark:text-neutral-200">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                Draft
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                All products
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                $5
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-              0
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd8" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd8">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Loyal Cutomer
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-loyal10"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-loyal10" class="uppercase">loyal10</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-green-100 text-green-800 rounded-full dark:bg-green-500/10 dark:text-green-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-                Active
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="flex items-center gap-x-3">
-                <img class="shrink-0 size-8 rounded-md" src="https://images.unsplash.com/photo-1549298916-f52d724204b4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=320&h=320&q=80" alt="Product Image">
-                <div class="grow">
-                  <span class="text-sm text-stone-600 dark:text-neutral-400">
-                    Nike Air Jordan 1 Yellow
-                  </span>
-                </div>
-              </div>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                $10
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                66
-              </span>
-            </td>
-            <td class="h-px w-nowrap px-4 py-1 text-end">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd9" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd9">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Summer Sale
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-summersale"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-summersale" class="uppercase">summersale</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-green-100 text-green-800 rounded-full dark:bg-green-500/10 dark:text-green-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-                Active
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="flex items-center gap-x-3">
-                <img class="shrink-0 size-8 rounded-md" src="https://images.unsplash.com/photo-1610398752800-146f269dfcc8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=320&h=320&q=80" alt="Product Image">
-                <div class="grow">
-                  <span class="text-sm text-stone-600 dark:text-neutral-400">
-                    Mango Women's shoe
-                  </span>
-                </div>
-              </div>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                $40
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                12
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd10" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd10">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                Just for Fun
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-fun"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-fun" class="uppercase">fun</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-stone-100 text-stone-800 rounded-full dark:bg-neutral-700 dark:text-neutral-200">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                Draft
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="flex items-center gap-x-3">
-                <img class="shrink-0 size-8 rounded-md" src="https://images.unsplash.com/photo-1549298916-f52d724204b4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=320&h=320&q=80" alt="Product Image">
-                <div class="grow">
-                  <span class="text-sm text-stone-600 dark:text-neutral-400">
-                    Nike Air Jordan 1 Yellow
-                  </span>
-                </div>
-              </div>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                20 Custom hats
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-              0
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd11" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd11">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
-
-          <tr>
-            <td class="size-px whitespace-nowrap px-3 py-4">
-              <input type="checkbox" class="shrink-0 border-stone-300 rounded-sm text-green-600 focus:ring-green-600 checked:border-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200">
-                20% Off
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="js-clipboard [--is-toggle-tooltip:false] hs-tooltip p-2 bg-stone-100 text-stone-800 text-xs rounded-md cursor-pointer dark:bg-neutral-700 dark:text-neutral-200"
-                    data-clipboard-target="#hs-20off"
-                    data-clipboard-action="copy"
-                    data-clipboard-success-text="Copied">
-                <span id="hs-20off" class="uppercase">20%off</span>
-                <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity hidden invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-lg shadow-2xs dark:bg-neutral-700" role="tooltip">
-                  <span class="js-clipboard-success-text">Copy</span>
-                </span>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium bg-red-100 text-red-800 rounded-full dark:bg-red-500/10 dark:text-red-500">
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
-                Expired
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                All products
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                $50
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
-              <span class="text-sm text-stone-600 dark:text-neutral-400">
-                41
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap px-4 py-1">
-              <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
-                <button id="hs-pro-errtmd12" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                </button>
-
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-errtmd12">
-                  <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Edit
-                    </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Duplicate
-                    </button>
-
-                    <div class="my-1 border-t border-stone-200 dark:border-neutral-800"></div>
-
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </td>
-          </tr>
+        </template>
         </tbody>
       </table>
       <!-- End Table -->
@@ -1735,21 +768,204 @@
   <!-- End Table Section -->
 </div>
 <!-- End Discounts Table Card -->
-    <!-- Media Card -->
-    <div class="p-4 flex justify-end gap-x-2">
-        <div class="flex-1 flex justify-end items-center gap-2">
-          <a href="/flimix/asset/all/" class="py-2 px-3 text-nowrap inline-flex justify-center items-center text-start bg-white border border-gray-200 text-gray-800 text-sm font-medium rounded-lg shadow-sm align-middle hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" data-hs-overlay="#hs-pro-daem">
-            Cancel
-          </a>
-    
-          <button type="button" disabled class="py-2 px-3 text-nowrap inline-flex justify-center items-center gap-x-2 text-start bg-blue-600 border border-blue-600 text-white text-sm font-medium rounded-lg shadow-sm align-middle hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-500" data-hs-overlay="#hs-pro-daem">
-            Start Upload
-          </button>
-        </div>
+<div class="p-4 flex justify-end gap-x-2" x-cloak x-show="!isUploading">
+  <div class="flex-1 flex justify-end items-center gap-2">
+    <a href="/flimix/asset/all/" class="py-2 px-3 text-nowrap inline-flex justify-center items-center text-start bg-white border border-gray-200 text-gray-800 text-sm font-medium rounded-lg shadow-sm align-middle hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" data-hs-overlay="#hs-pro-daem">
+      Cancel
+    </a>
+
+    <button type="button"  :disabled="isUploadDisabled" @click="startUpload()" class="py-2 px-3 text-nowrap inline-flex justify-center items-center gap-x-2 text-start bg-blue-600 border border-blue-600 text-white text-sm font-medium rounded-lg shadow-sm align-middle hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-500" data-hs-overlay="#hs-pro-daem">
+      Start Upload
+    </button>
+  </div>
+</div>
+    <!-- Discounts Table Card -->
+<div class="p-5 space-y-4 flex flex-col bg-white border border-stone-200 shadow-2xs rounded-xl dark:bg-neutral-800 dark:border-neutral-700" x-cloak x-show="isUploading">
+  <!-- Filter Group -->
+  <div class="flex justify-between items-center gap-x-5">
+    <h2 class="inline-block font-semibold text-lg text-gray-800 dark:text-neutral-200">
+      Uploading Files
+    </h2>
+
+    <div class="flex justify-end items-center gap-x-2" x-cloak x-show="!isRemoveDisabled">
+      <!-- Button -->
+      <button id="hs-pro-dupfind" type="button" @click="removeSelectedFiles" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"  class="shrink-0 size-3.5"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+        Remove
+      </button>
+      <!-- End Button -->
     </div>
+  </div>
+  <!-- End Filter Group -->
 
-  <!-- End Media Card -->
+  <!-- Table Section -->
+  <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+    <div class="min-w-full inline-block align-middle">
+      <!-- Table -->
+      <table class="min-w-full divide-y divide-stone-200 dark:divide-neutral-700">
+        <thead>
+          <tr>
+            <th scope="col" class="min-w-[250px] ">
+              <!-- Sort Dropdown -->
+              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
+                <button id="hs-pro-eptits" type="button"
+                  class="px-4 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                  Name
+                </button>
+              </div>
+              <!-- End Sort Dropdown -->
+            </th>
+        
+            <th scope="col">
+              <!-- Sort Dropdown -->
+              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
+                <button id="hs-pro-epttys" type="button"
+                  class="px-4 py-3 text-start w-full flex items-center whitespace-nowrap gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                  Type
+                </button>
 
+              </div>
+              <!-- End Sort Dropdown -->
+            </th>
+        
+            <th scope="col">
+              <!-- Sort Dropdown -->
+              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
+                <button id="hs-pro-eptsts" type="button"
+                  class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                  Size
+                </button>
+              </div>
+              <!-- End Sort Dropdown -->
+            </th>
+
+            <th scope="col">
+              <!-- Sort Dropdown -->
+              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
+                <button id="hs-pro-eptsts" type="button"
+                  class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                  Status
+                </button>
+              </div>
+              <!-- End Sort Dropdown -->
+            </th>
+
+            <th scope="col">
+              <!-- Sort Dropdown -->
+              <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
+                <button id="hs-pro-eptsts" type="button"
+                  class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-none focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700"
+                  aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                  Progress
+                </button>
+              </div>
+              <!-- End Sort Dropdown -->
+            </th>
+        
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-200 dark:divide-neutral-700">
+          <template x-for="(file, index) in files" :key="index">
+          <tr>
+            <td class="size-px whitespace-nowrap px-4 py-3">
+              <span class="text-sm font-medium text-stone-800 dark:text-neutral-200" x-text="file.name.split('.').slice(0, -1).join('.')">
+              </span>
+            </td>
+            <td class="size-px whitespace-nowrap">
+              <div class="px-5 py-2">
+                <span class="text-sm text-stone-600 dark:text-neutral-400"  x-text="file.type">
+                </span>
+              </div>
+            </td>
+            <td class="size-px whitespace-nowrap">
+              <div class="px-5 py-2">
+                <span class="text-sm text-stone-600 dark:text-neutral-400" x-text="(file.size / 1024).toFixed(2) + ' KB'">
+                </span>
+              </div>
+            </td>
+            <td class="size-px whitespace-nowrap px-4 py-1">
+              <span class="py-1.5 px-2 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-full"
+                :class="{
+                  'bg-stone-100 text-stone-800': file.status === 'Not Started',
+                  'bg-yellow-100 text-yellow-800': file.status === 'Uploading',
+                  'bg-blue-100 text-blue-800': file.status === 'Queued'
+                }">
+                <template x-if="file.status === 'Not Started'">
+                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                  </svg>
+                </template>
+      
+                <template x-if="file.status === 'Uploading'">
+                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                  </svg>
+                </template>
+      
+                <template x-if="file.status === 'Queued'">
+                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25ZM6.75 12h.008v.008H6.75V12Zm0 3h.008v.008H6.75V15Zm0 3h.008v.008H6.75V18Z" />
+                  </svg>
+                </template>
+      
+                <span x-text="file.status"></span>
+              </span>
+            </td>
+            <td class="size-px whitespace-nowrap min-w-36">
+              <div class="py-3 px-5">
+                <div class="flex items-center gap-x-3">
+                  <span class="text-xs text-gray-500 dark:text-neutral-500" x-text="file.progress + '%'"></span>
+                  <div class="flex w-full h-1.5 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700"
+                    role="progressbar">
+                    <div class="bg-indigo-600 h-full transition-all duration-200"
+                      :style="`width: ${file.progress}%`"></div>
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td class="size-px whitespace-nowrap px-4 py-1 text-end">
+              <div class="col-span-full md:col-span-1 md:text-end">
+                <button @click="removeFile(index)" type="button" class="py-1 px-3 md:px-1 inline-flex justify-center items-center gap-x-1.5 font-medium text-sm rounded-full bg-stone-100 border border-transparent text-stone-600 hover:bg-stone-200 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-200 dark:bg-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-600 dark:focus:bg-neutral-600" data-hs-copy-markup-delete-item="">
+                  <svg class="hidden md:block shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18"></path>
+                    <path d="m6 6 12 12"></path>
+                  </svg>
+                  <span class="md:hidden">Delete</span>
+                </button>
+              </div></td>
+          </tr>
+        </template>
+        </tbody>
+      </table>
+      <!-- End Table -->
+    </div>
+  </div>
+  <!-- End Table Section -->
+</div>
+<!-- End Discounts Table Card -->
+
+<div class="p-4 flex justify-end gap-x-2" x-cloak x-show="isUploaded">
+  <div class="flex-1 flex justify-end items-center gap-2">
+    <a href="/flimix/asset/all/"  :disabled="isUploadDisabled" @click="startUpload()" class="py-2 px-3 text-nowrap inline-flex justify-center items-center gap-x-2 text-start bg-blue-600 border border-blue-600 text-white text-sm font-medium rounded-lg shadow-sm align-middle hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-500" data-hs-overlay="#hs-pro-daem">
+      View Uploaded Assets
+    </a>
+
+    <a href="/flimix/asset/bulk_upload/"  :disabled="isUploadDisabled" @click="startUpload()" class="py-2 px-3 text-nowrap inline-flex justify-center items-center gap-x-2 text-start bg-blue-600 border border-blue-600 text-white text-sm font-medium rounded-lg shadow-sm align-middle hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-1 focus:ring-blue-300 dark:focus:ring-blue-500" data-hs-overlay="#hs-pro-daem">
+      Upload More Files 
+    </a>
+  </div>
+</div>
  </div>
 
 
@@ -1761,6 +977,122 @@
     </div>
 
      
+    <script>
+  function bulkUploadComponent() {
+    return {
+      files: [],
+      selectedFiles: new Set(),
+      selectAll: false,
+      isUploading: false,
+      isUploaded:false,
+
+      allowedExtensions: {
+        video: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mpeg', 'mpg', '3gp', 'ogv', 'm4v', 'ts', 'vob'],
+        audio: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'wma', 'm4a', 'opus', 'aiff', 'alac', 'amr'],
+        ebook: ['pdf', 'epub', 'mobi', 'azw', 'azw3', 'txt', 'docx', 'rtf', 'fb2', 'djvu', 'cbz', 'cbr', 'lit']
+      },
+
+
+      handleFiles(event) {
+        const newFiles = Array.from(event.target.files || event.dataTransfer.files);
+        this.invalidFiles = [];
+
+        newFiles.forEach(file => {
+          const ext = file.name.split('.').pop().toLowerCase();
+          const isValid = Object.values(this.allowedExtensions).some(types => types.includes(ext));
+
+          if (isValid) {
+            this.files.push({
+              file: file,
+              name: file.name,
+              type: file.type,
+              size: file.size,
+              status: 'Not Started',
+              progress: 0
+            });
+          } else {
+            this.invalidFiles.push(file.name);
+          }
+        });
+      },
+
+      removeFile(index) {
+        this.files.splice(index, 1);
+        this.selectedFiles.delete(index);
+      },
+
+      toggleSelectAll() {
+        if (this.selectAll) {
+          this.selectedFiles = new Set(this.files.map((_, index) => index));
+        } else {
+          this.selectedFiles.clear();
+        }
+      },
+
+      clearInvalidFiles() {
+        this.invalidFiles = [];
+      },
+
+      toggleFileSelection(index) {
+        if (this.selectedFiles.has(index)) {
+          this.selectedFiles.delete(index);
+        } else {
+          this.selectedFiles.add(index);
+        }
+        this.selectAll = this.selectedFiles.size === this.files.length;
+      },
+      
+
+      removeSelectedFiles() {
+        this.files = this.files.filter((_, index) => !this.selectedFiles.has(index));
+        this.selectedFiles.clear();
+        this.selectAll = false;
+      },
+
+          startUpload() {
+      if (this.isUploading) return;
+
+      this.isUploading = true;
+      let currentIndex = 0;
+
+      const uploadNext = () => {
+        if (currentIndex >= this.files.length) {
+          this.isUploaded = true;
+          return;
+        }
+
+        const file = this.files[currentIndex];
+        file.status = 'Uploading';
+        file.progress = 0;
+
+        const interval = setInterval(() => {
+          file.progress += 20;
+          if (file.progress >= 100) {
+            file.progress = 100;
+            file.status = 'Queued';
+            clearInterval(interval);
+            currentIndex++;
+            uploadNext();
+          }
+        }, 1000);
+      };
+
+      uploadNext();
+    },
+
+
+      get isUploadDisabled() {
+        return this.files.length === 0;
+      },
+
+      get isRemoveDisabled() {
+        return this.selectedFiles.size === 0;
+      }
+    };
+  }
+</script>
+
+
     
     <script src="/node_modules/preline/dist/preline.js"></script>
     
