@@ -2,6 +2,7 @@
   function bulkUploadComponent() {
     return {
       files: [],
+      invalidFiles: [],
       selectedFiles: new Set(),
       selectAll: false,
       isUploading: false,
@@ -70,7 +71,7 @@
         this.selectAll = false;
       },
 
-          startUpload() {
+      startUpload() {
       if (this.isUploading) return;
 
       this.isUploading = true;
@@ -83,14 +84,28 @@
         }
 
         const file = this.files[currentIndex];
+
+        // Skip cancelled files
+        if (file.status === 'Upload Cancelled') {
+          currentIndex++;
+          uploadNext();
+          return;
+        }
+        
         file.status = 'Uploading';
         file.progress = 0;
 
         const interval = setInterval(() => {
+          if (file.status === 'Upload Cancelled') {
+          clearInterval(interval);
+          uploadNext();
+          return;
+        }
           file.progress += 20;
           if (file.progress >= 100) {
             file.progress = 100;
             file.status = 'Uploaded';
+            file.interval = interval
             clearInterval(interval);
             currentIndex++;
             uploadNext();
@@ -100,6 +115,20 @@
 
       uploadNext();
     },
+
+    cancelUpload(index) {
+    const file = this.files[index];
+
+    if (file.status === 'Uploading') {
+      console.log('called')
+      clearInterval(file.interval);
+    }
+
+    if (file.status !== 'Uploaded') {
+      file.status = 'Upload Cancelled';
+      file.progress = 0;
+    }
+  },
 
 
       get isUploadDisabled() {
