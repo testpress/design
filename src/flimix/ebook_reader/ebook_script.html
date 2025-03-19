@@ -1,6 +1,4 @@
 <script>
-
-
   var params = URLSearchParams && new URLSearchParams(document.location.search.substring(1));
   var url = params && params.get("url") && decodeURIComponent(params.get("url"));
   var currentSectionIndex = (params && params.get("loc")) ? params.get("loc") : undefined;
@@ -50,27 +48,84 @@ book.ready.then(function () {
     let touchStartX = 0;
     let touchEndX = 0;
 
-    document.getElementById("viewer").addEventListener("touchstart", function (e) {
+    rendition.hooks.content.register(function(contents) {
+    let doc = contents.document;
+    
+    let touchStartX = 0;
+    let touchEndX = 0;
+    let swipeThreshold = 30; // Reduce swipe sensitivity
+
+    doc.addEventListener("touchstart", function (e) {
         touchStartX = e.changedTouches[0].screenX;
     });
 
-    document.getElementById("viewer").addEventListener("touchend", function (e) {
+    doc.addEventListener("touchend", function (e) {
         touchEndX = e.changedTouches[0].screenX;
         handleSwipe();
     });
 
     function handleSwipe() {
-        let swipeThreshold = 50; // Minimum swipe distance to trigger a page turn
         if (touchStartX - touchEndX > swipeThreshold) {
-            book.package.metadata.direction === "rtl" ? rendition.prev() : rendition.next();
+            rendition.next(); // Swipe Left → Next Page
         } else if (touchEndX - touchStartX > swipeThreshold) {
-            book.package.metadata.direction === "rtl" ? rendition.next() : rendition.prev();
+            rendition.prev(); // Swipe Right → Previous Page
         }
     }
+});
+
 
     // Hide loader and show eBook preview
     document.getElementById("preview-loader").classList.add("hidden");
     document.getElementById("ebook-preview").classList.remove("hidden");
+    setTimeout(() => {
+        const rangeSlider = window.HSRangeSlider.getInstance('#fontSizeSlider', true);
+        const lineheightselector = window.HSRangeSlider.getInstance('#lineheight', true);
+        if (rangeSlider) {
+            rangeSlider.element.el.noUiSlider.on('update', (values) => {
+                let fontSize = values[0] + "px"; // Convert slider value to px
+                if (window.rendition) {
+                    // Register a custom theme with dynamic font size
+                    window.rendition.themes.register("custom-size", {
+                        "body": { "font-size": fontSize + " !important" },
+                        "p": { "font-size": fontSize + " !important" }
+                    });
+
+                    // Apply the registered theme
+                    window.rendition.themes.select("custom-size");
+                    let currentLocation = window.rendition.currentLocation();
+                    window.rendition.display(currentLocation.start.href);
+                } else {
+                    console.error("EPUB.js rendition not initialized.");
+                }
+            });
+        } else {
+            console.error("HSRangeSlider instance not found!");
+        }
+
+        if (lineheightselector) {
+            lineheightselector.element.el.noUiSlider.on('update', (values) => {
+                let lineheight = values[0] + "px"; // Convert slider value to px
+
+                if (window.rendition) {
+                    // Register a custom theme with dynamic font size
+                    window.rendition.themes.register("custom-size", {
+                        "body": { "line-height": lineheight  + " !important" },
+                        "p": { "line-height": lineheight  + " !important" }
+                    });
+
+                    // Apply the registered theme
+                    window.rendition.themes.select("custom-size");
+                    let currentLocation = window.rendition.currentLocation();
+                    window.rendition.display(currentLocation.start.href);
+                } else {
+                    console.error("EPUB.js rendition not initialized.");
+                }
+            });
+        } else {
+            console.error("HSRangeSlider instance not found!");
+        }
+
+    }, 2000);
 });
 
 
@@ -79,7 +134,6 @@ book.ready.then(function () {
   function toggleModalVisibility(modal_button_id, should_show) {
     if (should_show) {
       let modal = new HSOverlay(document.querySelector(`#${modal_button_id}`));
-      console.log(modal)
       modal.open()
     } else {
       const {
@@ -91,9 +145,12 @@ book.ready.then(function () {
 
 
 rendition.on("rendered", function(section) {
+    let selectedFont = document.getElementById("fontSelector").value;
+    let fontSize = window.HSRangeSlider.getInstance('#fontSizeSlider', true)?.element.el.noUiSlider.get() + "px";
+    let lineheight = window.HSRangeSlider.getInstance('#lineheight', true)?.element.el.noUiSlider.get() + "px";
     var current = book.navigation && book.navigation.get(section.href);
     const comboBox = window.HSComboBox.getInstance("#toc-container");
-   const fullScreenOverlay = document.getElementById("full-screen-render");
+    const fullScreenOverlay = document.getElementById("full-screen-render");
 
     if (current) {
         var $toc = document.getElementById("toc");
@@ -136,6 +193,31 @@ rendition.on("rendered", function(section) {
         });
 
     }
+
+    if (selectedFont) {
+        rendition.themes.register("custom-font", {
+            "body": { "font-family": selectedFont + " !important" },
+            "p": { "font-family": selectedFont + " !important" }
+        });
+        rendition.themes.select("custom-font");
+    }
+
+    if (fontSize) {
+        rendition.themes.register("custom-size", {
+            "body": { "font-size": fontSize + " !important" },
+            "p": { "font-size": fontSize + " !important" }
+        });
+        rendition.themes.select("custom-size");
+    }
+
+    if (lineheight) {
+        rendition.themes.register("custom-size", {
+            "body": { "line-height": lineheight + " !important" },
+            "p": { "line-height": lineheight + " !important" }
+        });
+        rendition.themes.select("custom-size");
+    }
+
 });
 
 // Debounce function to optimize search handling
@@ -149,8 +231,6 @@ function debounce(func, delay) {
 
 // Function to filter TOC items based on search query
 function filterTOC(searchQuery) {
-    console.log("🔎 Searching for:", searchQuery);
-
     const tocItems = document.querySelectorAll("#toc div[data-hs-combo-box-output-item]");
     let hasResults = false;
 
@@ -194,8 +274,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
   rendition.on("relocated", function(location){
-    console.log(location);
-
     var next = book.package.metadata.direction === "rtl" ?  document.getElementById("prev") : document.getElementById("next");
     var prev = book.package.metadata.direction === "rtl" ?  document.getElementById("next") : document.getElementById("prev");
 
@@ -224,52 +302,21 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   window.addEventListener("unload", function () {
-    console.log("unloading");
     this.book.destroy();
   });
 
   document.getElementById("fontSelector").addEventListener("change", function() {
     let selectedFont = this.value;
-    console.log("Selected Font:", selectedFont);
-
     rendition.themes.register("custom-font", {
         "body": { "font-family": selectedFont + " !important" },
         "p": { "font-family": selectedFont + " !important" }
     });
 
     rendition.themes.select("custom-font");
+    let currentLocation = window.rendition.currentLocation();
+    window.rendition.display(currentLocation.start.href);
     
 });
 
-document.addEventListener("DOMContentLoaded", function () {
-    setTimeout(() => {
-        const rangeSlider = window.HSRangeSlider.getInstance('#fontSizeSlider', true);
 
-        if (rangeSlider) {
-            console.log("Range Slider Element:", rangeSlider.element);
-
-            rangeSlider.element.el.noUiSlider.on('update', (values) => {
-                let fontSize = values[0] + "px"; // Convert slider value to px
-                console.log("Selected Font Size:", fontSize);
-
-                if (window.rendition) {
-                    // Register a custom theme with dynamic font size
-                    window.rendition.themes.register("custom-size", {
-                        "body": { "font-size": fontSize + " !important" },
-                        "p": { "font-size": fontSize + " !important" }
-                    });
-
-                    // Apply the registered theme
-                    window.rendition.themes.select("custom-size");
-
-                    console.log("Font size applied to eBook:", fontSize);
-                } else {
-                    console.error("EPUB.js rendition not initialized.");
-                }
-            });
-        } else {
-            console.error("HSRangeSlider instance not found!");
-        }
-    }, 2000);
-});
 </script> 
