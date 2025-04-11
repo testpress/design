@@ -29,6 +29,9 @@ module.exports = config => {
     config.addPassthroughCopy("node_modules/lodash/lodash.min.js");
     config.addPassthroughCopy("node_modules/dropzone/dist/dropzone-min.js");
     config.addPassthroughCopy("node_modules/apexcharts/dist/apexcharts.min.js");
+    config.addPassthroughCopy("node_modules/vanilla-calendar-pro/index.js");
+    config.addPassthroughCopy("node_modules/@preline/datepicker/index.js");
+    config.addPassthroughCopy("css/preline-datepicker.src.css");
     
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
