@@ -1,0 +1,867 @@
+<script>
+  window.addEventListener('load', () => {
+    // Apex Orders Bar Chart
+    (function () {
+      const branch_performance = [
+        { branch: 'Tiruppur', target: 4000, achieved: 3800 },     // 95%
+        { branch: 'Trichy', target: 3000, achieved: 2900 },       // 96.6%
+        { branch: 'Chidambaram', target: 6000, achieved: 3300 },  // 55%
+        { branch: 'Tiruvanamalai', target: 2500, achieved: 1400 },// 56%
+        { branch: 'Namakkal', target: 3500, achieved: 1800 },     // 51%
+        { branch: 'Nagercoil', target: 5000, achieved: 4200 },    // 84%
+        { branch: 'Coimbatore', target: 4500, achieved: 3000 },   // 66.6%
+      ];
+
+      const sortedData = branch_performance
+        .map(item => ({
+          ...item,
+          percentage: (item.achieved / item.target) * 100
+        }))
+        .sort((a, b) => b.percentage - a.percentage);
+
+      const categories = sortedData.map(item => item.branch);
+      const targetData = sortedData.map(item => item.target);
+      const achievedData = sortedData.map(item => item.achieved);
+
+      const achievedColors = sortedData.map(item =>
+        item.percentage >= 60 ? '#16a34a' : '#dc2626'
+      );
+      console.log(achievedColors)
+
+      buildChart('#hs-orders-bar-chart', (mode) => ({
+        chart: {
+          type: 'bar',
+          height: 250,
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          { name: 'Target', data: targetData },
+          { name: 'Achieved', data: achievedData }
+        ],
+        colors: ['#3b82f6', "#3b82f6"],
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: '14px',
+            borderRadius: 0,
+          }
+        },
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          show: true,
+          width: 2,
+          colors: ['transparent']
+        },
+        xaxis: {
+          categories: categories,
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          crosshairs: {
+            show: false
+          },
+          labels: {
+            style: {
+              colors: '#a8a29e',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: -2,
+            formatter: (title) => title
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#a8a29e',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        tooltip: {
+          custom: function ({ series, seriesIndex, dataPointIndex, w }) {
+            const label = w.globals.labels[dataPointIndex];
+            const target = series[0][dataPointIndex];
+            const achieved = series[1][dataPointIndex];
+            const achievedPercent = (achieved / target) * 100;
+            const achievedColor = achievedPercent >= 60 ? '#16a34a' : '#dc2626';
+
+            return `
+      <div class="border border-gray-200 dark:border-neutral-800 bg-white rounded-xl shadow-xl w-36">
+        <div class="px-2 py-1.5 font-semibold text-[13px] flex items-center">
+            <span>${label}</span>
+            <span class="ms-auto">${achievedPercent.toFixed(0)}%</span>
+        </div>
+        <div class="border-t border-gray-200 dark:border-neutral-800"></div>
+        <div class="space-y-1.5 p-2">
+          <div class="flex items-center gap-x-2 text-xs text-stone-600">
+            <span class="w-3 h-3 bg-blue-500 rounded-sm inline-block"></span>
+            <span class="">Target</span>
+            <span class="ms-auto">₹${target}</span>
+          </div>
+          <div class="flex items-center gap-x-2  text-xs text-stone-600">
+            <span class="w-3 h-3 rounded-sm inline-block" style="background:${achievedColor}"></span>
+            <span class="">Achieved</span>
+            <span class="ms-auto">₹${achieved}</span>
+          </div>
+        </div>
+      </div
+    `;
+          }
+        },
+
+
+        states: {
+          hover: {
+            filter: {
+              type: 'darken',
+              value: 0.9
+            }
+          }
+        },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: {
+              height: 300
+            },
+            plotOptions: {
+              bar: {
+                columnWidth: '14px'
+              }
+            },
+            stroke: {
+              width: 10
+            },
+            responsive: [{
+              breakpoint: 568,
+              options: {
+                chart: {
+                  height: 300
+                },
+                plotOptions: {
+                  bar: {
+                    columnWidth: '14px'
+                  }
+                },
+                stroke: {
+                  width: 10
+                },
+                labels: {
+                  style: {
+                    colors: '#a8a29e',
+                    fontSize: '11px',
+                    fontFamily: 'Inter, ui-sans-serif',
+                    fontWeight: 400
+                  },
+                  offsetX: -2,
+                  formatter: (title) => title.slice(0, 3)
+                },
+                yaxis: {
+                  labels: {
+                    align: 'left',
+                    minWidth: 0,
+                    maxWidth: 140,
+                    style: {
+                      colors: '#a8a29e',
+                      fontSize: '11px',
+                      fontFamily: 'Inter, ui-sans-serif',
+                      fontWeight: 400
+                    },
+                    formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+                  }
+                },
+              },
+            }]
+          },
+        }]
+      }), {
+        fill: {
+          colors: [({ seriesIndex, dataPointIndex, w }) => {
+            if (seriesIndex === 1) { // Achieved series (2nd series)
+              const percentage = (achievedData[dataPointIndex] / targetData[dataPointIndex]) * 100;
+              return percentage >= 60 ? '#16a34a' : '#dc2626';
+            }
+            return '#3b82f6'; // Target series (1st series)
+          }]
+        },
+        grid: {
+          borderColor: '#e5e5e5'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e'
+            }
+          }
+        }
+      }, {
+        colors: ['#22c55e', '#737373'],
+        grid: {
+          borderColor: '#404040'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        }
+      });
+    })();
+  });
+
+
+
+
+  window.addEventListener('load', () => {
+    // Apex Total Sales Chart
+    (function () {
+      buildChart('#daily_enrollment', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'area',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Enrollments',
+            data: [200, 20, 140, 50, 380, 300, 400, 450, 450, 700, 670, 670]
+          }
+        ],
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            type: 'vertical',
+            shadeIntensity: 1,
+            opacityFrom: 0.2,
+            opacityTo: 0.8
+          }
+        },
+        xaxis: {
+          type: 'category',
+          tickPlacement: 'on',
+          categories: [
+            '1 April', '3 April', '5 April', '7 April',
+            '10 April', '13 April', '16 April', '18 April',
+            '21 April', '24 April', '27 April', '30 April',
+          ],
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          crosshairs: {
+            stroke: {
+              dashArray: 0
+            },
+            dropShadow: {
+              show: false
+            }
+          },
+          tooltip: {
+            enabled: false
+          },
+          labels: {
+            style: {
+              colors: '#a8a29e',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (title) => title ? title.slice(0, 2) : title
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#a8a29e',
+              fontSize: '12px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: (value) => `$${value >= 1000 ? `${value / 1000}k` : value}`
+          },
+          custom: function (props) {
+            const { categories } = props.ctx.opts.xaxis;
+            const { dataPointIndex } = props;
+            const title = categories[dataPointIndex];
+            const newTitle = `${title}`;
+
+            return buildTooltip(props, {
+              title: newTitle,
+              mode,
+              valuePrefix: '',
+              hasCategory: false,
+              hasTextLabel: true,
+              wrapperExtClasses: 'min-w-32.5',
+              labelDivider: ':',
+              labelExtClasses: 'ms-2'
+            });
+          }
+        },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: {
+              height: 200
+            },
+            labels: {
+              style: {
+                colors: '#a8a29e',
+                fontSize: '11px',
+                fontFamily: 'Inter, ui-sans-serif',
+                fontWeight: 400
+              },
+              offsetX: -2,
+              formatter: (title) => title.slice(0, 3)
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: 0,
+                maxWidth: 140,
+                style: {
+                  colors: '#a8a29e',
+                  fontSize: '11px',
+                  fontFamily: 'Inter, ui-sans-serif',
+                  fontWeight: 400
+                },
+                formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+              }
+            }
+          },
+        }]
+      }), {
+        colors: ['#16a34a'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e5e5e5'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e'
+            }
+          }
+        }
+      }, {
+        colors: ['#22c55e'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#44403c'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        }
+      });
+    })();
+  });
+
+
+  
+  window.addEventListener('load', () => {
+    // Apex Total Sales Chart
+    (function () {
+      buildChart('#daily_revenue', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'area',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Revenue',
+            data: [
+            3200, 2100, 4000, 2700, 3800, 3500,
+            4300, 3100, 2900, 4700, 3900, 3600
+          ]
+
+          }
+        ],
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            type: 'vertical',
+            shadeIntensity: 1,
+            opacityFrom: 0.2,
+            opacityTo: 0.8
+          }
+        },
+        xaxis: {
+          type: 'category',
+          tickPlacement: 'on',
+          categories: [
+            '1 April', '3 April', '5 April', '7 April',
+            '10 April', '13 April', '16 April', '18 April',
+            '21 April', '24 April', '27 April', '30 April',
+          ],
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          crosshairs: {
+            stroke: {
+              dashArray: 0
+            },
+            dropShadow: {
+              show: false
+            }
+          },
+          tooltip: {
+            enabled: false
+          },
+          labels: {
+            style: {
+              colors: '#a8a29e',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (title) => title ? title.slice(0, 2) : title
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#a8a29e',
+              fontSize: '12px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        tooltip: {
+        custom: function(props) {
+          const { ctx, series, seriesIndex, dataPointIndex } = props;
+          const title = ctx.opts.xaxis.categories[dataPointIndex]; // Fetch full '3 April', not just 3
+          const value = series[seriesIndex][dataPointIndex];
+
+              return `
+                <div class="border border-gray-200 dark:border-neutral-800 bg-white rounded-xl shadow-xl w-36">
+                  <div class="px-2 py-1.5 font-semibold text-[13px] flex items-center">
+                      <span>${title}</span>
+                  </div>
+                  <div class="border-t border-gray-200 dark:border-neutral-800"></div>
+                  <div class="space-y-1.5 p-2">
+                    <div class="flex items-center gap-x-2 text-xs text-stone-600">
+                      <span class="">Renenue</span>
+                      <span class="ms-auto">₹${value}</span>
+                    </div>
+                  </div>
+                </div
+              `;
+            }
+          },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: {
+              height: 200
+            },
+            labels: {
+              style: {
+                colors: '#a8a29e',
+                fontSize: '11px',
+                fontFamily: 'Inter, ui-sans-serif',
+                fontWeight: 400
+              },
+              offsetX: -2,
+              formatter: (title) => title.slice(0, 3)
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: 0,
+                maxWidth: 140,
+                style: {
+                  colors: '#a8a29e',
+                  fontSize: '11px',
+                  fontFamily: 'Inter, ui-sans-serif',
+                  fontWeight: 400
+                },
+                formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+              }
+            }
+          },
+        }]
+      }), {
+        colors: ['#16a34a'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e5e5e5'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e'
+            }
+          }
+        }
+      }, {
+        colors: ['#22c55e'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#44403c'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        }
+      });
+    })();
+  });
+
+
+  window.addEventListener('load', () => {
+    // Apex Total Sales Chart
+    (function () {
+      buildChart('#daily_collection', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'area',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Collection',
+            data: [
+          2800, 3400, 2900, 3700, 4100, 3900,
+          4200, 3100, 4500, 3800, 4300, 4000
+        ]
+          }
+        ],
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            type: 'vertical',
+            shadeIntensity: 1,
+            opacityFrom: 0.2,
+            opacityTo: 0.8
+          }
+        },
+        xaxis: {
+          type: 'category',
+          tickPlacement: 'on',
+          categories: [
+            '1 April', '3 April', '5 April', '7 April',
+            '10 April', '13 April', '16 April', '18 April',
+            '21 April', '24 April', '27 April', '30 April',
+          ],
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          crosshairs: {
+            stroke: {
+              dashArray: 0
+            },
+            dropShadow: {
+              show: false
+            }
+          },
+          tooltip: {
+            enabled: false
+          },
+          labels: {
+            style: {
+              colors: '#a8a29e',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (title) => title ? title.slice(0, 2) : title
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#a8a29e',
+              fontSize: '12px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        tooltip: {
+        custom: function(props) {
+          const { ctx, series, seriesIndex, dataPointIndex } = props;
+          const title = ctx.opts.xaxis.categories[dataPointIndex]; // Fetch full '3 April', not just 3
+          const value = series[seriesIndex][dataPointIndex];
+
+              return `
+                <div class="border border-gray-200 dark:border-neutral-800 bg-white rounded-xl shadow-xl w-36">
+                  <div class="px-2 py-1.5 font-semibold text-[13px] flex items-center">
+                      <span>${title}</span>
+                  </div>
+                  <div class="border-t border-gray-200 dark:border-neutral-800"></div>
+                  <div class="space-y-1.5 p-2">
+                    <div class="flex items-center gap-x-2 text-xs text-stone-600">
+                      <span class="">Collection</span>
+                      <span class="ms-auto">₹${value}</span>
+                    </div>
+                  </div>
+                </div
+              `;
+            }
+          },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: {
+              height: 200
+            },
+            labels: {
+              style: {
+                colors: '#a8a29e',
+                fontSize: '11px',
+                fontFamily: 'Inter, ui-sans-serif',
+                fontWeight: 400
+              },
+              offsetX: -2,
+              formatter: (title) => title.slice(0, 3)
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: 0,
+                maxWidth: 140,
+                style: {
+                  colors: '#a8a29e',
+                  fontSize: '11px',
+                  fontFamily: 'Inter, ui-sans-serif',
+                  fontWeight: 400
+                },
+                formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+              }
+            }
+          },
+        }]
+      }), {
+        colors: ['#16a34a'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e5e5e5'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e'
+            }
+          }
+        }
+      }, {
+        colors: ['#22c55e'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#44403c'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        }
+      });
+    })();
+  });
+
+</script>
