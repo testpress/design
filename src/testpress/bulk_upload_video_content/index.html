@@ -1,0 +1,169 @@
+---
+tags: testpress
+title: Bulk Upload Video Content
+date: 2024-08-27
+---
+
+{% extends "layouts/admin_base.html" %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+{% endblock extra_head %}
+{% block content %}
+<div class="max-w-6xl mx-auto xl:px-8 py-8">
+    <div class="" x-data="app">
+        {% include "./includes/header.html" %}
+        <div data-hs-stepper='{"currentIndex":1}'>
+            {% include "./includes/stepper_nav.html" %}
+            <div class="mt-4 bg-white px-4 py-6 sm:p-6 shadow sm:rounded-xl">
+                {% include "./includes/select_videos.html" %}
+                {% include "./includes/configuration.html" %}
+                {% include "./includes/preview_videos.html" %}
+            </div>
+            {% include "./includes/navigation_buttons.html" %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block script %}
+<script type="application/javascript" src="https://releases.transloadit.com/uppy/v3.3.1/uppy.min.js"></script>
+<script>
+    class UppyFileUploader {
+        constructor() {
+            this.initialize()
+        }
+
+        initialize() {
+            this.uppy = new Uppy.Uppy({
+                autoProceed: true,
+                allowMultipleUploadBatches: false,
+            })
+        }
+
+        on(event, operation) {
+            this.uppy.on(event, operation)
+        }
+
+        addFile(attachment) {
+            return this.uppy.addFile({
+                data: attachment.file,
+                type: attachment.file.type,
+                name: attachment.name,
+                meta: { id: attachment.id },
+            })
+        }
+
+        addFiles(files) {
+            const filesToAdd = files.map(attachment => {
+                return {
+                    data: attachment.file,
+                    type: attachment.file.type,
+                    name: attachment.name,
+                    meta: { id: attachment.id, asset_id: attachment.asset_id },
+                }
+            })
+            return this.uppy.addFiles(filesToAdd)
+        }
+    }
+
+    function app() {
+        return {
+            assets: [],
+            isSelectAllChecked: false,
+            resolutions: [],
+            error: null,
+            uppy: null,
+            showLoading: false,
+            uploadStarted: false,
+            isAllVideosUploaded: false,
+
+
+            selectFile: function (evt) {
+                evt.preventDefault();
+                const files = evt.dataTransfer ? [...evt.dataTransfer.files] : [...evt.target.files];
+
+                if (files.length === 0) return;
+
+                const validFiles = files
+                const objects = validFiles.map((file) => {
+                    return {
+                        id: crypto.randomUUID(),
+                        name: file.name,
+                        file: file,
+                        isSelected: false,
+                        progress: 0,
+                        status: "Completed",
+                    };
+                });
+
+                this.assets = this.assets.concat([...objects]);
+            },
+
+            removeFile: function (id) {
+                this.$refs.assets.value = null;
+                this.assets = this.assets.filter((asset) => asset.id !== id);
+            },
+
+            selectAll() {
+                this.assets = this.assets.map(asset => {
+                    asset.isSelected = true
+                    return asset
+                })
+            },
+
+            unSelectAll() {
+                this.assets = this.assets.map(asset => {
+                    asset.isSelected = false;
+                    return asset
+                })
+            },
+
+            removeSelected() {
+                console.log("remove selected");
+                this.assets = this.assets.filter((asset) => !asset.isSelected);
+                console.log("asserts are", this.assets);
+                this.isSelectAllChecked = false;
+            },
+
+            preventPageNavigation() {
+                window.onbeforeunload = function (event) {
+                    event.returnValue = "An upload is in progress, are you sure you want to leave this page?";
+                };
+            },
+
+            uploadVideos() {
+                // this.preventPageNavigation();
+                this.createAssetsAndStartUpload();
+                setInterval(() => {
+                    this.assets.forEach((asset) => {
+                        if (asset.status === "Completed" && asset.progress < 100) {
+                            asset.progress += 10;
+                        }
+                    });
+                    const allComplete = this.assets.every((asset) => asset.progress === 100);
+                    if (allComplete) {
+                        this.isAllVideosUploaded = true;
+                    }
+                }, 1000);
+            },
+
+            createAssetsAndStartUpload() {
+                this.showLoading = true;
+                this.uploadStarted = true;
+            },
+
+            humanizeBytes(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+
+        }
+    }
+</script>
+
+{% endblock script%}
