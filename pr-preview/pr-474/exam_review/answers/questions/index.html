@@ -7,20 +7,22 @@
         <div class="py-3 px-5 flex justify-between items-center gap-x-5 border-b border-gray-200 dark:border-neutral-700">
           <div class="flex space-x-1 sm:space-x-2">
             <h2 class="inline-block font-semibold text-gray-800 dark:text-neutral-200">
-              <span class="hidden sm:inline" x-text="'Question No. ' + currentQuestion.q_no"></span>
-              <span class="inline sm:hidden" x-text="'Q' + currentQuestion.q_no"></span>
+              <span class="hidden sm:inline" x-text="currentQuestion ? 'Question No. ' + currentQuestion.q_no : ''"></span>
+              <span class="inline sm:hidden" x-text="currentQuestion ? 'Q' + currentQuestion.q_no : ''"></span>
+              
             </h2>
           </h2>
           <p class="text-gray-200">|</p>
           <span
-          :class="{
+          :class="currentQuestion ? {
             'bg-green-100 text-green-700': currentQuestion.response_status === 'correct',
-            'bg-red-100   text-red-700'  : currentQuestion.response_status === 'incorrect',
-            'bg-gray-100 text-gray-700'  : currentQuestion.response_status === 'unanswered'
-          }"
+            'bg-red-100 text-red-700': currentQuestion.response_status === 'incorrect',
+            'bg-gray-100 text-gray-700': currentQuestion.response_status === 'unanswered'
+          } : ''"
           class="inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium"
-          x-text="currentQuestion.response_status.charAt(0).toUpperCase() + currentQuestion.response_status.slice(1)"
+          x-text="currentQuestion ? currentQuestion.response_status.charAt(0).toUpperCase() + currentQuestion.response_status.slice(1) : ''"
         ></span>
+        
         
             <p class="text-gray-200">|</p>
             <div class="inline-flex items-center">
@@ -117,16 +119,26 @@
               </template>
               
             </div>
+            <div class="col-span-2 sm:col-span-4 mt-4" x-cloak x-show="currentQuestion.type == 'essay' ">
+              <dt class="text-sm font-medium text-gray-500">Your Answer</dt>
+              <dd class="mt-1 max-w-prose space-y-5 text-sm text-gray-900">
+             <span x-text="currentQuestion.user_answer"></span>
+            </dd>
+          </div>
             <div class="mt-6">
               <dl class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4">
                 <div class="sm:col-span-1">
                     <dt class="text-sm font-medium text-gray-500">Total Marks</dt>
                     <dd class="mt-1 text-sm text-gray-900" x-text="currentQuestion.total"></dd>
                   </div>
-                <div class="sm:col-span-1">
+                  <div class="sm:col-span-1" x-cloak x-show="currentQuestion.type !='essay'">
                     <dt class="text-sm font-medium text-gray-500">Negative Marks</dt>
                     <dd class="mt-1 text-sm text-gray-900" x-text="currentQuestion.negative"></dd>
                   </div>
+                <div class="sm:col-span-1" x-cloak x-show="currentQuestion.type=='essay'">
+                  <dt class="text-sm font-medium text-gray-500">Marks Obtained</dt>
+                  <dd class="mt-1 text-sm text-gray-900" x-text="currentQuestion.awarded"></dd>
+                </div>
                 <div class="sm:col-span-1">
                     <dt class="text-sm font-medium text-gray-500">Subject</dt>
                     <dd class="mt-1 text-sm text-gray-900" x-text="currentQuestion.subject"></dd>
@@ -138,7 +150,7 @@
               </dl>
             </div>
             <div class="mt-6 space-y-4" x-cloak x-show="currentQuestion.show_answer">
-              <div>
+              <div x-cloak x-show="currentQuestion.type != 'essay'">
               <div class="flex  flex-wrap gap-x-4 justify-between">
                 <p class="text-sm font-medium text-gray-500">Correct Answer is
                   <span class="text-sm text-gray-900" x-text="currentQuestion.options[currentQuestion.correctIndex]"></span>
@@ -173,6 +185,26 @@
               <dd class="mt-1 max-w-prose space-y-5 text-sm text-gray-900">
              <span x-text="currentQuestion.explanation"></span>
             </dd>
+          </div>
+          <div class="col-span-2 sm:col-span-4" x-cloak x-show="currentQuestion.type == 'essay'">
+          <dt class="text-sm font-medium text-gray-500">Feedbacks</dt>
+          <div class="flex space-x-3 mt-2">
+            <div class="flex-shrink-0">
+              <img class="h-10 w-10 rounded-full" src="https://static.testpress.in/static/img/default_medium_image.png" alt="">
+            </div>
+            <div>
+              <div class="text-sm flex space-x-2 items-center" x-data="{showcommentdropdown:null}">
+                <a href="#" class="font-medium text-gray-900">Tim cook</a>
+                <p class="mt-0.5 text-sm text-gray-500">10 minutes ago</p>
+              </div>
+              <div class="mt-1 text-sm text-gray-700">
+                <p x-text="currentQuestion.feedback?.response || 'NA'"></p>
+              </div>
+              <div class="flex mt-2 truncate text-sm">
+              <div></div></div>
+              
+            </div>
+          </div>
           </div>
             </div>
             <div x-show="!currentQuestion.show_answer" x-cloak class="mt-6">
@@ -251,63 +283,76 @@
         </div>
         <article aria-labelledby="question-title-81614" class="p-5">
           <div>
-            <h2 id="question-title-81614" class="text-base font-medium text-gray-900"  x-text="`Q${question.q_no}. ${question.question}`"></h2>
+            <h2 id="question-title-81614" class="text-base font-medium text-gray-900"  x-text="`${question.question}`"></h2>
           </div>
           <div class="mt-2 space-y-4 text-sm text-gray-700">
             <template x-if="question.type === 'mcq'">
-              <template x-for="(option, index) in question.options" :key="index">
-                <div class="flex items-center">
-                  <div
-                    class="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-sm"
-                    :class="{
-                      'bg-green-400 text-white': question.selectedIndex === index && index === question.correctIndex,
-                      'bg-red-400 text-white': question.selectedIndex === index && index !== question.correctIndex,
-                      'bg-white text-gray-900 border-gray-300': question.selectedIndex !== index
-                    }"
-                    x-text="String.fromCharCode(97 + index)">
-                  </div>
-                  <span class="ml-3" x-text="option"></span>
+            <template x-for="(option, index) in question.options" :key="index">
+              <div class="flex items-center">
+                <div
+                  class="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-sm"
+                  :class="{
+                    'bg-green-400 text-white': question.selectedIndex === index && index === question.correctIndex,
+                    'bg-red-400 text-white': question.selectedIndex === index && index !== question.correctIndex,
+                    'bg-white text-gray-900 border-gray-300': question.selectedIndex !== index
+                  }"
+                  x-text="String.fromCharCode(97 + index)">
                 </div>
-              </template>
-              </template>
-              <template x-if="question.type === 'match'">
-                <div class="grid grid-cols-4 gap-4">
-                  <template x-for="(option, index) in question.options" :key="index">
-                    <div class="contents">
-                      <div class="flex items-center col-span-1">
-                        <div
-                          class="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-sm"
-                          :class="{
-                            'bg-green-400 text-white': question.user_answer[index] === question.answer[index],
-                            'bg-red-400 text-white': question.user_answer[index] && question.user_answer[index] !== question.answer[index],
-                            'bg-white text-gray-900 border-gray-300': !question.user_answer[index]
-                          }"
-                          x-text="String.fromCharCode(97 + index)">
-                        </div>
-                        <span class="ml-3" x-text="option"></span>
+                <span class="ml-3" x-text="option"></span>
+              </div>
+            </template>
+            </template>
+            <template x-if="question.type === 'match'">
+              <div class="grid grid-cols-4 gap-4">
+                <template x-for="(option, index) in question.options" :key="index">
+                  <div class="contents">
+                    <div class="flex items-center col-span-1">
+                      <div
+                        class="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-sm"
+                        :class="{
+                          'bg-green-400 text-white': question.user_answer[index] === question.answer[index],
+                          'bg-red-400 text-white': question.user_answer[index] && question.user_answer[index] !== question.answer[index],
+                          'bg-white text-gray-900 border-gray-300': !question.user_answer[index]
+                        }"
+                        x-text="String.fromCharCode(97 + index)">
                       </div>
-                      <div class="flex items-center gap-4 col-span-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                          <path d="M18 8L22 12L18 16"/>
-                          <path d="M2 12H22"/>
-                        </svg>
-                        <span class="text-sm text-gray-800" x-show="question.user_answer[index]" x-text="question.user_answer[index]"></span>
-                      </div>
+                      <span class="ml-3" x-text="option"></span>
                     </div>
-                  </template>
-                </div>
-              </template>
+                    <div class="flex items-center gap-4 col-span-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8L22 12L18 16"/>
+                        <path d="M2 12H22"/>
+                      </svg>
+                      <span class="text-sm text-gray-800" x-show="question.user_answer[index]" x-text="question.user_answer[index]"></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              
+              
+            </template>
+            
           </div>
+          <div class="col-span-2 sm:col-span-4 mt-4" x-cloak x-show="question.type == 'essay' ">
+            <dt class="text-sm font-medium text-gray-500">Your Answer</dt>
+            <dd class="mt-1 max-w-prose space-y-5 text-sm text-gray-900">
+           <span x-text="question.user_answer"></span>
+          </dd>
+        </div>
           <div class="mt-6">
             <dl class="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4">
               <div class="sm:col-span-1">
                   <dt class="text-sm font-medium text-gray-500">Total Marks</dt>
                   <dd class="mt-1 text-sm text-gray-900" x-text="question.total"></dd>
                 </div>
-              <div class="sm:col-span-1">
+              <div class="sm:col-span-1" x-cloak x-show="question.type !='essay'">
                   <dt class="text-sm font-medium text-gray-500">Negative Marks</dt>
                   <dd class="mt-1 text-sm text-gray-900" x-text="question.negative"></dd>
                 </div>
+              <div class="sm:col-span-1" x-cloak x-show="question.type=='essay'">
+                <dt class="text-sm font-medium text-gray-500">Marks Obtained</dt>
+                <dd class="mt-1 text-sm text-gray-900" x-text="question.awarded"></dd>
+              </div>
               <div class="sm:col-span-1">
                   <dt class="text-sm font-medium text-gray-500">Subject</dt>
                   <dd class="mt-1 text-sm text-gray-900" x-text="question.subject"></dd>
@@ -319,7 +364,7 @@
             </dl>
           </div>
           <div class="mt-6 space-y-4" x-cloak x-show="question.show_answer">
-            <div>
+            <div x-cloak x-show="question.type != 'essay'">
             <div class="flex  flex-wrap gap-x-4 justify-between">
               <p class="text-sm font-medium text-gray-500">Correct Answer is
                 <span class="text-sm text-gray-900" x-text="question.options[question.correctIndex]"></span>
@@ -352,8 +397,28 @@
           <div class="col-span-2 sm:col-span-4">
             <dt class="text-sm font-medium text-gray-500">Explanation</dt>
             <dd class="mt-1 max-w-prose space-y-5 text-sm text-gray-900">
-           <span x-text="currentQuestion.explanation"></span>
+           <span x-text="question.explanation"></span>
           </dd>
+        </div>
+        <div class="col-span-2 sm:col-span-4" x-cloak x-show="question.type == 'essay'">
+        <dt class="text-sm font-medium text-gray-500">Feedbacks</dt>
+        <div class="flex space-x-3 mt-2">
+          <div class="flex-shrink-0">
+            <img class="h-10 w-10 rounded-full" src="https://static.testpress.in/static/img/default_medium_image.png" alt="">
+          </div>
+          <div>
+            <div class="text-sm flex space-x-2 items-center" x-data="{showcommentdropdown:null}">
+              <a href="#" class="font-medium text-gray-900">Tim cook</a>
+              <p class="mt-0.5 text-sm text-gray-500">10 minutes ago</p>
+            </div>
+            <div class="mt-1 text-sm text-gray-700">
+              <p x-text="question.feedback?.response || 'NA'"></p>
+            </div>
+            <div class="flex mt-2 truncate text-sm">
+            <div></div></div>
+            
+          </div>
+        </div>
         </div>
           </div>
           <div x-show="!question.show_answer" x-cloak class="mt-6">
