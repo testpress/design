@@ -1,0 +1,142 @@
+---
+tags: testpress
+title: Bulk Upload Video Content
+date: 2024-08-27
+---
+
+{% extends "layouts/admin_base.html" %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+{% endblock extra_head %}
+{% block content %}
+<div class="max-w-6xl mx-auto xl:px-8 py-8">
+    <div class="" x-data="app">
+        {% include "./includes/header.html" %}
+        <div data-hs-stepper='{"currentIndex":1}'>
+            {% include "./includes/stepper_nav.html" %}
+            <div class="mt-4 bg-white px-4 py-6 sm:p-6 shadow sm:rounded-xl">
+                {% include "./includes/select_videos.html" %}
+                {% include "./includes/configuration.html" %}
+                {% include "./includes/preview_videos.html" %}
+            </div>
+            {% include "./includes/navigation_buttons.html" %}
+        </div>
+    </div>
+</div>
+{% endblock content %}
+
+{% block script %}
+<script>
+
+    function app() {
+        return {
+            assets: [],
+            isSelectAllChecked: false,
+            error: null,
+            uploadStarted: false,
+            isAllVideosUploaded: false,
+
+            selectFile: function (evt) {
+                evt.preventDefault();
+                const files = evt.dataTransfer ? [...evt.dataTransfer.files] : [...evt.target.files];
+
+                if (files.length === 0) return;
+
+                const validFiles = files
+                const objects = validFiles.map((file) => {
+                    return {
+                        id: crypto.randomUUID(),
+                        name: file.name,
+                        file: file,
+                        isSelected: false,
+                        progress: 0,
+                        status: "Uploading",
+                    };
+                });
+
+                this.assets = this.assets.concat([...objects]);
+            },
+
+            removeFile: function (id) {
+                this.$refs.assets.value = null;
+                this.assets = this.assets.filter((asset) => asset.id !== id);
+            },
+
+            selectAll() {
+                this.assets = this.assets.map(asset => {
+                    asset.isSelected = true
+                    return asset
+                })
+            },
+
+            unSelectAll() {
+                this.assets = this.assets.map(asset => {
+                    asset.isSelected = false;
+                    return asset
+                })
+            },
+
+            removeSelected() {
+                console.log("remove selected");
+                this.assets = this.assets.filter((asset) => !asset.isSelected);
+                console.log("asserts are", this.assets);
+                this.isSelectAllChecked = false;
+            },
+
+            cancelUpload(asset){
+                const item = this.assets.find(item => item.name === asset.name);
+                if (item) item.status = "Cancelled";
+            },
+
+            preventPageNavigation() {
+                window.onbeforeunload = function (event) {
+                    event.returnValue = "An upload is in progress, are you sure you want to leave this page?";
+                };
+            },
+
+            uploadVideos() {
+                this.preventPageNavigation();
+                this.createAssetsAndStartUpload();
+            },
+
+            createAssetsAndStartUpload() {
+                this.uploadStarted = true;
+                setInterval(() => {
+                    this.assets.forEach((asset) => {
+                        if (asset.status === "Uploading" && asset.progress < 100) {
+                            asset.progress += 10;
+                        }
+                        if (asset.progress == 100) asset.status = "Completed";
+                    });
+                    const allComplete = this.assets.every((asset) => asset.status!='Uploading');
+                    if (allComplete) {
+                        this.isAllVideosUploaded = true;
+                        this.uploadStarted = false;
+                    }
+                }, 1000);
+            },
+
+            humanizeBytes(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            },
+
+            resetUpload() {
+                this.uploadStarted = false;
+                this.assets.map(item=>{
+                    item.status= "Uploading";
+                    item.progress = 0;
+                });
+                this.isAllVideosUploaded = false;
+            }
+
+        }
+    }
+</script>
+
+{% endblock script%}
