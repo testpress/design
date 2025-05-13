@@ -28,57 +28,15 @@ date: 2024-08-27
 {% endblock content %}
 
 {% block script %}
-<script type="application/javascript" src="https://releases.transloadit.com/uppy/v3.3.1/uppy.min.js"></script>
 <script>
-    class UppyFileUploader {
-        constructor() {
-            this.initialize()
-        }
-
-        initialize() {
-            this.uppy = new Uppy.Uppy({
-                autoProceed: true,
-                allowMultipleUploadBatches: false,
-            })
-        }
-
-        on(event, operation) {
-            this.uppy.on(event, operation)
-        }
-
-        addFile(attachment) {
-            return this.uppy.addFile({
-                data: attachment.file,
-                type: attachment.file.type,
-                name: attachment.name,
-                meta: { id: attachment.id },
-            })
-        }
-
-        addFiles(files) {
-            const filesToAdd = files.map(attachment => {
-                return {
-                    data: attachment.file,
-                    type: attachment.file.type,
-                    name: attachment.name,
-                    meta: { id: attachment.id, asset_id: attachment.asset_id },
-                }
-            })
-            return this.uppy.addFiles(filesToAdd)
-        }
-    }
 
     function app() {
         return {
             assets: [],
             isSelectAllChecked: false,
-            resolutions: [],
             error: null,
-            uppy: null,
-            showLoading: false,
             uploadStarted: false,
             isAllVideosUploaded: false,
-
 
             selectFile: function (evt) {
                 evt.preventDefault();
@@ -141,6 +99,10 @@ date: 2024-08-27
             uploadVideos() {
                 this.preventPageNavigation();
                 this.createAssetsAndStartUpload();
+            },
+
+            createAssetsAndStartUpload() {
+                this.uploadStarted = true;
                 setInterval(() => {
                     this.assets.forEach((asset) => {
                         if (asset.status === "Uploading" && asset.progress < 100) {
@@ -156,17 +118,21 @@ date: 2024-08-27
                 }, 1000);
             },
 
-            createAssetsAndStartUpload() {
-                this.showLoading = true;
-                this.uploadStarted = true;
-            },
-
             humanizeBytes(bytes) {
                 if (bytes === 0) return '0 Bytes';
                 const k = 1024;
                 const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
                 const i = Math.floor(Math.log(bytes) / Math.log(k));
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            },
+
+            resetUpload() {
+                this.uploadStarted = false;
+                this.assets.map(item=>{
+                    item.status= "Uploading";
+                    item.progress = 0;
+                });
+                this.isAllVideosUploaded = false;
             }
 
         }
