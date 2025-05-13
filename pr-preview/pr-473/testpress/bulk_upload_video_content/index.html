@@ -954,7 +954,7 @@
         </div>
       </div>
     </div>
-    <div class="rounded-md bg-blue-50 p-4 mt-2" x-cloak x-show="uploadStarted">
+    <div class="rounded-md bg-blue-50 p-4 mt-2" x-cloak x-show="uploadStarted && !isAllVideosUploaded">
       <div class="flex">
         <div class="flex-shrink-0">
           <svg class="size-5 text-blue-400"
@@ -980,7 +980,7 @@
         <table class="min-w-full divide-y divide-gray-200">
   
           <thead>
-            <tr class="sticky top-0 bg-white shadow-sm">
+            <tr class="sticky top-0 bg-white shadow-sm z-10">
               <th scope="col" class="min-w-36">
                 <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
                   <div id="name" class="px-4 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-gray-500 focus:outline-none focus:bg-gray-100 " aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">Name</div>
@@ -999,13 +999,13 @@
                 </div>
               </th>
   
-              <th x-clock x-show="uploadStarted" scope="col" class="min-w-36">
+              <th x-clock x-show="uploadStarted || isAllVideosUploaded" scope="col" class="min-w-36">
                 <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
                   <div id="upload_status" class="px-4 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-gray-500 focus:outline-none focus:bg-gray-100 " aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">Upload Status</div>
                 </div>
               </th>
 
-              <th x-clock x-show="uploadStarted" scope="col" class="">
+              <th x-clock x-show="uploadStarted || isAllVideosUploaded" scope="col" class="">
               </th>
 
             </tr>
@@ -1022,7 +1022,7 @@
                 <td class="size-px whitespace-nowrap p-4">
                   <span class="text-sm text-gray-600 block truncate max-w-64 hs-tooltip" x-text="humanizeBytes(asset.file.size)"></span>
                 </td> 
-                <td x-clock x-show="uploadStarted" class="size-px whitespace-nowrap rounded-full p-4">
+                <td x-clock x-show="uploadStarted || isAllVideosUploaded" class="size-px whitespace-nowrap rounded-full p-4">
                   <!-- Progress Bar -->
                   <div x-clock x-show="asset.progress!=100 && asset.status!='Cancelled'" class="w-full bg-gray-200 rounded-full dark:bg-gray-700">
                     <div class="bg-emerald-600 text-xs font-medium text-white text-center p-0.5 leading-none rounded-full transition-all duration-500 ease-in-out" :style="`width: ${asset.progress}%`" x-text="asset.progress + '%'"></div>
@@ -1036,7 +1036,7 @@
                   </p>
                 </td>
                 
-                <td x-clock x-show="uploadStarted" class="size-px whitespace-nowrap rounded-full p-4">
+                <td x-clock x-show="uploadStarted || isAllVideosUploaded" class="size-px whitespace-nowrap rounded-full p-4">
                   <div class="col-span-full md:col-span-1 md:text-end">
                     <button @click="cancelUpload(asset)" :disabled="asset.status === 'Completed' || asset.status === 'Cancelled'" type="button" class="py-1 px-3 md:px-1 inline-flex justify-center items-center gap-x-1.5 font-medium text-sm rounded-full bg-stone-100 border border-transparent text-stone-600 hover:bg-stone-200 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-200 dark:bg-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-600 dark:focus:bg-neutral-600" data-hs-copy-markup-delete-item="">
                       <svg class="hidden md:block shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1059,6 +1059,7 @@
             <div class="mt-5 flex justify-between items-center gap-x-2">
   <button type="button"
     class="py-2 px-3 inline-flex items-center gap-x-1 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none"
+    @click="resetUpload()"
     data-hs-stepper-back-btn="">
     <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
       fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1066,7 +1067,7 @@
     </svg>
     Back
   </button>
-  <button type="button"
+  <button type="button" 
     class="py-2 px-3 inline-flex items-center gap-x-1 text-sm font-medium rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none"
     data-hs-stepper-next-btn=""
     :disabled="!assets || assets.length === 0"
@@ -1090,57 +1091,15 @@
     </div>
 
     
-<script type="application/javascript" src="https://releases.transloadit.com/uppy/v3.3.1/uppy.min.js"></script>
 <script>
-    class UppyFileUploader {
-        constructor() {
-            this.initialize()
-        }
-
-        initialize() {
-            this.uppy = new Uppy.Uppy({
-                autoProceed: true,
-                allowMultipleUploadBatches: false,
-            })
-        }
-
-        on(event, operation) {
-            this.uppy.on(event, operation)
-        }
-
-        addFile(attachment) {
-            return this.uppy.addFile({
-                data: attachment.file,
-                type: attachment.file.type,
-                name: attachment.name,
-                meta: { id: attachment.id },
-            })
-        }
-
-        addFiles(files) {
-            const filesToAdd = files.map(attachment => {
-                return {
-                    data: attachment.file,
-                    type: attachment.file.type,
-                    name: attachment.name,
-                    meta: { id: attachment.id, asset_id: attachment.asset_id },
-                }
-            })
-            return this.uppy.addFiles(filesToAdd)
-        }
-    }
 
     function app() {
         return {
             assets: [],
             isSelectAllChecked: false,
-            resolutions: [],
             error: null,
-            uppy: null,
-            showLoading: false,
             uploadStarted: false,
             isAllVideosUploaded: false,
-
 
             selectFile: function (evt) {
                 evt.preventDefault();
@@ -1203,6 +1162,10 @@
             uploadVideos() {
                 this.preventPageNavigation();
                 this.createAssetsAndStartUpload();
+            },
+
+            createAssetsAndStartUpload() {
+                this.uploadStarted = true;
                 setInterval(() => {
                     this.assets.forEach((asset) => {
                         if (asset.status === "Uploading" && asset.progress < 100) {
@@ -1218,17 +1181,21 @@
                 }, 1000);
             },
 
-            createAssetsAndStartUpload() {
-                this.showLoading = true;
-                this.uploadStarted = true;
-            },
-
             humanizeBytes(bytes) {
                 if (bytes === 0) return '0 Bytes';
                 const k = 1024;
                 const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
                 const i = Math.floor(Math.log(bytes) / Math.log(k));
                 return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            },
+
+            resetUpload() {
+                this.uploadStarted = false;
+                this.assets.map(item=>{
+                    item.status= "Uploading";
+                    item.progress = 0;
+                });
+                this.isAllVideosUploaded = false;
             }
 
         }
