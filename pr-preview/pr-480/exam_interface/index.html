@@ -52,7 +52,7 @@
   <body class="antialiased h-full  ">
     <div class="min-h-full">
       
-<div class="h-screen flex flex-col" x-data="examComponent()", x-init="selectSection(0)">
+<div class="h-screen flex flex-col" x-data="examComponent()", x-init="selectSection(0),initUploadFile()">
 <!-- ========== HEADER ========== -->
 <header class="sticky top-0 z-50 flex justify-between  md:flex-nowrap z-50 w-full bg-white border-b border-gray-200 py-2 px-4 sm:px-6">
   <nav>
@@ -226,7 +226,12 @@
     <span class="inline sm:hidden">Q No. </span>
     <span x-text="currentQuestion.q_no"></span>
     <span class="ml-2 inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700" 
-    x-text="currentQuestion.type.toUpperCase()"></span>
+    x-text="currentQuestion.type === 'gap_fill' ? 'Gap Fill' :
+               currentQuestion.type === 'mcq' ? 'MCQ' :
+               currentQuestion.type === 'essay' ? 'Essay' :
+               currentQuestion.type === 'match' ? 'Match' :
+               currentQuestion.type === 'file' ? 'File Upload' :
+               currentQuestion.type.toUpperCase()"></span>
   </p>
   <span class="sm:hidden cursor-pointer inline-flex items-center ml-1">
     <svg x-cloak x-show="!(responses[currentSection.name]?.[currentQuestion.q_no]?.markedForReview)"
@@ -344,7 +349,7 @@
 <div class="mt-4 space-y-4 text-sm">
 <!-- Drag 'n Drop -->
 <div class="space-y-2">
-  <div id="hs-file-upload-with-limited-file-size" data-hs-file-upload='{
+  <div id="file-upload" data-hs-file-upload='{
     "url": "/upload",
     "maxFilesize": 1000,
     "extensions": {
@@ -748,7 +753,7 @@
       responses: {},
       gapFillAnswers: [],
       matchAnswers: [],
-      uploaded_files: ['mocked-file-upload'],
+      uploaded_files: [],
 
       get currentSection() {
         return this.exam.sections[this.currentSectionIndex];
@@ -790,6 +795,22 @@
       isActive(index) {
         return this.currentSectionIndex === index;
       },
+
+      initUploadFile() {
+      window.addEventListener('load', () => {
+        const instance = HSFileUpload.getInstance('#file-upload', true);
+        if (!instance) return;
+
+        const { element } = instance;
+        const { dropzone } = element;
+
+        dropzone.on('complete', () => {
+          this.uploaded_files = ['mock-upload'];
+        });
+      });
+     },
+
+
 
       goToQuestion(index) {
         this.currentQuestionIndex = index;
@@ -945,10 +966,10 @@
         if (!resp) return 'not_visited';
         if (resp.markedForReview) return 'review';
         if (
-          resp.selected != null ||
+          (resp.selected && resp.selected.length > 0) ||
           resp.text != null ||
-          (resp.answers && resp.answers.length > 0) ||
-          (resp.matches && resp.matches.length > 0) ||
+          (resp.answers && resp.answers.some(ans => ans.trim() !== "")) ||
+          (resp.matches && resp.matches.some(match => match.trim() !== "")) ||
           (resp.uploaded_files && resp.uploaded_files.length > 0)
         )
           return 'answered';
@@ -1008,6 +1029,7 @@
 </script>
 <script src="/node_modules/lodash/lodash.min.js"></script>
 <script src="/node_modules/dropzone/dist/dropzone-min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@preline/file-upload@3.0.0/index.min.js"></script>
 
   </body>
 
