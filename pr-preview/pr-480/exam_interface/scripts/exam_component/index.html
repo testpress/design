@@ -30,6 +30,15 @@
               mark: "5.00",
               negative: "0.00",
               text: "Explain the impact of globalization on rural economies in India."
+            },
+            {
+              q_no: 5,
+              type: "gap_fill",
+              mark: "5.00",
+              negative: "0.00",
+              text_with_blanks: `
+            The [BLANK_1] Revolution was a turning point. It began in [BLANK_2] and changed [BLANK_3]. People moved to [BLANK_4] areas, and innovations like the steam engine revolutionized [BLANK_5].
+            `
             }
             ]
           },
@@ -94,6 +103,7 @@
       essayDraft: '',
       show_exam_ended_modal :false,
       responses: {},
+      gapFillAnswers: [],
 
       get currentSection() {
         return this.exam.sections[this.currentSectionIndex];
@@ -156,6 +166,15 @@
           const saved = this.responses[sectionKey][questionKey]?.text;
           this.essayDraft = saved ?? '';
         }
+        if (this.currentQuestion.type === 'gap_fill') {
+          const sectionKey = this.currentSection.name;
+          const questionKey = this.currentQuestion.q_no;
+
+          const blankCount = (this.currentQuestion.text_with_blanks.match(/\[BLANK_\d+\]/g) || []).length;
+
+          const saved = this.responses[sectionKey]?.[questionKey]?.answers;
+          this.gapFillAnswers = saved ? [...saved] : Array(blankCount).fill('');
+        }
       },
 
       saveAnswer(optionIndex) {
@@ -172,6 +191,9 @@
       },
 
       saveEssayAnswer() {
+        if(this.essayDraft == ''){
+          this.essayDraft =  null;
+        }
         const sectionKey = this.currentSection.name;
         const questionKey = this.currentQuestion.q_no;
 
@@ -183,6 +205,49 @@
         };
       },
 
+      saveGapFillAnswer() {
+        const sectionKey = this.currentSection.name;
+        const questionKey = this.currentQuestion.q_no;
+
+        if (!this.responses[sectionKey]) this.responses[sectionKey] = {};
+        this.responses[sectionKey][questionKey] = {
+          answers: [...this.gapFillAnswers],
+          visited: true
+        };
+      },
+
+      saveCurrentAnswer() {
+        const type = this.currentQuestion.type;
+
+        if (type === 'mcq') {
+          this.saveAnswer(this.selectedOption);
+        } else if (type === 'essay') {
+          this.saveEssayAnswer();
+        } else if (type === 'gap_fill') {
+          this.saveGapFillAnswer();
+        }
+      },
+
+
+      getGapFillHTML() {
+      const text = this.currentQuestion.text_with_blanks;
+      const blanks = (text.match(/\[BLANK_\d+\]/g) || []).length;
+
+      // Ensure gapFillAnswers array is initialized
+      if (this.gapFillAnswers.length !== blanks) {
+        this.gapFillAnswers = Array(blanks).fill('');
+      }
+
+      const parts = text.split(/\[BLANK_\d+\]/g);
+
+      // Build HTML string using Alpine-compatible bindings
+      return parts.map((part, index) => {
+        const input = index < blanks
+          ? `<input x-model='gapFillAnswers[${index}]' type='text' class='inline-block h-6 min-w-36 align-middle w-20 px-2 py-1 text-sm border border-gray-300 rounded-md placeholder:text-gray-400 focus:border-emerald-500 focus:ring-emerald-500' placeholder='answer here' />`
+          : '';
+        return `${part}${input}`;
+      }).join('');
+    },
 
       markForReview() {
         const sectionKey = this.currentSection.name;
@@ -199,7 +264,13 @@
         const resp = this.responses[sectionName]?.[q_no];
         if (!resp) return 'not_visited';
         if (resp.markedForReview) return 'review';
-        if (resp.selected != null || resp.text != null) return 'answered';
+        if (
+          resp.selected != null ||          // for MCQ
+          resp.text != null ||              // for Essay
+          (resp.answers && resp.answers.length > 0) // for Gap Fill
+        )
+          return 'answered';
+
         return 'visited';
       },
 
@@ -238,8 +309,10 @@
         if (this.responses[sectionKey]?.[questionKey]) {
           this.responses[sectionKey][questionKey].selected = null;
           this.responses[sectionKey][questionKey].text = null;
+          this.responses[sectionKey][questionKey].answers = [];
           this.essayDraft = null;
           this.selectedOption = null;
+          this.gapFillAnswers = [];
         }
       }
 
