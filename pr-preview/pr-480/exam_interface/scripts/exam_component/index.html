@@ -11,6 +11,7 @@
               {
                 q_no: 1,
                 type: "mcq",
+                is_multi_choice:false,
                 mark: "1.00",
                 negative: "0.25",
                 text: "If the cost price of 15 items is equal to the selling price of 12 items, what is the profit percentage?",
@@ -19,6 +20,7 @@
               {
                 q_no: 2,
                 type: "mcq",
+                is_multi_choice:true,
                 mark: "1.00",
                 negative: "0.25",
                 text: "A train 240 m long passes a pole in 24 seconds. What is the speed of the train in km/hr?",
@@ -32,14 +34,40 @@
               text: "Explain the impact of globalization on rural economies in India."
             },
             {
-              q_no: 5,
+              q_no: 4,
               type: "gap_fill",
               mark: "5.00",
               negative: "0.00",
               text_with_blanks: `
             The [BLANK_1] Revolution was a turning point. It began in [BLANK_2] and changed [BLANK_3]. People moved to [BLANK_4] areas, and innovations like the steam engine revolutionized [BLANK_5].
             `
-            }
+            },
+            {
+              q_no: 5,
+              type: "match",
+              mark: "2.00",
+              negative: "0.05",
+              text: "Match the countries with their capitals:",
+              questions: ["France", "Japan", "India", "Germany"],
+              answers: ["Berlin", "Tokyo", "Paris", "New Delhi"] // already in correct order
+            },
+            {
+              q_no: 6,
+              type: "file",
+              mark: "1.00",
+              negative: "0.00",
+              text: "Describe the impact of social media on modern communication. Include both positive and negative aspects in your response"
+            },
+            {
+              q_no: 7,
+              type: "mcq",
+              is_multi_choice: false,
+              mark: "1.00",
+              negative: "0.25",
+              passage: "A train traveling at a speed of 90 km/h takes 2 hours to reach its destination. If the train had traveled at 60 km/h, it would have taken 3 hours. The difference in time is due to the variation in speed.",
+              text: "Based on the passage, what is the distance between the starting point and the destination?",
+              options: ["120 km", "150 km", "180 km", "210 km"]
+            },
             ]
           },
           {
@@ -99,11 +127,13 @@
       totalSeconds: 0,
       interval: null,
       isLocked: false,
-      selectedOption: null,
+      selectedOption: [],
       essayDraft: '',
       show_exam_ended_modal :false,
       responses: {},
       gapFillAnswers: [],
+      matchAnswers: [],
+      uploaded_files: ['mocked-file-upload'],
 
       get currentSection() {
         return this.exam.sections[this.currentSectionIndex];
@@ -159,7 +189,7 @@
         }
         if (this.currentQuestion.type === 'mcq') {
           const saved = this.responses[sectionKey][questionKey]?.selected;
-          this.selectedOption = saved ?? null;
+          this.selectedOption = saved ?? [];
         }
 
         if (this.currentQuestion.type === 'essay') {
@@ -175,16 +205,25 @@
           const saved = this.responses[sectionKey]?.[questionKey]?.answers;
           this.gapFillAnswers = saved ? [...saved] : Array(blankCount).fill('');
         }
-      },
+        if (this.currentQuestion.type === 'match') {
+          const blanks = this.currentQuestion.questions.length;
+          this.matchAnswers = Array(blanks).fill('');
 
-      saveAnswer(optionIndex) {
+          const saved = this.responses[this.currentSection.name]?.[this.currentQuestion.q_no]?.matches;
+          if (saved) this.matchAnswers = [...saved];
+       }
+
+      },
+      
+
+      saveMCQAnswer() {
         const sectionKey = this.currentSection.name;
         const questionKey = this.currentQuestion.q_no;
 
         if (!this.responses[sectionKey]) this.responses[sectionKey] = {};
 
         this.responses[sectionKey][questionKey] = {
-          selected: optionIndex,
+          selected: this.selectedOption,
           markedForReview: false,
           visited: true
         };
@@ -216,20 +255,46 @@
         };
       },
 
-      saveCurrentAnswer() {
+      saveMatchAnswer() {
+        const sectionKey = this.currentSection.name;
+        const questionKey = this.currentQuestion.q_no;
+
+        if (!this.responses[sectionKey]) this.responses[sectionKey] = {};
+
+        this.responses[sectionKey][questionKey] = {
+          matches: this.matchAnswers.slice(),
+          markedForReview: false,
+          visited: true
+        };
+       },
+
+       saveFileAnswer() {
+        const sectionKey = this.currentSection.name;
+        const questionKey = this.currentQuestion.q_no;
+
+        if (!this.responses[sectionKey]) this.responses[sectionKey] = {};
+
+        this.responses[sectionKey][questionKey] = {
+          uploaded_files: this.uploaded_files,
+          markedForReview: false,
+          visited: true
+        };
+       },
+
+
+       saveCurrentAnswer() {
         const type = this.currentQuestion.type;
 
-        if (type === 'mcq') {
-          this.saveAnswer(this.selectedOption);
-        } else if (type === 'essay') {
-          this.saveEssayAnswer();
-        } else if (type === 'gap_fill') {
-          this.saveGapFillAnswer();
-        }
-      },
-
+        if (type === 'mcq') this.saveMCQAnswer();
+        else if (type === 'essay') this.saveEssayAnswer();
+        else if (type === 'gap_fill') this.saveGapFillAnswer();
+        else if (type === 'match') this.saveMatchAnswer();
+        else if (type === 'file') this.saveFileAnswer();
+       },
 
       getGapFillHTML() {
+      if (this.currentQuestion.type !== 'gap_fill') return '';
+
       const text = this.currentQuestion.text_with_blanks;
       const blanks = (text.match(/\[BLANK_\d+\]/g) || []).length;
 
@@ -265,9 +330,11 @@
         if (!resp) return 'not_visited';
         if (resp.markedForReview) return 'review';
         if (
-          resp.selected != null ||          // for MCQ
-          resp.text != null ||              // for Essay
-          (resp.answers && resp.answers.length > 0) // for Gap Fill
+          resp.selected != null ||
+          resp.text != null ||
+          (resp.answers && resp.answers.length > 0) ||
+          (resp.matches && resp.matches.length > 0) ||
+          (resp.uploaded_files && resp.uploaded_files.length > 0)
         )
           return 'answered';
 
@@ -307,15 +374,20 @@
         const questionKey = this.currentQuestion.q_no;
 
         if (this.responses[sectionKey]?.[questionKey]) {
-          this.responses[sectionKey][questionKey].selected = null;
-          this.responses[sectionKey][questionKey].text = null;
-          this.responses[sectionKey][questionKey].answers = [];
-          this.essayDraft = null;
-          this.selectedOption = null;
-          this.gapFillAnswers = [];
+          delete this.responses[sectionKey][questionKey];
         }
-      }
 
+        this.responses[sectionKey][questionKey] = {
+          visited: true,
+          markedForReview: false
+        };
+
+        // Reset local UI state
+        this.selectedOption = [];
+        this.essayDraft = '';
+        this.gapFillAnswers = [];
+        this.matchAnswers = [];
+      },
     }
   }
 </script>
