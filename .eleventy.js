@@ -39,6 +39,7 @@ module.exports = config => {
     config.addPassthroughCopy("fonts");
     config.addFilter("groupBy", groupBy);
     config.addFilter("filter", filter);
+    config.addPassthroughCopy({ "src/api": "api" });
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
