@@ -11,6 +11,7 @@
       currentView: 'root',     // 'root' or 'nested'
       parentSubject: null,
       parentStack: [],
+      showAllsubjects: false,
   
       // Columns
       columns: [
@@ -40,9 +41,17 @@
   
       // Filtering
       applyFilter() {
-        const source = this.parentStack.length > 0
-  ? this.parentStack[this.parentStack.length - 1].nested_subjects
-  : this.data;
+        let source;
+
+      if (this.showAllsubjects) {
+        // When showing all subjects: flatten to leaf subjects only
+        source = this.getAllLeafSubjects(this.data);
+      } else {
+        // Normal behavior: show nested subjects under current parent or root
+        source = this.parentStack.length > 0
+          ? this.parentStack[this.parentStack.length - 1].nested_subjects
+          : this.data;
+      }
 
       const filtered = this.filter === 'All'
         ? [...source]
@@ -56,7 +65,38 @@
       this.sortBy(this.sort.key, this.sort.asc); // sorts only filteredData
      },
 
-  
+
+     getAllLeafSubjects(subjects, parents = []) {
+  let leaves = [];
+
+  for (const subject of subjects) {
+    const currentParents = [...parents];
+    if (subject.nested_subjects && subject.nested_subjects.length > 0) {
+      // Recursively add leaves from nested subjects, passing current subject as parent
+      leaves = leaves.concat(this.getAllLeafSubjects(subject.nested_subjects, [...currentParents, subject]));
+    } else {
+      // This subject has no nested subjects → leaf
+      // Attach parents array to leaf
+      subject.parents = currentParents;
+      leaves.push(subject);
+    }
+  }
+
+  return leaves;
+},
+
+      hasNestedSubjects() {
+        // Check recursively if any subject has nested_subjects with length > 0
+        function checkNested(subjects) {
+          for (const s of subjects) {
+            if (s.nested_subjects && s.nested_subjects.length > 0) return true;
+            if (s.nested_subjects && s.nested_subjects.length > 0 && checkNested(s.nested_subjects)) return true;
+          }
+          return false;
+        }
+        return checkNested(this.data);
+      },
+        
       matchesFilter(row) {
 
         const p = row.percentage;
