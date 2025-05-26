@@ -62,7 +62,7 @@
     <div class="min-h-full">
       
 
-<div class="py-5 max-w-7xl mx-auto lg:px-8 px-4 space-y-5">
+<div x-data="SubjectStatsComponent()" x-init="fetchData()" class="py-5 max-w-7xl mx-auto lg:px-8 px-4 space-y-5">
   <div>
   <nav class="sm:hidden mb-2" aria-label="Back">
   <a href="/exam_review/dashboard/" class="flex items-center text-sm font-medium text-gray-500 hover:text-gray-700">
@@ -110,33 +110,77 @@
 </div>
   </div>
   <div>
+<div class="text-sm text-gray-500 dark:text-neutral-400 mb-2"  x-cloak x-show="parentStack.length > 0">
+  <!-- Mobile: Back button only -->
+  <div class="sm:hidden">
+    <button
+      @click="goBack()"
+      class="inline-flex items-center gap-x-1 text-gray-500 hover:text-emerald-600 dark:hover:text-neutral-300"
+    >
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-move-left-icon lucide-move-left"><path d="M6 8L2 12L6 16"/><path d="M2 12H22"/></svg>
+    <span> Back</span>
+    </button>
+  </div>
+
+  <!-- Desktop: Full breadcrumb -->
+  <div class="hidden sm:flex flex-wrap items-center gap-x-1">
+    <button 
+    @click="parentStack = []; applyFilter()" class="flex items-center text-sm text-gray-500 hover:text-emerald-600 focus:outline-hidden focus:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-500 dark:focus:text-emerald-500">
+    Subject Performance
+    </button>
+    <template x-for="(subject, index) in parentStack" :key="index">
+      <span class="flex items-center gap-x-1">
+      <button 
+      @click="goToLevel(index)"class="flex items-center text-sm text-gray-500 hover:text-emerald-600 focus:outline-hidden focus:text-emerald-600 dark:text-neutral-500 dark:hover:text-emerald-500 dark:focus:text-emerald-500">
+      <svg class="size-5 shrink-0 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" data-slot="icon">
+        <path fill-rule="evenodd" d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd"></path>
+      </svg>
+        <span class="ml-2" x-text="subject.subject">App Center</span>
+      </button>
+      </span>
+    </template>
+  </div>
+</div>
+<div>
   <div
     class="flex flex-col bg-white border border-gray-200 shadow-2xs rounded-xl dark:bg-neutral-800 dark:border-neutral-700 space-y-4">
     <div>
       <div
         class="py-3 px-5 flex flex-wrap justify-between items-center gap-2 border-b border-gray-200 dark:border-neutral-700">
         <h2 class="inline-block font-semibold text-gray-800 dark:text-neutral-200">
-          Subject Performance
+<!-- Show when NOT nested -->
+          <span x-show="parentStack.length === 0" class="inline-block font-semibold text-gray-800 dark:text-neutral-200">
+            Subject Performance
+          </span>
+
+          <!-- Show when inside nested -->
+          <span x-cloak x-show="parentStack.length > 0" class="flex items-center gap-x-2 font-semibold text-gray-800 dark:text-neutral-200">
+            <span x-text="parentStack[parentStack.length - 1].subject"></span>
+          </span>
+
         </h2>
-        <div class="hs-dropdown [--placement:bottom-right] relative flex justify-end items-center gap-x-2">
+        <div x-cloak x-show="!loading" class="hs-dropdown [--placement:bottom-right] relative flex justify-end items-center gap-x-2">
           <button id="hs-dropdown-default"  type="button"
             class="hs-dropdown-toggle  py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"
             aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-            All
+            <span x-text="filter"></span>
             <svg class="hs-dropdown-open:rotate-180 shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
           </button>
           <div class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] lg:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 relative w-auto border border-gray-200 z-10 top-full bg-white lg:rounded-lg lg:shadow-xl shadow-gray-200 ps-7 lg:ps-0 before:absolute before:-top-4 before:start-0 before:w-full before:h-5 lg:after:hidden after:absolute after:top-1 after:start-[18px] after:w-0.5 after:h-[calc(100%-0.25rem)] after:bg-gray-100 dark:bg-neutral-800 dark:shadow-neutral-900 dark:after:bg-neutral-700 hidden" role="menu" aria-orientation="vertical" aria-labelledby="hs-dropdown-default">
             <div class="p-1 space-y-0.5">
-              <button class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
+              <button   @click="filter = 'All'; applyFilter()" class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
                 All
               </button>
-              <button class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
+              <button 
+              @click="filter = 'Strong'; applyFilter()" class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
                 Strong
               </button>
-              <button class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
+              <button 
+              @click="filter = 'Improving'; applyFilter()" class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
                 Improving
               </button>
-              <button class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
+              <button 
+              @click="filter = 'Weak'; applyFilter()" class="group py-2 px-3 w-full flex items-center gap-x-3 text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 rounded-lg dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="#">
                 Weak
               </button>
             </div>
@@ -144,8 +188,7 @@
         </div>
       </div>
       <div class="p-5">
-        <div>
-
+        <div x-cloak x-show="getSortedPercentageData().length > 0">
 <div class="space-y-4">
   <div class="flex flex-col sm:flex-row sm:justify-end sm:items-center gap-2">
     <div class="flex sm:justify-end items-center gap-x-2 md:gap-x-4">
@@ -172,91 +215,24 @@
   </div>
 
   <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 lg:gap-5">
+    <template x-for="subject in getSortedPercentageData()" :key="subject.id">
+      <div class="flex flex-col justify-center items-center py-6"
+           x-init="$nextTick(() => renderDonutChart(`#subject_${subject.id}`, [subject.correct, subject.incorrect, subject.unattempted], ['Correct', 'Incorrect', 'Unanswered']))">
+           
+        <!-- Chart container -->
+        <div :id="`subject_${subject.id}`" class="min-h-[14rem]"></div>
     
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_1" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Arithmetic
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
+        <!-- Subject label -->
+        <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
+          <span class="text-sm text-gray-600 dark:text-neutral-400" x-text="subject.subject"></span>
         </div>
-    
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_2" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Vocabulary
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
-        </div>
-    
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_3" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Data Interpretation
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
-        </div>
-    
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_4" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Reasoning Puzzles
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
-        </div>
-    
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_5" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Reading Comprehension
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
-        </div>
-    
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_6" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Algebra
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
-        </div>
-    
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_7" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Para Jumbles
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
-        </div>
-    
-        <div class="flex flex-col justify-center items-center py-6">
-          <div id="subject_8" class="min-h-[14rem]"></div>
-          <div class="flex justify-center sm:justify-end items-center gap-x-4 mt-3 sm:mt-6">
-            <span class="text-sm text-gray-600 dark:text-neutral-400">
-              Geometry
-            </span>
-          </div>
-          <!-- End Legend Indicator -->
-        </div>
+      </div>
+    </template>
     
   </div>
 </div>
 </div>
-        <div>
+        <div x-cloak x-show="filteredData.length > 0">
   <div
     class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
     <div class="min-w-full inline-block align-middle">
@@ -267,7 +243,7 @@
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button  type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button type="button" class="whitespace-nowrap px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Subject Name
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
@@ -275,11 +251,13 @@
                 <!-- Dropdown -->
                 <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
                   <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('subject',true)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
                       Sort ascending
                     </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('subject',false)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
                       Sort descending
                     </button>
@@ -293,7 +271,7 @@
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button  type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button  type="button" class="whitespace-nowrap px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Attempted
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
@@ -301,13 +279,15 @@
                 <!-- Dropdown -->
                 <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
                   <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('attempted',true)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
+                      Lowest First
                     </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('attempted',false)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
+                      Highest First
                     </button>
                   </div>
                 </div>
@@ -319,7 +299,7 @@
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button  type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button  type="button" class="whitespace-nowrap px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Correct
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
@@ -327,13 +307,15 @@
                 <!-- Dropdown -->
                 <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
                   <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('correct',true)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
+                      Lowest First
                     </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('correct',false)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
+                      Highest First
                     </button>
                   </div>
                 </div>
@@ -345,7 +327,7 @@
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button  type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button  type="button" class="whitespace-nowrap px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Incorrect
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
@@ -353,13 +335,15 @@
                 <!-- Dropdown -->
                 <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
                   <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('incorrect',true)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
+                      Lowest First
                     </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('incorrect',false)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
+                      Highest First
                     </button>
                   </div>
                 </div>
@@ -371,7 +355,8 @@
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button  type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button  
+                 type="button" class="whitespace-nowrap px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Unanswered
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
@@ -379,13 +364,15 @@
                 <!-- Dropdown -->
                 <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
                   <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('unattempted',true)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
+                      Lowest First
                     </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('unattempted',false)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
+                      Highest First
                     </button>
                   </div>
                 </div>
@@ -397,7 +384,7 @@
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button  type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button  type="button" class="whitespace-nowrap px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Score
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
@@ -405,13 +392,15 @@
                 <!-- Dropdown -->
                 <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
                   <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('score',true)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
+                      Lowest First
                     </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('score',false)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
+                      Highest First
                     </button>
                   </div>
                 </div>
@@ -423,7 +412,7 @@
             <th scope="col">
               <!-- Sort Dropdown -->
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
-                <button  type="button" class="px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <button  type="button" class="whitespace-nowrap px-5 py-2.5 text-start w-full flex items-center gap-x-1 text-sm font-normal text-stone-500 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-500 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                   Percentage
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
                 </button>
@@ -431,13 +420,15 @@
                 <!-- Dropdown -->
                 <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-xl dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-eptnms">
                   <div class="p-1">
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('percentage',true)" type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
-                      Sort ascending
+                      Lowest First
                     </button>
-                    <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <button 
+                    @click="sortBy('percentage',false)"  type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-stone-800 hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-hidden focus:bg-stone-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
-                      Sort descending
+                      Highest First
                     </button>
                   </div>
                 </div>
@@ -461,394 +452,148 @@
         </thead>
 
         <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 underline hover:cursor-pointer">
-                Arithmetic
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                15<small class="text-xs opacity-60"> / 15</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                14
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                1
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                0
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                14
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                93.33%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-green-500 rounded-full dark:bg-green-500"></span>
-              Strong
-            </span>
-            
-            </td>
-          </tr>
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 ">
-                Vocabulary
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                9<small class="text-xs opacity-60"> / 10</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                8
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                1
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                1
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                8
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                80%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-green-500 rounded-full dark:bg-green-500"></span>
-              Strong
-            </span>
-            
-            </td>
-          </tr>
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 ">
-                Data Interpretation
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                10<small class="text-xs opacity-60"> / 12</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                9
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                1
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                9
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                75%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-yellow-500 rounded-full dark:bg-yellow-500"></span>
-              Improving
-            </span>
-            
-            </td>
-          </tr>
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 underline hover:cursor-pointer">
-                Reasoning Puzzles
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                18<small class="text-xs opacity-60"> / 20</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                13
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                5
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                13
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                65%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-yellow-500 rounded-full dark:bg-yellow-500"></span>
-              Improving
-            </span>
-            
-            </td>
-          </tr>
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 underline hover:cursor-pointer">
-                Reading Comprehension
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                7<small class="text-xs opacity-60"> / 10</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                6
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                1
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                3
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                6
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                60%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-yellow-500 rounded-full dark:bg-yellow-500"></span>
-              Improving
-            </span>
-            
-            </td>
-          </tr>
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 ">
-                Algebra
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                7<small class="text-xs opacity-60"> / 10</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                5
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                3
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                5
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                50%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-yellow-500 rounded-full dark:bg-yellow-500"></span>
-              Improving
-            </span>
-            
-            </td>
-          </tr>
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 ">
-                Para Jumbles
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                5<small class="text-xs opacity-60"> / 8</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                3
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                3
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                25%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-red-500 rounded-full dark:bg-red-500"></span>
-              Weak
-            </span>
-            
-            </td>
-          </tr>
-          
-          <tr>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400 ">
-                Geometry
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2<small class="text-xs opacity-60"> / 10</small>
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                0
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                8
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                2
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-              <span class="text-sm text-gray-600 dark:text-neutral-400">
-                20%
-              </span>
-            </td>
-            <td class="size-px whitespace-nowrap py-3 px-5">
-            
-            <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
-              <span class="size-2 inline-block bg-red-500 rounded-full dark:bg-red-500"></span>
-              Weak
-            </span>
-            
-            </td>
-          </tr>
-          
+          <template x-for="subject in filteredData" :key="subject.subject">
+            <tr>
+                <td class="size-px whitespace-nowrap py-3 px-5">
+                  <span 
+                    class="text-sm text-gray-600 dark:text-neutral-400"
+                    :class="subject.nested_subjects && subject.nested_subjects.length > 0 ? 'underline hover:cursor-pointer' : ''"
+                    @click="goToNested(subject)"
+                    x-text="subject.subject">
+                  </span>
+                </td>
+        
+              <td class="size-px whitespace-nowrap py-3 px-5">
+                <span class="text-sm text-gray-600 dark:text-neutral-400">
+                  <span x-text="subject.attempted"></span>
+                  <small class="text-xs opacity-60"> / <span x-text="subject.total_questions"></span></small>
+                </span>
+              </td>
+        
+              <td class="size-px whitespace-nowrap py-3 px-5">
+                <span class="text-sm text-gray-600 dark:text-neutral-400" x-text="subject.correct"></span>
+              </td>
+        
+              <td class="size-px whitespace-nowrap py-3 px-5">
+                <span class="text-sm text-gray-600 dark:text-neutral-400" x-text="subject.incorrect"></span>
+              </td>
+        
+              <td class="size-px whitespace-nowrap py-3 px-5">
+                <span class="text-sm text-gray-600 dark:text-neutral-400" x-text="subject.unattempted"></span>
+              </td>
+        
+              <td class="size-px whitespace-nowrap py-3 px-5">
+                <span class="text-sm text-gray-600 dark:text-neutral-400" x-text="subject.score"></span>
+              </td>
+        
+              <td class="size-px whitespace-nowrap py-3 px-5">
+                <span class="text-sm text-gray-600 dark:text-neutral-400">
+                  <span x-text="subject.percentage"></span>%
+                </span>
+              </td>
+        
+              <td class="size-px whitespace-nowrap py-3 px-5">
+                <template x-if="subject.percentage >= 80">
+                  <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
+                    <span class="size-2 inline-block bg-green-500 rounded-full dark:bg-green-500"></span>
+                    Strong
+                  </span>
+                </template>
+                <template x-if="subject.percentage >= 50 && subject.percentage < 80">
+                  <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
+                    <span class="size-2 inline-block bg-yellow-500 rounded-full dark:bg-yellow-500"></span>
+                    Improving
+                  </span>
+                </template>
+                <template x-if="subject.percentage < 50">
+                  <span class="inline-flex items-center gap-x-1 text-xs text-gray-600">
+                    <span class="size-2 inline-block bg-red-500 rounded-full dark:bg-red-500"></span>
+                    Weak
+                  </span>
+                </template>
+              </td>
+            </tr>
+          </template>
         </tbody>
+        
       </table>
       <!-- End Table -->
     </div>
   </div>
 </div>
+
+<div x-cloak x-show="filteredData.length == 0 && !loading">
+  <div class="h-[50vh] flex flex-col justify-center items-center text-center">
+    <svg class="w-48 mx-auto mb-4" width="178" height="90" viewBox="0 0 178 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="27" y="50.5" width="124" height="39" rx="7.5" fill="currentColor" class="fill-white"></rect>
+    <rect x="27" y="50.5" width="124" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-50"></rect>
+    <rect x="34.5" y="58" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-50"></rect>
+    <rect x="66.5" y="61" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-50"></rect>
+    <rect x="66.5" y="73" width="77" height="6" rx="3" fill="currentColor" class="fill-gray-50"></rect>
+    <rect x="19.5" y="28.5" width="139" height="39" rx="7.5" fill="currentColor" class="fill-white"></rect>
+    <rect x="19.5" y="28.5" width="139" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-100"></rect>
+    <rect x="27" y="36" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-100"></rect>
+    <rect x="59" y="39" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-100"></rect>
+    <rect x="59" y="51" width="92" height="6" rx="3" fill="currentColor" class="fill-gray-100"></rect>
+    <g filter="url(#filter19)">
+    <rect x="12" y="6" width="154" height="40" rx="8" fill="currentColor" class="fill-white" shape-rendering="crispEdges"></rect>
+    <rect x="12.5" y="6.5" width="153" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-100" shape-rendering="crispEdges"></rect>
+    <rect x="20" y="14" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-200 "></rect>
+    <rect x="52" y="17" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-200"></rect>
+    <rect x="52" y="29" width="106" height="6" rx="3" fill="currentColor" class="fill-gray-200"></rect>
+    </g>
+    <defs>
+    <filter id="filter19" x="0" y="0" width="178" height="64" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+    <feFlood flood-opacity="0" result="BackgroundImageFix"></feFlood>
+    <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"></feColorMatrix>
+    <feOffset dy="6"></feOffset>
+    <feGaussianBlur stdDeviation="6"></feGaussianBlur>
+    <feComposite in2="hardAlpha" operator="out"></feComposite>
+    <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.03 0"></feColorMatrix>
+    <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1187_14810"></feBlend>
+    <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1187_14810" result="shape"></feBlend>
+    </filter>
+    </defs>
+    </svg>
+    
+    <div class="max-w-sm mx-auto">
+    <p class="mt-2 font-medium text-gray-800">
+      No subjects found
+    </p>
+    <p class="mb-5 text-sm text-gray-500">
+      Looks like there are no <span class="font-medium" x-text="filter.toLowerCase()"></span> subjects in your performance report.
+    </p>
+    </div>
+    </div>
+</div>
+
+<div x-show="loading">
+  <div class="h-[50vh] flex flex-col justify-center items-center text-center">
+
+    <div role="status">
+      <svg aria-hidden="true" class="inline w-10 h-10 text-gray-200 animate-spin dark:text-gray-600 fill-emerald-600" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
+          <path d="M93.9676 39.0409C96.393 38.4038 97.8624 35.9116 97.0079 33.5539C95.2932 28.8227 92.871 24.3692 89.8167 20.348C85.8452 15.1192 80.8826 10.7238 75.2124 7.41289C69.5422 4.10194 63.2754 1.94025 56.7698 1.05124C51.7666 0.367541 46.6976 0.446843 41.7345 1.27873C39.2613 1.69328 37.813 4.19778 38.4501 6.62326C39.0873 9.04874 41.5694 10.4717 44.0505 10.1071C47.8511 9.54855 51.7191 9.52689 55.5402 10.0491C60.8642 10.7766 65.9928 12.5457 70.6331 15.2552C75.2735 17.9648 79.3347 21.5619 82.5849 25.841C84.9175 28.9121 86.7997 32.2913 88.1811 35.8758C89.083 38.2158 91.5421 39.6781 93.9676 39.0409Z" fill="currentFill"/>
+      </svg>
+      <span class="sr-only">Loading...</span>
+  </div>
+  
+    </div>
+</div>
       </div>
     </div>
   </div>
 </div>
+</div>
 <!-- End Products Table Card -->
-  <div>
+  <div x-cloak x-show="getSortedAccuracyData().length > 0">
   <div
     class="flex flex-col bg-white border border-gray-200 shadow-2xs rounded-xl dark:bg-neutral-800 dark:border-neutral-700 space-y-4">
     <div>
       <div
         class="py-3 px-5 flex flex-wrap items-center gap-2 border-b border-gray-200 dark:border-neutral-700">
         <h2 class="inline-block font-semibold text-gray-800 dark:text-neutral-200">
-          Accuracy & Time Spent
+          Accuracy & Time Spent 
         </h2>
         <div class="ml-1 hs-tooltip inline-block">
           <svg class="hs-tooltip-toggle shrink-0 size-3.5 text-gray-500 dark:text-neutral-500"
@@ -868,326 +613,37 @@
       <div class="p-5">
 <!-- Stats Grid -->
 <div class="mb-2 xl:mb-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-2 xl:gap-5">
+    <template x-for="subject in getSortedAccuracyData" :key="subject.id">
+      <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl space-y-4">
   
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Arithmetic
-      </h2>
+        <!-- Subject Title -->
+        <h2 class="text-xs uppercase text-gray-500" x-text="subject.subject"></h2>
   
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          93.33%
+        <!-- Accuracy + Chart -->
+        <div class="grid grid-cols-2 gap-x-2 items-center">
+          <div class="text-2xl font-semibold text-gray-800" x-text="subject.accuracy + '%'"></div>
+          <div id="hs-users-line-chart"></div> <!-- Optional: bind chart here -->
         </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
-      </div>
   
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="93.33" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-green-500 
-           
-          transition duration-500" style="width: 93.33%">
+        <!-- Progress Bar -->
+        <div class="flex items-center gap-x-3 whitespace-nowrap">
+          <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700"
+               :aria-valuenow="subject.accuracy" aria-valuemin="0" aria-valuemax="100">
+            <div class="flex flex-col justify-center rounded-full overflow-hidden transition duration-500"
+                 :class="subject.accuracy > 80 ? 'bg-green-500' : subject.accuracy > 50 ? 'bg-yellow-500' : 'bg-red-500'"
+                 :style="`width: ${subject.accuracy}%`">
+            </div>
           </div>
         </div>
-      </div>
   
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 12m 30s</span>
-        <span>14 / 15 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
-  
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Vocabulary
-      </h2>
-  
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          88.89%
+        <!-- Time and Attempts Info -->
+        <div class="flex justify-between text-xs text-gray-500 mt-1">
+          <span x-text="'🕒 ' + subject.time_spent"></span>
+          <span x-text="`${subject.correct} / ${subject.attempted} correct`"></span>
         </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
+  
       </div>
-  
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="88.89" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-green-500 
-           
-          transition duration-500" style="width: 88.89%">
-          </div>
-        </div>
-      </div>
-  
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 6m 10s</span>
-        <span>8 / 9 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
-  
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Data Interpretation
-      </h2>
-  
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          90%
-        </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
-      </div>
-  
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="90" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-green-500 
-           
-          transition duration-500" style="width: 90%">
-          </div>
-        </div>
-      </div>
-  
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 9m 20s</span>
-        <span>9 / 10 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
-  
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Reasoning Puzzles
-      </h2>
-  
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          72.22%
-        </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
-      </div>
-  
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="72.22" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-yellow-500 
-           
-          transition duration-500" style="width: 72.22%">
-          </div>
-        </div>
-      </div>
-  
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 14m 10s</span>
-        <span>13 / 18 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
-  
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Reading Comprehension
-      </h2>
-  
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          85.71%
-        </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
-      </div>
-  
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="85.71" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-green-500 
-           
-          transition duration-500" style="width: 85.71%">
-          </div>
-        </div>
-      </div>
-  
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 8m 40s</span>
-        <span>6 / 7 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
-  
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Algebra
-      </h2>
-  
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          71.43%
-        </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
-      </div>
-  
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="71.43" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-yellow-500 
-           
-          transition duration-500" style="width: 71.43%">
-          </div>
-        </div>
-      </div>
-  
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 7m 00s</span>
-        <span>5 / 7 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
-  
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Para Jumbles
-      </h2>
-  
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          40%
-        </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
-      </div>
-  
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-red-500 
-           
-          transition duration-500" style="width: 40%">
-          </div>
-        </div>
-      </div>
-  
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 5m 20s</span>
-        <span>2 / 5 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
-  
-  <!-- Card -->
-  <div class="flex flex-col p-5 bg-white border border-gray-200 shadow-xs rounded-xl">
-    <div class="space-y-4">
-      
-      <!-- Subject Title -->
-      <h2 class="text-xs uppercase text-gray-500">
-        Geometry
-      </h2>
-  
-      <!-- Accuracy + Chart (if any) -->
-      <div class="grid grid-cols-2 gap-x-2 items-center">
-        <div class="text-2xl font-semibold text-gray-800">
-          100%
-        </div>
-        <!-- Optional Chart -->
-        <div id="hs-users-line-chart"></div>
-      </div>
-  
-      <!-- Progress Bar -->
-      <div class="flex items-center gap-x-3 whitespace-nowrap">
-        <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden 
-          
-            bg-green-500 
-           
-          transition duration-500" style="width: 100%">
-          </div>
-        </div>
-      </div>
-  
-      <!-- Time and Attempts Info -->
-      <div class="flex justify-between text-xs text-gray-500 mt-1">
-        <span>🕒 2m 10s</span>
-        <span>2 / 2 correct</span>
-      </div>
-  
-    </div>
-  </div>
-  
+    </template>
   
   <!-- End Card -->
 
@@ -1199,7 +655,7 @@
     </div>
   </div>
 </div>
-<!-- End Products Table Card -->  
+<!-- End Products Table Card -->
 </div>
 
     </div>
@@ -1314,28 +770,130 @@ function getCustomTooltip(seriesData, seriesLabels) {
       }
     };
   }
-
-  window.addEventListener('load', () => {
-  
-    renderDonutChart('#subject_1', [14, 1, 0], ['Correct', 'Incorrect', 'Unanswered']);
-  
-    renderDonutChart('#subject_2', [8, 1, 1], ['Correct', 'Incorrect', 'Unanswered']);
-  
-    renderDonutChart('#subject_3', [9, 1, 2], ['Correct', 'Incorrect', 'Unanswered']);
-  
-    renderDonutChart('#subject_4', [13, 5, 2], ['Correct', 'Incorrect', 'Unanswered']);
-  
-    renderDonutChart('#subject_5', [6, 1, 3], ['Correct', 'Incorrect', 'Unanswered']);
-  
-    renderDonutChart('#subject_6', [5, 2, 3], ['Correct', 'Incorrect', 'Unanswered']);
-  
-    renderDonutChart('#subject_7', [2, 3, 3], ['Correct', 'Incorrect', 'Unanswered']);
-  
-    renderDonutChart('#subject_8', [2, 0, 8], ['Correct', 'Incorrect', 'Unanswered']);
-  
-});
 </script>
 
+<script>
+  function SubjectStatsComponent() {
+    return {
+      // State
+      loading: true,
+      data: [],
+      filteredData: [],
+      rawFilteredData: [],
+      filter: 'All',
+      sort: { key: 'percentage', asc: false },
+      currentView: 'root',     // 'root' or 'nested'
+      parentSubject: null,
+      parentStack: [],
+  
+      // Columns
+      columns: [
+        { key: 'subject', label: 'Subject Name' },
+        { key: 'attempted', label: 'Attempted' },
+        { key: 'correct', label: 'Correct' },
+        { key: 'incorrect', label: 'Incorrect' },
+        { key: 'unattempted', label: 'Unanswered' },
+        { key: 'score', label: 'Score' },
+        { key: 'percentage', label: 'Percentage' },
+        { key: 'performance', label: 'Performance' },
+      ],
+  
+      // Load data
+      async fetchData() {
+        this.loading = true;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+  
+        const previewPath = window.location.pathname.match(/(\/pr-preview\/pr-\d+)?/)[0] || '' 
+        const response = await fetch(`${previewPath}/api/exam/subject_report.json`);
+        const json = await response.json();
+  
+        this.data = json;
+        this.applyFilter();
+        this.loading = false;
+      },
+  
+      // Filtering
+      applyFilter() {
+        const source = this.parentStack.length > 0
+  ? this.parentStack[this.parentStack.length - 1].nested_subjects
+  : this.data;
+
+      const filtered = this.filter === 'All'
+        ? [...source]
+        : source.filter(row => this.matchesFilter(row));
+      console.log(filtered)
+      // 🔁 One for raw (unsorted)
+      this.rawFilteredData = filtered;
+
+      // 🔁 One for sorted
+      this.filteredData = [...filtered];
+      this.sortBy(this.sort.key, this.sort.asc); // sorts only filteredData
+     },
+
+  
+      matchesFilter(row) {
+
+        const p = row.percentage;
+        console.log('Filtering for:', this.filter, '→ percentage:', p);
+        return (
+          (this.filter === 'Strong' && p >= 80) ||
+          (this.filter === 'Improving' && p >= 50 && p < 80) ||
+          (this.filter === 'Weak' && p < 50)
+        );
+      },
+  
+      // Sorting
+      sortBy(key, preserve = false) {
+        this.sort.key = key;
+        this.sort.asc = preserve;
+        this.filteredData.sort((a, b) => this.compare(a[key], b[key]));
+      },
+  
+      compare(a, b) {
+        if (typeof a === 'string') {
+          return this.sort.asc ? a.localeCompare(b) : b.localeCompare(a);
+        }
+        return this.sort.asc ? a - b : b - a;
+      },
+
+  
+      // View switching
+      goToNested(subject) {
+      if (!subject.nested_subjects || subject.nested_subjects.length === 0) return;
+
+      this.parentSubject = subject;
+      this.currentView = 'nested';
+      this.parentStack.push(subject);
+      this.sort.key = 'percentage';
+      this.sort.asc = false;
+      this.applyFilter();
+      window.scrollTo(0, 0);
+    },
+
+    goToLevel(index) {
+  this.parentStack = this.parentStack.slice(0, index + 1);
+  this.applyFilter();
+},
+
+    getSortedAccuracyData() {
+    return [...this.rawFilteredData].sort((a, b) => b.accuracy - a.accuracy);
+   },
+
+   getSortedPercentageData() {
+  return [...this.rawFilteredData].sort((a, b) => b.percentage - a.percentage);
+  },
+
+  
+  goBack() {
+  if (this.parentStack.length > 0) {
+    this.parentStack.pop();
+    this.applyFilter();
+  }
+}
+};
+}
+</script>
+  
 
   </body>
 

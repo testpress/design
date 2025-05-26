@@ -1,0 +1,122 @@
+<script>
+  function SubjectStatsComponent() {
+    return {
+      // State
+      loading: true,
+      data: [],
+      filteredData: [],
+      rawFilteredData: [],
+      filter: 'All',
+      sort: { key: 'percentage', asc: false },
+      currentView: 'root',     // 'root' or 'nested'
+      parentSubject: null,
+      parentStack: [],
+  
+      // Columns
+      columns: [
+        { key: 'subject', label: 'Subject Name' },
+        { key: 'attempted', label: 'Attempted' },
+        { key: 'correct', label: 'Correct' },
+        { key: 'incorrect', label: 'Incorrect' },
+        { key: 'unattempted', label: 'Unanswered' },
+        { key: 'score', label: 'Score' },
+        { key: 'percentage', label: 'Percentage' },
+        { key: 'performance', label: 'Performance' },
+      ],
+  
+      // Load data
+      async fetchData() {
+        this.loading = true;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+  
+        const previewPath = window.location.pathname.match(/(\/pr-preview\/pr-\d+)?/)[0] || '' 
+        const response = await fetch(`${previewPath}/api/exam/subject_report.json`);
+        const json = await response.json();
+  
+        this.data = json;
+        this.applyFilter();
+        this.loading = false;
+      },
+  
+      // Filtering
+      applyFilter() {
+        const source = this.parentStack.length > 0
+  ? this.parentStack[this.parentStack.length - 1].nested_subjects
+  : this.data;
+
+      const filtered = this.filter === 'All'
+        ? [...source]
+        : source.filter(row => this.matchesFilter(row));
+      console.log(filtered)
+      // 🔁 One for raw (unsorted)
+      this.rawFilteredData = filtered;
+
+      // 🔁 One for sorted
+      this.filteredData = [...filtered];
+      this.sortBy(this.sort.key, this.sort.asc); // sorts only filteredData
+     },
+
+  
+      matchesFilter(row) {
+
+        const p = row.percentage;
+        console.log('Filtering for:', this.filter, '→ percentage:', p);
+        return (
+          (this.filter === 'Strong' && p >= 80) ||
+          (this.filter === 'Improving' && p >= 50 && p < 80) ||
+          (this.filter === 'Weak' && p < 50)
+        );
+      },
+  
+      // Sorting
+      sortBy(key, preserve = false) {
+        this.sort.key = key;
+        this.sort.asc = preserve;
+        this.filteredData.sort((a, b) => this.compare(a[key], b[key]));
+      },
+  
+      compare(a, b) {
+        if (typeof a === 'string') {
+          return this.sort.asc ? a.localeCompare(b) : b.localeCompare(a);
+        }
+        return this.sort.asc ? a - b : b - a;
+      },
+
+  
+      // View switching
+      goToNested(subject) {
+      if (!subject.nested_subjects || subject.nested_subjects.length === 0) return;
+
+      this.parentSubject = subject;
+      this.currentView = 'nested';
+      this.parentStack.push(subject);
+      this.sort.key = 'percentage';
+      this.sort.asc = false;
+      this.applyFilter();
+      window.scrollTo(0, 0);
+    },
+
+    goToLevel(index) {
+  this.parentStack = this.parentStack.slice(0, index + 1);
+  this.applyFilter();
+},
+
+    getSortedAccuracyData() {
+    return [...this.rawFilteredData].sort((a, b) => b.accuracy - a.accuracy);
+   },
+
+   getSortedPercentageData() {
+  return [...this.rawFilteredData].sort((a, b) => b.percentage - a.percentage);
+  },
+
+  
+  goBack() {
+  if (this.parentStack.length > 0) {
+    this.parentStack.pop();
+    this.applyFilter();
+  }
+}
+};
+}
+</script>
+  
