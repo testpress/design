@@ -23,6 +23,7 @@
         { key: 'score', label: 'Score' },
         { key: 'percentage', label: 'Percentage' },
         { key: 'performance', label: 'Performance' },
+        { key: 'time_spent', label: 'Time Spent' },
       ],
   
       // Load data
@@ -110,20 +111,45 @@
   
       // Sorting
       sortBy(key, preserve = false) {
+        console.log('key is',key)
         this.sort.key = key;
         this.sort.asc = preserve;
         this.filteredData.sort((a, b) => this.compare(a[key], b[key]));
       },
   
       compare(a, b) {
-        if (typeof a === 'string') {
-          return this.sort.asc ? a.localeCompare(b) : b.localeCompare(a);
-        }
-        return this.sort.asc ? a - b : b - a;
-      },
+      const key = this.sort.key;
 
-  
-      // View switching
+      // Special handling for time_spent
+      if (key === 'time_spent') {
+        const aSeconds = this.convertToSeconds(a);
+        const bSeconds = this.convertToSeconds(b);
+        return this.sort.asc ? aSeconds - bSeconds : bSeconds - aSeconds;
+      }
+
+      // Normal string/number comparison
+      if (typeof a === 'string') {
+        return this.sort.asc ? a.localeCompare(b) : b.localeCompare(a);
+      }
+      return this.sort.asc ? a - b : b - a;
+    },
+
+    convertToSeconds(timeStr) {
+      // Example formats: "2m 40s", "165s", "1m", "00:02:40"
+      if (!timeStr) return 0;
+
+      // If already a number
+      if (typeof timeStr === 'number') return timeStr;
+
+      // Handle format like "2m 40s"
+      const minMatch = timeStr.match(/(\d+)\s*m/);
+      const secMatch = timeStr.match(/(\d+)\s*s/);
+
+      const mins = minMatch ? parseInt(minMatch[1]) : 0;
+      const secs = secMatch ? parseInt(secMatch[1]) : 0;
+
+      return mins * 60 + secs;
+    },     // View switching
       goToNested(subject) {
       if (!subject.nested_subjects || subject.nested_subjects.length === 0) return;
 
