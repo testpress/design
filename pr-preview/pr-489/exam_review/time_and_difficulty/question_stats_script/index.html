@@ -1,0 +1,68 @@
+<script>
+  function questionStats() {
+    return {
+      questions: [],
+      filteredQuestions: [],
+      sections: [],
+      selectedSection: '',
+      selectedDifficulty: '',
+      searchText: '',
+      sortBy: '',
+      loading: true,
+
+      init() {
+        setTimeout(() => {
+          fetch('/api/exam/user_selected_answer.json')
+            .then(res => res.json())
+            .then(data => {
+              this.questions = data;
+              this.sections = [...new Set(data.map(q => q.section_name))];
+              this.applyFilter();
+              this.loading = false;
+            });
+        }, 3000); // Show loader for at least 3 seconds
+      },
+
+      applyFilter() {
+        let result = this.questions;
+
+        if (this.selectedSection) {
+          result = result.filter(q => q.section_name === this.selectedSection);
+        }
+
+        if (this.selectedDifficulty) {
+          result = result.filter(q => q.difficulty_level === this.selectedDifficulty);
+        }
+
+        if (this.searchText.trim()) {
+          const term = this.searchText.toLowerCase();
+          result = result.filter(q =>
+            q.question_number.includes(term) ||
+            q.question_text.toLowerCase().includes(term)
+          );
+        }
+
+        if (this.sortBy) {
+          result = result.sort((a, b) => a[this.sortBy] - b[this.sortBy]);
+        }
+
+        this.filteredQuestions = result;
+      },
+
+      get selectedSectionName() {
+        return this.sections.find(s => s.section_id === this.selectedSection);
+      },
+
+      getSectionOptions() {
+        return [...new Set(this.questions.map(q => q.section_name))];
+      },
+
+      $watch: {
+        selectedSection() { this.applyFilter(); },
+        selectedDifficulty() { this.applyFilter(); },
+        searchText() { this.applyFilter(); },
+        sortBy() { this.applyFilter(); }
+      }
+    }
+  }
+</script>
