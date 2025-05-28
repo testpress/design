@@ -1,0 +1,403 @@
+---
+tags: testpress
+title: Recurring Class Management
+permalink: testpress/recurring-class/manage/
+date: 2025-05-28
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock body_class %}
+
+{% block extra_head %}
+<script>
+  function recurringClassesApp() {
+    return {
+      showImportModal: false,
+      showEditModal: false,
+      showCancelModal: false,
+      showEditClassesModal: false,
+      showIndividualClassModal: false,
+      
+      selectedSeries: null,
+      selectedChapters: [],
+      seriesToCancel: null,
+      confirmCancellation: false,
+      
+      editingClass: null,
+      
+      chapterSearchTerm: '',
+      searchTerm: '',
+      statusFilter: '',
+      
+      seriesList: [
+        { 
+          id: 1, 
+          title: "Advanced Mathematics", 
+          description: "Weekly math classes covering calculus and algebra", 
+          schedule: "Every Monday 10:00 AM", 
+          dayOfWeek: "Monday",
+          startTime: "10:00",
+          duration: 60,
+          host: "Dr. Sarah Johnson",
+          recurrence: "Weekly",
+          status: "active", 
+          chaptersCount: 3,
+          nextSession: "2025-06-02",
+          createdAt: "2025-05-01"
+        },
+        { 
+          id: 2, 
+          title: "Physics Fundamentals", 
+          description: "Physics concepts and problem solving", 
+          schedule: "Every Wednesday 2:00 PM", 
+          dayOfWeek: "Wednesday",
+          startTime: "14:00",
+          duration: 90,
+          host: "Prof. Michael Chen",
+          recurrence: "Weekly",
+          status: "active", 
+          chaptersCount: 5,
+          nextSession: "2025-05-29",
+          createdAt: "2025-04-15"
+        },
+        { 
+          id: 3, 
+          title: "Chemistry Lab", 
+          description: "Practical chemistry experiments", 
+          schedule: "Every Friday 11:00 AM", 
+          dayOfWeek: "Friday",
+          startTime: "11:00",
+          duration: 75,
+          host: "Ms. Emily Rodriguez",
+          recurrence: "Weekly",
+          status: "cancelled", 
+          chaptersCount: 0,
+          nextSession: null,
+          createdAt: "2025-05-20"
+        }
+      ],
+      
+      courses: [
+        {
+          id: 1,
+          name: "Mathematics Grade 12",
+          chapters: [
+            { id: 1, title: "Chapter 1: Introduction to Calculus" },
+            { id: 2, title: "Chapter 2: Derivatives" },
+            { id: 3, title: "Chapter 3: Integrals" }
+          ]
+        },
+        {
+          id: 2,
+          name: "Physics Grade 11",
+          chapters: [
+            { id: 4, title: "Chapter 4: Physics Basics" },
+            { id: 5, title: "Chapter 5: Motion" },
+            { id: 6, title: "Chapter 6: Thermodynamics" }
+          ]
+        },
+        {
+          id: 3,
+          name: "Chemistry Grade 11",
+          chapters: [
+            { id: 7, title: "Chapter 1: Atomic Structure" },
+            { id: 8, title: "Chapter 2: Chemical Bonding" }
+          ]
+        }
+      ],
+      
+      classes: [
+        { 
+          id: 101, 
+          seriesId: 1, 
+          sessionNumber: 1,
+          title: "Advanced Mathematics 1", 
+          date: "Mon, May 26, 2025", 
+          dateValue: "2025-05-26",
+          time: "10:00 AM", 
+          host: "Dr. Sarah Johnson",
+          status: "completed"
+        },
+        { 
+          id: 102, 
+          seriesId: 1, 
+          sessionNumber: 2,
+          title: "Advanced Mathematics 2", 
+          date: "Mon, Jun 2, 2025", 
+          dateValue: "2025-06-02",
+          time: "10:00 AM", 
+          host: "Dr. Sarah Johnson",
+          status: "scheduled"
+        },
+        { 
+          id: 103, 
+          seriesId: 1, 
+          sessionNumber: 3,
+          title: "Advanced Mathematics 3", 
+          date: "Mon, Jun 9, 2025", 
+          dateValue: "2025-06-09",
+          time: "10:00 AM", 
+          host: "Dr. Sarah Johnson",
+          status: "scheduled"
+        },
+        
+        { 
+          id: 201, 
+          seriesId: 2, 
+          sessionNumber: 1,
+          title: "Physics Fundamentals 1", 
+          date: "Wed, May 21, 2025", 
+          dateValue: "2025-05-21",
+          time: "2:00 PM", 
+          host: "Prof. Michael Chen",
+          status: "completed"
+        },
+        { 
+          id: 202, 
+          seriesId: 2, 
+          sessionNumber: 2,
+          title: "Physics Fundamentals 2", 
+          date: "Wed, May 28, 2025", 
+          dateValue: "2025-05-28",
+          time: "2:00 PM", 
+          host: "Prof. Michael Chen",
+          status: "scheduled"
+        },
+        
+        { 
+          id: 301, 
+          seriesId: 3, 
+          sessionNumber: 1,
+          title: "Chemistry Lab 1", 
+          date: "Fri, May 30, 2025", 
+          dateValue: "2025-05-30",
+          time: "11:00 AM", 
+          host: "Ms. Emily Rodriguez",
+          status: "scheduled"
+        }
+      ],
+      
+      selectedCourse: null,
+
+      get filteredSeries() {
+        return this.seriesList.filter(series => {
+          const matchesSearch = !this.searchTerm || 
+            series.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+          const matchesStatus = !this.statusFilter || series.status === this.statusFilter;
+          
+          return matchesSearch && matchesStatus;
+        });
+      },
+
+      get availableChapters() {
+        return this.courses.flatMap(course => 
+          course.chapters.map(chapter => ({
+            ...chapter,
+            course: course.name
+          }))
+        );
+      },
+
+      get filteredChapters() {
+        if (!this.chapterSearchTerm) {
+          return this.availableChapters;
+        }
+        
+        return this.availableChapters.filter(chapter => 
+          chapter.title.toLowerCase().includes(this.chapterSearchTerm.toLowerCase()) ||
+          chapter.course.toLowerCase().includes(this.chapterSearchTerm.toLowerCase())
+        );
+      },
+
+      formatTime(time) {
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+      },
+
+      formatDate(dateString) {
+        if (!dateString) return '-';
+        return new Date(dateString).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      },
+
+      getStatusBadgeClass(status) {
+        const classes = {
+          'active': 'bg-green-100 text-green-800',
+          'cancelled': 'bg-yellow-100 text-yellow-800',
+          'archived': 'bg-gray-100 text-gray-800'
+        };
+        return classes[status] || 'bg-gray-100 text-gray-800';
+      },
+      
+      getClassesForSeries(seriesId) {
+        return this.classes.filter(cls => cls.seriesId === seriesId);
+      },
+
+      toggleChapterSelection(chapterId) {
+        const index = this.selectedChapters.indexOf(chapterId);
+        if (index === -1) {
+          this.selectedChapters.push(chapterId);
+        } else {
+          this.selectedChapters.splice(index, 1);
+        }
+      },
+      
+      selectCourse(course) {
+        this.selectedCourse = course;
+        this.selectedChapters = [];
+      },
+      
+      goBackToCourseSelection() {
+        this.selectedCourse = null;
+        this.selectedChapters = [];
+      },
+
+      openImportModal(series) {
+        this.selectedSeries = series;
+        this.selectedCourse = null;
+        this.selectedChapters = [];
+        this.chapterSearchTerm = '';
+        this.showImportModal = true;
+      },
+
+      openCancelModal(series) {
+        this.seriesToCancel = series;
+        this.showCancelModal = true;
+      },
+
+      importToChapters() {
+        const series = this.seriesList.find(s => s.id === this.selectedSeries.id);
+        if (series) {
+          series.chaptersCount += this.selectedChapters.length;
+          if (series.chaptersCount > 0 && series.status === 'cancelled') {
+            series.status = 'active';
+          }
+        }
+        
+        this.showImportModal = false;
+        this.selectedSeries = null;
+        this.selectedChapters = [];
+      },
+
+      updateSeries() {
+        this.showEditModal = false;
+        this.selectedSeries = null;
+      },
+
+      cancelSeries() {
+        if (this.seriesToCancel) {
+          const series = this.seriesList.find(s => s.id === this.seriesToCancel.id);
+          if (series) {
+            series.status = 'cancelled';
+          }
+          this.showCancelModal = false;
+          this.seriesToCancel = null;
+          this.confirmCancellation = false;
+        }
+      },
+      
+      openEditClasses(series) {
+        this.selectedSeries = series;
+        this.showEditClassesModal = true;
+      },
+      
+      editIndividualClass(classItem) {
+        this.editingClass = { ...classItem };
+        this.showIndividualClassModal = true;
+      },
+      
+      saveIndividualClass() {
+        if (this.editingClass) {
+          const index = this.classes.findIndex(cls => cls.id === this.editingClass.id);
+          if (index !== -1) {
+            if (this.editingClass.dateValue) {
+              const date = new Date(this.editingClass.dateValue);
+              this.editingClass.date = date.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+              });
+            }
+            
+            this.classes[index] = { ...this.editingClass };
+            this.showIndividualClassModal = false;
+            this.editingClass = null;
+          }
+        }
+      },
+      
+      rescheduleClass(classItem) {
+        this.editIndividualClass(classItem);
+      },
+      
+      cancelClass(classItem) {
+        if (confirm(`Are you sure you want to cancel "${classItem.title}"?`)) {
+          const index = this.classes.findIndex(cls => cls.id === classItem.id);
+          if (index !== -1) {
+            this.classes[index].status = 'cancelled';
+          }
+        }
+      },
+      
+      saveAllChanges() {
+        this.showEditClassesModal = false;
+      }
+    }
+  }
+</script>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="py-10 max-w-7xl mx-auto lg:px-8 px-4 space-y-5" x-data="recurringClassesApp()">
+  {% include "./includes/header.html" %}
+  
+  <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-xl">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="flex-1 max-w-lg">
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+          <input 
+            type="text" 
+            x-model="searchTerm"
+            placeholder="Search series by title..."
+            class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+          >
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <select 
+          x-model="statusFilter"
+          class="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm rounded-md"
+        >
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+
+        <span class="text-sm text-gray-500 whitespace-nowrap" x-text="filteredSeries.length + ' series'"></span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="p-5 space-y-4 flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl">
+    {% include "./includes/series_table.html" %}
+  </div>
+
+  {% include "./includes/import_to_chapters_modal.html" %}
+  {% include "./includes/cancel_confirmation_modal.html" %}
+  {% include "./includes/edit_classes_modal.html" %}
+</div>
+{% endblock content %}
