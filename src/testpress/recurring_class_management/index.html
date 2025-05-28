@@ -178,7 +178,9 @@ date: 2025-05-28
         }
       ],
       
-      selectedCourse: null,
+      selectedCourses: [],
+      showCourseDropdown: false,
+      showChapterDropdown: false,
 
       get filteredSeries() {
         return this.seriesList.filter(series => {
@@ -191,12 +193,18 @@ date: 2025-05-28
       },
 
       get availableChapters() {
-        return this.courses.flatMap(course => 
-          course.chapters.map(chapter => ({
-            ...chapter,
-            course: course.name
-          }))
-        );
+        if (this.selectedCourses.length === 0) {
+          return [];
+        }
+        
+        return this.courses
+          .filter(course => this.selectedCourses.includes(course.id))
+          .flatMap(course => 
+            course.chapters.map(chapter => ({
+              ...chapter,
+              course: course.name
+            }))
+          );
       },
 
       get filteredChapters() {
@@ -249,6 +257,21 @@ date: 2025-05-28
         }
       },
       
+      toggleCourseSelection(courseId) {
+        const index = this.selectedCourses.indexOf(courseId);
+        if (index === -1) {
+          this.selectedCourses.push(courseId);
+        } else {
+          this.selectedCourses.splice(index, 1);
+          // Remove chapters from unselected course
+          const course = this.courses.find(c => c.id === courseId);
+          if (course) {
+            const chapterIds = course.chapters.map(ch => ch.id);
+            this.selectedChapters = this.selectedChapters.filter(id => !chapterIds.includes(id));
+          }
+        }
+      },
+      
       selectCourse(course) {
         this.selectedCourse = course;
         this.selectedChapters = [];
@@ -261,9 +284,11 @@ date: 2025-05-28
 
       openImportModal(series) {
         this.selectedSeries = series;
-        this.selectedCourse = null;
+        this.selectedCourses = [];
         this.selectedChapters = [];
         this.chapterSearchTerm = '';
+        this.showCourseDropdown = false;
+        this.showChapterDropdown = false;
         this.showImportModal = true;
       },
 
@@ -283,12 +308,10 @@ date: 2025-05-28
         
         this.showImportModal = false;
         this.selectedSeries = null;
+        this.selectedCourses = [];
         this.selectedChapters = [];
-      },
-
-      updateSeries() {
-        this.showEditModal = false;
-        this.selectedSeries = null;
+        this.showCourseDropdown = false;
+        this.showChapterDropdown = false;
       },
 
       cancelSeries() {
