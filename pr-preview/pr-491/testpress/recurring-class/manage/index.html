@@ -1,0 +1,1684 @@
+<!doctype html>
+<html class=" ">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="generator" content="Eleventy v3.0.0">
+  <title>Recurring Class Management</title>
+  <link rel="stylesheet" href="/pr-preview/pr-491/css/tailwind.css" />
+  
+  <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter var',],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    [data-tooltip]:hover span {
+      display: block;
+    }
+  </style>
+  
+<script>
+  function recurringClassesApp() {
+    return {
+      showImportModal: false,
+      showEditModal: false,
+      showCancelModal: false,
+      showEditClassesModal: false,
+      showIndividualClassModal: false,
+      
+      selectedSeries: null,
+      selectedChapters: [],
+      seriesToCancel: null,
+      confirmCancellation: false,
+      
+      editingClass: null,
+      
+      chapterSearchTerm: '',
+      searchTerm: '',
+      statusFilter: '',
+      
+      seriesList: [
+        { 
+          id: 1, 
+          title: "Advanced Mathematics", 
+          description: "Weekly math classes covering calculus and algebra", 
+          schedule: "Every Monday 10:00 AM", 
+          dayOfWeek: "Monday",
+          startTime: "10:00",
+          duration: 60,
+          host: "Dr. Sarah Johnson",
+          recurrence: "Weekly",
+          status: "active", 
+          chaptersCount: 3,
+          nextSession: "2025-06-02",
+          createdAt: "2025-05-01"
+        },
+        { 
+          id: 2, 
+          title: "Physics Fundamentals", 
+          description: "Physics concepts and problem solving", 
+          schedule: "Every Wednesday 2:00 PM", 
+          dayOfWeek: "Wednesday",
+          startTime: "14:00",
+          duration: 90,
+          host: "Prof. Michael Chen",
+          recurrence: "Weekly",
+          status: "active", 
+          chaptersCount: 5,
+          nextSession: "2025-05-29",
+          createdAt: "2025-04-15"
+        },
+        { 
+          id: 3, 
+          title: "Chemistry Lab", 
+          description: "Practical chemistry experiments", 
+          schedule: "Every Friday 11:00 AM", 
+          dayOfWeek: "Friday",
+          startTime: "11:00",
+          duration: 75,
+          host: "Ms. Emily Rodriguez",
+          recurrence: "Weekly",
+          status: "cancelled", 
+          chaptersCount: 0,
+          nextSession: null,
+          createdAt: "2025-05-20"
+        }
+      ],
+      
+      courses: [
+        {
+          id: 1,
+          name: "Mathematics Grade 12",
+          chapters: [
+            { id: 1, title: "Chapter 1: Introduction to Calculus" },
+            { id: 2, title: "Chapter 2: Derivatives" },
+            { id: 3, title: "Chapter 3: Integrals" }
+          ]
+        },
+        {
+          id: 2,
+          name: "Physics Grade 11",
+          chapters: [
+            { id: 4, title: "Chapter 4: Physics Basics" },
+            { id: 5, title: "Chapter 5: Motion" },
+            { id: 6, title: "Chapter 6: Thermodynamics" }
+          ]
+        },
+        {
+          id: 3,
+          name: "Chemistry Grade 11",
+          chapters: [
+            { id: 7, title: "Chapter 1: Atomic Structure" },
+            { id: 8, title: "Chapter 2: Chemical Bonding" }
+          ]
+        }
+      ],
+      
+      classes: [
+        { 
+          id: 101, 
+          seriesId: 1, 
+          sessionNumber: 1,
+          title: "Advanced Mathematics 1", 
+          date: "Mon, May 26, 2025", 
+          dateValue: "2025-05-26",
+          time: "10:00 AM", 
+          host: "Dr. Sarah Johnson",
+          status: "completed"
+        },
+        { 
+          id: 102, 
+          seriesId: 1, 
+          sessionNumber: 2,
+          title: "Advanced Mathematics 2", 
+          date: "Mon, Jun 2, 2025", 
+          dateValue: "2025-06-02",
+          time: "10:00 AM", 
+          host: "Dr. Sarah Johnson",
+          status: "scheduled"
+        },
+        { 
+          id: 103, 
+          seriesId: 1, 
+          sessionNumber: 3,
+          title: "Advanced Mathematics 3", 
+          date: "Mon, Jun 9, 2025", 
+          dateValue: "2025-06-09",
+          time: "10:00 AM", 
+          host: "Dr. Sarah Johnson",
+          status: "scheduled"
+        },
+        
+        { 
+          id: 201, 
+          seriesId: 2, 
+          sessionNumber: 1,
+          title: "Physics Fundamentals 1", 
+          date: "Wed, May 21, 2025", 
+          dateValue: "2025-05-21",
+          time: "2:00 PM", 
+          host: "Prof. Michael Chen",
+          status: "completed"
+        },
+        { 
+          id: 202, 
+          seriesId: 2, 
+          sessionNumber: 2,
+          title: "Physics Fundamentals 2", 
+          date: "Wed, May 28, 2025", 
+          dateValue: "2025-05-28",
+          time: "2:00 PM", 
+          host: "Prof. Michael Chen",
+          status: "scheduled"
+        },
+        
+        { 
+          id: 301, 
+          seriesId: 3, 
+          sessionNumber: 1,
+          title: "Chemistry Lab 1", 
+          date: "Fri, May 30, 2025", 
+          dateValue: "2025-05-30",
+          time: "11:00 AM", 
+          host: "Ms. Emily Rodriguez",
+          status: "scheduled"
+        }
+      ],
+      
+      selectedCourse: null,
+
+      get filteredSeries() {
+        return this.seriesList.filter(series => {
+          const matchesSearch = !this.searchTerm || 
+            series.title.toLowerCase().includes(this.searchTerm.toLowerCase())
+          const matchesStatus = !this.statusFilter || series.status === this.statusFilter;
+          
+          return matchesSearch && matchesStatus;
+        });
+      },
+
+      get availableChapters() {
+        return this.courses.flatMap(course => 
+          course.chapters.map(chapter => ({
+            ...chapter,
+            course: course.name
+          }))
+        );
+      },
+
+      get filteredChapters() {
+        if (!this.chapterSearchTerm) {
+          return this.availableChapters;
+        }
+        
+        return this.availableChapters.filter(chapter => 
+          chapter.title.toLowerCase().includes(this.chapterSearchTerm.toLowerCase()) ||
+          chapter.course.toLowerCase().includes(this.chapterSearchTerm.toLowerCase())
+        );
+      },
+
+      formatTime(time) {
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+      },
+
+      formatDate(dateString) {
+        if (!dateString) return '-';
+        return new Date(dateString).toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      },
+
+      getStatusBadgeClass(status) {
+        const classes = {
+          'active': 'bg-green-100 text-green-800',
+          'cancelled': 'bg-yellow-100 text-yellow-800',
+          'archived': 'bg-gray-100 text-gray-800'
+        };
+        return classes[status] || 'bg-gray-100 text-gray-800';
+      },
+      
+      getClassesForSeries(seriesId) {
+        return this.classes.filter(cls => cls.seriesId === seriesId);
+      },
+
+      toggleChapterSelection(chapterId) {
+        const index = this.selectedChapters.indexOf(chapterId);
+        if (index === -1) {
+          this.selectedChapters.push(chapterId);
+        } else {
+          this.selectedChapters.splice(index, 1);
+        }
+      },
+      
+      selectCourse(course) {
+        this.selectedCourse = course;
+        this.selectedChapters = [];
+      },
+      
+      goBackToCourseSelection() {
+        this.selectedCourse = null;
+        this.selectedChapters = [];
+      },
+
+      openImportModal(series) {
+        this.selectedSeries = series;
+        this.selectedCourse = null;
+        this.selectedChapters = [];
+        this.chapterSearchTerm = '';
+        this.showImportModal = true;
+      },
+
+      openCancelModal(series) {
+        this.seriesToCancel = series;
+        this.showCancelModal = true;
+      },
+
+      importToChapters() {
+        const series = this.seriesList.find(s => s.id === this.selectedSeries.id);
+        if (series) {
+          series.chaptersCount += this.selectedChapters.length;
+          if (series.chaptersCount > 0 && series.status === 'cancelled') {
+            series.status = 'active';
+          }
+        }
+        
+        this.showImportModal = false;
+        this.selectedSeries = null;
+        this.selectedChapters = [];
+      },
+
+      updateSeries() {
+        this.showEditModal = false;
+        this.selectedSeries = null;
+      },
+
+      cancelSeries() {
+        if (this.seriesToCancel) {
+          const series = this.seriesList.find(s => s.id === this.seriesToCancel.id);
+          if (series) {
+            series.status = 'cancelled';
+          }
+          this.showCancelModal = false;
+          this.seriesToCancel = null;
+          this.confirmCancellation = false;
+        }
+      },
+      
+      openEditClasses(series) {
+        this.selectedSeries = series;
+        this.showEditClassesModal = true;
+      },
+      
+      editIndividualClass(classItem) {
+        this.editingClass = { ...classItem };
+        this.showIndividualClassModal = true;
+      },
+      
+      saveIndividualClass() {
+        if (this.editingClass) {
+          const index = this.classes.findIndex(cls => cls.id === this.editingClass.id);
+          if (index !== -1) {
+            if (this.editingClass.dateValue) {
+              const date = new Date(this.editingClass.dateValue);
+              this.editingClass.date = date.toLocaleDateString('en-US', { 
+                weekday: 'short', 
+                year: 'numeric', 
+                month: 'short', 
+                day: 'numeric' 
+              });
+            }
+            
+            this.classes[index] = { ...this.editingClass };
+            this.showIndividualClassModal = false;
+            this.editingClass = null;
+          }
+        }
+      },
+      
+      rescheduleClass(classItem) {
+        this.editIndividualClass(classItem);
+      },
+      
+      cancelClass(classItem) {
+        if (confirm(`Are you sure you want to cancel "${classItem.title}"?`)) {
+          const index = this.classes.findIndex(cls => cls.id === classItem.id);
+          if (index !== -1) {
+            this.classes[index].status = 'cancelled';
+          }
+        }
+      },
+      
+      saveAllChanges() {
+        this.showEditClassesModal = false;
+      }
+    }
+  }
+</script>
+
+
+  <script defer src="https://unpkg.com/alpinejs@3.4.2/dist/cdn.min.js"></script>
+  <script src="/node_modules/preline/dist/preline.js"></script>
+
+   <style>
+    [x-cloak] {
+      display: none !important;
+    }
+  </style>
+</head>
+
+ 
+  <body class="h-full overflow-y-scroll min-h-screen bg-gray-100">
+    <div class="min-h-full">
+      <nav class="bg-white shadow-sm" x-data="{open: false}">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16">
+        <div class="flex">
+          <div class="flex-shrink-0 flex items-center">
+            <img class="block lg:hidden h-8 w-auto"
+              src="https://brilliantpala.org/wp-content/uploads/2021/12/brilliant-logo-2.webp" alt="Workflow">
+            <img class="hidden lg:block h-8 w-auto"
+              src="https://brilliantpala.org/wp-content/uploads/2021/12/brilliant-logo-2.webp" alt="Workflow">
+          </div>
+          <div class="hidden lg:flex sm:-my-px sm:ml-6 sm:space-x-8">
+            <!-- Current: "border-indigo-500 text-gray-900", Default: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" -->
+            <a href="#"
+              class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Courses</a>
+
+            <a href="#"
+              class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Exams</a>
+
+              <a href="/pr-preview/pr-491/questions/reports"
+              class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">Questions</a>
+
+              <div class="relative inline-block flex" x-data="{showdropdown:false}">
+                <div class="flex">
+                  <button type="button" @click="showdropdown=!showdropdown" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                    <p class="ml-2 whitespace-nowrap">Memberships</p>
+                    <svg class="ml-2 h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path>
+                    </svg>
+                  </button>
+                  <div class="absolute right-0 z-50 w-48 origin-top-right top-full rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" x-show="showdropdown" @click.away="showdropdown=false" style="display: none;">
+                    <div class="py-1" role="none">
+                      <!-- Active: "bg-gray-100 text-gray-900", Not Active: "text-gray-700" -->
+                      <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 text-gray-900 hover:curson-pointer" role="menuitem" tabindex="-1" id="menu-item-0">Members Management</a>
+                      <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 text-gray-900 hover:curson-pointer" role="menuitem" tabindex="-1" id="menu-item-1">Batch Management</a>
+                      <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 text-gray-900 hover:curson-pointer" role="menuitem" tabindex="-1" id="menu-item-2">Roles management</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="relative inline-block flex" x-data="{showdropdown:false}">
+                <div class="flex">
+                  <button type="button" @click="showdropdown=!showdropdown" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                    <p class="ml-2 whitespace-nowrap">Evaluate</p>
+                    <svg class="ml-2 h-5 w-5 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd"></path>
+                    </svg>
+                  </button>
+                  <div class="absolute right-0 z-50 w-48 origin-top-right top-full rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" x-show="showdropdown" @click.away="showdropdown=false" style="display: none;">
+                    <div class="py-1" role="none">
+                      <!-- Active: "bg-gray-100 text-gray-900", Not Active: "text-gray-700" -->
+                      <a href="#" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 text-gray-900 hover:curson-pointer" role="menuitem" tabindex="-1" id="menu-item-0">Exam Evaluations</a>
+                      <a href="/pr-preview/pr-491/testpress/assignment_submissions/" class="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:curson-pointer" role="menuitem" tabindex="-1" id="menu-item-1">Assignment Evaluations</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+
+            <a href="/pr-preview/pr-491/doubts/"
+              class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+              aria-current="page">Doubts</a>
+
+              <a href="/reported_forum_thread/"
+              class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
+              aria-current="page">Discussion</a>
+          </div>
+        </div>
+        <div x-data="globalSearch()" x-init="watchSearchOpen" class="hidden lg:flex sm:ml-6 items-center">
+          
+          <button @click="search_open = true" type="button"
+            class="bg-white p-1 mr-2 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <span class="sr-only">Global search</span>
+            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"></path>
+            </svg>
+          </button>
+          <div x-cloak x-show="search_open" @keydown.window.escape="search_open = false" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+    x-transition:enter="ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0">
+  </div>
+
+  <div class="fixed inset-0 z-10">
+    <div class="m-3 flex h-[calc(100%-3.5rem)] min-h-[calc(100%-3.5rem)] items-center transition-all ease-out sm:mx-auto sm:w-full sm:max-w-lg">
+<div @click.away="search_open = false;" class="relative transform overflow-hidden rounded-lg bg-white  text-left shadow-xl transition-all sm:my-8 sm:w-full">
+    <!-- Input -->
+    <div class="relative">
+      <div class="pointer-events-none absolute inset-y-0 start-0 z-20 flex items-center pl-3">
+        <svg class="w-4 h-4 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      </div>
+      <input x-model="searchQuery" type="text" value="Refund" class="block w-full rounded-t-lg border-transparent border-b-stone-200 bg-white py-3 pl-10 pr-8 text-sm placeholder:text-stone-500 focus:border-transparent focus:border-b-stone-200 focus:outline-none focus:ring-0 disabled:pointer-events-none disabled:opacity-50" placeholder="Search or type a command" autofocus />
+      <div class="pointer-events-none absolute inset-y-0 end-0 z-20 flex hidden items-center pr-1">
+        <button type="button" class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-gray-500 hover:text-blue-600 focus:text-blue-600 focus:outline-none" aria-label="Close">
+          <span class="sr-only">Close</span>
+          <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="m15 9-6 6" />
+            <path d="m9 9 6 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <!-- End Input -->
+
+    <!-- Body -->
+    <div class="overflow-hidden">
+      <!-- List Group -->
+      <div :class="{'mb-4 border-b': searchQuery.trim().length > 0, 'pb-4 last:mb-0 last:border-0 last:pb-0': true}" class="border-stone-200 border-b last:mb-0 last:border-0 last:pb-0 p-4 shadow-sm">
+        <span class="mb-2 block text-xs text-stone-500"> Filters </span>
+
+        <div class="flex flex-wrap gap-1 sm:gap-2">
+          <!-- Loop through filterItems -->
+          <template x-for="(filter, index) in filterItems" :key="index">
+            <a 
+              :class="selectedFilters.includes(filter) ? 'bg-stone-200 text-stone-900' : ''" 
+              class="inline-flex items-center gap-x-1.5 rounded-full border border-stone-200 px-2.5 py-1.5 text-xs text-stone-800 hover:bg-stone-200 focus:outline-none cursor-pointer" 
+              href="#" 
+              @click.prevent="selectedFilters.includes(filter) ? selectedFilters = selectedFilters.filter(f => f !== filter) : selectedFilters.push(filter)"
+            >
+              <span x-text="filter"></span>
+            </a>
+          </template>
+        </div>
+      </div>
+
+      <div x-show="searchQuery.trim().length > 0" class="overflow-hidden overflow-y-auto max-h-98 mb-4 border-b pb-4 last:mb-0 last:border-0 last:pb-0 px-4 pt-2" style="max-height: 33rem;">
+        <span class="mb-2 block text-xs text-stone-500 dark:text-neutral-500">Results </span>
+
+        <!-- List Group -->
+        <ul>
+          <!-- Loop through results that have 'learning' in title or description -->
+          <template x-for="(result, index) in results.filter(r => (r.title.toLowerCase().includes('learning') || r.description.toLowerCase().includes('learning')))" :key="result.id">
+            <li class="py-3 flex items-center border-t border-gray-200 cursor-pointer group hover:bg-gray-200" :class="{ 'border-t': index !== 0 }">
+              <!-- Icon based on type -->
+              <span class="mr-3">
+                <img :src="iconMapping[result.type]" class="w-10 h-10" alt="Live Stream">
+              </span>
+    
+              <!-- Result content with highlighted 'learning' -->
+              <div>
+                <p class="truncate">
+                  <a class="truncate font-semibold text-sm text-gray-800 hover:text-blue-600 decoration-2 hover:underline focus:outline-none focus:underline" href="#">
+                    <span x-html="highlight(result.title)"></span>
+                  </a>
+                </p>
+                <p class="text-sm text-gray-500" x-html="highlight(result.description)"></p>
+                <span class="mt-2 py-0.5 px-2 inline-flex items-center gap-x-1.5 bg-white border border-gray-200 text-gray-800 text-xs rounded-lg group-hover:bg-white" x-show="result.tags">
+                  <!-- SVG Icon -->
+                  <svg class="shrink-0 size-3 text-sm text-gray-800" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path>
+                    <circle cx="7.5" cy="7.5" r=".5" fill="currentColor"></circle>
+                  </svg>
+                  <span class="mb-0.5" x-html="highlight(result.tags)"></span>
+                </span> 
+              </div>
+            </li>
+          </template>
+        </ul>
+        <!-- End List Group -->
+      </div>
+    </div>
+    <!-- End Body -->
+    <!-- Footer -->
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 p-4">
+      <div class="inline-flex items-center gap-x-2">
+        <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+          <svg class="size-3 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 10 4 15 9 20" />
+            <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+          </svg>
+        </div>
+        <span class="text-xs text-stone-400"> to close </span>
+      </div>
+
+      <div class="inline-flex items-center gap-x-4">
+        <div class="inline-flex items-center gap-x-2">
+          <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+            <svg class="size-3.5 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 14.596C21.828 15.1189 20.888 16 19.5969 16C18.3057 16 16.9265 14.6624 16.9265 12.8974V12.0687C16.9265 10.2373 18.2022 9.00142 19.5969 9.00142C20.9918 9.00142 21.7942 9.69876 22 10.5666M14.5417 10.3109C14.3233 9.6198 13.3292 8.96537 12.1831 9.00142C11.0374 9.03732 10.0119 9.83333 10.0119 10.777C10.0119 11.7208 10.6901 12.0632 12.1839 12.2081C13.6774 12.353 14.49 13.1331 14.5417 13.9596C14.5934 14.7861 13.8083 16 12.1839 16C10.7604 16 9.69525 14.6894 9.63548 13.9379M7.25295 14.7213C6.82726 15.5884 5.94455 15.9999 4.75814 15.9999C3.57172 15.9999 2 15.088 2 12.7831V12.1113C2 10.5911 3.16477 9.00113 4.75814 9.00113C6.35166 9.00113 7.41158 10.5059 7.25295 12.2838H2.47754" /></svg>
+          </div>
+          <span class="text-xs text-stone-400"> to select </span>
+        </div>
+
+        <div class="inline-flex items-center gap-x-2">
+          <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+            <svg class="size-3 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5v14" />
+              <path d="m19 12-7 7-7-7" />
+            </svg>
+          </div>
+          <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+            <svg class="size-3 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 12 7-7 7 7" />
+              <path d="M12 19V5" />
+            </svg>
+          </div>
+          <span class="text-xs text-stone-400"> to navigate </span>
+        </div>
+      </div>
+    </div>
+    <!-- End Footer -->
+  </div>
+</div>
+</div>
+</div>
+          <button type="button"
+            class="bg-white p-1 mr-2 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <span class="sr-only">View notifications</span>
+            <!-- Heroicon name: outline/bell -->
+            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </button>
+
+          <!-- Profile dropdown -->
+          <div @keydown.escape.stop="open = false;" @click.away="open=false" class="ml-3 relative">
+            <div>
+              <button type="button" @click="open=true"
+                class="bg-white flex text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                id="user-menu-button" aria-expanded="false" aria-haspopup="true">
+                <span class="sr-only">Open user menu</span>
+                <img class="h-8 w-8 rounded-full"
+                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+                  alt="">
+              </button>
+            </div>
+            
+            <!--
+            Dropdown menu, show/hide based on menu state.
+
+            Entering: "transition ease-out duration-200"
+              From: "transform opacity-0 scale-95"
+              To: "transform opacity-100 scale-100"
+            Leaving: "transition ease-in duration-75"
+              From: "transform opacity-100 scale-100"
+              To: "transform opacity-0 scale-95"
+          -->
+            <div x-show="open" x-transition:enter="transition ease-out duration-200"
+              x-transition:enter-start="transform opacity-0 scale-95"
+              x-transition:enter-end="transform opacity-100 scale-100"
+              x-transition:leave="transition ease-in duration-75"
+              x-transition:leave-start="transform opacity-100 scale-100"
+              x-transition:leave-end="transform opacity-0 scale-95"
+              class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none"
+              role="menu" aria-orientation="vertical" aria-labelledby="user-menu-button" tabindex="-1">
+              <!-- Active: "bg-gray-100", Not Active: "" -->
+              <a href="#" class="block px-4 py-2 text-sm text-gray-700" role="menuitem" tabindex="-1"
+                id="user-menu-item-0">Your Profile</a>
+
+              <a href="#" class="block px-4 py-2 text-sm text-gray-700" role="menuitem" tabindex="-1"
+                id="user-menu-item-1">Settings</a>
+
+              <a href="#" class="block px-4 py-2 text-sm text-gray-700" role="menuitem" tabindex="-1"
+                id="user-menu-item-2">Sign out</a>
+            </div>
+          </div>
+        </div>
+        <div x-data="globalSearch()" x-init="watchSearchOpen" @keydown.escape.stop="open = false;" @click.away="open=false" class="space-x-2 flex lg:hidden items-center">
+          <!-- Mobile menu button -->
+          <button type="button" @click="search_open = true" 
+            class="bg-white inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            aria-controls="mobile-menu" aria-expanded="false">
+            <span class="sr-only">Global search</span>
+            <svg class="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd"></path>
+            </svg>
+          </button>  
+          <div x-cloak x-show="search_open" @keydown.window.escape="search_open = false" class="relative z-50" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+    x-transition:enter="ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0">
+  </div>
+
+  <div class="fixed inset-0 z-10">
+    <div class="m-3 flex h-[calc(100%-3.5rem)] min-h-[calc(100%-3.5rem)] items-center transition-all ease-out sm:mx-auto sm:w-full sm:max-w-lg">
+<div @click.away="search_open = false;" class="relative transform overflow-hidden rounded-lg bg-white  text-left shadow-xl transition-all sm:my-8 sm:w-full">
+    <!-- Input -->
+    <div class="relative">
+      <div class="pointer-events-none absolute inset-y-0 start-0 z-20 flex items-center pl-3">
+        <svg class="w-4 h-4 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      </div>
+      <input x-model="searchQuery" type="text" value="Refund" class="block w-full rounded-t-lg border-transparent border-b-stone-200 bg-white py-3 pl-10 pr-8 text-sm placeholder:text-stone-500 focus:border-transparent focus:border-b-stone-200 focus:outline-none focus:ring-0 disabled:pointer-events-none disabled:opacity-50" placeholder="Search or type a command" autofocus />
+      <div class="pointer-events-none absolute inset-y-0 end-0 z-20 flex hidden items-center pr-1">
+        <button type="button" class="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-gray-500 hover:text-blue-600 focus:text-blue-600 focus:outline-none" aria-label="Close">
+          <span class="sr-only">Close</span>
+          <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="m15 9-6 6" />
+            <path d="m9 9 6 6" />
+          </svg>
+        </button>
+      </div>
+    </div>
+    <!-- End Input -->
+
+    <!-- Body -->
+    <div class="overflow-hidden">
+      <!-- List Group -->
+      <div :class="{'mb-4 border-b': searchQuery.trim().length > 0, 'pb-4 last:mb-0 last:border-0 last:pb-0': true}" class="border-stone-200 border-b last:mb-0 last:border-0 last:pb-0 p-4 shadow-sm">
+        <span class="mb-2 block text-xs text-stone-500"> Filters </span>
+
+        <div class="flex flex-wrap gap-1 sm:gap-2">
+          <!-- Loop through filterItems -->
+          <template x-for="(filter, index) in filterItems" :key="index">
+            <a 
+              :class="selectedFilters.includes(filter) ? 'bg-stone-200 text-stone-900' : ''" 
+              class="inline-flex items-center gap-x-1.5 rounded-full border border-stone-200 px-2.5 py-1.5 text-xs text-stone-800 hover:bg-stone-200 focus:outline-none cursor-pointer" 
+              href="#" 
+              @click.prevent="selectedFilters.includes(filter) ? selectedFilters = selectedFilters.filter(f => f !== filter) : selectedFilters.push(filter)"
+            >
+              <span x-text="filter"></span>
+            </a>
+          </template>
+        </div>
+      </div>
+
+      <div x-show="searchQuery.trim().length > 0" class="overflow-hidden overflow-y-auto max-h-98 mb-4 border-b pb-4 last:mb-0 last:border-0 last:pb-0 px-4 pt-2" style="max-height: 33rem;">
+        <span class="mb-2 block text-xs text-stone-500 dark:text-neutral-500">Results </span>
+
+        <!-- List Group -->
+        <ul>
+          <!-- Loop through results that have 'learning' in title or description -->
+          <template x-for="(result, index) in results.filter(r => (r.title.toLowerCase().includes('learning') || r.description.toLowerCase().includes('learning')))" :key="result.id">
+            <li class="py-3 flex items-center border-t border-gray-200 cursor-pointer group hover:bg-gray-200" :class="{ 'border-t': index !== 0 }">
+              <!-- Icon based on type -->
+              <span class="mr-3">
+                <img :src="iconMapping[result.type]" class="w-10 h-10" alt="Live Stream">
+              </span>
+    
+              <!-- Result content with highlighted 'learning' -->
+              <div>
+                <p class="truncate">
+                  <a class="truncate font-semibold text-sm text-gray-800 hover:text-blue-600 decoration-2 hover:underline focus:outline-none focus:underline" href="#">
+                    <span x-html="highlight(result.title)"></span>
+                  </a>
+                </p>
+                <p class="text-sm text-gray-500" x-html="highlight(result.description)"></p>
+                <span class="mt-2 py-0.5 px-2 inline-flex items-center gap-x-1.5 bg-white border border-gray-200 text-gray-800 text-xs rounded-lg group-hover:bg-white" x-show="result.tags">
+                  <!-- SVG Icon -->
+                  <svg class="shrink-0 size-3 text-sm text-gray-800" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path>
+                    <circle cx="7.5" cy="7.5" r=".5" fill="currentColor"></circle>
+                  </svg>
+                  <span class="mb-0.5" x-html="highlight(result.tags)"></span>
+                </span> 
+              </div>
+            </li>
+          </template>
+        </ul>
+        <!-- End List Group -->
+      </div>
+    </div>
+    <!-- End Body -->
+    <!-- Footer -->
+    <div class="flex flex-wrap items-center justify-between gap-2 border-t border-stone-200 p-4">
+      <div class="inline-flex items-center gap-x-2">
+        <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+          <svg class="size-3 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 10 4 15 9 20" />
+            <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+          </svg>
+        </div>
+        <span class="text-xs text-stone-400"> to close </span>
+      </div>
+
+      <div class="inline-flex items-center gap-x-4">
+        <div class="inline-flex items-center gap-x-2">
+          <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+            <svg class="size-3.5 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 14.596C21.828 15.1189 20.888 16 19.5969 16C18.3057 16 16.9265 14.6624 16.9265 12.8974V12.0687C16.9265 10.2373 18.2022 9.00142 19.5969 9.00142C20.9918 9.00142 21.7942 9.69876 22 10.5666M14.5417 10.3109C14.3233 9.6198 13.3292 8.96537 12.1831 9.00142C11.0374 9.03732 10.0119 9.83333 10.0119 10.777C10.0119 11.7208 10.6901 12.0632 12.1839 12.2081C13.6774 12.353 14.49 13.1331 14.5417 13.9596C14.5934 14.7861 13.8083 16 12.1839 16C10.7604 16 9.69525 14.6894 9.63548 13.9379M7.25295 14.7213C6.82726 15.5884 5.94455 15.9999 4.75814 15.9999C3.57172 15.9999 2 15.088 2 12.7831V12.1113C2 10.5911 3.16477 9.00113 4.75814 9.00113C6.35166 9.00113 7.41158 10.5059 7.25295 12.2838H2.47754" /></svg>
+          </div>
+          <span class="text-xs text-stone-400"> to select </span>
+        </div>
+
+        <div class="inline-flex items-center gap-x-2">
+          <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+            <svg class="size-3 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 5v14" />
+              <path d="m19 12-7 7-7-7" />
+            </svg>
+          </div>
+          <div class="flex size-5 flex-col items-center justify-center rounded border border-stone-200 bg-white text-xs uppercase text-stone-400 shadow-sm">
+            <svg class="size-3 shrink-0 text-stone-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m5 12 7-7 7 7" />
+              <path d="M12 19V5" />
+            </svg>
+          </div>
+          <span class="text-xs text-stone-400"> to navigate </span>
+        </div>
+      </div>
+    </div>
+    <!-- End Footer -->
+  </div>
+</div>
+</div>
+</div>      
+          <button type="button" @click="open=!open"
+            class="bg-white inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            aria-controls="mobile-menu" aria-expanded="false">
+            <span class="sr-only">Open main menu</span>
+            <!--
+            Heroicon name: outline/menu
+
+            Menu open: "hidden", Menu closed: "block"
+          -->
+            <svg :class="{ 'hidden': open, 'block': !open }" class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <!--
+            Heroicon name: outline/x
+
+            Menu open: "block", Menu closed: "hidden"
+          -->
+            <svg :class="{ 'hidden': !open, 'block': open }" class="hidden h-6 w-6" xmlns="http://www.w3.org/2000/svg"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile menu, show/hide based on menu state. -->
+    <div x-show="open" class="lg:hidden" id="mobile-menu">
+      <div class="pt-2 pb-3 space-y-1">
+        <!-- Current: "bg-indigo-50 border-indigo-500 text-indigo-700", Default: "border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800" -->
+        <a href="#"
+          class="bg-indigo-50 border-indigo-500 text-indigo-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium"
+          aria-current="page">Courses</a>
+
+        <a href="#"
+          class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium">Exams</a>
+
+        <a href="#"
+          class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium">Videos</a>
+
+        <a href="#"
+          class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium">Students</a>
+      </div>
+      <div class="pt-4 pb-3 border-t border-gray-200">
+        <div class="flex items-center px-4">
+          <div class="flex-shrink-0">
+            <img class="h-10 w-10 rounded-full"
+              src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
+              alt="">
+          </div>
+          <div class="ml-3">
+            <div class="text-base font-medium text-gray-800">Tom Cook</div>
+            <div class="text-sm font-medium text-gray-500">tom@example.com</div>
+          </div>
+          <button type="button"
+            class="ml-auto bg-white flex-shrink-0 p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+            <span class="sr-only">View notifications</span>
+            <!-- Heroicon name: outline/bell -->
+            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
+          </button>
+        </div>
+        <div class="mt-3 space-y-1">
+          <a href="#"
+            class="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100">Your
+            Profile</a>
+
+          <a href="#"
+            class="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100">Settings</a>
+
+          <a href="#"
+            class="block px-4 py-2 text-base font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100">Sign
+            out</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <script>
+    function globalSearch() {
+      return {
+        search_open: false, 
+        searchQuery: '',
+        selectedFilters: [],
+        filterItems: ['Course', 'Chapter', 'Video', 'Exam', 'Post', 'Notes', 'Live stream', 'Attachment', 'Discussion', 'Store'],
+        results: [
+          { id: 1, title: 'Introduction to Machine Learning', description: 'A course on machine learning concepts.', type: 'course', tags:'programming' },
+          { id: 2, title: 'Supervised Learning Basics', description: 'Chapter covering supervised learning algorithms.', type: 'chapter', tags:'programming' },
+          { id: 3, title: 'Neural Networks learning', description: 'A video explaining the basics of neural networks.', type: 'video' },
+          { id: 4, title: 'Machine Learning Final Exam', description: 'Final exam for the machine learning course.', type: 'exam' },
+          { id: 5, title: 'Python for Data Science learning', description: 'Notes on Python for data science.', type: 'notes' },
+          { id: 6, title: 'Live Stream: ML Workshop', description: 'Join our live stream learning on ML workshop.', type: 'live_stream' },
+          { id: 7, title: 'Video Conference: ML Q&A', description: 'A video conference to learning answer ML questions.', type: 'video_conference' },
+          { id: 8, title: 'Testpress Post', description: 'Learning post is good.', type: 'post' },
+          { id: 9, title: 'ML learning Group', description: 'Join the ML discussion forum.', type: 'discussion' },
+          { id: 10, title: 'CAT test series learning', description: 'All the available mock tests for practice', type: 'store' },
+        ],
+        iconMapping: {
+          'course': 'https://static.testpress.in/static/courses/general/1442850373_115.png', 
+          'chapter': 'https://static.testpress.in/static/courses/general/1442850373_115.png', 
+          'video': 'https://static.testpress.in/static/img/videoicon.png', 
+          'exam': 'https://static.testpress.in/static/img/examicon.png',
+          'notes': 'https://static.testpress.in/static/img/bookicon.png', 
+          'attachment': 'https://static.testpress.in/static/img/fileicon.png', 
+          'video_conference': 'https://static.testpress.in/static/img/live_conference.png', 
+          'live_stream': 'https://static.testpress.in/static/img/live.png', 
+          'post': 'https://static.testpress.in/static/img/posts.svg',
+          'discussion': 'https://static.testpress.in/static/img/discussion.png', 
+          'store': 'https://static.testpress.in/static/img/market.svg',        
+        },
+  
+        highlight(text) {
+          const query = this.searchQuery.toLowerCase();
+          if (!query || query.length === 0) return text;
+          return text.replace(new RegExp(query, 'gi'), (match) => `<span class='bg-yellow-200'>${match}</span>`);
+        },
+  
+        toggleScrollLock(open) {
+          if (open) {
+            document.body.classList.add('overflow-hidden');
+          } else {
+            document.body.classList.remove('overflow-hidden');
+          }
+        },
+  
+        watchSearchOpen() {
+          this.$watch('searchQuery', (value) => {
+            if (value.trim().length > 0) {
+              this.toggleScrollLock(true);
+            } else {
+              this.toggleScrollLock(false);
+            }
+          });
+        }
+      };
+    }
+  </script>
+      
+<div class="py-10 max-w-7xl mx-auto lg:px-8 px-4 space-y-5" x-data="recurringClassesApp()">
+  <div class="flex flex-wrap justify-between items-center gap-2">
+  <div>
+    <h1 class="text-lg md:text-xl font-semibold text-gray-800">Recurring Classes</h1>
+    <p class="text-sm text-gray-500">Manage weekly live class series and import them to course chapters.</p>
+  </div>
+  <div class="inline-flex sm:justify-end items-center gap-x-3">
+    <div class="flex justify-end items-center gap-x-2">
+      <a 
+        href="http://localhost:8080/testpress/recurring_classes/"
+        class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-green-500">
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14"/>
+          <path d="M12 5v14"/>
+        </svg>
+        Create Series
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-4">
+  <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+    <div class="p-4">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+          </svg>
+        </div>
+        <div class="ml-5 w-0 flex-1">
+          <dl>
+            <dt class="text-sm font-medium text-gray-500 truncate">Total Series</dt>
+            <dd class="text-lg font-medium text-gray-900" x-text="seriesList.length"></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+    <div class="p-4">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <svg class="h-6 w-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        </div>
+        <div class="ml-5 w-0 flex-1">
+          <dl>
+            <dt class="text-sm font-medium text-gray-500 truncate">Active Series</dt>
+            <dd class="text-lg font-medium text-gray-900" x-text="seriesList.filter(s => s.status === 'active').length"></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+    <div class="p-4">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <svg class="h-6 w-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+          </svg>
+        </div>
+        <div class="ml-5 w-0 flex-1">
+          <dl>
+            <dt class="text-sm font-medium text-gray-500 truncate">Cancelled Series</dt>
+            <dd class="text-lg font-medium text-gray-900" x-text="seriesList.filter(s => s.status === 'cancelled').length"></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+    <div class="p-4">
+      <div class="flex items-center">
+        <div class="flex-shrink-0">
+          <svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2v0a2 2 0 01-2-2v-5a2 2 0 00-2-2H8z"/>
+          </svg>
+        </div>
+        <div class="ml-5 w-0 flex-1">
+          <dl>
+            <dt class="text-sm font-medium text-gray-500 truncate">With Chapters</dt>
+            <dd class="text-lg font-medium text-gray-900" x-text="seriesList.filter(s => s.chaptersCount > 0).length"></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+  <div class="p-5 bg-white border border-gray-200 shadow-sm rounded-xl">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div class="flex-1 max-w-lg">
+        <div class="relative">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+          <input 
+            type="text" 
+            x-model="searchTerm"
+            placeholder="Search series by title..."
+            class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+          >
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <select 
+          x-model="statusFilter"
+          class="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm rounded-md"
+        >
+          <option value="">All Status</option>
+          <option value="active">Active</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+
+        <span class="text-sm text-gray-500 whitespace-nowrap" x-text="filteredSeries.length + ' series'"></span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="p-5 space-y-4 flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl">
+    <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300">
+  <div class="min-w-full inline-block align-middle">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead>
+        <tr class="border-t border-gray-200">
+          <th scope="col" class="px-4 py-2.5 text-start">
+            <span class="text-sm font-normal text-gray-500">Series Title</span>
+          </th>
+          <th scope="col" class="px-4 py-2.5 text-start">
+            <span class="text-sm font-normal text-gray-500">Schedule</span>
+          </th>
+          <th scope="col" class="px-4 py-2.5 text-start">
+            <span class="text-sm font-normal text-gray-500">Status</span>
+          </th>
+          <th scope="col" class="px-4 py-2.5 text-start">
+            <span class="text-sm font-normal text-gray-500">Chapters</span>
+          </th>
+          <th scope="col" class="px-4 py-2.5 text-end">
+            <span class="text-sm font-normal text-gray-500">Actions</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        <template x-for="series in filteredSeries" :key="series.id">
+          <tr class="hover:bg-gray-50">
+            <td class="px-4 py-3">
+              <div class="flex flex-col">
+                <h3 class="text-sm font-medium text-gray-900" x-text="series.title"></h3>
+                <p class="text-sm text-gray-500 mt-1" x-text="series.description"></p>
+                <div class="flex items-center mt-2 space-x-4 text-xs text-gray-500">
+                  <span class="flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                    <span x-text="series.host"></span>
+                  </span>
+                  <span class="flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span x-text="series.duration + ' min'"></span>
+                  </span>
+                </div>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex flex-col">
+                <span class="text-sm text-gray-900" x-text="series.schedule"></span>
+                <template x-if="series.nextSession">
+                  <span class="text-xs text-gray-500 mt-1">
+                    Next: <span x-text="formatDate(series.nextSession)"></span>
+                  </span>
+                </template>
+              </div>
+            </td>
+            <td class="px-4 py-3">
+              <span 
+                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                :class="getStatusBadgeClass(series.status)"
+                x-text="series.status.charAt(0).toUpperCase() + series.status.slice(1)">
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-gray-900" x-text="series.chaptersCount + ' chapters'"></span>
+                <template x-if="series.chaptersCount === 0">
+                  <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-yellow-100 text-yellow-800">
+                    Not imported
+                  </span>
+                </template>
+                <template x-if="series.chaptersCount > 0">
+                  <span class="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-green-100 text-green-800">
+                    Imported
+                  </span>
+                </template>
+              </div>
+            </td>
+            <td class="px-4 py-3 text-end">
+              <div x-show="series.status !== 'cancelled'" class="inline-flex items-center gap-x-2">
+                <button 
+                  @click="openImportModal(series)"
+                  type="button" 
+                  class="py-1.5 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-50">
+                  <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" x2="12" y1="3" y2="15"/>
+                  </svg>
+                  Import
+                </button>
+
+                <div class="hs-dropdown relative inline-flex">
+                  <button id="hs-dropdown-basic" type="button" class="hs-dropdown-toggle py-1.5 px-2 inline-flex items-center gap-x-1 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                    <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="1"/>
+                      <circle cx="12" cy="5" r="1"/>
+                      <circle cx="12" cy="19" r="1"/>
+                    </svg>
+                  </button>
+
+                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-lg" role="menu" aria-orientation="vertical">
+                    <div class="p-1">
+                      <button 
+                        @click="openEditClasses(series)"
+                        type="button" 
+                        class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100">
+                        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        Edit Classes
+                      </button>
+                      <div class="border-t border-gray-200 my-1"></div>
+                      <button 
+                        @click="openCancelModal(series)"
+                        type="button" 
+                        class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-yellow-600 hover:bg-yellow-50 focus:outline-none focus:bg-yellow-50">
+                        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M18 6 6 18"/>
+                          <path d="m6 6 12 12"/>
+                        </svg>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
+
+    <template x-if="filteredSeries.length === 0">
+      <div class="text-center py-12">
+        <svg class="mx-auto h-12 w-12 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"/>
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-gray-900">
+          <span x-show="seriesList.length === 0">No recurring series</span>
+          <span x-show="seriesList.length > 0 && filteredSeries.length === 0">No series match your filters</span>
+        </h3>
+        <p class="mt-1 text-sm text-gray-500">
+          <span x-show="seriesList.length === 0">Get started by creating a new weekly live class series.</span>
+          <span x-show="seriesList.length > 0 && filteredSeries.length === 0">Try adjusting your search terms or filters.</span>
+        </p>
+        <div class="mt-6" x-show="seriesList.length === 0">
+          <a 
+            href="http://localhost:8080/testpress/recurring_classes/"
+            class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+            <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+            </svg>
+            Create Series
+          </a>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+  </div>
+
+  <div 
+  x-show="showImportModal" 
+  x-transition:enter="ease-out duration-300"
+  x-transition:enter-start="opacity-0"
+  x-transition:enter-end="opacity-100"
+  x-transition:leave="ease-in duration-200"
+  x-transition:leave-start="opacity-100"
+  x-transition:leave-end="opacity-0"
+  class="fixed inset-0 z-50 overflow-y-auto"
+  style="display: none;"
+>
+  <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div 
+      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      @click="showImportModal = false"
+    ></div>
+
+    <div 
+      class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full sm:p-6"
+      x-transition:enter="ease-out duration-300"
+      x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+      x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave="ease-in duration-200"
+      x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+    >
+      <div class="sm:flex sm:items-start">
+        <div class="w-full">
+          <!-- Header -->
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h3 class="text-lg font-medium leading-6 text-gray-900">
+                Import to Chapters
+              </h3>
+              <p class="mt-1 text-sm text-gray-500" x-show="selectedSeries">
+                Import "<span x-text="selectedSeries ? selectedSeries.title : ''"></span>" to course chapters
+              </p>
+            </div>
+            <button 
+              @click="showImportModal = false"
+              class="text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <div x-show="!selectedCourse" class="space-y-4">
+            <h4 class="text-md font-medium text-gray-900">Select a Course</h4>
+            <div class="grid grid-cols-1 gap-3">
+              <template x-for="course in courses" :key="course.id">
+                <button 
+                  @click="selectCourse(course)"
+                  class="text-left p-4 border border-gray-200 rounded-lg hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <h5 class="text-sm font-medium text-gray-900" x-text="course.name"></h5>
+                      <p class="text-sm text-gray-500" x-text="course.chapters.length + ' chapters'"></p>
+                    </div>
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                  </div>
+                </button>
+              </template>
+            </div>
+          </div>
+
+          <div x-show="selectedCourse" class="space-y-4">
+            <div class="flex items-center space-x-2">
+              <button 
+                @click="goBackToCourseSelection()"
+                class="text-emerald-600 hover:text-emerald-800"
+              >
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+              </button>
+              <h4 class="text-md font-medium text-gray-900" x-text="selectedCourse ? selectedCourse.name : ''"></h4>
+            </div>
+
+            <div class="relative">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <input 
+                type="text" 
+                x-model="chapterSearchTerm"
+                placeholder="Search chapters..."
+                class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+              >
+            </div>
+
+            <div class="max-h-60 overflow-y-auto border border-gray-200 rounded-lg">
+              <template x-for="chapter in selectedCourse.chapters.filter(ch => !chapterSearchTerm || ch.title.toLowerCase().includes(chapterSearchTerm.toLowerCase()))" :key="chapter.id">
+                <label class="flex items-center p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0">
+                  <input 
+                    type="checkbox" 
+                    :value="chapter.id"
+                    @change="toggleChapterSelection(chapter.id)"
+                    :checked="selectedChapters.includes(chapter.id)"
+                    class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                  >
+                  <div class="ml-3">
+                    <p class="text-sm font-medium text-gray-900" x-text="chapter.title"></p>
+                  </div>
+                </label>
+              </template>
+            </div>
+
+            <div x-show="selectedChapters.length > 0" class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+              <p class="text-sm text-emerald-800">
+                <span x-text="selectedChapters.length"></span> chapter(s) selected for import
+              </p>
+            </div>
+          </div>
+
+          <div class="flex justify-end space-x-3 mt-6">
+            <button 
+              @click="showImportModal = false"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button 
+              @click="importToChapters()"
+              :disabled="selectedChapters.length === 0"
+              class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 border border-transparent rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Import Series
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof Alpine !== 'undefined') {
+    Alpine.data('importModal', () => ({
+      chapterSearchTerm: '',
+      
+      get filteredChapters() {
+        if (!this.chapterSearchTerm) {
+          return this.availableChapters;
+        }
+        
+        return this.availableChapters.filter(chapter => 
+          chapter.title.toLowerCase().includes(this.chapterSearchTerm.toLowerCase()) ||
+          chapter.course.toLowerCase().includes(this.chapterSearchTerm.toLowerCase())
+        );
+      }
+    }));
+  }
+});
+</script>
+
+  <div 
+  x-show="showCancelModal" 
+  x-transition:enter="ease-out duration-300"
+  x-transition:enter-start="opacity-0"
+  x-transition:enter-end="opacity-100"
+  x-transition:leave="ease-in duration-200"
+  x-transition:leave-start="opacity-100"
+  x-transition:leave-end="opacity-0"
+  class="fixed inset-0 z-50 overflow-y-auto"
+  style="display: none;"
+>
+  <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div 
+      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      @click="showCancelModal = false"
+    ></div>
+
+    <div 
+      class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6"
+      x-transition:enter="ease-out duration-300"
+      x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+      x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave="ease-in duration-200"
+      x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+    >
+      <div class="sm:flex sm:items-start" x-show="seriesToCancel">
+        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-yellow-100 sm:mx-0 sm:h-10 sm:w-10">
+          <svg class="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+          </svg>
+        </div>
+        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+          <h3 class="text-lg leading-6 font-medium text-gray-900">
+            Cancel Recurring Series
+          </h3>
+          <div class="mt-2">              <p class="text-sm text-gray-500">
+                Are you sure you want to cancel "<span class="font-medium" x-text="seriesToCancel ? seriesToCancel.title : ''"></span>"? The series will be marked as cancelled but not removed from the system.
+              <div x-show="seriesToCancel && seriesToCancel.chaptersCount > 0" class="mt-4 p-3 bg-blue-50 rounded-md">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <svg class="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                  </svg>
+                </div>
+                <div class="ml-3">
+                  <h4 class="text-sm font-medium text-blue-800">
+                    Important Notice
+                  </h4>
+                  <div class="mt-1 text-sm text-blue-700">
+                    <p>This series is currently imported to <span class="font-medium" x-text="seriesToCancel ? seriesToCancel.chaptersCount : 0"></span> chapter(s). Cancelling it will:</p>
+                    <ul class="mt-2 list-disc list-inside space-y-1">
+                      <li>Stop all future scheduled classes</li>
+                      <li>Keep historical data and completed sessions</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div x-show="seriesToCancel && seriesToCancel.chaptersCount > 0" class="mt-4">
+              <label class="flex items-start">
+                <input 
+                  type="checkbox" 
+                  x-model="confirmCancellation"
+                  class="mt-1 h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                >
+                <span class="ml-2 text-sm text-gray-700">
+                  I understand that this will cancel the series and stop all upcoming scheduled classes.
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+        <button 
+          @click="cancelSeries()"
+          :disabled="seriesToCancel && seriesToCancel.chaptersCount > 0 && !confirmCancellation"
+          type="button" 
+          class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-yellow-600 text-base font-medium text-white hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Cancel Series
+        </button>
+        <button 
+          @click="showCancelModal = false; confirmCancellation = false"
+          type="button" 
+          class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:mt-0 sm:w-auto sm:text-sm"
+        >
+          Keep Active
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div 
+  x-show="showEditClassesModal" 
+  x-transition:enter="ease-out duration-300"
+  x-transition:enter-start="opacity-0"
+  x-transition:enter-end="opacity-100"
+  x-transition:leave="ease-in duration-200"
+  x-transition:leave-start="opacity-100"
+  x-transition:leave-end="opacity-0"
+  class="fixed inset-0 z-50 overflow-y-auto"
+  style="display: none;"
+>
+  <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div 
+      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      @click="showEditClassesModal = false"
+    ></div>
+
+    <div 
+      class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full sm:p-6"
+      x-transition:enter="ease-out duration-300"
+      x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+      x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave="ease-in duration-200"
+      x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+    >
+      <div class="sm:flex sm:items-start" x-show="selectedSeries">
+        <div class="w-full">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium leading-6 text-gray-900">
+              Edit Classes
+            </h3>
+            <button 
+              @click="showEditClassesModal = false"
+              class="text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="space-y-4">
+            <template x-for="classItem in getClassesForSeries(selectedSeries?.id || 0)" :key="classItem.id">
+              <div class="border border-gray-200 rounded-lg p-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="text-sm font-medium text-gray-900" x-text="classItem.title"></h4>
+                    <p class="text-sm text-gray-500" x-text="classItem.date + ' at ' + classItem.time"></p>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button 
+                      @click="editIndividualClass(classItem)"
+                      class="text-sm text-emerald-600 hover:text-emerald-900"
+                    >
+                      Edit
+                    </button>
+                    <button 
+                      @click="rescheduleClass(classItem)"
+                      class="text-sm text-yellow-600 hover:text-yellow-900"
+                    >
+                      Reschedule
+                    </button>
+                    <button 
+                      @click="cancelClass(classItem)"
+                      class="text-sm text-red-600 hover:text-red-900"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="mt-6 flex justify-end space-x-3">
+            <button 
+              @click="showEditClassesModal = false"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button 
+              @click="saveAllChanges()"
+              class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 border border-transparent rounded-md hover:bg-emerald-700"
+            >
+              Save All Changes
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div 
+  x-show="showIndividualClassModal" 
+  x-transition:enter="ease-out duration-300"
+  x-transition:enter-start="opacity-0"
+  x-transition:enter-end="opacity-100"
+  x-transition:leave="ease-in duration-200"
+  x-transition:leave-start="opacity-100"
+  x-transition:leave-end="opacity-0"
+  class="fixed inset-0 z-[70] overflow-y-auto"
+  style="display: none;"
+>
+  <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div 
+      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      @click="showIndividualClassModal = false"
+    ></div>
+
+    <div 
+      class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6"
+      x-transition:enter="ease-out duration-300"
+      x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+      x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave="ease-in duration-200"
+      x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+    >
+      <div class="sm:flex sm:items-start" x-show="editingClass">
+        <div class="w-full">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-medium leading-6 text-gray-900">
+              Edit Class
+            </h3>
+            <button 
+              @click="showIndividualClassModal = false"
+              class="text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <form @submit.prevent="saveIndividualClass()" class="space-y-6">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Title</label>
+              <input 
+                type="text" 
+                x-model="editingClass.title"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+              >
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Date</label>
+              <input 
+                type="date" 
+                x-model="editingClass.dateValue"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+              >
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Time</label>
+              <input 
+                type="time" 
+                x-model="editingClass.time"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 sm:text-sm"
+              >
+            </div>
+
+            <div class="flex justify-end space-x-3">
+              <button 
+                type="button"
+                @click="showIndividualClassModal = false"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit"
+                class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 border border-transparent rounded-md hover:bg-emerald-700"
+              >
+                Save Changes
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+    </div>
+
+     
+  </body>
+
+
+</html>
