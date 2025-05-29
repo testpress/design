@@ -50,6 +50,10 @@
       endByDateValue: this.$refs.endByDateInput?.value || '',
       endAfterValue: this.$refs.endAfterInput?.value || '',
       host: this.$refs.hostInput?.value || 'staff1',
+      monthlyOccursOn: document.querySelector('input[name=\'occurs_on\']:checked')?.value || 'day',
+      monthlyDay: document.getElementById('monthly_day')?.value || '26',
+      monthlyWeekOccurrence: document.getElementById('monthly_week_occurrence')?.value || '4',
+      monthlyWeekDay: document.getElementById('monthly_week_day')?.value || '1',
     }
   },
 
@@ -93,6 +97,10 @@
       endByDateValue: this.$refs.endByDateInput?.value || '',
       endAfterValue: this.$refs.endAfterInput?.value || '',
       host: this.$refs.hostInput?.value || 'staff1',
+      monthlyOccursOn: document.querySelector('input[name=\'occurs_on\']:checked')?.value || 'day',
+      monthlyDay: document.getElementById('monthly_day')?.value || '26',
+      monthlyWeekOccurrence: document.getElementById('monthly_week_occurrence')?.value || '4',
+      monthlyWeekDay: document.getElementById('monthly_week_day')?.value || '1',
     }
   },
 
@@ -246,27 +254,83 @@
         }
       } else if (this.recurrence === '3') { // Monthly
         let sessionCount = 0;
-        let currentDate = new Date(baseDate);
+        const monthlyOccursOn = this.activeFormData.monthlyOccursOn || 'day';
         
-        while (sessionCount < maxSessions) {
-          // Check if we've passed the end date
-          if (endDate && currentDate > endDate) break;
+        if (monthlyOccursOn === 'day') {
+          const targetDay = parseInt(this.activeFormData.monthlyDay || '26');
+          let currentDate = new Date(baseDate);
           
-          sessions.push({
-            number: sessionCount + 1,
-            date: currentDate.toLocaleDateString('en-US', { 
-              weekday: 'short', 
-              year: 'numeric', 
-              month: 'short', 
-              day: 'numeric' 
-            }),
-            time: startTime,
-            title: this.generateSessionTitle(this.activeFormData.title, sessionCount + 1, currentDate),
-            dateObj: new Date(currentDate)
-          });
+          if (currentDate.getDate() !== targetDay) {
+            currentDate.setDate(targetDay);
+            if (currentDate.getDate() !== targetDay) {
+              currentDate.setMonth(currentDate.getMonth() + 1);
+              currentDate.setDate(targetDay);
+            }
+          }
           
-          sessionCount++;
-          currentDate.setMonth(currentDate.getMonth() + 1);
+          while (sessionCount < maxSessions) {
+            if (endDate && currentDate > endDate) break;
+            
+            if (currentDate >= baseDate) {
+              sessions.push({
+                number: sessionCount + 1,
+                date: currentDate.toLocaleDateString('en-US', { 
+                  weekday: 'short', 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric' 
+                }),
+                time: startTime,
+                title: this.generateSessionTitle(this.activeFormData.title, sessionCount + 1, currentDate),
+                dateObj: new Date(currentDate)
+              });
+              sessionCount++;
+            }
+            
+            const nextMonth = new Date(currentDate);
+            nextMonth.setMonth(nextMonth.getMonth() + 1);
+            nextMonth.setDate(targetDay);
+            
+            if (nextMonth.getDate() !== targetDay) {
+              nextMonth.setDate(0); // Go to last day of previous month
+              if (nextMonth.getMonth() === currentDate.getMonth()) {
+                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                nextMonth.setDate(Math.min(targetDay, new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate()));
+              }
+            }
+            
+            currentDate = nextMonth;
+          }
+          
+        } else if (monthlyOccursOn === 'week') {
+          const weekOccurrence = parseInt(this.activeFormData.monthlyWeekOccurrence || '4');
+          const weekDay = parseInt(this.activeFormData.monthlyWeekDay || '1');
+          
+          let currentMonth = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+          
+          while (sessionCount < maxSessions) {
+            const sessionDate = this.calculateNthWeekdayOfMonth(currentMonth, weekOccurrence, weekDay);
+            
+            if (endDate && sessionDate > endDate) break;
+            
+            if (sessionDate && sessionDate >= baseDate) {
+              sessions.push({
+                number: sessionCount + 1,
+                date: sessionDate.toLocaleDateString('en-US', { 
+                  weekday: 'short', 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric' 
+                }),
+                time: startTime,
+                title: this.generateSessionTitle(this.activeFormData.title, sessionCount + 1, sessionDate),
+                dateObj: new Date(sessionDate)
+              });
+              sessionCount++;
+            }
+            
+            currentMonth.setMonth(currentMonth.getMonth() + 1);
+          }
         }
       }
       
@@ -283,6 +347,39 @@
         time: 'Please check your inputs',
         title: this.activeFormData.title || 'Class Title'
       }];
+    }
+  },
+
+  calculateNthWeekdayOfMonth(month, weekOccurrence, weekDay) {    
+    const year = month.getFullYear();
+    const monthIndex = month.getMonth();
+    
+    if (weekOccurrence === -1) {
+      const lastDay = new Date(year, monthIndex + 1, 0);
+      const lastDayOfWeek = lastDay.getDay();
+      
+      let daysBack = (lastDayOfWeek - weekDay + 7) % 7;
+      if (daysBack === 0 && lastDay.getDay() !== weekDay) {
+        daysBack = 7;
+      }
+      
+      const result = new Date(year, monthIndex, lastDay.getDate() - daysBack);
+      return result;
+    } else {
+      const firstDay = new Date(year, monthIndex, 1);
+      const firstDayOfWeek = firstDay.getDay();
+      
+      let daysToAdd = (weekDay - firstDayOfWeek + 7) % 7;
+      
+      daysToAdd += (weekOccurrence - 1) * 7;
+      
+      const result = new Date(year, monthIndex, 1 + daysToAdd);
+      
+      if (result.getMonth() !== monthIndex) {
+        return null;
+      }
+      
+      return result;
     }
   },
 
@@ -535,23 +632,86 @@
           </div>
           <!-- End Button Group -->
         </div>
-        <div  x-cloak x-show="recurrence=='3'">
+        <div  x-cloak x-show="recurrence=='3'" x-data="{monthlyOccursOn: 'day'}">
           <label for="comments" class="font-medium text-gray-900">Occurs on</label>
           <div class="mt-2 space-y-3">
+            <!-- Option 1: Day of the month -->
             <div class="flex items-center gap-x-3">
               <input
-                id="push-email"
+                id="occurs-on-day"
                 name="occurs_on"
                 type="radio"
+                value="day"
+                x-model="monthlyOccursOn"
                 checked="true"
                 class="relative size-4 appearance-none rounded-full text-emerald-600 focus:ring-emerald-500 border border-gray-300 bg-white before:absolute before:inset-1 before:rounded-full before:bg-white not-checked:before:hidden checked:border-emerald-600 checked:bg-emerald-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:before:bg-gray-400 forced-colors:appearance-auto forced-colors:before:hidden" />
-              <label for="push-email" class="block text-sm/6 font-medium text-gray-500">
+              <label for="occurs-on-day" class="block text-sm/6 font-medium text-gray-500">
                 <div class="flex items-center gap-x-2">
                   <span class="text-sm text-gray-500 dark:text-neutral-500">Day</span>
-                  <select id="watermark_type" name="watermark_type" class="text-sm text-gray-500 block w-full rounded-md border-0 py-1 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-emerald-500 sm:max-w-xs sm:text-sm sm:leading-6">
-                    <option value="1" selected>1</option>
+                  <select id="monthly_day" name="monthly_day" class="text-sm text-gray-500 block w-full rounded-md border-0 py-1 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-emerald-500 sm:max-w-xs sm:text-sm sm:leading-6">
+                    <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7">7</option>
+                    <option value="8">8</option>
+                    <option value="9">9</option>
+                    <option value="10">10</option>
+                    <option value="11">11</option>
+                    <option value="12">12</option>
+                    <option value="13">13</option>
+                    <option value="14">14</option>
+                    <option value="15">15</option>
+                    <option value="16">16</option>
+                    <option value="17">17</option>
+                    <option value="18">18</option>
+                    <option value="19">19</option>
+                    <option value="20">20</option>
+                    <option value="21">21</option>
+                    <option value="22">22</option>
+                    <option value="23">23</option>
+                    <option value="24">24</option>
+                    <option value="25">25</option>
+                    <option value="26" selected>26</option>
+                    <option value="27">27</option>
+                    <option value="28">28</option>
+                    <option value="29">29</option>
+                    <option value="30">30</option>
+                    <option value="31">31</option>
+                  </select>
+                  <span class="text-sm text-gray-500 dark:text-neutral-500 whitespace-nowrap">of the month</span>
+                </div>
+              </label>
+            </div>
+            
+            <!-- Option 2: Week pattern (e.g., "Fourth Monday") -->
+            <div class="flex items-center gap-x-3">
+              <input
+                id="occurs-on-week"
+                name="occurs_on"
+                type="radio"
+                value="week"
+                x-model="monthlyOccursOn"
+                class="relative size-4 appearance-none rounded-full text-emerald-600 focus:ring-emerald-500 border border-gray-300 bg-white before:absolute before:inset-1 before:rounded-full before:bg-white not-checked:before:hidden checked:border-emerald-600 checked:bg-emerald-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:before:bg-gray-400 forced-colors:appearance-auto forced-colors:before:hidden" />
+              <label for="occurs-on-week" class="block text-sm/6 font-medium text-gray-500">
+                <div class="flex items-center gap-x-2">
+                  <select id="monthly_week_occurrence" name="monthly_week_occurrence" class="text-sm text-gray-500 block w-full rounded-md border-0 py-1 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-emerald-500 sm:max-w-xs sm:text-sm sm:leading-6">
+                    <option value="1">First</option>
+                    <option value="2">Second</option>
+                    <option value="3">Third</option>
+                    <option value="4" selected>Fourth</option>
+                    <option value="-1">Last</option>
+                  </select>
+                  <select id="monthly_week_day" name="monthly_week_day" class="text-sm text-gray-500 block w-full rounded-md border-0 py-1 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-emerald-500 sm:max-w-xs sm:text-sm sm:leading-6">
+                    <option value="0">Sunday</option>
+                    <option value="1" selected>Monday</option>
+                    <option value="2">Tuesday</option>
+                    <option value="3">Wednesday</option>
+                    <option value="4">Thursday</option>
+                    <option value="5">Friday</option>
+                    <option value="6">Saturday</option>
                   </select>
                   <span class="text-sm text-gray-500 dark:text-neutral-500 whitespace-nowrap">of the month</span>
                 </div>
@@ -740,6 +900,18 @@
             <div x-show="recurrence === '2' && formData.selectedDays && formData.selectedDays.length > 0">
               <dt class="text-sm font-medium text-gray-500">Days of Week</dt>
               <dd class="mt-1 text-sm text-gray-900" x-text="formData.selectedDays ? formData.selectedDays.join(', ') : 'No days selected'"></dd>
+            </div>
+            <div x-show="recurrence === '3'">
+              <dt class="text-sm font-medium text-gray-500">Monthly Pattern</dt>
+              <dd class="mt-1 text-sm text-gray-900" x-text="
+                formData.monthlyOccursOn === 'day' 
+                  ? 'Day ' + (formData.monthlyDay || '26') + ' of each month'
+                  : (() => {
+                      const occurrences = {'1': 'First', '2': 'Second', '3': 'Third', '4': 'Fourth', '-1': 'Last'};
+                      const days = {'0': 'Sunday', '1': 'Monday', '2': 'Tuesday', '3': 'Wednesday', '4': 'Thursday', '5': 'Friday', '6': 'Saturday'};
+                      return (occurrences[formData.monthlyWeekOccurrence] || 'Fourth') + ' ' + (days[formData.monthlyWeekDay] || 'Monday') + ' of each month';
+                    })()
+              "></dd>
             </div>
           </div>
         </div>
