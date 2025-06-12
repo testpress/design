@@ -36,7 +36,10 @@ module.exports = config => {
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
+    config.addPassthroughCopy("css/learnlens-frontend.css");
     config.addPassthroughCopy("fonts");
+    config.addPassthroughCopy("js/pdfchat/index.es.js");
+    config.addPassthroughCopy("js/shared/jsx-runtime-SzVGEVAg.js");
     config.addFilter("groupBy", groupBy);
     config.addFilter("filter", filter);
     config.addPassthroughCopy({ "src/api": "api" });
