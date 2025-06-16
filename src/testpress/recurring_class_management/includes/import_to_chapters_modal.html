@@ -1,0 +1,226 @@
+<div 
+  x-show="showImportModal" 
+  x-transition:enter="ease-out duration-300"
+  x-transition:enter-start="opacity-0"
+  x-transition:enter-end="opacity-100"
+  x-transition:leave="ease-in duration-200"
+  x-transition:leave-start="opacity-100"
+  x-transition:leave-end="opacity-0"
+  class="fixed inset-0 z-[60] overflow-y-auto"
+  style="display: none;"
+>
+  <div class="flex min-h-screen items-end justify-center px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+    <div 
+      class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
+      @click="showImportModal = false"
+    ></div>
+
+    <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+    <div 
+      class="relative inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full sm:p-6"
+      x-transition:enter="ease-out duration-300"
+      x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+      x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave="ease-in duration-200"
+      x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+      x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+    >
+      <div class="sm:flex sm:items-start">
+        <div class="w-full">
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <h3 class="text-lg font-medium leading-6 text-gray-900">
+                Import to Chapters
+              </h3>
+              <p class="mt-1 text-sm text-gray-500" x-show="selectedSeries">
+                Import "<span x-text="selectedSeries ? selectedSeries.title : ''"></span>" to course chapters
+              </p>
+            </div>
+            <button 
+              @click="showImportModal = false"
+              class="text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+              <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="space-y-6 overflow-visible">
+            <div class="overflow-visible">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Select Courses
+              </label>
+              <div class="relative overflow-visible" @click.away="showCourseDropdown = false">
+                <button
+                  @click="showCourseDropdown = !showCourseDropdown"
+                  class="relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                >
+                  <span class="block truncate" x-text="selectedCourses.length === 0 ? 'Select courses...' : selectedCourses.length + ' course(s) selected'"></span>
+                  <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </span>
+                </button>
+
+                <div 
+                  x-show="showCourseDropdown"
+                  x-transition:enter="transition ease-out duration-100"
+                  x-transition:enter-start="transform opacity-0 scale-95"
+                  x-transition:enter-end="transform opacity-100 scale-100"
+                  x-transition:leave="transition ease-in duration-75"
+                  x-transition:leave-start="transform opacity-100 scale-100"
+                  x-transition:leave-end="transform opacity-0 scale-95"
+                  class="absolute z-[9999] mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm divide-y divide-gray-100"
+                  style="display: none;"
+                >
+                  <template x-for="course in courses" :key="course.id">
+                    <label class="flex items-center cursor-pointer select-none relative py-3 pl-3 pr-9 hover:bg-emerald-50 focus-within:bg-emerald-50 active:bg-emerald-100 transition-colors duration-150 ease-in-out">
+                      <input 
+                        type="checkbox" 
+                        :value="course.id"
+                        @change="toggleCourseSelection(course.id)"
+                        :checked="selectedCourses.includes(course.id)"
+                        class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 focus:ring-2 focus:ring-offset-1 border-gray-300 rounded mr-3 flex-shrink-0"
+                      >
+                      <div class="flex-1 min-w-0">
+                        <span class="block font-medium text-gray-900 truncate" x-text="course.name"></span>
+                        <span class="block text-sm text-gray-500 truncate" x-text="course.chapters.length + ' chapters'"></span>
+                      </div>
+                    </label>
+                  </template>
+                </div>
+              </div>
+              
+              <div x-show="selectedCourses.length > 0" class="mt-2">
+                <div class="flex flex-wrap gap-2">
+                  <template x-for="courseId in selectedCourses" :key="courseId">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                      <span x-text="courses.find(c => c.id === courseId)?.name"></span>
+                      <button 
+                        @click="toggleCourseSelection(courseId)" 
+                        type="button" 
+                        class="flex-shrink-0 ml-1.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-emerald-400 hover:bg-emerald-200 hover:text-emerald-500 focus:outline-none focus:bg-emerald-500 focus:text-white"
+                      >
+                        <svg class="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
+                          <path stroke-linecap="round" stroke-width="1.5" d="m1 1 6 6m0-6-6 6"/>
+                        </svg>
+                      </button>
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </div>
+
+            <div x-show="selectedCourses.length > 0" class="overflow-visible">
+              <label class="block text-sm font-medium text-gray-700 mb-2">
+                Select Chapters
+              </label>
+              
+              <div class="relative overflow-visible" @click.away="showChapterDropdown = false">
+                <button
+                  @click="showChapterDropdown = !showChapterDropdown"
+                  class="relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
+                >
+                  <span class="block truncate" x-text="selectedChapters.length === 0 ? 'Select chapters...' : selectedChapters.length + ' chapter(s) selected'"></span>
+                  <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                  </span>
+                </button>
+
+                <div 
+                  x-show="showChapterDropdown"
+                  x-transition:enter="transition ease-out duration-100"
+                  x-transition:enter-start="transform opacity-0 scale-95"
+                  x-transition:enter-end="transform opacity-100 scale-100"
+                  x-transition:leave="transition ease-in duration-75"
+                  x-transition:leave-start="transform opacity-100 scale-100"
+                  x-transition:leave-end="transform opacity-0 scale-95"
+                  class="absolute z-[9999] mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm divide-y divide-gray-100"
+                  style="display: none;"
+                >
+                  <template x-for="chapter in filteredChapters" :key="chapter.id">
+                    <label class="flex items-center cursor-pointer select-none relative py-3 pl-3 pr-9 hover:bg-emerald-50 focus-within:bg-emerald-50 active:bg-emerald-100 transition-colors duration-150 ease-in-out">
+                      <input 
+                        type="checkbox" 
+                        :value="chapter.id"
+                        @change="toggleChapterSelection(chapter.id)"
+                        :checked="selectedChapters.includes(chapter.id)"
+                        class="h-4 w-4 text-emerald-600 focus:ring-emerald-500 focus:ring-2 focus:ring-offset-1 border-gray-300 rounded mr-3 flex-shrink-0"
+                      >
+                      <div class="flex-1 min-w-0">
+                        <span class="block font-medium text-gray-900 truncate" x-text="chapter.title"></span>
+                        <span class="block text-sm text-gray-500 truncate" x-text="chapter.course"></span>
+                      </div>
+                    </label>
+                  </template>
+                  
+                  <div x-show="filteredChapters.length === 0" class="py-2 pl-3 pr-9 text-gray-500 text-sm">
+                    No chapters available
+                  </div>
+                </div>
+              </div>
+              
+              <div x-show="selectedChapters.length > 0" class="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <p class="text-sm text-emerald-800 mb-2">
+                  <span x-text="selectedChapters.length"></span> chapter(s) selected for import
+                </p>
+                <div class="flex flex-wrap gap-1">
+                  <template x-for="chapterId in selectedChapters.slice(0, 5)" :key="chapterId">
+                    <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                      <span x-text="availableChapters.find(ch => ch.id === chapterId)?.title"></span>
+                    </span>
+                  </template>
+                  <span x-show="selectedChapters.length > 5" class="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                    +<span x-text="selectedChapters.length - 5"></span> more
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-end space-x-3 mt-6">
+            <button 
+              @click="showImportModal = false"
+              class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button 
+              @click="importToChapters()"
+              :disabled="selectedChapters.length === 0"
+              class="px-4 py-2 text-sm font-medium text-white bg-emerald-600 border border-transparent rounded-md hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Import Series
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof Alpine !== 'undefined') {
+    Alpine.data('importModal', () => ({
+      chapterSearchTerm: '',
+      
+      get filteredChapters() {
+        if (!this.chapterSearchTerm) {
+          return this.availableChapters;
+        }
+        
+        return this.availableChapters.filter(chapter => 
+          chapter.title.toLowerCase().includes(this.chapterSearchTerm.toLowerCase()) ||
+          chapter.course.toLowerCase().includes(this.chapterSearchTerm.toLowerCase())
+        );
+      }
+    }));
+  }
+});
+</script>
