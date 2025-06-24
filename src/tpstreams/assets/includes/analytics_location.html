@@ -1,0 +1,615 @@
+<div class="mt-6" x-data="locationAnalytics()" x-init="initMap()">
+  <!-- Location Analytics Header -->
+  <div class="flex justify-between items-center mb-4">
+    <!-- Dynamic Title -->
+    <div>
+      <h3 class="text-lg font-semibold text-gray-800" x-show="location_tab === 'map'">Global Analytics - World Map</h3>
+      <h3 class="text-lg font-semibold text-gray-800" x-show="location_tab === 'countries'">Countries Analytics</h3>
+      <h3 class="text-lg font-semibold text-gray-800" x-show="location_tab === 'states' && selectedCountry" x-text="getCountryName(selectedCountry) + ' - States/Regions'"></h3>
+      
+      <p class="text-sm text-gray-600" x-show="location_tab === 'map'">Click on any country to view its states/regions</p>
+      <p class="text-sm text-gray-600" x-show="location_tab === 'countries'">View breakdown by countries</p>
+    </div>
+    
+    <!-- Location Sub-tabs -->
+    <nav class="flex space-x-2">
+      <button @click="location_tab = 'map'; initMapSafely()" 
+              :class="location_tab === 'map' ? 'text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 py-1.5 text-sm font-medium transition-colors">
+        Map
+      </button>
+      <button @click="location_tab = 'countries'; $nextTick(() => initCountriesChart())" 
+              :class="location_tab === 'countries' ? 'text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 py-1.5 text-sm font-medium transition-colors">
+        Countries   
+      </button>
+      <button @click="location_tab = 'states'; if(!selectedCountry) selectedCountry = 'IND'; $nextTick(() => initStatesChart())" 
+              :class="location_tab === 'states' ? 'text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 py-1.5 text-sm font-medium transition-colors">
+        States
+      </button>
+    </nav>
+  </div>
+
+  <!-- Location Analytics Container -->
+  <div class="bg-white relative">
+    <!-- Map View -->
+    <div x-show="location_tab === 'map'" class="p-6">
+      <div id="world-map" class="w-full h-96"></div>
+    </div>
+
+    <!-- Countries Flow Chart -->
+    <div x-show="location_tab === 'countries'" class="p-6">
+      <div id="countries-chart" class="w-full" style="width: 1000px; height: 500px;"></div>
+    </div>
+
+    <!-- States Flow Chart -->
+    <div x-show="location_tab === 'states'" class="p-6">
+      <div id="states-chart" class="w-full" style="width: 1000px; height: 500px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function locationAnalytics() {
+  return {
+    location_tab: 'map',
+    map: null,
+    countriesChart: null,
+    statesChart: null,
+    selectedCountry: null,
+    resizeListenerAdded: false,
+    countryStatesData: {
+      'USA': [
+        {value: 845, name: 'California'},
+        {value: 623, name: 'Texas'},
+        {value: 445, name: 'New York'},
+        {value: 334, name: 'Florida'},
+        {value: 261, name: 'Illinois'}
+      ],
+      'IND': [
+        {value: 456, name: 'Maharashtra'},
+        {value: 289, name: 'Karnataka'},
+        {value: 234, name: 'Delhi'},
+        {value: 189, name: 'Tamil Nadu'},
+        {value: 156, name: 'Gujarat'},
+        {value: 110, name: 'West Bengal'}
+      ],
+      'GBR': [
+        {value: 334, name: 'London'},
+        {value: 189, name: 'Manchester'},
+        {value: 156, name: 'Birmingham'},
+        {value: 123, name: 'Liverpool'},
+        {value: 90, name: 'Leeds'}
+      ],
+      'AUS': [
+        {value: 267, name: 'New South Wales'},
+        {value: 189, name: 'Victoria'},
+        {value: 156, name: 'Queensland'},
+        {value: 123, name: 'Western Australia'},
+        {value: 54, name: 'South Australia'}
+      ],
+      'BRA': [
+        {value: 234, name: 'São Paulo'},
+        {value: 178, name: 'Rio de Janeiro'},
+        {value: 123, name: 'Minas Gerais'},
+        {value: 110, name: 'Bahia'}
+      ],
+      'CAN': [
+        {value: 223, name: 'Ontario'},
+        {value: 134, name: 'Quebec'},
+        {value: 123, name: 'British Columbia'},
+        {value: 87, name: 'Alberta'}
+      ]
+    },
+    initMap() {
+      // Use Alpine's $nextTick to ensure DOM is ready
+      this.$nextTick(() => {
+        // Check if we're on the map tab and container is visible
+        if (this.location_tab !== 'map') {
+          return; // Don't initialize if not on map tab
+        }
+        
+        const mapElement = document.getElementById('world-map');
+        
+        // Ensure container exists and has dimensions
+        if (!mapElement || !this.isContainerReady(mapElement)) {
+          // Retry after a short delay if container not ready
+          setTimeout(() => this.initMap(), 100);
+          return;
+        }
+        
+        // Check if libraries are loaded
+        if (typeof Datamap === 'undefined' || typeof d3 === 'undefined') {
+          console.log('Map libraries not loaded yet, retrying...');
+          setTimeout(() => this.initMap(), 200);
+          return;
+        }
+        
+        // Clear any existing content
+        mapElement.innerHTML = '';
+        
+        const data = {
+          'USA': { fillKey: 'high', views: 2508 },
+          'IND': { fillKey: 'high', views: 1434 },
+          'GBR': { fillKey: 'medium', views: 892 },
+          'AUS': { fillKey: 'medium', views: 789 },
+          'BRA': { fillKey: 'medium', views: 645 },
+          'CAN': { fillKey: 'medium', views: 567 }
+        };
+
+        // Initial fills - all grey
+        const initialFills = {
+          'high': '#d1d5db',
+          'medium': '#d1d5db', 
+          'low': '#d1d5db',
+          defaultFill: '#f3f4f6'
+        };
+
+        // Final fills - actual colors
+        const finalFills = {
+          'high': '#1e40af',
+          'medium': '#3b82f6',
+          'low': '#93c5fd',
+          defaultFill: '#f3f4f6'
+        };
+
+        this.map = new Datamap({
+          element: mapElement,
+          projection: 'mercator',
+          responsive: true,
+          aspectRatio: 0.5,
+          setProjection: function(element) {
+            var projection = d3.geo.mercator()
+              .center([-20, 20])
+              .scale(Math.min(element.offsetWidth / 5, element.offsetHeight / 5))
+              .translate([element.offsetWidth /3, element.offsetHeight / 1.8]);
+            var path = d3.geo.path().projection(projection);
+            return {path: path, projection: projection};
+          },
+          fills: initialFills, // Start with grey colors
+          data: data,
+          geographyConfig: {
+            borderWidth: 1,
+            borderColor: '#6b7280',
+            popupTemplate: function(geography, data) {
+              if (!data) return null;
+              
+              var countryName = geography.properties.NAME || 
+                              geography.properties.name || 
+                              geography.properties.NAME_LONG || 
+                              geography.properties.ADMIN || 
+                              geography.id || 
+                              'Unknown';
+              return '<div class="hoverinfo" style="background: white; padding: 8px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); border: 1px solid #e5e7eb;"><strong>' + 
+                     countryName + '</strong><br/>Views: ' + data.views.toLocaleString() + '<br/><small style="color: #6b7280;">Click to view states</small></div>';
+            },
+            highlightFillColor: false,
+            highlightBorderColor: '#2563eb',
+            highlightBorderWidth: 2,
+          },
+          done: (datamap) => {
+            // Add click event
+            datamap.svg.selectAll('.datamaps-subunit').on('click', (geography) => {
+              const countryCode = geography.id;
+              if (data[countryCode] && this.countryStatesData[countryCode]) {
+                this.selectedCountry = countryCode;
+                this.location_tab = 'states';
+                this.$nextTick(() => this.initStatesChart());
+              }
+            });
+
+            // Start color transition after 500ms
+            setTimeout(() => {
+              // Update fills to final colors
+              datamap.options.fills = finalFills;
+              
+              // Animate all data countries simultaneously with smooth fade
+              Object.keys(data).forEach((countryCode) => {
+                const countryElement = datamap.svg.select('.datamaps-subunit.' + countryCode);
+                if (!countryElement.empty()) {
+                  const fillKey = data[countryCode].fillKey;
+                  const finalColor = finalFills[fillKey];
+                  
+                  countryElement
+                    .transition()
+                    .duration(1500)
+                    .ease('quad-in-out')
+                    .style('fill', finalColor);
+                }
+              });
+              
+              // Animate other countries (without data) with smooth fade
+              datamap.svg.selectAll('.datamaps-subunit')
+                .filter(function(d) {
+                  return !data[d.id];
+                })
+                .transition()
+                .duration(1500)
+                .ease('quad-in-out')
+                .style('fill', finalFills.defaultFill);
+              
+            }, 300);
+          }
+        });
+        
+        // Initialize charts
+        this.initCountriesChart();
+        this.initStatesChart();
+        
+        // Add resize listener for map responsiveness (only once)
+        if (!this.resizeListenerAdded) {
+          window.addEventListener('resize', () => {
+            if (this.map && this.location_tab === 'map') {
+              this.map.resize();
+            }
+          });
+          this.resizeListenerAdded = true;
+        }
+      });
+    },
+    
+    // Helper method to check if container is ready
+    isContainerReady(element) {
+      const rect = element.getBoundingClientRect();
+      const computedStyle = window.getComputedStyle(element);
+      
+      return (
+        rect.width > 0 && 
+        rect.height > 0 && 
+        computedStyle.display !== 'none' &&
+        computedStyle.visibility !== 'hidden'
+      );
+    },
+    
+    // Method to safely initialize map when tab changes
+    initMapSafely() {
+      this.$nextTick(() => {
+        if (this.location_tab === 'map' && !this.map) {
+          this.initMap();
+        }
+      });
+    },
+    
+    initCountriesChart() {
+      const chartElement = document.getElementById('countries-chart');
+      if (chartElement && typeof echarts !== 'undefined') {
+        // Dispose existing chart if it exists to ensure fresh animation
+        if (this.countriesChart) {
+          this.countriesChart.dispose();
+        }
+        
+        this.countriesChart = echarts.init(chartElement);
+        
+        const option = {
+          // Add smooth animation
+          animation: true,
+          animationDuration: 1000,
+          animationEasing: 'cubicOut',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            },
+            formatter: function(params) {
+              return params[0].name + '<br/>' + 
+                     'Views: ' + params[0].value.toLocaleString() + '<br/>' +
+                     '<small style="color: #6b7280;">Click to view states</small>';
+            }
+          },
+          grid: {
+            left: '5%',
+            right: '25%',
+            top: '1%',
+            bottom: '12%',
+            containLabel: false
+          },
+          xAxis: {
+            type: 'value',
+            name: 'Views',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: {
+              color: '#6b7280',
+              fontSize: 12,
+              fontWeight: 'normal'
+            },
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              color: '#6b7280',
+              formatter: function(value) {
+                if (value >= 1000) {
+                  return (value / 1000).toFixed(value % 1000 === 0 ? 0 : 1) + 'k';
+                }
+                return value.toString();
+              }
+            },
+            splitLine: {
+              lineStyle: {
+                color: '#f3f4f6'
+              }
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: ['United States', 'India', 'United Kingdom', 'Australia', 'Brazil', 'Canada'],
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              show: false
+            }
+          },
+          series: [{
+            data: [
+              {value: 2508, name: 'United States'},
+              {value: 1434, name: 'India'},
+              {value: 892, name: 'United Kingdom'},
+              {value: 789, name: 'Australia'},
+              {value: 645, name: 'Brazil'},
+              {value: 567, name: 'Canada'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: '#2563eb',
+              borderRadius: [0, 4, 4, 0]
+            },
+            barWidth: '60%',
+            // Add animation for bars
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'insideLeft',
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 'bold',
+              formatter: function(params) {
+                return params.data.name;
+              }
+            }
+          }, {
+            data: [
+              {value: 2508, name: 'United States'},
+              {value: 1434, name: 'India'},
+              {value: 892, name: 'United Kingdom'},
+              {value: 789, name: 'Australia'},
+              {value: 645, name: 'Brazil'},
+              {value: 567, name: 'Canada'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: 'transparent'
+            },
+            barWidth: '60%',
+            barGap: '-100%',
+            // Add animation for labels
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'right',
+              color: '#6b7280',
+              fontSize: 11,
+              offset: [5, 0],
+              verticalAlign: 'middle',
+              align: 'left',
+              formatter: function(params) {
+                return params.value.toLocaleString();
+              }
+            },
+            tooltip: {
+              show: false
+            }
+          }]
+        };
+        
+        this.countriesChart.setOption(option);
+        
+        // Add click event to countries chart
+        this.countriesChart.on('click', (params) => {
+          const countryName = params.data.name;
+          const countryCode = this.getCountryCode(countryName);
+          if (countryCode && this.countryStatesData[countryCode]) {
+            this.selectedCountry = countryCode;
+            this.location_tab = 'states';
+            this.$nextTick(() => this.initStatesChart());
+          }
+        });
+      }
+    },
+    
+    getCountryName(countryCode) {
+      const countryNames = {
+        'USA': 'United States',
+        'IND': 'India',
+        'GBR': 'United Kingdom',
+        'AUS': 'Australia',
+        'BRA': 'Brazil',
+        'CAN': 'Canada'
+      };
+      return countryNames[countryCode] || countryCode;
+    },
+
+    getCountryCode(countryName) {
+      const nameToCode = {
+        'United States': 'USA',
+        'India': 'IND',
+        'United Kingdom': 'GBR',
+        'Australia': 'AUS',
+        'Brazil': 'BRA',
+        'Canada': 'CAN'
+      };
+      return nameToCode[countryName] || null;
+    },
+
+    initStatesChart() {
+      const chartElement = document.getElementById('states-chart');
+      if (chartElement && typeof echarts !== 'undefined') {
+        // Dispose existing chart if it exists
+        if (this.statesChart) {
+          this.statesChart.dispose();
+        }
+        
+        this.statesChart = echarts.init(chartElement);
+        
+        // Get data for selected country or default data
+        const statesData = this.selectedCountry && this.countryStatesData[this.selectedCountry] 
+          ? this.countryStatesData[this.selectedCountry]
+          : [
+              {value: 15200, name: 'California'},
+              {value: 8900, name: 'Maharashtra'},
+              {value: 7300, name: 'Texas'},
+              {value: 6100, name: 'London'},
+              {value: 5400, name: 'Karnataka'},
+              {value: 4200, name: 'Ontario'},
+              {value: 3800, name: 'Berlin'},
+              {value: 3100, name: 'Mumbai'}
+            ];
+        
+        const option = {
+          // Add smooth animation
+          animation: true,
+          animationDuration: 1000,
+          animationEasing: 'cubicOut',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            },
+            formatter: function(params) {
+              return params[0].name + '<br/>' + 
+                     'Views: ' + params[0].value.toLocaleString();
+            }
+          },
+          grid: {
+            left: '5%',
+            right: '25%',
+            top: '1%',
+            bottom: '1%',
+            containLabel: false
+          },
+          xAxis: {
+            type: 'value',
+            name: 'Views',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: {
+              color: '#6b7280',
+              fontSize: 12,
+              fontWeight: 'normal'
+            },
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              color: '#6b7280',
+              formatter: function(value) {
+                if (value >= 1000) {
+                  return (value / 1000).toFixed(value % 1000 === 0 ? 0 : 1) + 'k';
+                }
+                return value.toString();
+              }
+            },
+            splitLine: {
+              lineStyle: {
+                color: '#f3f4f6'
+              }
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: statesData.map(item => item.name),
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              show: false
+            }
+          },
+          series: [{
+            data: statesData,
+            type: 'bar',
+            itemStyle: {
+              color: '#2563eb',
+              borderRadius: [0, 4, 4, 0]
+            },
+            barWidth: '60%',
+            // Add animation for bars
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'insideLeft',
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 'bold',
+              formatter: function(params) {
+                return params.data.name;
+              }
+            }
+          }, {
+            data: statesData,
+            type: 'bar',
+            itemStyle: {
+              color: 'transparent'
+            },
+            barWidth: '60%',
+            barGap: '-100%',
+            // Add animation for labels
+            animation: true,
+            animationDuration: 500,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 50;
+            },
+            label: {
+              show: true,
+              position: 'right',
+              color: '#6b7280',
+              fontSize: 11,
+              offset: [5, 0],
+              verticalAlign: 'middle',
+              align: 'left',
+              formatter: function(params) {
+                return params.value.toLocaleString();
+              }
+            },
+            tooltip: {
+              show: false
+            }
+          }]
+        };
+        
+        this.statesChart.setOption(option);
+      }
+    }
+  };
+}
+</script> 
