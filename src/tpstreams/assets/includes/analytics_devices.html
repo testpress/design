@@ -1,6 +1,515 @@
-<div class="mt-6">
-  <div class="text-center py-12">
-    <h3 class="mt-2 text-sm font-medium text-gray-900">Device Analytics</h3>
-    <p class="mt-1 text-sm text-gray-500">Device-based viewing data will appear here</p>
+<div class="mt-6" x-data="deviceAnalytics()" x-init="initBrowserChart()">
+  <!-- Device Analytics Header -->
+  <div class="flex justify-between items-center mb-4">
+    <!-- Dynamic Title -->
+    <div>
+      <h3 class="text-lg font-semibold text-gray-800" x-show="device_tab === 'browser'">Device Analytics - Browsers</h3>
+      <h3 class="text-lg font-semibold text-gray-800" x-show="device_tab === 'os'">Device Analytics - Operating Systems</h3>
+      <h3 class="text-lg font-semibold text-gray-800" x-show="device_tab === 'size'">Device Analytics - Screen Sizes</h3>
+      
+      <p class="text-sm text-gray-600" x-show="device_tab === 'browser'">View breakdown by web browsers</p>
+      <p class="text-sm text-gray-600" x-show="device_tab === 'os'">View breakdown by operating systems</p>
+      <p class="text-sm text-gray-600" x-show="device_tab === 'size'">View breakdown by device screen sizes</p>
+    </div>
+    
+    <!-- Device Sub-tabs -->
+    <nav class="flex space-x-2">
+      <button @click="device_tab = 'browser'; $nextTick(() => initBrowserChart())" 
+              :class="device_tab === 'browser' ? 'text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 py-1.5 text-sm font-medium transition-colors">
+        Browser
+      </button>
+      <button @click="device_tab = 'os'; $nextTick(() => initOSChart())" 
+              :class="device_tab === 'os' ? 'text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 py-1.5 text-sm font-medium transition-colors">
+        OS   
+      </button>
+      <button @click="device_tab = 'size'; $nextTick(() => initSizeChart())" 
+              :class="device_tab === 'size' ? 'text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'"
+              class="px-3 py-1.5 text-sm font-medium transition-colors">
+        Size
+      </button>
+    </nav>
   </div>
-</div> 
+
+  <!-- Device Analytics Container -->
+  <div class="bg-white relative">
+    <!-- Browser Chart -->
+    <div x-show="device_tab === 'browser'" class="p-6">
+      <div id="browser-chart" class="w-full" style="width: 1000px; height: 500px;"></div>
+    </div>
+
+    <!-- OS Chart -->
+    <div x-show="device_tab === 'os'" class="p-6">
+      <div id="os-chart" class="w-full" style="width: 1000px; height: 500px;"></div>
+    </div>
+
+    <!-- Size Chart -->
+    <div x-show="device_tab === 'size'" class="p-6">
+      <div id="size-chart" class="w-full" style="width: 1000px; height: 500px;"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+function deviceAnalytics() {
+  return {
+    device_tab: 'browser',
+    browserChart: null,
+    osChart: null,
+    sizeChart: null,
+
+    initBrowserChart() {
+      const chartElement = document.getElementById('browser-chart');
+      if (chartElement && typeof echarts !== 'undefined') {
+        // Dispose existing chart if it exists to ensure fresh animation
+        if (this.browserChart) {
+          this.browserChart.dispose();
+        }
+        
+        this.browserChart = echarts.init(chartElement);
+        
+        const option = {
+          // Add smooth animation
+          animation: true,
+          animationDuration: 1000,
+          animationEasing: 'cubicOut',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            },
+            formatter: function(params) {
+              return params[0].name + '<br/>' + 
+                     'Views: ' + params[0].value.toLocaleString();
+            }
+          },
+          grid: {
+            left: '5%',
+            right: '25%',
+            top: '1%',
+            bottom: '12%',
+            containLabel: false
+          },
+          xAxis: {
+            type: 'value',
+            name: 'Views',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: {
+              color: '#6b7280',
+              fontSize: 12,
+              fontWeight: 'normal'
+            },
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              color: '#6b7280',
+              formatter: function(value) {
+                if (value >= 1000) {
+                  return (value / 1000).toFixed(value % 1000 === 0 ? 0 : 1) + 'k';
+                }
+                return value.toString();
+              }
+            },
+            splitLine: {
+              lineStyle: {
+                color: '#f3f4f6'
+              }
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: ['Chrome', 'Safari', 'Firefox', 'Edge', 'Opera', 'Other'],
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              show: false
+            }
+          },
+          series: [{
+            data: [
+              {value: 845, name: 'Chrome'},
+              {value: 623, name: 'Safari'},
+              {value: 456, name: 'Firefox'},
+              {value: 234, name: 'Edge'},
+              {value: 156, name: 'Opera'},
+              {value: 89, name: 'Other'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: '#2563eb',
+              borderRadius: [0, 4, 4, 0]
+            },
+            barWidth: '60%',
+            // Add animation for bars
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'insideLeft',
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 'bold',
+              formatter: function(params) {
+                return params.data.name;
+              }
+            }
+          }, {
+            data: [
+              {value: 845, name: 'Chrome'},
+              {value: 623, name: 'Safari'},
+              {value: 456, name: 'Firefox'},
+              {value: 234, name: 'Edge'},
+              {value: 156, name: 'Opera'},
+              {value: 89, name: 'Other'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: 'transparent'
+            },
+            barWidth: '60%',
+            barGap: '-100%',
+            // Add animation for labels
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'right',
+              color: '#6b7280',
+              fontSize: 11,
+              offset: [5, 0],
+              verticalAlign: 'middle',
+              align: 'left',
+              formatter: function(params) {
+                return params.value.toLocaleString();
+              }
+            },
+            tooltip: {
+              show: false
+            }
+          }]
+        };
+        
+        this.browserChart.setOption(option);
+      }
+    },
+    
+    initOSChart() {
+      const chartElement = document.getElementById('os-chart');
+      if (chartElement && typeof echarts !== 'undefined') {
+        // Dispose existing chart if it exists to ensure fresh animation
+        if (this.osChart) {
+          this.osChart.dispose();
+        }
+        
+        this.osChart = echarts.init(chartElement);
+        
+        const option = {
+          // Add smooth animation
+          animation: true,
+          animationDuration: 1000,
+          animationEasing: 'cubicOut',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            },
+            formatter: function(params) {
+              return params[0].name + '<br/>' + 
+                     'Views: ' + params[0].value.toLocaleString();
+            }
+          },
+          grid: {
+            left: '5%',
+            right: '25%',
+            top: '1%',
+            bottom: '12%',
+            containLabel: false
+          },
+          xAxis: {
+            type: 'value',
+            name: 'Views',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: {
+              color: '#6b7280',
+              fontSize: 12,
+              fontWeight: 'normal'
+            },
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              color: '#6b7280',
+              formatter: function(value) {
+                if (value >= 1000) {
+                  return (value / 1000).toFixed(value % 1000 === 0 ? 0 : 1) + 'k';
+                }
+                return value.toString();
+              }
+            },
+            splitLine: {
+              lineStyle: {
+                color: '#f3f4f6'
+              }
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: ['Windows', 'macOS', 'Android', 'iOS', 'Linux', 'Other'],
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              show: false
+            }
+          },
+          series: [{
+            data: [
+              {value: 734, name: 'Windows'},
+              {value: 623, name: 'macOS'},
+              {value: 456, name: 'Android'},
+              {value: 334, name: 'iOS'},
+              {value: 189, name: 'Linux'},
+              {value: 67, name: 'Other'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: '#2563eb',
+              borderRadius: [0, 4, 4, 0]
+            },
+            barWidth: '60%',
+            // Add animation for bars
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'insideLeft',
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 'bold',
+              formatter: function(params) {
+                return params.data.name;
+              }
+            }
+          }, {
+            data: [
+              {value: 734, name: 'Windows'},
+              {value: 623, name: 'macOS'},
+              {value: 456, name: 'Android'},
+              {value: 334, name: 'iOS'},
+              {value: 189, name: 'Linux'},
+              {value: 67, name: 'Other'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: 'transparent'
+            },
+            barWidth: '60%',
+            barGap: '-100%',
+            // Add animation for labels
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'right',
+              color: '#6b7280',
+              fontSize: 11,
+              offset: [5, 0],
+              verticalAlign: 'middle',
+              align: 'left',
+              formatter: function(params) {
+                return params.value.toLocaleString();
+              }
+            },
+            tooltip: {
+              show: false
+            }
+          }]
+        };
+        
+        this.osChart.setOption(option);
+      }
+    },
+
+    initSizeChart() {
+      const chartElement = document.getElementById('size-chart');
+      if (chartElement && typeof echarts !== 'undefined') {
+        // Dispose existing chart if it exists to ensure fresh animation
+        if (this.sizeChart) {
+          this.sizeChart.dispose();
+        }
+        
+        this.sizeChart = echarts.init(chartElement);
+        
+        const option = {
+          // Add smooth animation
+          animation: true,
+          animationDuration: 1000,
+          animationEasing: 'cubicOut',
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow'
+            },
+            formatter: function(params) {
+              return params[0].name + '<br/>' + 
+                     'Views: ' + params[0].value.toLocaleString();
+            }
+          },
+          grid: {
+            left: '5%',
+            right: '25%',
+            top: '1%',
+            bottom: '12%',
+            containLabel: false
+          },
+          xAxis: {
+            type: 'value',
+            name: 'Views',
+            nameLocation: 'middle',
+            nameGap: 30,
+            nameTextStyle: {
+              color: '#6b7280',
+              fontSize: 12,
+              fontWeight: 'normal'
+            },
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              color: '#6b7280',
+              formatter: function(value) {
+                if (value >= 1000) {
+                  return (value / 1000).toFixed(value % 1000 === 0 ? 0 : 1) + 'k';
+                }
+                return value.toString();
+              }
+            },
+            splitLine: {
+              lineStyle: {
+                color: '#f3f4f6'
+              }
+            }
+          },
+          yAxis: {
+            type: 'category',
+            data: ['Desktop', 'Mobile', 'Tablet', 'Others'],
+            axisLine: {
+              show: false
+            },
+            axisTick: {
+              show: false
+            },
+            axisLabel: {
+              show: false
+            }
+          },
+          series: [{
+            data: [
+              {value: 567, name: 'Desktop'},
+              {value: 334, name: 'Mobile'},
+              {value: 189, name: 'Tablet'},
+              {value: 67, name: 'Others'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: '#2563eb',
+              borderRadius: [0, 4, 4, 0]
+            },
+            barWidth: '60%',
+            // Add animation for bars
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'insideLeft',
+              color: '#ffffff',
+              fontSize: 12,
+              fontWeight: 'bold',
+              formatter: function(params) {
+                return params.data.name;
+              }
+            }
+          }, {
+            data: [
+              {value: 567, name: 'Desktop'},
+              {value: 334, name: 'Mobile'},
+              {value: 189, name: 'Tablet'},
+              {value: 67, name: 'Others'}
+            ],
+            type: 'bar',
+            itemStyle: {
+              color: 'transparent'
+            },
+            barWidth: '60%',
+            barGap: '-100%',
+            // Add animation for labels
+            animation: true,
+            animationDuration: 1000,
+            animationEasing: 'cubicOut',
+            animationDelay: function(idx) {
+              return idx * 100;
+            },
+            label: {
+              show: true,
+              position: 'right',
+              color: '#6b7280',
+              fontSize: 11,
+              offset: [5, 0],
+              verticalAlign: 'middle',
+              align: 'left',
+              formatter: function(params) {
+                return params.value.toLocaleString();
+              }
+            },
+            tooltip: {
+              show: false
+            }
+          }]
+        };
+        
+        this.sizeChart.setOption(option);
+      }
+    }
+  };
+}
+</script> 
