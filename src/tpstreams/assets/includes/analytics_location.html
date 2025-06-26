@@ -42,7 +42,9 @@
   <div class="relative overflow-hidden">
     <!-- Map View -->
     <div x-show="location_tab === 'map'" class="p-4 sm:p-6">
-      <div id="world-map" class="w-full h-[300px] sm:h-[400px] lg:h-[500px] xl:h-[600px]"></div>
+      <div class="w-full overflow-x-auto overflow-y-hidden relative scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 hover:scrollbar-thumb-gray-400">
+        <div id="world-map" class="min-w-[1000px] w-full h-[350px] sm:h-[450px] lg:h-[550px] xl:h-[650px] min-h-[350px]" style="overflow: visible;"></div>
+      </div>
     </div>
 
     <!-- Countries Flow Chart -->
@@ -70,6 +72,7 @@ function locationAnalytics() {
     statesChart: null,
     selectedCountry: null,
     resizeListenerAdded: false,
+    resizeTimeout: null,
     countryStatesData: {
       'USA': [
         {value: 845, name: 'California'},
@@ -174,12 +177,24 @@ function locationAnalytics() {
           element: mapElement,
           projection: 'mercator',
           responsive: true,
-          height: 600,
+          aspectRatio: 0.6,
           setProjection: function(element) {
+            // Calculate responsive scale that maintains full map view
+            var containerWidth = element.offsetWidth;
+            var containerHeight = element.offsetHeight;
+            
+            // Slightly smaller to prevent top cropping
+            var widthScale = containerWidth / 8;
+            var heightScale = containerHeight / 5.5;
+            var scale = Math.min(widthScale, heightScale);
+            
+            // Good minimum scale for reasonable map size
+            scale = Math.max(scale, 85);
+            
             var projection = d3.geo.mercator()
-              .center([0, 0])
-              .scale(Math.min(element.offsetWidth / 4.5, element.offsetHeight / 4.5))
-              .translate([element.offsetWidth / 2, element.offsetHeight / 1.5]);
+              .center([0, -20])  // Move center further down to show more of the top
+              .scale(scale)
+              .translate([containerWidth / 2, containerHeight / 1.6]);
             var path = d3.geo.path().projection(projection);
             return {path: path, projection: projection};
           },
@@ -283,11 +298,33 @@ function locationAnalytics() {
         
         // Add resize listener for map responsiveness (only once)
         if (!this.resizeListenerAdded) {
+          // Window resize listener
           window.addEventListener('resize', () => {
-            if (this.map && this.location_tab === 'map') {
-              this.map.resize();
-            }
+            // Debounce resize events
+            clearTimeout(this.resizeTimeout);
+            this.resizeTimeout = setTimeout(() => {
+              if (this.map && this.location_tab === 'map') {
+                // For Datamap, we need to reinitialize rather than just resize
+                this.refreshMap();
+              }
+              if (this.countriesChart) this.countriesChart.resize();
+              if (this.statesChart) this.statesChart.resize();
+            }, 150);
           });
+          
+          // Also add ResizeObserver for better container size detection
+          if (window.ResizeObserver) {
+            const resizeObserver = new ResizeObserver((entries) => {
+              clearTimeout(this.resizeTimeout);
+              this.resizeTimeout = setTimeout(() => {
+                if (this.map && this.location_tab === 'map') {
+                  this.refreshMap();
+                }
+              }, 150);
+            });
+            resizeObserver.observe(mapElement);
+          }
+          
           this.resizeListenerAdded = true;
         }
       });
@@ -313,6 +350,30 @@ function locationAnalytics() {
           this.initMap();
         }
       });
+    },
+    
+    // Method to refresh map on resize
+    refreshMap() {
+      if (this.map && this.location_tab === 'map') {
+        const mapElement = document.getElementById('world-map');
+        if (mapElement && this.isContainerReady(mapElement)) {
+          // Store current state
+          const wasMapInitialized = !!this.map;
+          
+          // Dispose current map
+          if (this.map) {
+            this.map = null;
+          }
+          
+          // Clear container
+          mapElement.innerHTML = '';
+          
+          // Reinitialize with new dimensions
+          if (wasMapInitialized) {
+            this.initMap();
+          }
+        }
+      }
     },
     
     initCountriesChart() {
