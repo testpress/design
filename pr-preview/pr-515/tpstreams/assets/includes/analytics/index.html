@@ -35,11 +35,11 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8 mb-8 px-20">
     
     <!-- Regions Box -->
-    <div class="bg-white rounded-lg border border-gray-200 shadow-sm relative" style="width: 450px; height: 400px;" x-data="locationAnalytics()" x-init="initMap()">
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm relative w-full max-w-md overflow-hidden" style="aspect-ratio: 7/6;" x-data="locationAnalytics()" x-init="initMap()">
   <!-- Location Analytics Container -->
-  <div class="relative px-3 pt-0 pb-2 h-full flex flex-col">
+  <div class="relative px-3 pt-3 pb-2 h-full flex flex-col">
     <!-- Header with Title and Tabs -->
-    <div class="flex items-center justify-between mb-2 pt-1 pl-3">
+    <div class="flex items-center justify-between mb-2 pt-3 pl-3">
       <!-- Title -->
       <h3 class="text-lg font-semibold text-gray-800">Locations</h3>
       
@@ -63,34 +63,34 @@
       </div>
     </div>
     <!-- Content Area -->
-    <div class="flex-1 flex items-end justify-center">
+    <div class="flex-1 flex items-stretch justify-center overflow-hidden">
       <!-- Map View -->
-      <div x-show="location_tab === 'map'" class="w-full h-[350px]">
+      <div x-show="location_tab === 'map'" class="w-full h-full">
         <div id="world-map" class="w-full h-full"></div>
       </div>
 
       <!-- Countries Flow Chart -->
-      <div x-show="location_tab === 'countries'" class="w-full h-[350px] flex flex-col">
+      <div x-show="location_tab === 'countries'" class="w-full h-full flex flex-col">
         <!-- Column Headers -->
-        <div class="flex justify-between items-center px-4 pt-2 pb-0">
+        <div class="flex justify-between items-center px-4 pt-2 pb-0 flex-shrink-0">
           <h4 class="text-sm font-medium text-gray-600">Country</h4>
           <h4 class="text-sm font-medium text-gray-600 pr-2">Views</h4>
         </div>
         <!-- Chart Container -->
-        <div class="flex-1">
+        <div class="flex-1 min-h-0">
           <div id="countries-chart" class="w-full h-full"></div>
         </div>
       </div>
 
       <!-- States Flow Chart -->
-      <div x-show="location_tab === 'states'" class="w-full h-[350px] flex flex-col">
+      <div x-show="location_tab === 'states'" class="w-full h-full flex flex-col">
         <!-- Column Headers -->
-        <div class="flex justify-between items-center px-4 pt-2 pb-0">
+        <div class="flex justify-between items-center px-4 pt-2 pb-0 flex-shrink-0">
           <h4 class="text-sm font-medium text-gray-600">State</h4>
           <h4 class="text-sm font-medium text-gray-600 pr-2">Views</h4>
         </div>
         <!-- Chart Container -->
-        <div class="flex-1">
+        <div class="flex-1 min-h-0">
           <div id="states-chart" class="w-full h-full"></div>
         </div>
       </div>
@@ -523,6 +523,9 @@ function locationAnalytics() {
             color: '#fef3c7',
             borderRadius: [0, 4, 4, 0]
           },
+          emphasis: {
+            disabled: true
+          },
           barWidth: '60%',
           // Add animation for bars
           animation: true,
@@ -615,6 +618,68 @@ function locationAnalytics() {
           this.location_tab = 'states';
           this.$nextTick(() => this.initStatesChart());
         }
+      });
+      
+      // Add hover effect for country names
+      this.countriesChart.on('mouseover', (params) => {
+        this.countriesChart.getZr().setCursorStyle('pointer');
+        
+        // Add underline effect by updating the label formatter
+        const currentOption = this.countriesChart.getOption();
+        const newOption = JSON.parse(JSON.stringify(currentOption));
+        
+        newOption.series[0].label.formatter = function(formatterParams) {
+          const flagCodes = {
+            'United States': 'us',
+            'India': 'in',
+            'United Kingdom': 'gb',
+            'Australia': 'au',
+            'Brazil': 'br',
+            'Canada': 'ca'
+          };
+          const code = flagCodes[formatterParams.data.name];
+          const countryName = formatterParams.data.name;
+          
+          if (formatterParams.dataIndex === params.dataIndex) {
+            // Add underline for hovered item
+            return code ? `{${code}|}   {underline|${countryName}}` : `{underline|${countryName}}`;
+          } else {
+            return code ? `{${code}|}   ${countryName}` : countryName;
+          }
+        };
+        
+        // Add underline style to rich text
+        if (!newOption.series[0].label.rich.underline) {
+          newOption.series[0].label.rich.underline = {
+            textDecoration: 'underline',
+            color: '#374151'
+          };
+        }
+        
+        this.countriesChart.setOption(newOption, false);
+      });
+      
+      this.countriesChart.on('mouseout', (params) => {
+        this.countriesChart.getZr().setCursorStyle('default');
+        
+        // Remove underline effect by restoring original formatter
+        const currentOption = this.countriesChart.getOption();
+        const newOption = JSON.parse(JSON.stringify(currentOption));
+        
+        newOption.series[0].label.formatter = function(formatterParams) {
+          const flagCodes = {
+            'United States': 'us',
+            'India': 'in',
+            'United Kingdom': 'gb',
+            'Australia': 'au',
+            'Brazil': 'br',
+            'Canada': 'ca'
+          };
+          const code = flagCodes[formatterParams.data.name];
+          return code ? `{${code}|}   ${formatterParams.data.name}` : formatterParams.data.name;
+        };
+        
+        this.countriesChart.setOption(newOption, false);
       });
       
       // Final resize to ensure proper dimensions
@@ -741,6 +806,9 @@ function locationAnalytics() {
             color: '#fef3c7',
             borderRadius: [0, 4, 4, 0]
           },
+          emphasis: {
+            disabled: true
+          },
           barWidth: '60%',
           // Add animation for bars
           animation: true,
@@ -785,14 +853,14 @@ function locationAnalytics() {
 </script> 
 
     <!-- Devices Box -->
-    <div class="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden relative" style="width: 450px; height: 400px;" x-data="deviceAnalytics()" x-init="$nextTick(() => setTimeout(() => initBrowserChart(), 100))">
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm relative w-full max-w-md overflow-hidden" style="aspect-ratio: 7/6;" x-data="deviceAnalytics()" x-init="$nextTick(() => setTimeout(() => initBrowserChart(), 100))">
   <!-- Load Iconify -->
   <script src="https://code.iconify.design/iconify-icon/3.0.0/iconify-icon.min.js"></script>
   
   <!-- Device Analytics Container -->
-  <div class="relative overflow-hidden px-3 pt-0 pb-2 h-full flex flex-col">
+  <div class="relative px-3 pt-3 pb-2 h-full flex flex-col">
     <!-- Header with Title and Tabs -->
-    <div class="flex items-center justify-between mb-2 pt-1 pl-3">
+    <div class="flex items-center justify-between mb-2 pt-3 pl-3">
       <!-- Title -->
       <h3 class="text-lg font-semibold text-gray-800">Devices</h3>
       
@@ -816,35 +884,35 @@ function locationAnalytics() {
       </div>
     </div>
     <!-- Content Area -->
-    <div class="flex-1 flex items-end justify-center">
+    <div class="flex-1 flex items-stretch justify-center overflow-hidden">
       <!-- Browser Chart -->
-      <div x-show="device_tab === 'browser'" class="w-full h-[350px] flex flex-col">
+      <div x-show="device_tab === 'browser'" class="w-full h-full flex flex-col">
         <!-- Column Headers -->
-        <div class="flex justify-between items-center px-4 pt-2 pb-0">
+        <div class="flex justify-between items-center px-4 pt-2 pb-0 flex-shrink-0">
           <h4 class="text-sm font-medium text-gray-600">Browser</h4>
           <h4 class="text-sm font-medium text-gray-600 pr-2">Views</h4>
         </div>
         <!-- Chart Container -->
-        <div class="flex-1">
+        <div class="flex-1 min-h-0">
           <div id="browsers-chart" class="w-full h-full"></div>
         </div>
       </div>
 
       <!-- OS Chart -->
-      <div x-show="device_tab === 'os'" class="w-full h-[350px] flex flex-col">
+      <div x-show="device_tab === 'os'" class="w-full h-full flex flex-col">
         <!-- Column Headers -->
-        <div class="flex justify-between items-center px-4 pt-2 pb-0">
+        <div class="flex justify-between items-center px-4 pt-2 pb-0 flex-shrink-0">
           <h4 class="text-sm font-medium text-gray-600">Operating System</h4>
           <h4 class="text-sm font-medium text-gray-600 pr-2">Views</h4>
         </div>
         <!-- Chart Container -->
-        <div class="flex-1">
+        <div class="flex-1 min-h-0">
           <div id="os-chart" class="w-full h-full"></div>
         </div>
       </div>
 
       <!-- Size Chart -->
-              <div x-show="device_tab === 'size'" class="w-full h-[350px] flex items-center justify-center">
+              <div x-show="device_tab === 'size'" class="w-full h-full flex items-center justify-center">
           <!-- Circular Progress Design -->
           <div class="grid grid-cols-2 gap-x-4 gap-y-12 w-full max-w-lg px-8">
           <!-- Desktop -->
@@ -1151,6 +1219,9 @@ function deviceAnalytics() {
             color: '#fef3c7',
             borderRadius: [0, 4, 4, 0]
           },
+          emphasis: {
+            disabled: true
+          },
           barWidth: '60%',
           // Add animation for bars
           animation: true,
@@ -1360,6 +1431,9 @@ function deviceAnalytics() {
           itemStyle: {
             color: '#fef3c7',
             borderRadius: [0, 4, 4, 0]
+          },
+          emphasis: {
+            disabled: true
           },
           barWidth: '60%',
           // Add animation for bars
