@@ -1,0 +1,222 @@
+---
+role: "Superadmin"
+view: "Zonal Manager Performance"
+tags: simba
+user:
+first_name: James
+is_superuser: true
+tailwindv4: true
+---
+{% extends "src/simba/base.html" %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ '/node_modules/apexcharts/dist/apexcharts.css' | url }}">
+<style type="text/css">
+  .apexcharts-tooltip.apexcharts-theme-light {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+</style>
+{% endblock extra_head %}
+
+{% block content %}
+<div class="max-w-[85rem] px-4 sm:px-6 lg:px-8 mx-auto">
+  {% include 'src/simba/partials/breadcrumb.html' %}
+  <div class="py-2 sm:pb-0 sm:pt-5 space-y-5">
+    <div class="flex flex-wrap justify-between items-center gap-2" x-data="{
+      selectedPeriod: 'Month',
+      baseMonth: new Date().getMonth(),
+      baseYear: new Date().getFullYear(),
+      currentMonth: new Date().getMonth(),
+      currentYear: new Date().getFullYear(),
+      get currentQuarter() { return Math.floor(this.currentMonth / 3) + 1 },
+      nextPeriod() {
+        if (this.selectedPeriod === 'Month') {
+          if (this.currentMonth === 11) {
+            this.currentMonth = 0;
+            this.currentYear++;
+          } else {
+            this.currentMonth++;
+          }
+        } else if (this.selectedPeriod === 'Quarter') {
+          if (this.currentQuarter === 4) {
+            this.currentMonth = 0;
+            this.currentYear++;
+          } else {
+            this.currentMonth += 3;
+          }
+        } else if (this.selectedPeriod === 'Year') {
+          this.currentYear++;
+        }
+      },
+      prevPeriod() {
+        if (this.selectedPeriod === 'Month') {
+          if (this.currentMonth === 0) {
+            this.currentMonth = 11;
+            this.currentYear--;
+          } else {
+            this.currentMonth--;
+          }
+        } else if (this.selectedPeriod === 'Quarter') {
+          if (this.currentQuarter === 1) {
+            this.currentMonth = 9;
+            this.currentYear--;
+          } else {
+            this.currentMonth -= 3;
+          }
+        } else if (this.selectedPeriod === 'Year') {
+          this.currentYear--;
+        }
+      },
+      monthName(idx) {
+        return ['January','February','March','April','May','June','July','August','September','October','November','December'][idx];
+      },
+      quarterLabel() {
+        const q = this.currentQuarter;
+        const startMonth = (q - 1) * 3;
+        const endMonth = startMonth + 2;
+        return `Q${q} ${this.currentYear} (${this.monthName(startMonth).slice(0,3)}–${this.monthName(endMonth).slice(0,3)})`;
+      }
+   }" x-effect="
+  if (selectedPeriod === 'Month') {
+    currentMonth = baseMonth;
+    currentYear = baseYear;
+  } else if (selectedPeriod === 'Quarter' || selectedPeriod === 'Year') {
+    currentMonth = baseMonth;
+    currentYear = baseYear;
+  }
+" @keydown.window="
+  if ($event.key.toLowerCase() === 'm') selectedPeriod = 'Month';
+  if ($event.key.toLowerCase() === 'q') selectedPeriod = 'Quarter';
+  if ($event.key.toLowerCase() === 'y') selectedPeriod = 'Year';
+">
+      <div>
+        <h1 class="text-lg md:text-xl font-semibold text-stone-800 dark:text-neutral-200" x-text="`John Doe` + `'s performance in ` + `Kerala Zone` + ` – ` + (
+              selectedPeriod === 'Month'
+                ? monthName(currentMonth) + ' ' + currentYear
+                : selectedPeriod === 'Quarter'
+                  ? quarterLabel()
+                  : currentYear
+            )">
+        </h1>
+
+      </div>
+      <div class="flex justify-end items-center gap-x-2">
+        <div class="flex -space-x-px">
+          <button type="button" @click="prevPeriod"
+            class="size-8.5 inline-flex justify-center items-center gap-x-1 text-xs first:rounded-s-md last:rounded-e-md border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600 dark:focus:bg-neutral-600">
+            <!-- left arrow SVG -->
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+          </button>
+
+          <button type="button" @click="currentMonth = baseMonth; currentYear = baseYear"
+            class="py-2 px-2.5 inline-flex items-center gap-x-1 text-xs first:rounded-s-md last:rounded-e-md border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600 dark:focus:bg-neutral-600">
+            <span
+              x-text="selectedPeriod === 'Month' ? 'This Month' : selectedPeriod === 'Quarter' ? 'This Quarter' : 'This Year'"></span>
+          </button>
+
+          <button type="button" @click="nextPeriod"
+            class="size-8.5 inline-flex justify-center items-center gap-x-1 text-xs first:rounded-s-md last:rounded-e-md border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-600 dark:focus:bg-neutral-600">
+            <!-- right arrow SVG -->
+            <svg class="shrink-0 size-3.5" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m9 18 6-6-6-6"></path>
+            </svg>
+          </button>
+        </div>
+        <!-- Time Period Selection Dropdown -->
+        <div class="hs-dropdown [--auto-close:inside] [--placement:bottom-right] relative inline-flex">
+          <button id="hs-pro-inthsndid1" type="button"
+            class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"
+            aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+            <span x-text="selectedPeriod"></span>
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
+
+          <!-- Time Period Selection Dropdown -->
+          <div
+            class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-44 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-2xs dark:bg-neutral-900"
+            role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-inthsndid1">
+            <!-- Body -->
+            <div
+              class="p-1 max-h-80 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-stone-100 [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+              <fieldset class="grid gap-y-0.5">
+                <legend class="sr-only">
+                  Time Period Selection
+                </legend>
+
+                <!-- Checkbox -->
+                <label for="month"
+                  class="py-2 px-3 flex items-center rounded-lg cursor-pointer rounded-md hover:bg-stone-100 has-checked:bg-stone-100 has-disabled:opacity-50 has-disabled:pointer-events-none dark:hover:bg-neutral-800 dark:has-checked:bg-neutral-800 ">
+                  <input type="radio" id="month" class="hidden" value="Month" name="period" x-model="selectedPeriod">
+                  <span class="grow">
+                    <span class="block text-sm text-stone-800 dark:text-neutral-200">
+                      Month
+                    </span>
+                  </span>
+                  <span class="font-normal text-xs text-stone-500 dark:text-neutral-500">
+                    M
+                  </span>
+                </label>
+                <!-- End Checkbox -->
+
+                <!-- Checkbox -->
+                <label for="quarter"
+                  class="py-2 px-3 flex items-center rounded-lg cursor-pointer rounded-md hover:bg-stone-100 has-checked:bg-stone-100 has-disabled:opacity-50 has-disabled:pointer-events-none dark:hover:bg-neutral-800 dark:has-checked:bg-neutral-800 ">
+                  <input type="radio" id="quarter" class="hidden" value="Quarter" name="period"
+                    x-model="selectedPeriod">
+                  <span class="grow">
+                    <span class="block text-sm text-stone-800 dark:text-neutral-200">
+                      Quarter
+                    </span>
+                  </span>
+                  <span class="font-normal text-xs text-stone-500 dark:text-neutral-500">
+                    Q
+                  </span>
+                </label>
+                <!-- End Checkbox -->
+
+                <!-- Checkbox -->
+                <label for="year"
+                  class="py-2 px-3 flex items-center rounded-lg cursor-pointer rounded-md hover:bg-stone-100 has-checked:bg-stone-100 has-disabled:opacity-50 has-disabled:pointer-events-none dark:hover:bg-neutral-800 dark:has-checked:bg-neutral-800 ">
+                  <input type="radio" id="year" class="hidden" value="Year" name="period" x-model="selectedPeriod">
+                  <span class="grow">
+                    <span class="block text-sm text-stone-800 dark:text-neutral-200">
+                      Year
+                    </span>
+                  </span>
+                  <span class="font-normal text-xs text-stone-500 dark:text-neutral-500">
+                    Y
+                  </span>
+                </label>
+                <!-- End Year Option -->
+              </fieldset>
+            </div>
+            <!-- End Body -->
+          </div>
+          <!-- End Time Period Selection Dropdown -->
+        </div>
+        <!-- End Time Period Selection Dropdown -->
+      </div>
+    </div>
+    {% include './includes/stats.html' %}
+    {% include './includes/performance_chart.html' %}
+    {% include './includes/revenue_and_admissions.html' %}
+  </div>
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+<script src="/node_modules/preline/dist/preline.js"></script>
+<script src="{{ '/node_modules/lodash/lodash.min.js' | url }}"></script>
+<script src="{{ '/node_modules/apexcharts/dist/apexcharts.min.js' | url }}"></script>
+<script src="https://preline.co/pro/assets/js/hs-apexcharts-helpers.js"></script>
+{% include './includes/apexchart_script.html' %}
+{% endblock extra_scripts %}
