@@ -1,0 +1,155 @@
+<script>
+
+function selectOptions(el) {
+    // Remove selected class from all siblings
+    const parent = el.parentElement;
+    parent.querySelectorAll('.option-item').forEach(opt => {
+      opt.classList.add('border-gray-200', 'dark:border-neutral-600');
+      opt.classList.remove('border-emerald-500', 'bg-emerald-50', 'dark:bg-emerald-900/20');
+      opt.classList.remove('selected');
+    });
+    el.classList.add('selected');
+    el.classList.remove('border-gray-200', 'dark:border-neutral-600');
+    el.classList.add('border-emerald-500', 'bg-emerald-50', 'dark:bg-emerald-900/20');
+  }
+function checkAnswer(button) {
+  const container = button.closest('.p-6');
+  const selected = container.querySelector('.option-item.selected');
+  const correct = selected?.dataset.correct;
+
+  if (!selected) {
+    return;
+  }
+
+  // Mark correct/incorrect
+  const selectedValue = selected.dataset.option;
+  if (selectedValue === correct) {
+    selected.classList.add('border-emerald-500', 'bg-emerald-50');
+    selected.querySelector('.checkmark-icon').classList.remove('hidden');
+  } else {
+    selected.classList.add('border-red-500', 'bg-red-50');
+    selected.querySelector('.wrong-icon').classList.remove('hidden');
+
+    // also highlight correct answer
+    container.querySelectorAll('.option-item').forEach(opt => {
+      if (opt.dataset.option === correct) {
+        opt.classList.remove('border-gray-200', 'dark:border-neutral-600');
+        opt.classList.add('border-emerald-500', 'bg-emerald-50');
+        opt.querySelector('.checkmark-icon').classList.remove('hidden');
+      }
+    });
+  }
+
+  // Show explanation
+  container.querySelector('.explanation-container')?.classList.remove('hidden');
+
+  // Swap buttons
+  button.classList.add('hidden');
+  container.querySelector('.continue-btn').classList.remove('hidden');
+}
+  function checkMultipleAnswer(button) {
+    const container = button.closest('.p-6');
+    const selectedOptions = Array.from(container.querySelectorAll('.option-item.selected'));
+    if (selectedOptions.length === 0) {
+      return;
+    }
+
+    const correctOptions = container.querySelector('.option-item').dataset.correct.split(',');
+    let allCorrect = true;
+
+    // Mark selected options
+    selectedOptions.forEach(selected => {
+      const selectedValue = selected.dataset.option;
+      if (correctOptions.includes(selectedValue)) {
+        selected.classList.add('border-emerald-500', 'bg-emerald-50');
+        selected.querySelector('.checkmark-icon').classList.remove('hidden');
+      } else {
+        selected.classList.add('border-red-500', 'bg-red-50');
+        selected.querySelector('.wrong-icon').classList.remove('hidden');
+        allCorrect = false;
+      }
+    });
+
+    // Highlight unselected correct options
+    correctOptions.forEach(correctOpt => {
+      const optionEl = container.querySelector(`.option-item[data-option="${correctOpt}"]`);
+      if (!selectedOptions.includes(optionEl)) {
+        optionEl.classList.add('border-emerald-500', 'bg-emerald-50');
+        optionEl.querySelector('.checkmark-icon').classList.remove('hidden');
+        allCorrect = false;
+      }
+    });
+
+    // Show explanation
+    container.querySelector('.explanation-container')?.classList.remove('hidden');
+
+    // Swap buttons
+    button.classList.add('hidden');
+    container.querySelector('.continue-btn').classList.remove('hidden');
+  }
+  function checkGapFillAnswer(button) {
+    const container = button.closest('.p-6');
+    const inputFields = Array.from(container.querySelectorAll('input[type="text"]'));
+    let allFilled = true;
+    let allCorrect = true;
+
+    inputFields.forEach(input => {
+      if (input.value.trim() === '') {
+        allFilled = false;
+      }
+    });
+
+    if (!allFilled) {
+      return;
+    }
+
+    inputFields.forEach(input => {
+      const userAnswer = input.value.trim().toLowerCase();
+      const correctAnswer = input.dataset.correct.toLowerCase();
+      console.log(userAnswer, correctAnswer);
+
+      if (userAnswer === correctAnswer) {
+        input.classList.add('border-emerald-500', 'bg-emerald-50');
+      } else {
+        input.classList.add('border-red-500', 'bg-red-50');
+        allCorrect = false;
+      }
+    });
+    if (allCorrect) {
+      const correctDiv = container.querySelector('.gapfill-correct');
+      correctDiv.classList.remove('hidden');
+    } else {
+      const incorrectDiv = container.querySelector('.gapfill-incorrect');
+      incorrectDiv.classList.remove('hidden');
+    }
+
+    // Show explanation
+    container.querySelector('.explanation-container')?.classList.remove('hidden');
+
+    // Swap buttons
+    button.classList.add('hidden');
+    container.querySelector('.continue-btn').classList.remove('hidden');
+  }
+  function navigateVideoQuestion(direction) {
+    const totalQuestions = {{ video_questions.data.questions | length }};
+    
+    if (direction === 'next' && currentQuestionIndex < totalQuestions - 1) {
+      currentQuestionIndex++;
+    } else if (direction === 'next' && currentQuestionIndex === totalQuestions - 1) {
+      // Show summary when clicking next on last question
+      showSummary();
+      return;
+    } else if (direction === 'prev' && currentQuestionIndex > 0) {
+      currentQuestionIndex--;
+    }
+    
+    // Update question display
+    showQuestion(currentQuestionIndex);
+    
+    // Update navigation buttons
+    updateNavigationButtons();
+    
+    // Update counter
+    updateQuestionCounter();
+}
+</script>

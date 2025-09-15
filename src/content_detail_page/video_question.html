@@ -1,0 +1,216 @@
+{% extends "layouts/student_base.html" %}
+{% block script %}
+{% endblock script %}
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+{% include "./includes/content_scripts.html" %}
+{% include "./includes/search_script.html" %}
+{% endblock extra_head %}
+{% block content %}
+<div x-data="contents">
+  {% include "./includes/mobile_sidebar.html" %}
+  {% include "./includes/desktop_sidebar.html" %}
+  <main class="lg:pl-96">
+    {% include "./includes/navigate_content.html" %}
+    <div class="lg:px-8" x-data="{toggleSVG : true, isBookmarked:false, is_renderable:false}">
+      <div class="mt-6 p-4 sm:px-6 lg:px-0 flex items-center justify-between">
+        <div class="min-w-0 flex-1">
+          <h1 class="text-lg lg:text-2xl font-bold text-gray-900">Video Question</h1>
+        </div>
+      </div>
+      <div class="w-full">
+        <!-- Quiz Card -->
+        <div
+          class="mt-0 sm:mt-4 bg-white dark:bg-neutral-900 rounded-none lg:rounded-lg shadow-sm border border-gray-200 dark:border-neutral-700">
+          {% for question in video_questions.data.questions %}
+          <div class="p-6">
+            <!-- Question -->
+            {% if question.type == "GAPFILL" %}
+              <div class="mt-2">
+                {% set parts = question.question_text.split('___') %}
+                <form id="gapfill-form-{{ question.question_index }}">
+                  {% for part in parts %}
+                  <span>{{ part }}</span>
+                  {% if not loop.last %}
+                  <input type="text" name="gap-{{ loop.index0 }}"
+                    class="inline-block w-24 border border-gray-300 dark:border-neutral-600 rounded-md p-1 focus:border-none focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    data-question="{{ question.question_index }}"
+                    data-correct="{{ question.correct_option }}">
+                  {% endif %}
+                  {% endfor %}
+                </form>
+                <div class="gapfill-incorrect text-sm text-red-500 mt-1 hidden" id="gapfill-error-{{ question.question_index }}">
+                  Correct answer is {{ question.correct_option }}.
+                </div>
+                <div class="gapfill-correct text-sm text-emerald-500 mt-1 hidden" id="gapfill-success-{{ question.question_index }}">
+                  Correct! Well done.
+                </div>
+              </div>
+            {% else %}
+              <div class="mb-6">
+                <p x-text="currentQuestion.text">{{question.question_text}}</p>
+              </div>
+            {% endif %}
+
+            <!-- Options -->
+            <div class="grid grid-cols-1 gap-3" x-data="{ options: {{ question.options|safe }},">
+              {% if question.type == "MULTIPLE_CHOICE"%}
+              {% for option in question.options %}
+              <div
+                class="option-item flex items-start justify-between p-3 rounded-lg border transition-colors cursor-pointer"
+                data-question="{{ question.question_index }}"
+                data-option="{{ option }}"
+                data-correct="{{ question.correct_option }}"
+                onclick="selectOptions(this)"
+              >
+                <div class="flex items-start flex-1 min-w-0">
+                  <span class="text-sm font-medium text-gray-700 dark:text-neutral-300 mr-3 flex-shrink-0 mt-0.5">
+                    {% if loop.index0 == 0 %}A.{% elif loop.index0 == 1 %}B.{% elif loop.index0 == 2 %}C.{% else %}D.{%
+                    endif %}
+                  </span>
+                  <div
+                    class="text-gray-700 dark:text-neutral-300 break-words leading-relaxed line-clamp-2 overflow-hidden"
+                    title="{{ option }}">{{ option }}</div>
+                </div>
+                <div class="checkmark-icon hidden">
+                  <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="m9 12 2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path>
+                  </svg>
+                </div>
+                <div class="wrong-icon hidden">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="w-5 h-5 text-red-500" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="m15 9-6 6"></path>
+                    <path d="m9 9 6 6"></path>
+                  </svg>
+                </div>
+              </div>
+              {% endfor %}
+              {% endif %}
+              {% if question.type == "MULTIPLE_SELECT"%}
+              {% for option in question.options %}
+              <div
+                class="option-item flex items-start justify-between p-3 rounded-lg border transition-colors cursor-pointer"
+                data-question="{{ question.question_index }}"
+                data-option="{{ option }}"
+                data-correct="{{ question.correct_option | safe }}"
+                onclick="selectMultipleOption(this)"
+              >
+                <div class="flex items-start flex-1 min-w-0">
+                  <span class="text-sm font-medium text-gray-700 dark:text-neutral-300 mr-3 flex-shrink-0 mt-0.5">
+                    {% if loop.index0 == 0 %}A.{% elif loop.index0 == 1 %}B.{% elif loop.index0 == 2 %}C.{% else %}D.{%
+                    endif %}
+                  </span>
+                  <div
+                    class="text-gray-700 dark:text-neutral-300 break-words leading-relaxed line-clamp-2 overflow-hidden"
+                    title="{{ option }}">{{ option }}</div>
+                </div>
+                <div class="checkmark-icon hidden">
+                  <svg class="w-5 h-5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="m9 12 2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"></path>
+                  </svg>
+                </div>
+                <div class="wrong-icon hidden">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                    class="w-5 h-5 text-red-500" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="m15 9-6 6"></path>
+                    <path d="m9 9 6 6"></path>
+                  </svg>
+                </div>
+              </div>
+              {% endfor %}
+              {% endif %}
+              
+            </div>
+
+            <!-- Hint Section -->
+            <div class="mt-4">
+              <!-- Hint Button -->
+              <button type="button"
+                class="hint-btn text-xs text-gray-600 dark:text-neutral-400 hover:text-gray-700 dark:hover:text-neutral-300 flex items-center"
+                onclick="toggleHint('{{question.question_index}}')">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                  stroke="currentColor" class="w-3 h-3 mr-1">
+                  <path stroke-linecap="round" stroke-linejoin="round"
+                    d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+                </svg>
+                <span class="hint-text">Show Hint</span>
+              </button>
+              
+
+              <!-- Hint Container -->
+              <div class="hint-container hidden mt-3">
+                <div
+                  class="text-xs text-gray-600 dark:text-neutral-400 bg-gray-50 dark:bg-neutral-800 px-3 py-2 rounded-md border border-gray-200 dark:border-neutral-600">
+                  <span>{{ question.hint }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Explanation Section -->
+            <div class="explanation-container hidden mt-4">
+              <div
+                class="explanation-card bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-600 rounded-lg p-4">
+                <!-- Explanation Header -->
+                <div class="flex items-center mb-3">
+                  <svg class="w-4 h-4 mr-2 text-gray-600 dark:text-neutral-400" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                  <h5 class="text-sm font-medium text-gray-800 dark:text-neutral-200">Explanation</h5>
+                </div>
+
+                <!-- Explanation Text -->
+                <p class="text-sm text-gray-700 dark:text-neutral-300 mb-3">{{ question.explanation }}</p>
+
+              </div>
+            </div>
+            <div class="mt-4 flex space-x-3">
+              <div class="mt-4 flex space-x-3">
+                <!-- Check Button -->
+                {% if question.type == "MULTIPLE_CHOICE"%}
+                <button type="button" class="check-btn px-4 py-2 bg-emerald-500 text-white rounded-lg disabled:opacity-50" onclick="checkAnswer(this)">
+                  Check
+                </button>
+                {% endif %}
+                {% if question.type == "MULTIPLE_SELECT"%}
+                <button type="button" class="check-btn px-4 py-2 bg-emerald-500 text-white rounded-lg disabled:opacity-50" onclick="checkMultipleAnswer(this)">
+                  Check
+                </button>
+                {% endif %}
+                {% if question.type == "GAPFILL"%}
+                <button type="button" class="check-btn px-4 py-2 bg-emerald-500 text-white rounded-lg disabled:opacity-50" onclick="checkGapFillAnswer(this)">
+                  Check
+                </button>
+                {% endif %}
+                <!-- Continue Button -->
+                <button type="button"
+                 class="continue-btn px-4 py-2 bg-emerald-500 text-white rounded-lg hidden"
+                 onclick="navigateVideoQuestion('next')">
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+{% include './includes/quiz_chart_script.html' %}
+{% include './includes/quiz_script.html' %}
+{% include './includes/video_question_script.html' %}
+{% endblock %}
+
+
+
+<!-- ApexCharts Scripts -->
