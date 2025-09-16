@@ -1,9 +1,16 @@
 
-<div class="lg:px-8" x-data="{...videoQuiz(), toggleSVG:true, isBookmarked:false, is_renderable:false}" x-init="init()">
+<div class="lg:px-8" x-data="{toggleSVG:true, isBookmarked:false, is_renderable:false}">
   {% include "./content_heading.html" %}
   <div class="mt-6">
-    <div style="padding-top:56.25%;position:relative;" class="video-container">
-      <iframe src="https://lmsdemo.testpress.in/embed/iFTEoF7PzJe/?access_token=ea3de778-37e2-41af-b8a2-e96dda33f662" style="border:0;max-width:100%;position:absolute;top:0;left:0;height:100%;width:100%;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope picture-in-picture" allowfullscreen="" frameborder="0"></iframe>
+    <div>
+      <video id="my-video" class="video-js vjs-big-play-centered h-[32rem]" controls preload="auto" style="width: 100%">
+        <source src="http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4"/>
+        <p class="vjs-no-js">
+          To view this video please enable JavaScript, and consider upgrading to a
+          web browser that
+          <a href="https://videojs.com/html5-video-support/" target="_blank">supports HTML5 video</a>
+        </p>
+      </video>
     </div>
     {% include "./video_question.html" %}
   </div>
@@ -25,47 +32,62 @@
     </div>
   </div>
 </div>
-
+<script src="https://vjs.zencdn.net/7.8.4/video.js"></script>
 <script>
-function videoQuiz() {
-  return {
-    quizEnabled: false,
-    video_container: null,
-    video_iframe: null,
-    isPausedForQuiz: false,
-    video_questions_positions: [10,50,90], // checkpoints in seconds
-    currentPositionIndex: 0,
+var video = videojs("my-video"); 
+var video_question_modal = document.querySelector(".video-question-modal");
+var video_questions_positions = [10,50,90]; 
+var currentPosition = 0;
+const params = new URLSearchParams(window.location.search);
+var quizEnabled = params.get("video_quiz_enabled") === "true";
 
-    init() {
-      const params = new URLSearchParams(window.location.search);
-      this.quizEnabled = params.get("video_quiz_enabled") === "true";
-
-      this.video_container = document.querySelector(".video-container");
-      this.video_iframe = this.video_container.querySelector("iframe");
-
-      if (this.quizEnabled){
-        this.schedulePause();
-      }
-    },
-
-    schedulePause() {
-      this.video_questions_positions.forEach((position, index) => {
-        const delay = position * 1000;
-        setTimeout(() => {
-          this.currentPositionIndex = index;
-          this.pauseVideo();
-        }, delay);
-      });
-    },
-
-    pauseVideo() {
-      video_question_modal = document.querySelector(".video-question-modal");
-      video_question_modal.classList.remove("hidden");
-      const currentVideoQuestion = document.querySelector(`.video-question-position-${this.video_questions_positions[this.currentPositionIndex]}`);
-      if (currentVideoQuestion) {
-        currentVideoQuestion.style.display = "block";
-      }
-    },
+video.on("timeupdate", function () {
+  if(quizEnabled == false)return;
+  var currentTime = Math.floor(video.currentTime());
+  if (video_questions_positions.includes(currentTime) && this.currentPosition != currentTime) {
+    const prevVideoQuestion = document.querySelector(`.video-question-position-${currentTime}`);
+    if (prevVideoQuestion) {
+      prevVideoQuestion.style.display = "none";
+    }
+    this.isPausedForQuiz = true;
+    this.currentPosition = currentTime;
+    video.pause();
+    video_question_modal.classList.remove("hidden");
+    const currentVideoQuestion = document.querySelector(`.video-question-position-${currentTime}`);
+    if (currentVideoQuestion) {
+      currentVideoQuestion.style.display = "block";
+    }
   }
-}
+});
+var continueBtn = document.querySelectorAll(".continue-btn");
+continueBtn.forEach(button => {
+  button.addEventListener("click", function() {
+    var currentTime = Math.floor(video.currentTime());
+    video_question_modal.classList.add("hidden");
+    const currentVideoQuestion = document.querySelector(`.video-question-position-${currentTime}`);
+    if (currentVideoQuestion) {
+      currentVideoQuestion.style.display = "none";
+    }
+    video.play();
+  });
+});
+
+video.on("loadedmetadata",function(){
+  if(quizEnabled == false)return;
+  
+  var total = video.duration();
+  
+  var p = jQuery(video.controlBar.progressControl.children_[0].el_);
+  
+  for(var i=0;i<video_questions_positions.length;i++){
+    var left =( video_questions_positions[i]/ total * 100)+'%';
+    var time = video_questions_positions[i];
+
+		var el = jQuery('<div class="vjs-marker" style="left:'+left+'" data-time="'+time+'"><span>Quiz</span></div>');
+		el.click(function(){
+      video.currentTime($(this).data('time')); 
+		});
+		p.append(el);
+  }
+});
 </script>
