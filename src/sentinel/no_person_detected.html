@@ -1,0 +1,102 @@
+---
+tags: sentinel
+student_view : No Person Detected
+date: 2000-10-01
+new_student_page: true
+---
+
+
+{% extends "src/testpress/layout/student_layout.html" %}
+
+{% block main_content %}
+<div 
+  x-data="{ 
+    open: true,
+    dragging: false,
+    posX: 20,
+    posY: 0,
+    offsetX: 0,
+    offsetY: 0,
+    no_person_detected: false, // current detection state
+    updatePosition() {
+      this.posY = window.innerHeight - this.$el.offsetHeight - 5;
+      this.posX = 2;
+    },
+    init() {
+      // Position widget
+      this.$nextTick(() => this.updatePosition());
+      window.addEventListener('resize', () => this.updatePosition());
+
+      // 🧠 Simulated detection change (replace with real logic)
+      setTimeout(() => {
+        // Example logic: randomly toggle detection
+        this.no_person_detected = true;
+      }, 3000);
+    }
+  }"
+  x-init="init()"
+  x-show="open"
+  class="fixed z-[80] flex items-center justify-center cursor-pointer
+         w-64 max-w-sm"
+  @mousedown="dragging = true; offsetX = $event.clientX - posX; offsetY = $event.clientY - posY;"
+  @mousemove="
+    if (dragging) {
+      posX = Math.max(0, Math.min(window.innerWidth - $el.offsetWidth, $event.clientX - offsetX));
+      posY = Math.max(0, Math.min(window.innerHeight - $el.offsetHeight, $event.clientY - offsetY));
+    }
+  "
+  @mouseup="dragging = false"
+  @mouseleave="dragging = false"
+  :style="'top:' + posY + 'px; left:' + posX + 'px;'"
+>
+
+  <div class="w-full flex items-center">
+    <div 
+      class="w-full overflow-hidden flex flex-col rounded-md pointer-events-auto shadow-xl transition-all duration-300"
+      :class="!no_person_detected 
+        ? 'bg-white dark:bg-neutral-800 text-gray-800 dark:text-white' 
+        : 'bg-gradient-to-b from-red-600 to-red-500 dark:from-red-700 dark:to-red-800 text-white'"
+    >
+
+      <!-- Header -->
+      <div class="p-2 flex justify-between items-center text-xs font-medium">
+        <div class="flex items-center gap-x-1.5 whitespace-nowrap">
+          <span>Webcam Monitor</span>
+        </div>
+
+        <template x-if="no_person_detected">
+          <span class="inline-flex items-center gap-x-1.5 text-xs font-medium">
+            <span class="relative inline-flex h-2 w-2 align-middle">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+            </span>
+            No person detected
+          </span>
+        </template>
+      </div>
+
+      <!-- Video -->
+      <div class="relative w-full aspect-video overflow-hidden rounded-b-md">
+        <video id="camera-feed" class="absolute inset-0 w-full h-full object-cover opacity-90 transition-all duration-300" autoplay playsinline></video>
+        <div 
+          class="absolute inset-0 pointer-events-none transition-all duration-300"
+          :class="!no_person_detected ? 'bg-transparent' : 'bg-red-500/30 dark:bg-red-800/30'"
+        ></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+  // 🎥 start webcam feed (kept outside Alpine to avoid re-inits)
+  const videoElement = document.getElementById('camera-feed');
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => videoElement.srcObject = stream)
+      .catch(err => console.error('Error accessing camera:', err));
+  }
+</script>
+
+
+{% endblock main_content %}
