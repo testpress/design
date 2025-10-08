@@ -1,0 +1,218 @@
+<script>
+  function editClassesApp() {
+    return {
+      selectedSeries: null,
+      editingClass: null,
+      confirmClassCancellation: false,
+      classToCancel: null,
+      showDropDown: false,
+      searchQuery: '',
+      statusFilter: 'all',
+      classes: [
+        {
+          id: 1,
+          seriesId: 1,
+          sessionNumber: 1,
+          title: "Introduction to Physics",
+          description: "Basic concepts and principles of physics",
+          date: "2024-01-15",
+          time: "10:00",
+          dateValue: "2024-01-15",
+          status: "completed",
+          host: "Dr. John Smith"
+        },
+        {
+          id: 2,
+          seriesId: 1,
+          sessionNumber: 2,
+          title: "Newton's Laws of Motion",
+          description: "Understanding the three fundamental laws",
+          date: "2024-01-22",
+          time: "10:00",
+          dateValue: "2024-01-22",
+          status: "completed",
+          host: "Dr. John Smith"
+        },
+        {
+          id: 3,
+          seriesId: 1,
+          sessionNumber: 3,
+          title: "Work and Energy",
+          description: "Concepts of work, energy, and power",
+          date: "2024-01-29",
+          time: "10:00",
+          dateValue: "2024-01-29",
+          status: "scheduled",
+          host: "Dr. John Smith"
+        },
+        {
+          id: 4,
+          seriesId: 1,
+          sessionNumber: 4,
+          title: "Momentum and Collisions",
+          description: "Conservation of momentum in different scenarios",
+          date: "2024-02-05",
+          time: "10:00",
+          dateValue: "2024-02-05",
+          status: "scheduled",
+          host: "Dr. John Smith"
+        },
+        {
+          id: 5,
+          seriesId: 1,
+          sessionNumber: 5,
+          title: "Oscillations and Waves",
+          description: "Simple harmonic motion and wave properties",
+          date: "2024-02-12",
+          time: "10:00",
+          dateValue: "2024-02-12",
+          status: "cancelled",
+          host: "Dr. John Smith"
+        }
+      ],
+
+      series: [
+        {
+          id: 1,
+          title: "Advanced Physics Course",
+          status: "active",
+          host: "Dr. John Smith",
+          schedule: "Mondays, 10:00 AM",
+          duration: "2 hours",
+          description: "Comprehensive physics course covering advanced topics"
+        }
+      ],
+
+      init() {
+        this.loadSeriesFromUrl();
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            this.closeAllModals();
+          }
+        });
+      },
+
+      loadSeriesFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const seriesId = urlParams.get('seriesId');
+
+        if (seriesId) {
+          this.selectedSeries = this.series.find(s => s.id == seriesId);
+        }
+      },
+
+
+      getClassesForSeries(seriesId) {
+        return this.classes.filter(c => c.seriesId === seriesId);
+      },
+
+      get filteredClasses() {
+        let filtered = this.getClassesForSeries(this.selectedSeries?.id || 0);
+
+        if (this.searchQuery) {
+          const query = this.searchQuery.toLowerCase();
+          filtered = filtered.filter(c =>
+            c.title.toLowerCase().includes(query) ||
+            (c.description && c.description.toLowerCase().includes(query))
+          );
+        }
+
+        if (this.statusFilter !== 'all') {
+          filtered = filtered.filter(c => c.status === this.statusFilter);
+        }
+
+        return filtered;
+      },
+
+      getStatusCount(status) {
+        return this.getClassesForSeries(this.selectedSeries?.id || 0)
+          .filter(c => c.status === status).length;
+      },
+
+      getCompletedCount() {
+        return this.getStatusCount('completed');
+      },
+
+      getScheduledCount() {
+        return this.getStatusCount('scheduled');
+      },
+
+      getCancelledCount() {
+        return this.getStatusCount('cancelled');
+      },
+
+      closeAllModals() {
+        this.editingClass = null;
+        this.confirmClassCancellation = false;
+        this.classToCancel = null;
+        this.showDropDown = false;
+      },
+
+      editIndividualClass(classItem) {
+        this.editingClass = { ...classItem };
+        this.showDropDown = false;
+      },
+
+      saveIndividualClass() {
+        if (!this.editingClass) return;
+
+        if (!this.editingClass.title?.trim()) {
+          alert('Class title is required');
+          return;
+        }
+
+        if (!this.editingClass.host?.trim()) {
+          alert('Host is required');
+          return;
+        }
+
+        if (!this.editingClass.dateValue) {
+          alert('Start date is required');
+          return;
+        }
+
+        if (!this.editingClass.time) {
+          alert('Start time is required');
+          return;
+        }
+
+        const index = this.classes.findIndex(c => c.id === this.editingClass.id);
+        if (index !== -1) {
+          const dateObj = new Date(this.editingClass.dateValue);
+          this.editingClass.date = dateObj.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+
+          this.classes[index] = { ...this.editingClass };
+        }
+
+        this.closeAllModals();
+      },
+
+      rescheduleClass(classItem) {
+        this.editIndividualClass(classItem);
+      },
+
+      openCancelClassModal(classItem) {
+        this.classToCancel = classItem;
+        this.showDropDown = false;
+      },
+
+      cancelClass(classItem) {
+        const index = this.classes.findIndex(c => c.id === classItem.id);
+        if (index !== -1) {
+          this.classes[index].status = 'cancelled';
+        }
+        this.closeAllModals();
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof Alpine !== 'undefined') {
+      Alpine.data('editClassesApp', editClassesApp);
+    }
+  });
+</script>
