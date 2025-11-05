@@ -15,35 +15,30 @@
 
       <!-- Body -->
       <div class="overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300"
-        x-data="{
-          selectedEvents: [],
-          hoveredMainEvent: null,
+       x-data="{
+          sections: [
+            { key: 'live_server', title: 'Live Stream Server Status', events: ['NOT_CREATED','CREATING','CREATED','PROXY_SETUP','AVAILABLE','DESTROYED','DELETING'] },
+            { key: 'live_stream', title: 'Live Stream', events: ['CREATED','ON_PUBLISH','ON_PUBLISH_DONE','STOPPED','RECORDING','COMPLETED','ERROR'] },
+            { key: 'transcoding', title: 'Transcoding', events: ['QUEUED','TRANSCODING','COMPLETED','ERROR'] },
+            { key: 'video_trim', title: 'Video Trim', events: ['PENDING','PROCESSING','COMPLETED','FAILED','REVERTED'] }
+          ],
+          selectedEvents: ['live_stream::ON_PUBLISH', 'transcoding::COMPLETED'],
           form: {
-            enabled: true
+            enabled: true,
           },
-          eventOptions: {
-            'Video': ['Created', 'Transcoded'],
-            'Livestream': ['Started', 'Streaming', 'Completed', 'Disconnected']
-          },
-          addEvent(mainEvent, subEvent) {
-            const eventKey = subEvent ? `${mainEvent}-${subEvent}` : mainEvent;
-            if (!this.selectedEvents.includes(eventKey)) {
-              this.selectedEvents.push(eventKey);
+          toggleSection(sectionKey, events) {
+            const allSelected = events.every(e => this.selectedEvents.includes(`${sectionKey}::${e}`));
+            if (allSelected) {
+              this.selectedEvents = this.selectedEvents.filter(v => !v.startsWith(sectionKey + '::'));
+            } else {
+              events.forEach(e => {
+                const val = `${sectionKey}::${e}`;
+                if (!this.selectedEvents.includes(val)) this.selectedEvents.push(val);
+              });
             }
           },
-          removeEvent(eventKey) {
-            this.selectedEvents = this.selectedEvents.filter(e => e !== eventKey);
-          },
-          isSelected(mainEvent, subEvent) {
-            const eventKey = subEvent ? `${mainEvent}-${subEvent}` : mainEvent;
-            return this.selectedEvents.includes(eventKey);
-          },
-          init() {
-            // Initialize form with webhook data when modal opens
-            // This would be populated from actual webhook data
-            // When modal opens, populate selectedEvents from webhook data
-            // For demo purposes, showing example selected events:
-            this.selectedEvents = ['Video-Created', 'Livestream-Streaming'];
+          isSectionChecked(sectionKey, events) {
+            return events.every(e => this.selectedEvents.includes(`${sectionKey}::${e}`));
           }
         }"
         x-init="init()">
@@ -75,80 +70,110 @@
               Events
             </label>
             <p class="text-xs text-gray-500 mb-3">
-              If no events are selected, this webhook will receive notifications for all events by default.
+               Select the events below to receive notifications exclusively for them. If no events are
+              selected, this webhook will receive notifications for all events by default.
             </p>
             
-            <!-- Main Event Buttons with Hover - Fixed Position -->
-            <div class="flex gap-2 mb-3">
-              <div class="relative" 
-                @mouseenter="hoveredMainEvent = 'Video'"
-                @mouseleave="hoveredMainEvent = null">
-                <button type="button"
-                  @click="addEvent('Video', null)"
-                  class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-800">
-                  Video
-                </button>
-                <div x-show="hoveredMainEvent === 'Video'" 
-                  class="absolute top-full left-0 mt-1 z-10 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
-                  @mouseenter="hoveredMainEvent = 'Video'"
-                  @mouseleave="hoveredMainEvent = null">
-                  <template x-for="subEvent in eventOptions['Video']" :key="subEvent">
-                    <button type="button"
-                      @click="addEvent('Video', subEvent)"
-                      class="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
-                      :class="isSelected('Video', subEvent) ? 'bg-blue-50 text-blue-700' : ''">
-                      <span x-text="subEvent"></span>
-                    </button>
-                  </template>
-                </div>
-              </div>
-
-              <div class="relative"
-                @mouseenter="hoveredMainEvent = 'Livestream'"
-                @mouseleave="hoveredMainEvent = null">
-                <button type="button"
-                  @click="addEvent('Livestream', null)"
-                  class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white text-gray-800">
-                  Livestream
-                </button>
-                <div x-show="hoveredMainEvent === 'Livestream'"
-                  class="absolute top-full left-0 mt-1 z-10 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1"
-                  @mouseenter="hoveredMainEvent = 'Livestream'"
-                  @mouseleave="hoveredMainEvent = null">
-                  <template x-for="subEvent in eventOptions['Livestream']" :key="subEvent">
-                    <button type="button"
-                      @click="addEvent('Livestream', subEvent)"
-                      class="w-full text-left px-3 py-2 text-sm text-gray-800 hover:bg-gray-50"
-                      :class="isSelected('Livestream', subEvent) ? 'bg-blue-50 text-blue-700' : ''">
-                      <span x-text="subEvent"></span>
-                    </button>
-                  </template>
-                </div>
-              </div>
-            </div>
-
-            <!-- Selected Events Display - Scrollable Area -->
-            <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-2 bg-gray-50" x-show="selectedEvents.length > 0">
-              <div class="flex flex-wrap gap-2">
-                <template x-for="eventKey in selectedEvents" :key="eventKey">
-                  <div class="inline-flex items-center gap-x-1.5 px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-lg text-sm text-blue-800 font-medium">
-                    <span x-text="eventKey"></span>
-                    <button type="button" 
-                      @click="removeEvent(eventKey)"
-                      class="inline-flex items-center justify-center size-4 rounded-full hover:bg-blue-200 focus:outline-none focus:ring-1 focus:ring-blue-300"
-                      aria-label="Remove">
-                      <svg class="size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
-                      </svg>
-                    </button>
+            <!-- Event Selection -->
+            <div class="p-5 pt-0 space-y-8 flex flex-col bg-white border border-gray-200 shadow-2xs rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+            <template x-for="section in sections" :key="section.key">
+              <div class="flex gap-3">
+                <!-- parent checkbox -->
+                <div class="flex h-6 shrink-0 items-center">
+                  <div class="group grid size-4 grid-cols-1">
+                    <input
+                      type="checkbox"
+                      :id="section.key"
+                      :name="section.key"
+                      @change="toggleSection(section.key, section.events)"
+                      :checked="isSectionChecked(section.key, section.events)"
+                      class="col-start-1 row-start-1 appearance-none rounded-sm text-blue-600 focus:ring-blue-600 border border-gray-300 bg-white checked:border-blue-600 checked:bg-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-neutral-600 dark:bg-neutral-800 dark:checked:bg-blue-600 dark:checked:border-blue-600"
+                    />
+                    <svg
+                      class="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                    >
+                      <path
+                        class="opacity-0 group-has-checked:opacity-100"
+                        d="M3 8L6 11L11 3.5"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      ></path>
+                    </svg>
                   </div>
-                </template>
-              </div>
-            </div>
-          </div>
-          <!-- End Event Selection -->
+                </div>
 
-          <div class="flex items-center gap-x-3">
+                <div class="text-sm/6 w-full">
+                  <label
+                    :for="section.key"
+                    class="font-medium text-gray-900 dark:text-neutral-100"
+                    x-text="section.title"
+                  ></label>
+
+                  <!-- inner status list -->
+                  <div
+                    x-show="isSectionChecked(section.key, section.events) || section.events.some(e => selectedEvents.includes(`${section.key}::${e}`))"
+                    x-transition:enter="transition ease-out duration-300"
+                    x-transition:enter-start="opacity-0 transform -translate-y-2"
+                    x-transition:enter-end="opacity-100 transform translate-y-0"
+                    x-transition:leave="transition ease-in duration-200"
+                    x-transition:leave-start="opacity-100 transform translate-y-0"
+                    x-transition:leave-end="opacity-0 transform -translate-y-2"
+                    class="space-y-5 rounded-lg py-4 mt-3"
+                  >
+                    <div class="flex flex-wrap gap-3">
+                      <template x-for="event in section.events" :key="event">
+                        <label
+                          class="flex items-center px-3 py-2 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 dark:border-neutral-700 dark:hover:bg-neutral-700"
+                        >
+                          <input
+                            type="checkbox"
+                            :value="`${section.key}::${event}`"
+                            x-model="selectedEvents"
+                            class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:border-neutral-600 dark:bg-neutral-800 dark:checked:bg-blue-600 flex-shrink-0"
+                          />
+                          <span
+                            class="ml-3 text-sm text-gray-800 dark:text-neutral-200 truncate max-w-[9rem]"
+                            x-text="event"
+                          ></span>
+                        </label>
+                      </template>
+                    </div>
+
+                    <!-- Live Stream Note -->
+                    <div
+                      x-show="section.key === 'live_stream'"
+                      class="mt-3 px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg"
+                    >
+                      <h4 class="text-sm font-semibold text-gray-800 mb-2">Note:</h4>
+                      <ul class="space-y-2 text-sm text-gray-600">
+                        <li>
+                          <strong>ON_PUBLISH:</strong>
+                          <span class="font-medium text-gray-700">Stream is Live.</span><br />
+                          The stream is actively running and viewable.
+                        </li>
+                        <li>
+                          <strong>ON_PUBLISH_DONE:</strong>
+                          <span class="font-medium text-gray-700">Disconnected.</span><br />
+                          The server remains active for some time, allowing for a reconnection
+                          attempt.
+                        </li>
+                        <li>
+                          <strong>STOPPED:</strong>
+                          <span class="font-medium text-gray-700">Permanently Ended.</span><br />
+                          The server has been terminated, and the stream cannot be resumed.
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="flex items-center gap-x-3 mt-3">
             <input type="checkbox" id="webhook_enabled" name="enabled"
               x-model="form.enabled"
               value="true"
@@ -158,8 +183,6 @@
             </label>
             <span class="text-sm text-gray-500"> (Disabled webhooks won't receive updates) </span>
           </div>
-          <!-- Hidden input to ensure form submission includes enabled status when unchecked -->
-          <input type="hidden" name="enabled" value="false" x-show="!form.enabled">
         </div>
       </div>
       <!-- End Body -->
