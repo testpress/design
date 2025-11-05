@@ -27,11 +27,11 @@
          src="{{ product.image }}"
          alt="Store Image">
   {% elif product.icon %}
-    <div class="bg-gray-100 w-full rounded-xl dark:bg-neutral-800 aspect-[16/9]">
-      <div class="flex items-center justify-center h-full">
-        <img class="w-20" src="{{ product.icon }}" alt="Product Icon">
-      </div>
-    </div>
+<div class="course-card bg-gray-100 w-full rounded-xl dark:bg-neutral-800 aspect-[16/9] relative overflow-hidden">
+  <div class="flex items-center justify-center h-full">
+    <img class="w-20 course-icon" src="{{ product.icon }}" alt="Product Icon" crossorigin="anonymous">
+  </div>
+</div>
   {% else %}
 
 
@@ -175,3 +175,67 @@
   {% endfor %}
   {% include "./loader.html" %}
 </div>
+<script>
+/**
+ * Simple, consistent browser-only dominant color extractor.
+ * Works reliably across Chrome, Firefox, Safari, Edge.
+ */
+async function getDominantColor(img, sampleStep = 10) {
+  if (!img.complete || img.naturalWidth === 0) await img.decode();
+
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d", {
+    colorSpace: "srgb",
+    willReadFrequently: true
+  });
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  canvas.width = w;
+  canvas.height = h;
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const { data } = ctx.getImageData(0, 0, w, h);
+  const colorMap = new Map();
+
+  for (let i = 0; i < data.length; i += 4 * sampleStep) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const a = data[i + 3];
+    if (a < 128) continue; // skip transparent
+    // skip near-white & near-black
+    if ((r > 245 && g > 245 && b > 245) || (r < 10 && g < 10 && b < 10)) continue;
+    const key = `${Math.round(r/16)*16},${Math.round(g/16)*16},${Math.round(b/16)*16}`;
+    colorMap.set(key, (colorMap.get(key) || 0) + 1);
+  }
+
+  let dominant = [128,128,128], max = 0;
+  for (const [key, count] of colorMap.entries()) {
+    if (count > max) {
+      max = count;
+      dominant = key.split(",").map(Number);
+    }
+  }
+  return dominant;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const cards = document.querySelectorAll(".course-card");
+
+  for (const card of cards) {
+    const img = card.querySelector(".course-icon");
+    if (!img) continue;
+    img.crossOrigin = "anonymous";
+
+    try {
+      const [r,g,b] = await getDominantColor(img);
+      console.log(`Dominant color: rgb(${r},${g},${b})`);
+      card.style.backgroundColor = `rgba(${r}, ${g}, ${b}, 0.20)`;
+      card.style.transition = "background 0.5s ease-out";
+    } catch (err) {
+      console.error("Color extraction failed:", err);
+    }
+  }
+});
+</script>
+
