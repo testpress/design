@@ -956,44 +956,7 @@
       </div>
     </div>
   </div>
-  <div class="border-b border-gray-200 py-6">
-    <h3 class="-my-3 flow-root">
-      <button type="button"
-        class="flex w-full items-center justify-between bg-white py-3 text-sm text-gray-400 hover:text-gray-500"
-        aria-controls="filter-section-course" aria-expanded="false">
-        <span class="font-medium text-gray-900">Filter by Course</span>
-        <span class="ml-6 flex items-center">
-          <svg x-show="!showCourseFilter"
-            @click="showCourseFilter=true,showStudentFilter=false,showSubjectFilter=false,showExamFilter=false,showChapterFilter=false,showReporteeFilter=false,showDateFilter=false"
-            class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
-          </svg>
-          <svg x-show="showCourseFilter" @click="showCourseFilter=false"
-            class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd"
-              d="M4 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H4.75A.75.75 0 014 10z"
-              clip-rule="evenodd" />
-          </svg>
-        </span>
-      </button>
-    </h3>
 
-    <div x-show="showCourseFilter" class="pt-6" id="filter-section-course">
-      <input placeholder="Search for course"
-        class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-green-500 focus:border-green-500 sm:text-sm"
-        maxlength="30" name="course_search" type="text" value="">
-      <div class="space-y-4 mt-4 max-h-52 overflow-auto">
-        <template hidden x-for="course in courses">
-          <div class="flex items-center">
-            <label for="filter-course" 
-              class="ml-3 text-sm text-gray-600 hover:underline hover:cursor-pointer"
-              @click='addToSelectedFilter(course,"course")'
-              x-text="course.name"></label>
-          </div>
-        </template>
-      </div>
-    </div>
-  </div>
   <div class="border-b border-gray-200 py-6">
     <h3 class="-my-3 flow-root">
       <!-- Expand/collapse section button -->
@@ -1643,53 +1606,81 @@
         currentUrl.search = searchParams.toString();
         window.location.href = currentUrl.href;
       },
-      
-    initialize_selected_filter() {
-      const searchParams = new URLSearchParams(window.location.search);
+      initialize_selected_filter() {
+        const searchParams = new URLSearchParams(window.location.search)
 
-      for (let [key, value] of searchParams) {
-        let filterItem;
-        let type;
-        this.active_filters = Array.from(searchParams.entries()).length;
+        for (let [key, value] of searchParams) {
+          let filterItem
+          let type
+          const entries = Array.from(searchParams.entries())
+          let count = entries.length
+          if (
+            entries.some(([k]) => k === 'date_from') &&
+            entries.some(([k]) => k === 'date_to')
+          ) {
+            count -= 1 // combine both into one logical filter
+          }
+          this.active_filters = count
 
-        switch(key) {
-          case 'exam':
-            filterItem = this.exams.find(item => item.id === parseInt(value));
-            type = 'exam';
-            break;
-          case 'subject':
-            filterItem = this.subjects.find(item => item.id === parseInt(value));
-            type = 'subject';
-            break;
-          case 'chapter':
-            filterItem = this.chapters.find(item => item.id === parseInt(value));
-            type = 'chapter';
-            break;
-          case 'course':
-            filterItem = this.courses.find(item => item.id === parseInt(value));
-            type = 'course';
-            break;
-          case 'reportee':
-            filterItem = this.reportees.find(item => item.id === parseInt(value));
-            type = 'reportee';
-            break;
-          case 'date_from':
-            this.dateFrom = value;
-            break;
-          case 'date_to':
-            this.dateTo = value;
-            break;
+          switch (key) {
+            case 'exam':
+              filterItem = this.exams.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'exam'
+              break
+            case 'subject':
+              filterItem = this.subjects.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'subject'
+              break
+            case 'chapter':
+              filterItem = this.chapters.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'chapter'
+              break
+            case 'course':
+              filterItem = this.courses.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'course'
+              break
+            case 'reportee':
+              filterItem = this.reportees.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'reportee'
+              break
+            case 'date_from':
+              this.dateFrom = value
+              break
+            case 'date_to':
+              this.dateTo = value
+              break
+          }
+
+          if (filterItem) {
+            filterItem.type = type
+            this.selected_filters.push(filterItem)
+          }
         }
-        if (filterItem) {
-          filterItem.type = type;
-          this.selected_filters.push(filterItem);
+
+        // ✅ Push date filter after dateFrom/dateTo are known
+        if (this.dateFrom && this.dateTo) {
+          this.selected_filters.push({
+            id: 'date_range',
+            type: 'date',
+            name: `${this.dateFrom} → ${this.dateTo}`,
+          })
         }
-      }
-    },
+      },
 
-
-      isItemSelected(item,type) {
-        return this.selected_filters.some(e => e.id === item.id && e.type === type);
+      isItemSelected(item, type) {
+        return this.selected_filters.some(
+          (e) => e.id === item.id && e.type === type
+        )
       },
 
       addToSelectedFilter(filter,type){
@@ -1701,26 +1692,72 @@
       },
 
       removeSelectedFilter(filter) {
-       this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
-    },
+        this.selected_filters = this.selected_filters.filter(
+          (item) => item.id !== filter.id || item.type !== filter.type
+        )
 
-    submitReportFilter(){
-      const params = this.selected_filters.map(filter => `${filter.type}=${filter.id}`).join('&');
-      if (this.dateFrom && this.dateTo) {
-          params += `${params ? '&' : ''}date_from=${this.dateFrom}&date_to=${this.dateTo}`;
+        // If removing the date filter, also clear URL params
+        if (filter.type === 'date') {
+          this.dateFrom = null
+          this.dateTo = null
+          const currentUrl = new URL(window.location)
+          const searchParams = new URLSearchParams(currentUrl.search)
+          searchParams.delete('date_from')
+          searchParams.delete('date_to')
+          currentUrl.search = searchParams.toString()
+          window.location.href = currentUrl.href
         }
-      window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
-    },
+      },
 
-    getSearchParameterValue() {
-    const searchParams = new URLSearchParams(window.location.search);
-    for (let [key, value] of searchParams) {
-        if (key) {
-            return value;
+      submitReportFilter() {
+        let params = this.selected_filters
+          .map((filter) => `${filter.type}=${filter.id}`)
+          .join('&')
+        if (this.dateFrom && this.dateTo) {
+          params += `${params ? '&' : ''}date_from=${this.dateFrom}&date_to=${this.dateTo}`
+        }
+        window.location.href = `${window.location.origin}${window.location.pathname}?${params}`
+      },
+      applyDateFilter() {
+        if (!this.dateFrom || !this.dateTo) {
+          alert('Please select both From and To dates.')
+          return
+        }
+
+        const currentUrl = new URL(window.location)
+        const searchParams = new URLSearchParams(currentUrl.search)
+
+        // Remove old date filters
+        searchParams.delete('date_from')
+        searchParams.delete('date_to')
+
+        // Add new date filters
+        searchParams.set('date_from', this.dateFrom)
+        searchParams.set('date_to', this.dateTo)
+
+        // Add date range into selected_filters[] for instant UI feedback
+        const existingDateIndex = this.selected_filters.findIndex(
+          (f) => f.type === 'date'
+        )
+        if (existingDateIndex !== -1) {
+          this.selected_filters.splice(existingDateIndex, 1)
+        }
+        this.selected_filters.push({
+          id: 'date_range',
+          type: 'date',
+          name: `${this.dateFrom} → ${this.dateTo}`,
+        })
+
+        // Update page URL
+        currentUrl.search = searchParams.toString()
+      },
+
+      getSearchParameterValue() {
+        const searchParams = new URLSearchParams(window.location.search)
+        for (let [key, value] of searchParams) {
+          if (key) return value
         }
     }
-    return ;
-  }
     }
   }
 </script>

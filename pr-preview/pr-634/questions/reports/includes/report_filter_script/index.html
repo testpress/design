@@ -27,53 +27,81 @@
         currentUrl.search = searchParams.toString();
         window.location.href = currentUrl.href;
       },
-      
-    initialize_selected_filter() {
-      const searchParams = new URLSearchParams(window.location.search);
+      initialize_selected_filter() {
+        const searchParams = new URLSearchParams(window.location.search)
 
-      for (let [key, value] of searchParams) {
-        let filterItem;
-        let type;
-        this.active_filters = Array.from(searchParams.entries()).length;
+        for (let [key, value] of searchParams) {
+          let filterItem
+          let type
+          const entries = Array.from(searchParams.entries())
+          let count = entries.length
+          if (
+            entries.some(([k]) => k === 'date_from') &&
+            entries.some(([k]) => k === 'date_to')
+          ) {
+            count -= 1 // combine both into one logical filter
+          }
+          this.active_filters = count
 
-        switch(key) {
-          case 'exam':
-            filterItem = this.exams.find(item => item.id === parseInt(value));
-            type = 'exam';
-            break;
-          case 'subject':
-            filterItem = this.subjects.find(item => item.id === parseInt(value));
-            type = 'subject';
-            break;
-          case 'chapter':
-            filterItem = this.chapters.find(item => item.id === parseInt(value));
-            type = 'chapter';
-            break;
-          case 'course':
-            filterItem = this.courses.find(item => item.id === parseInt(value));
-            type = 'course';
-            break;
-          case 'reportee':
-            filterItem = this.reportees.find(item => item.id === parseInt(value));
-            type = 'reportee';
-            break;
-          case 'date_from':
-            this.dateFrom = value;
-            break;
-          case 'date_to':
-            this.dateTo = value;
-            break;
+          switch (key) {
+            case 'exam':
+              filterItem = this.exams.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'exam'
+              break
+            case 'subject':
+              filterItem = this.subjects.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'subject'
+              break
+            case 'chapter':
+              filterItem = this.chapters.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'chapter'
+              break
+            case 'course':
+              filterItem = this.courses.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'course'
+              break
+            case 'reportee':
+              filterItem = this.reportees.find(
+                (item) => item.id === parseInt(value)
+              )
+              type = 'reportee'
+              break
+            case 'date_from':
+              this.dateFrom = value
+              break
+            case 'date_to':
+              this.dateTo = value
+              break
+          }
+
+          if (filterItem) {
+            filterItem.type = type
+            this.selected_filters.push(filterItem)
+          }
         }
-        if (filterItem) {
-          filterItem.type = type;
-          this.selected_filters.push(filterItem);
+
+        // ✅ Push date filter after dateFrom/dateTo are known
+        if (this.dateFrom && this.dateTo) {
+          this.selected_filters.push({
+            id: 'date_range',
+            type: 'date',
+            name: `${this.dateFrom} → ${this.dateTo}`,
+          })
         }
-      }
-    },
+      },
 
-
-      isItemSelected(item,type) {
-        return this.selected_filters.some(e => e.id === item.id && e.type === type);
+      isItemSelected(item, type) {
+        return this.selected_filters.some(
+          (e) => e.id === item.id && e.type === type
+        )
       },
 
       addToSelectedFilter(filter,type){
@@ -85,26 +113,72 @@
       },
 
       removeSelectedFilter(filter) {
-       this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
-    },
+        this.selected_filters = this.selected_filters.filter(
+          (item) => item.id !== filter.id || item.type !== filter.type
+        )
 
-    submitReportFilter(){
-      const params = this.selected_filters.map(filter => `${filter.type}=${filter.id}`).join('&');
-      if (this.dateFrom && this.dateTo) {
-          params += `${params ? '&' : ''}date_from=${this.dateFrom}&date_to=${this.dateTo}`;
+        // If removing the date filter, also clear URL params
+        if (filter.type === 'date') {
+          this.dateFrom = null
+          this.dateTo = null
+          const currentUrl = new URL(window.location)
+          const searchParams = new URLSearchParams(currentUrl.search)
+          searchParams.delete('date_from')
+          searchParams.delete('date_to')
+          currentUrl.search = searchParams.toString()
+          window.location.href = currentUrl.href
         }
-      window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
-    },
+      },
 
-    getSearchParameterValue() {
-    const searchParams = new URLSearchParams(window.location.search);
-    for (let [key, value] of searchParams) {
-        if (key) {
-            return value;
+      submitReportFilter() {
+        let params = this.selected_filters
+          .map((filter) => `${filter.type}=${filter.id}`)
+          .join('&')
+        if (this.dateFrom && this.dateTo) {
+          params += `${params ? '&' : ''}date_from=${this.dateFrom}&date_to=${this.dateTo}`
+        }
+        window.location.href = `${window.location.origin}${window.location.pathname}?${params}`
+      },
+      applyDateFilter() {
+        if (!this.dateFrom || !this.dateTo) {
+          alert('Please select both From and To dates.')
+          return
+        }
+
+        const currentUrl = new URL(window.location)
+        const searchParams = new URLSearchParams(currentUrl.search)
+
+        // Remove old date filters
+        searchParams.delete('date_from')
+        searchParams.delete('date_to')
+
+        // Add new date filters
+        searchParams.set('date_from', this.dateFrom)
+        searchParams.set('date_to', this.dateTo)
+
+        // Add date range into selected_filters[] for instant UI feedback
+        const existingDateIndex = this.selected_filters.findIndex(
+          (f) => f.type === 'date'
+        )
+        if (existingDateIndex !== -1) {
+          this.selected_filters.splice(existingDateIndex, 1)
+        }
+        this.selected_filters.push({
+          id: 'date_range',
+          type: 'date',
+          name: `${this.dateFrom} → ${this.dateTo}`,
+        })
+
+        // Update page URL
+        currentUrl.search = searchParams.toString()
+      },
+
+      getSearchParameterValue() {
+        const searchParams = new URLSearchParams(window.location.search)
+        for (let [key, value] of searchParams) {
+          if (key) return value
         }
     }
-    return ;
-  }
     }
   }
 </script>
