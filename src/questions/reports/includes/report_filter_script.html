@@ -6,10 +6,19 @@
       exams : JSON.parse('{{ exam_data |dump |safe }}'),
       subjects : JSON.parse('{{ subjects |dump |safe }}'),
       chapters : JSON.parse('{{ chapters |dump |safe }}'),
+      courses: JSON.parse('{{ courses |dump |safe }}'),
+      reportees: JSON.parse('{{ reportees |dump |safe }}'),
       selected_filters:[],
       showExamFilter:false,
       showChapterFilter:false,
       showSubjectFilter:false,
+      showStudentFilter: false,
+      showCourseFilter:false,
+      showDateRangeFilter:false,
+      showReporteeFilter:false,
+      showDateFilter:false,
+      fromDate:null,
+      toDate:null,
       active_filters:null,
 
       filterQuestionReport(key,value){
@@ -19,67 +28,103 @@
         currentUrl.search = searchParams.toString();
         window.location.href = currentUrl.href;
       },
-      
-    initialize_selected_filter() {
-      const searchParams = new URLSearchParams(window.location.search);
 
-      for (let [key, value] of searchParams) {
-        let filterItem;
-        let type;
-        this.active_filters = Array.from(searchParams.entries()).length;
+      initialize_selected_filter() {
+        const searchParams = new URLSearchParams(window.location.search)
+        const fromDate = searchParams.get('start_date')
+        const toDate = searchParams.get('end_date')
 
-        switch(key) {
-          case 'exam':
-            filterItem = this.exams.find(item => item.id === parseInt(value));
-            type = 'exam';
-            break;
-          case 'subject':
-            filterItem = this.subjects.find(item => item.id === parseInt(value));
-            type = 'subject';
-            break;
-          case 'chapter':
-            filterItem = this.chapters.find(item => item.id === parseInt(value));
-            type = 'chapter';
-            break;
+        for (let [key, value] of searchParams) {
+          let filterItem, type
+          switch (key) {
+            case 'exam':
+              filterItem = this.exams.find(i => i.id === parseInt(value)); type = 'exam'; break;
+            case 'subject':
+              filterItem = this.subjects.find(i => i.id === parseInt(value)); type = 'subject'; break;
+            case 'chapter':
+              filterItem = this.chapters.find(i => i.id === parseInt(value)); type = 'chapter'; break;
+            case 'course':
+              filterItem = this.courses.find(i => i.id === parseInt(value)); type = 'course'; break;
+            case 'reportee':
+              filterItem = this.reportees.find(i => i.id === parseInt(value)); type = 'reportee'; break;
+          }
+          if (filterItem) {
+            filterItem.type = type;
+            this.selected_filters.push(filterItem);
+          }
         }
-        if (filterItem) {
-          filterItem.type = type;
-          this.selected_filters.push(filterItem);
+
+        if (fromDate && toDate) {
+          this.fromDate = fromDate;
+          this.toDate = toDate;
+          this.selected_filters.push({
+            id: `${fromDate}_${toDate}`,
+            type: 'date',
+            name: `${fromDate} to ${toDate}`,
+          });
         }
-      }
-    },
 
+        this.active_filters = this.selected_filters.length;
+      },
 
-      isItemSelected(item,type) {
+      isItemSelected(item, type) {
         return this.selected_filters.some(e => e.id === item.id && e.type === type);
       },
 
       addToSelectedFilter(filter,type){
-        if (this.isItemSelected(filter,type)){
-          return
-        }
+        if (this.isItemSelected(filter,type)) return;
         filter.type = type;
-        this.selected_filters.push(filter)
+        if (type === 'date') {
+          // replace any existing date filter
+          this.selected_filters = this.selected_filters.filter(f => f.type !== 'date');
+        }
+        this.selected_filters.push(filter);
+        this.active_filters = this.selected_filters.length;
       },
 
       removeSelectedFilter(filter) {
-       this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
-    },
-
-    submitReportFilter(){
-      const params = this.selected_filters.map(filter => `${filter.type}=${filter.id}`).join('&');
-      window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
-    },
-
-    getSearchParameterValue() {
-    const searchParams = new URLSearchParams(window.location.search);
-    for (let [key, value] of searchParams) {
-        if (key) {
-            return value;
+        if (filter.type === 'date') {
+          // remove the single date filter + params
+          this.selected_filters = this.selected_filters.filter(f => f.type !== 'date');
+          this.fromDate = null;
+          this.toDate = null;
+          const currentUrl = new URL(window.location);
+          const searchParams = new URLSearchParams(currentUrl.search);
+          searchParams.delete('start_date');
+          searchParams.delete('end_date');
+          currentUrl.search = searchParams.toString();
+          window.location.href = currentUrl.href;
+          return;
         }
-    }
-    return ;
-  }
+        this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
+        this.active_filters = this.selected_filters.length;
+      },
+
+      submitReportFilter() {
+        const params = this.selected_filters.map(filter => {
+          if (filter.type === 'date') {
+            const [startDate, endDate] = filter.id.split('_');
+            return `start_date=${startDate}&end_date=${endDate}`;
+          }
+          return `${filter.type}=${filter.id}`;
+        }).join('&');
+        window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
+      },
+      handleDateChange(){
+        if (!(this.fromDate && this.toDate)) return;
+        const date_range = {
+          id: `${this.fromDate}_${this.toDate}`,
+          name: `${this.fromDate} → ${this.toDate}`,
+          type: 'date'
+        };
+        this.addToSelectedFilter(date_range,'date');
+        this.active_filters = this.selected_filters.length;
+      },
+
+      getSearchParameterValue() {
+        const searchParams = new URLSearchParams(window.location.search);
+        for (let [key, value] of searchParams) if (key) return value;
+      }
     }
   }
 </script>
