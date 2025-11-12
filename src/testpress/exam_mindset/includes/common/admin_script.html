@@ -1,0 +1,262 @@
+<script>
+  const allTemplates = {{ reflection_question_templates | dump | safe }};
+  const reflectionData = {{ reflection_data | dump | safe }};
+
+  function mindsetAdmin() {
+    return {
+      preExamQuestions: reflectionData.preExamQuestions.map(q => ({
+        ...q,
+        is_active: q.is_required,
+        description: '',
+        scale_type: 'positive'
+      })),
+      postExamQuestions: reflectionData.postExamQuestions.map(q => ({
+        ...q,
+        is_active: q.is_required,
+        description: '',
+        scale_type: 'positive'
+      })),
+      mistakeReasons: reflectionData.mistakeReasons,
+      allTemplates: allTemplates,
+      is_enabled: true,
+      navigationTab: 'pre',
+      openAddTemplateModal: false,
+      openAddQuestionModal: false,
+      openEditModal: false,
+      openDeleteModal: false,
+      openAddReasonModal: false,
+      openEditReasonModal: false,
+      editRow: {},
+      newQuestion: {},
+      editReason: {},
+      newReason: {},
+      rowToDelete: null,
+      selectedTemplates: [],
+      
+      get currentQuestions() {
+        return this.navigationTab === 'pre'
+          ? this.preExamQuestions
+          : this.postExamQuestions;
+      },
+
+      get currentReasons() {
+        return this.mistakeReasons;
+      },
+
+      get availableTemplates() {
+        const addedTemplateIds = new Set(
+          this.currentQuestions.map(q => q.template_id)
+        );
+        return this.allTemplates.filter(t =>
+          t.reflection_type === this.navigationTab && !addedTemplateIds.has(t.id)
+        );
+      },
+
+      initSortable() {
+        this.$watch('openAddQuestionModal', (value) => {
+          if (value) {
+            this.$nextTick(() => {
+              HSSelect.autoInit(this.$refs.addQuestionModal);
+            });
+          }
+        });
+        this.$watch('openEditModal', (value) => {
+          if (value) {
+            this.$nextTick(() => {
+              HSSelect.autoInit(this.$refs.editQuestionModal);
+            });
+          }
+        });
+        this.$watch('openAddReasonModal', (value) => {
+          if (value) {
+            this.$nextTick(() => {
+              HSSelect.autoInit(this.$refs.addReasonModal);
+            });
+          }
+        });
+        this.$watch('openEditReasonModal', (value) => {
+          if (value) {
+            this.$nextTick(() => {
+              HSSelect.autoInit(this.$refs.editReasonModal);
+            });
+          }
+        });
+        this.$watch('navigationTab', () => {
+          this.$nextTick(() => this.makeSortable());
+        });
+        this.makeSortable();
+      },
+
+      makeSortable() {
+        const initTable = (selector) => {
+          const table = document.querySelector(selector);
+          if (table && !table.sortable) {
+            table.sortable = new Sortable(table, {
+              animation: 150,
+              ghostClass: 'bg-gray-100',
+              handle: '.cursor-grab'
+            });
+          }
+        };
+        initTable('#sortable-pre');
+        initTable('#sortable-post');
+        initTable('#sortable-mistake');
+      },
+
+      openAddFromTemplate() {
+        this.selectedTemplates = [];
+        this.openAddTemplateModal = true;
+      },
+
+      saveFromTemplates() {
+        const list = (this.navigationTab === 'pre')
+          ? this.preExamQuestions
+          : this.postExamQuestions;
+        const maxId = list.length
+          ? Math.max(...list.map(r => r.id))
+          : 0;
+        this.selectedTemplates.forEach((templateId, i) => {
+          const template = this.allTemplates.find(t => t.id === templateId);
+          if (template) {
+            list.push({
+              id: maxId + i + 1,
+              order: list.length + 1,
+              text: template.text,
+              description: '',
+              response_type: template.response_type,
+              scale_type: 'positive',
+              is_active: true,
+              template_id: template.id
+            });
+          }
+        });
+        this.closeAllModals();
+      },
+
+      openAddQuestion() {
+        this.newQuestion = {
+          text: '',
+          description: '',
+          response_type: 'scale',
+          scale_type: 'positive'
+        };
+        this.openAddQuestionModal = true;
+      },
+
+      saveNewQuestion() {
+        const list = (this.navigationTab === 'pre')
+          ? this.preExamQuestions
+          : this.postExamQuestions;
+        const maxId = list.length
+          ? Math.max(...list.map(r => r.id))
+          : 0;
+        list.push({
+          id: maxId + 1,
+          ...this.newQuestion,
+          order: list.length + 1,
+          is_active: true
+        });
+        this.closeAllModals();
+      },
+
+      openEdit(row) {
+        this.editRow = { ...row };
+        if (
+          this.editRow.response_type === 'scale' &&
+          !this.editRow.scale_type
+        ) {
+          this.editRow.scale_type = 'positive';
+        }
+        this.openEditModal = true;
+      },
+
+      saveEdit() {
+        let list = (this.navigationTab === 'pre')
+          ? this.preExamQuestions
+          : this.postExamQuestions;
+        const index = list.findIndex(r => r.id === this.editRow.id);
+        if (index !== -1) {
+          list.splice(index, 1, { ...this.editRow });
+        }
+        this.closeAllModals();
+      },
+
+      openAddReason() {
+        this.newReason = {
+          name: '',
+          category: 'Test Skill',
+          description: ''
+        };
+        this.openAddReasonModal = true;
+      },
+
+      saveNewReason() {
+        const maxId = this.mistakeReasons.length
+          ? Math.max(...this.mistakeReasons.map(r => r.id))
+          : 0;
+        this.mistakeReasons.push({
+          id: maxId + 1,
+          ...this.newReason,
+          order: this.mistakeReasons.length + 1,
+          is_active: true
+        });
+        this.closeAllModals();
+      },
+
+      openEditReason(reason) {
+        this.editReason = { ...reason };
+        this.openEditReasonModal = true;
+      },
+
+      saveEditReason() {
+        const index = this.mistakeReasons.findIndex(
+          r => r.id === this.editReason.id
+        );
+        if (index !== -1) {
+          this.mistakeReasons.splice(index, 1, { ...this.editReason });
+        }
+        this.closeAllModals();
+      },
+
+      openDelete(row) {
+        this.rowToDelete = row;
+        this.openDeleteModal = true;
+      },
+
+      confirmDelete() {
+        if (this.navigationTab === 'mistake') {
+          const index = this.mistakeReasons.findIndex(
+            r => r.id === this.rowToDelete.id
+          );
+          if (index !== -1)
+            this.mistakeReasons.splice(index, 1);
+        } else {
+          let list = (this.navigationTab === 'pre')
+            ? this.preExamQuestions
+            : this.postExamQuestions;
+          const index = list.findIndex(
+            r => r.id === this.rowToDelete.id
+          );
+          if (index !== -1)
+            list.splice(index, 1);
+        }
+        this.closeAllModals();
+      },
+
+      closeAllModals() {
+        this.openAddTemplateModal = false;
+        this.openAddQuestionModal = false;
+        this.openEditModal = false;
+        this.openDeleteModal = false;
+        this.openAddReasonModal = false;
+        this.openEditReasonModal = false;
+        this.editRow = {};
+        this.newQuestion = {};
+        this.editReason = {};
+        this.newReason = {};
+        this.rowToDelete = null;
+        this.selectedTemplates = [];
+      }
+    };
+  }
+</script>
