@@ -1,0 +1,222 @@
+<script>
+  const COLOR_PALETTE = [
+    '#3B82F6', // blue-500
+    '#6366F1', // indigo-500
+    '#8B5CF6', // purple-500
+    '#EC4899', // pink-500
+    '#F43F5E', // rose-500
+    '#F97316', // orange-500
+    '#EAB308', // yellow-500
+    '#22C55E', // green-500
+    '#10B981', // emerald-500
+    '#14B8A6', // teal-500
+    '#06B6D4', // cyan-500
+    '#64748B', // slate-500
+    '#9CA3AF', // gray-400
+    '#F87171', // red-400
+    '#A78BFA', // violet-400
+  ];
+
+  class ColorMapper {
+    constructor(baseLabels = []) {
+      this.mapping = {};
+      this.colorIndex = 0;
+      baseLabels.forEach(label => {
+        this.getColor(label);
+      });
+    }
+
+    getColor(label) {
+      if (!this.mapping[label]) {
+        this.mapping[label] = COLOR_PALETTE[this.colorIndex % COLOR_PALETTE.length];
+        this.colorIndex++;
+      }
+      return this.mapping[label];
+    }
+
+    getColorsForLabels(labels = []) {
+      return labels.map(label => this.getColor(label));
+    }
+  }
+</script>
+
+<script>
+  function mindsetInsightsComponent() {
+    return {
+      data: {{ mindset_report | dump | safe }},
+      loading: {
+        preTest: true,
+        postTest: true,
+        errors: true,
+        pathway: true
+      },
+
+      preTestRatings: [],
+      preTestNotes: [],
+      postTestRatings: [],
+      postTestNotes: [],
+      sections: [],
+      selectedSectionId: null,
+      errorSummaryForChart: { labels: [], series: [], totalErrors: 0 },
+      pathway: {
+        topErrors: [],
+        mindsetBarriers: [],
+        totalErrors: 0
+      },
+
+      improvementStrategies: {},
+      strategyMap: {},
+      
+      colorMapper: null,
+      _bubbleRendered: false,
+
+      init() {
+        requestAnimationFrame(() => {
+          const src = this.data || {};
+          const overallLabels = src.errorReasons?.summary?.labels || [];
+          this.colorMapper = new ColorMapper(overallLabels);
+          this.processReflections(src);
+          this.processErrorData(src);
+          this.processPathway(src);
+          if (this.sections.length > 0) {
+            this.selectedSectionId = this.sections[0].section_id;
+            this.changeSection(false);
+          }
+          this.loading.preTest = false;
+          this.loading.postTest = false;
+          this.loading.errors = false;
+          this.loading.pathway = false;
+          this.$nextTick(() => {
+            this.renderErrorChart();
+            this.renderPathwayCharts();
+          });
+        });
+      },
+
+      processReflections(src) {
+        const pre = src.preTestAnswers || {};
+        this.preTestRatings = Array.isArray(pre.scale_based) ? pre.scale_based : [];
+        this.preTestNotes = Array.isArray(pre.text_based) ? pre.text_based : [];
+        const post = src.postTestAnswers || {};
+        this.postTestRatings = Array.isArray(post.scale_based) ? post.scale_based : [];
+        this.postTestNotes = Array.isArray(post.text_based) ? post.text_based : [];
+      },
+
+      processErrorData(src) {
+        const errorReasons = src.errorReasons || { summary: null, bySection: [] };
+        const summary = errorReasons.summary || {};
+        const bySection = Array.isArray(errorReasons.bySection) ? errorReasons.bySection : [];
+        this.pathway.totalErrors = errorReasons.totalErrors || 0;
+        this.sections = [];
+        if (summary.series && summary.series.length > 0) {
+          this.sections.push({
+            section_id: 'overall',
+            section_name: 'Overall',
+            data: {
+              ids: summary.ids,
+              labels: summary.labels,
+              series: summary.series,
+              totalErrors: this.pathway.totalErrors
+            }
+          });
+        }
+        bySection.forEach(subject => {
+          if (subject.series && subject.series.length > 0) {
+            this.sections.push({
+              section_id: subject.id || subject.name,
+              section_name: subject.name,
+              data: {
+                ids: subject.ids,
+                labels: subject.labels,
+                series: subject.series,
+                totalErrors: subject.errors || 0
+              }
+            });
+          }
+        });
+      },
+
+      processPathway(src) {
+        this.improvementStrategies = src.improvementStrategies || {};
+        this.strategyMap = src.strategyMap || {};
+        const srcPathway = src.pathway || { topErrors: [] };
+        if (this.pathway.totalErrors > 0) {
+          this.pathway.topErrors = (srcPathway.topErrors || [])
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 3)
+            .map(err => {
+              return {
+                id: err.id,
+                reason: err.label,
+                count: err.count,
+                percentage: Math.round((err.count / this.pathway.totalErrors) * 100),
+                improvementPhrase: err.suggestedImprovement || "reviewing your errors"
+              };
+            });
+        }
+      },
+
+      changeSection(renderChart = true) {
+        const selected = this.sections.find(s => s.section_id === this.selectedSectionId);
+        if (!selected) {
+          this.errorSummaryForChart = { labels: [], series: [], totalErrors: 0 };
+          return;
+        }
+        this.errorSummaryForChart = selected.data;
+        if (renderChart) {
+          this.$nextTick(() => this.renderErrorChart());
+        }
+      },
+
+      renderErrorChart() {
+        const chartEl = document.querySelector('#error-reason-chart');
+        if (!this.errorSummaryForChart.series?.length || !this.errorSummaryForChart.totalErrors) {
+          if (chartEl) chartEl.innerHTML = '';
+          return;
+        }
+        const chartColors = this.colorMapper.getColorsForLabels(this.errorSummaryForChart.labels);
+        renderPieChart(
+          '#error-reason-chart',
+          this.errorSummaryForChart.series,
+          this.errorSummaryForChart.labels,
+          chartColors
+        );
+      },
+
+      renderPathwayCharts() {
+        const chartEl = document.querySelector('#hs-devices-bubble-chart');
+        if (!chartEl) return;
+        if (!this.pathway.topErrors?.length) {
+          chartEl.innerHTML = '';
+          return;
+        }
+        const topErrors = this.pathway.topErrors;
+        const prelineSeries = [
+          { name: "Top Error 1", data: [[8.5, 7.5, 90]] },
+          { name: "Top Error 2", data: [[4.5, 7, 70]] },
+          { name: "Top Error 3", data: [[6.2, 5.2, 40]] }
+        ];
+        const chartColors = [];
+        const actualPercentages = [];
+        topErrors.forEach((error, index) => {
+          if (prelineSeries[index]) {
+            prelineSeries[index].name = error.reason;
+            chartColors[index] = this.colorMapper.getColor(error.reason);
+            actualPercentages[index] = error.percentage;
+          }
+        });
+        const finalSeries = prelineSeries.slice(0, topErrors.length);
+        const finalColors = chartColors.slice(0, topErrors.length);
+        const finalPercentages = actualPercentages.slice(0, topErrors.length);
+        chartEl.innerHTML = '';
+        renderBubbleChart('#hs-devices-bubble-chart', finalSeries, finalColors, finalPercentages);
+        this._bubbleRendered = true;
+      },
+
+      sanitizeScore(score, min = 1, max = 5) {
+        const s = parseInt(score, 10) || 1;
+        return Math.max(min, Math.min(max, s));
+      }
+    };
+  }
+</script>
