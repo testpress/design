@@ -57,7 +57,7 @@
       postTestNotes: [],
       sections: [],
       selectedSectionId: null,
-      errorSummaryForChart: { labels: [], series: [], totalErrors: 0 },
+      errorSummaryForChart: { labels: [], series: [], totalErrors: 0, bySubject: [] },
       pathway: {
         topErrors: [],
         mindsetBarriers: [],
@@ -89,10 +89,10 @@
           this.$nextTick(() => {
             this.renderErrorChart();
             this.renderPathwayCharts();
+            this.renderSubjectErrorCharts();
           });
         });
       },
-
       processReflections(src) {
         const pre = src.preTestAnswers || {};
         this.preTestRatings = Array.isArray(pre.scale_based) ? pre.scale_based : [];
@@ -116,11 +116,16 @@
               ids: summary.ids,
               labels: summary.labels,
               series: summary.series,
-              totalErrors: this.pathway.totalErrors
+              totalErrors: this.pathway.totalErrors,
+              bySubject: []
             }
           });
         }
         bySection.forEach(subject => {
+          const subTopics = (subject.bySubject || []).map(sub => ({
+            ...sub,
+            colors: this.colorMapper.getColorsForLabels(sub.labels)
+          }));
           if (subject.series && subject.series.length > 0) {
             this.sections.push({
               section_id: subject.id || subject.name,
@@ -129,7 +134,8 @@
                 ids: subject.ids,
                 labels: subject.labels,
                 series: subject.series,
-                totalErrors: subject.errors || 0
+                totalErrors: subject.errors || 0,
+                bySubject: subTopics
               }
             });
           }
@@ -159,12 +165,16 @@
       changeSection(renderChart = true) {
         const selected = this.sections.find(s => s.section_id === this.selectedSectionId);
         if (!selected) {
-          this.errorSummaryForChart = { labels: [], series: [], totalErrors: 0 };
+          this.errorSummaryForChart = { labels: [], series: [], totalErrors: 0, bySubject: [] };
           return;
         }
         this.errorSummaryForChart = selected.data;
+
         if (renderChart) {
-          this.$nextTick(() => this.renderErrorChart());
+          this.$nextTick(() => {
+            this.renderErrorChart();
+            this.renderSubjectErrorCharts();
+          });
         }
       },
 
@@ -213,6 +223,31 @@
         this._bubbleRendered = true;
       },
 
+      renderSubjectErrorCharts() {
+        const topics = this.errorSummaryForChart.bySubject || [];
+        const currentChartIds = new Set(topics.map(t => `subject-chart-${t.id}`));
+        document.querySelectorAll('[id^="subject-chart-"]').forEach(el => {
+          if (!currentChartIds.has(el.id)) {
+            el.innerHTML = '';
+          }
+        });
+        if (topics.length === 0) return;
+        topics.forEach(topic => {
+          const chartId = `#subject-chart-${topic.id}`;
+          const chartEl = document.querySelector(chartId);
+          if (chartEl && topic.series && topic.series.length > 0) {
+            renderPieChart(
+              chartId,
+              topic.series,
+              topic.labels,
+              topic.colors,
+              160,
+              160
+            );
+          }
+        });
+      },
+      
       sanitizeScore(score, min = 1, max = 5) {
         const s = parseInt(score, 10) || 1;
         return Math.max(min, Math.min(max, s));
