@@ -1,32 +1,32 @@
 <script>
-  function report_filter_components(){
+  function report_filter_components() {
     return {
-      showFilterReport:false,
-      showMobileFilterReport:false,
-      exams : JSON.parse('{{ exam_data |dump |safe }}'),
-      subjects : JSON.parse('{{ subjects |dump |safe }}'),
-      chapters : JSON.parse('{{ chapters |dump |safe }}'),
+      showFilterReport: false,
+      showMobileFilterReport: false,
+      exams: JSON.parse('{{ exam_data |dump |safe }}'),
+      subjects: JSON.parse('{{ subjects |dump |safe }}'),
+      chapters: JSON.parse('{{ chapters |dump |safe }}'),
       courses: JSON.parse('{{ courses |dump |safe }}'),
       reportees: JSON.parse('{{ reportees |dump |safe }}'),
-      selected_filters:[],
-      showExamFilter:false,
-      showChapterFilter:false,
-      showSubjectFilter:false,
+      selected_filters: [],
+      showExamFilter: false,
+      showChapterFilter: false,
+      showSubjectFilter: false,
       showStudentFilter: false,
-      showCourseFilter:false,
-      showDateRangeFilter:false,
-      showReporteeFilter:false,
-      showDateFilter:false,
-      fromDate:null,
-      toDate:null,
-      active_filters:null,
+      showCourseFilter: false,
+      showDateRangeFilter: false,
+      showReporteeFilter: false,
+      showDateFilter: false,
+      fromDate: null,
+      toDate: null,
+      active_filters: null,
 
-      filterQuestionReport(key,value){
-        const currentUrl = new URL(window.location);
-        const searchParams = new URLSearchParams(currentUrl.search);
-        searchParams.set(key, value);
-        currentUrl.search = searchParams.toString();
-        window.location.href = currentUrl.href;
+      filterQuestionReport(key, value) {
+        const currentUrl = new URL(window.location)
+        const searchParams = new URLSearchParams(currentUrl.search)
+        searchParams.set(key, value)
+        currentUrl.search = searchParams.toString()
+        window.location.href = currentUrl.href
       },
 
       initialize_selected_filter() {
@@ -38,93 +38,120 @@
           let filterItem, type
           switch (key) {
             case 'exam':
-              filterItem = this.exams.find(i => i.id === parseInt(value)); type = 'exam'; break;
+              filterItem = this.exams.find((i) => i.id === parseInt(value))
+              type = 'exam'
+              break
             case 'subject':
-              filterItem = this.subjects.find(i => i.id === parseInt(value)); type = 'subject'; break;
+              filterItem = this.subjects.find((i) => i.id === parseInt(value))
+              type = 'subject'
+              break
             case 'chapter':
-              filterItem = this.chapters.find(i => i.id === parseInt(value)); type = 'chapter'; break;
+              filterItem = this.chapters.find((i) => i.id === parseInt(value))
+              type = 'chapter'
+              break
             case 'course':
-              filterItem = this.courses.find(i => i.id === parseInt(value)); type = 'course'; break;
+              filterItem = this.courses.find((i) => i.id === parseInt(value))
+              type = 'course'
+              break
             case 'reportee':
-              filterItem = this.reportees.find(i => i.id === parseInt(value)); type = 'reportee'; break;
+              filterItem = this.reportees.find((i) => i.id === parseInt(value))
+              type = 'reportee'
+              normalized_name = filterItem.display_name || filterItem.id
+              filterItem.name = normalized_name
+              break
           }
           if (filterItem) {
-            filterItem.type = type;
-            this.selected_filters.push(filterItem);
+            filterItem.type = type
+            this.selected_filters.push(filterItem)
           }
         }
 
         if (fromDate && toDate) {
-          this.fromDate = fromDate;
-          this.toDate = toDate;
+          this.fromDate = fromDate
+          this.toDate = toDate
           this.selected_filters.push({
             id: `${fromDate}_${toDate}`,
             type: 'date',
             name: `${fromDate} to ${toDate}`,
-          });
+          })
         }
 
-        this.active_filters = this.selected_filters.length;
+        this.active_filters = this.selected_filters.length
       },
 
       isItemSelected(item, type) {
-        return this.selected_filters.some(e => e.id === item.id && e.type === type);
+        return this.selected_filters.some(
+          (e) => e.id === item.id && e.type === type
+        )
       },
 
-      addToSelectedFilter(filter,type){
-        if (this.isItemSelected(filter,type)) return;
-        filter.type = type;
+      addToSelectedFilter(filter, type) {
+        if (this.isItemSelected(filter, type)) return
+        filter.type = type
+        const normalized_name = filter.name || filter.display_name || filter.id
+        filter.name = normalized_name
         if (type === 'date') {
-          // replace any existing date filter
-          this.selected_filters = this.selected_filters.filter(f => f.type !== 'date');
+          this.selected_filters = this.selected_filters.filter(
+            (f) => f.type !== 'date'
+          )
         }
-        this.selected_filters.push(filter);
-        this.active_filters = this.selected_filters.length;
+        if (type === 'reportee') {
+          this.selected_filters = this.selected_filters.filter(
+            (f) => f.type !== 'reportee'
+          )
+        }
+        this.selected_filters.push(filter)
+        this.active_filters = this.selected_filters.length
       },
 
       removeSelectedFilter(filter) {
         if (filter.type === 'date') {
-          // remove the single date filter + params
-          this.selected_filters = this.selected_filters.filter(f => f.type !== 'date');
-          this.fromDate = null;
-          this.toDate = null;
-          const currentUrl = new URL(window.location);
-          const searchParams = new URLSearchParams(currentUrl.search);
-          searchParams.delete('start_date');
-          searchParams.delete('end_date');
-          currentUrl.search = searchParams.toString();
-          window.location.href = currentUrl.href;
-          return;
+          this.selected_filters = this.selected_filters.filter(
+            (f) => f.type !== 'date'
+          )
+          this.fromDate = null
+          this.toDate = null
+          const currentUrl = new URL(window.location)
+          const searchParams = new URLSearchParams(currentUrl.search)
+          searchParams.delete('start_date')
+          searchParams.delete('end_date')
+          currentUrl.search = searchParams.toString()
+          window.location.href = currentUrl.href
+          return
         }
-        this.selected_filters = this.selected_filters.filter(item => item.id !== filter.id || item.type !== filter.type);
-        this.active_filters = this.selected_filters.length;
+        this.selected_filters = this.selected_filters.filter(
+          (item) => item.id !== filter.id || item.type !== filter.type
+        )
+        this.active_filters = this.selected_filters.length
       },
 
       submitReportFilter() {
-        const params = this.selected_filters.map(filter => {
-          if (filter.type === 'date') {
-            const [startDate, endDate] = filter.id.split('_');
-            return `start_date=${startDate}&end_date=${endDate}`;
-          }
-          return `${filter.type}=${filter.id}`;
-        }).join('&');
-        window.location.href = `${window.location.origin}${window.location.pathname}?${params}`;
+        const params = this.selected_filters
+          .map((filter) => {
+            if (filter.type === 'date') {
+              const [startDate, endDate] = filter.id.split('_')
+              return `start_date=${startDate}&end_date=${endDate}`
+            }
+            return `${filter.type}=${filter.id}`
+          })
+          .join('&')
+        window.location.href = `${window.location.origin}${window.location.pathname}?${params}`
       },
-      handleDateChange(){
-        if (!(this.fromDate && this.toDate)) return;
+      handleDateChange() {
+        if (!(this.fromDate && this.toDate)) return
         const date_range = {
           id: `${this.fromDate}_${this.toDate}`,
           name: `${this.fromDate} → ${this.toDate}`,
-          type: 'date'
-        };
-        this.addToSelectedFilter(date_range,'date');
-        this.active_filters = this.selected_filters.length;
+          type: 'date',
+        }
+        this.addToSelectedFilter(date_range, 'date')
+        this.active_filters = this.selected_filters.length
       },
 
       getSearchParameterValue() {
-        const searchParams = new URLSearchParams(window.location.search);
-        for (let [key, value] of searchParams) if (key) return value;
-      }
+        const searchParams = new URLSearchParams(window.location.search)
+        for (let [key, value] of searchParams) if (key) return value
+      },
     }
   }
 </script>
