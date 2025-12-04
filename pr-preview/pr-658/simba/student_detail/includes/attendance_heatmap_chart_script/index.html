@@ -9,6 +9,14 @@
     #hs-pro-irhch .apexcharts-canvas {
       min-width: 100% !important;
     }
+
+    #hs-pro-irhch .apexcharts-heatmap-rect {
+      shape-rendering: geometricPrecision;
+    }
+
+    #hs-pro-irhch svg {
+      overflow: visible;
+    }
   }
 </style>
 <script>
@@ -115,16 +123,41 @@
         data: generateAttendanceData(dayIndex)
       }));
 
-      const isMobile = window.innerWidth < 768;
+      const MOBILE_BREAKPOINT = 768;
+      const MOBILE_HEIGHT_MULTIPLIER = 1.3;
+      const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
       const numberOfRows = daysOfWeek.length;
-      const cellSize = 18;
-      const gapWidth = 5;
-      const fontSize = '11px';
-      const yAxisLabelPadding = 80;
-      const chartPadding = 20;
 
-      const chartWidth = totalWeeks * (cellSize + gapWidth) + yAxisLabelPadding;
-      const chartHeight = numberOfRows * cellSize + (numberOfRows - 1) * gapWidth + chartPadding;
+      const chartConfig = {
+        desktop: {
+          cellSize: 18,
+          gapWidth: 5,
+          fontSize: '11px',
+          yAxisLabelPadding: 80,
+          chartPadding: 20,
+          radius: 3
+        },
+        mobile: {
+          cellSize: 11,
+          gapWidth: 3,
+          fontSize: '10px',
+          yAxisLabelPadding: 55,
+          chartPadding: 15,
+          radius: 2.5
+        }
+      };
+
+      const config = isMobile ? chartConfig.mobile : chartConfig.desktop;
+      const { cellSize, gapWidth, fontSize, yAxisLabelPadding, chartPadding, radius } = config;
+
+      const calculateChartDimensions = () => {
+        const width = totalWeeks * cellSize + (totalWeeks - 1) * gapWidth + yAxisLabelPadding;
+        const baseHeight = numberOfRows * cellSize + (numberOfRows - 1) * gapWidth + chartPadding;
+        const height = isMobile ? baseHeight * MOBILE_HEIGHT_MULTIPLIER : baseHeight;
+        return { width, height };
+      };
+
+      const { width: chartWidth, height: chartHeight } = calculateChartDimensions();
 
       const getOrdinalSuffix = (number) => {
         const suffixes = ['th', 'st', 'nd', 'rd'];
@@ -192,7 +225,10 @@
           type: 'heatmap',
           height: chartHeight,
           ...(isMobile && { width: chartWidth }),
-          toolbar: { show: false }
+          toolbar: { show: false },
+          ...(isMobile && {
+            animations: { enabled: false }
+          })
         },
         dataLabels: {
           enabled: false,
@@ -204,7 +240,7 @@
         plotOptions: {
           heatmap: {
             shadeIntensity: 0,
-            radius: 3,
+            radius: radius,
             useFillColorAsStroke: false,
             colorScale: {
               ranges: colorScaleRanges
