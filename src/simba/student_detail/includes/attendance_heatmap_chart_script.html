@@ -1,14 +1,11 @@
 <style>
-  /* Enable horizontal scrolling for heatmap only on mobile */
   @media (max-width: 767px) {
     #hs-pro-irhch {
       overflow-x: auto;
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
-      /* Smooth scrolling on iOS */
     }
 
-    /* Ensure chart doesn't shrink on mobile */
     #hs-pro-irhch .apexcharts-canvas {
       min-width: 100% !important;
     }
@@ -16,166 +13,201 @@
 </style>
 <script>
   window.addEventListener('load', () => {
-    // Apex Heatmap Chart
     (function () {
-      // Calculate weeks for the current calendar year (January to December)
-      const today = new Date();
-      const currentYear = today.getFullYear();
-
-      // Start from January 1st of current year
-      const yearStart = new Date(currentYear, 0, 1); // Month 0 = January
+      const currentYear = new Date().getFullYear();
+      const yearStart = new Date(currentYear, 0, 1);
       yearStart.setHours(0, 0, 0, 0);
-
-      // End on December 31st of current year
-      const yearEnd = new Date(currentYear, 11, 31); // Month 11 = December
+      const yearEnd = new Date(currentYear, 11, 31);
       yearEnd.setHours(0, 0, 0, 0);
 
-      // Generate week labels with month grouping
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthNamesFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+      const HEATMAP_COLORS = {
+        NONE: '#ffffff',
+        LOW: '#bbf7d0',
+        MEDIUM: '#4ade80',
+        HIGH: '#16a34a'
+      };
+
       const weeks = [];
       const weekDates = [];
-      const weekMonths = []; // Store month name for each week for tooltip
+      const weekMonths = [];
 
-      // Find the Sunday of the week containing January 1st (Sunday is day 0)
-      let currentDate = new Date(yearStart);
-      const startDayOfWeek = currentDate.getDay();
-      const daysToSunday = startDayOfWeek; // 0 = Sunday, so subtract the day of week to get to Sunday
-      currentDate.setDate(currentDate.getDate() - daysToSunday);
+      const getWeekStartDate = (date) => {
+        const dayOfWeek = date.getDay();
+        const weekStart = new Date(date);
+        weekStart.setDate(weekStart.getDate() - dayOfWeek);
+        return weekStart;
+      };
 
-      // Find the Saturday of the week containing December 31st
-      const endDate = new Date(yearEnd);
-      const endDayOfWeek = endDate.getDay();
-      const daysToSaturday = endDayOfWeek === 6 ? 0 : 6 - endDayOfWeek; // 6 = Saturday
-      endDate.setDate(endDate.getDate() + daysToSaturday);
+      const getWeekEndDate = (weekStart) => {
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        return weekEnd;
+      };
 
-      let lastMonth = -1;
+      const determineMonthToShow = (weekStart, weekEnd, weekStartYear, weekStartMonth) => {
+        if (weekStartYear < currentYear && weekStartMonth === 11 && weekEnd >= yearStart) {
+          return 0;
+        }
+        if (weekStartYear === currentYear) {
+          return weekStartMonth;
+        }
+        if (weekStartYear > currentYear && weekStart <= yearEnd) {
+          return 11;
+        }
+        return -1;
+      };
+
+      let weekStartDate = getWeekStartDate(yearStart);
+      const weekEndDate = getWeekEndDate(new Date(yearEnd));
+      let lastDisplayedMonth = -1;
       let weekIndex = 0;
 
-      // Generate weeks from start to end, filtering out weeks outside current year
-      while (currentDate <= endDate && weekIndex < 53) {
-        const weekStart = new Date(currentDate);
+      while (weekStartDate <= weekEndDate && weekIndex < 53) {
+        const weekStart = new Date(weekStartDate);
         const weekStartMonth = weekStart.getMonth();
         const weekStartYear = weekStart.getFullYear();
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 6); // Saturday of the week
-
-        // Check if this week contains any day from the current year
-        // Week overlaps with current year if: weekEnd >= Jan 1 AND weekStart <= Dec 31
+        const weekEnd = getWeekEndDate(weekStart);
         const weekOverlapsYear = weekEnd >= yearStart && weekStart <= yearEnd;
 
-        // Only include weeks that overlap with the current year
         if (weekOverlapsYear) {
-          // Determine which month to show for this week
-          let monthToShow = -1;
+          const monthToShow = determineMonthToShow(weekStart, weekEnd, weekStartYear, weekStartMonth);
 
-          // If week starts in previous year's December but contains January 1st, show January
-          if (weekStartYear < currentYear && weekStartMonth === 11) {
-            if (weekEnd >= yearStart) {
-              monthToShow = 0; // January
-            }
-          } else if (weekStartYear === currentYear) {
-            // Week is in current year, use the month of the week start
-            monthToShow = weekStartMonth;
-          } else if (weekStartYear > currentYear) {
-            // Week starts in next year but overlaps with current year (shouldn't happen with our logic, but handle it)
-            // This would be the last week of December extending into next year
-            if (weekStart <= yearEnd) {
-              monthToShow = 11; // December
-            }
-          }
-
-          // Show month name only at the start of a new month (and only for current year months)
-          if (monthToShow !== -1 && monthToShow !== lastMonth) {
-            weeks.push(monthNames[monthToShow]);
-            lastMonth = monthToShow;
+          if (monthToShow !== -1 && monthToShow !== lastDisplayedMonth) {
+            weeks.push(monthNamesShort[monthToShow]);
+            lastDisplayedMonth = monthToShow;
           } else {
-            weeks.push(''); // Empty string for weeks within the same month
+            weeks.push('');
           }
 
-          // Store month name for this week (for tooltip)
-          let tooltipMonth = monthToShow !== -1 ? monthToShow : weekStartMonth;
-          weekMonths.push(monthNames[tooltipMonth]);
-
+          const tooltipMonth = monthToShow !== -1 ? monthToShow : weekStartMonth;
+          weekMonths.push(monthNamesShort[tooltipMonth]);
           weekDates.push(new Date(weekStart));
         }
 
-        currentDate.setDate(currentDate.getDate() + 7); // Move to next week
+        weekStartDate.setDate(weekStartDate.getDate() + 7);
         weekIndex++;
       }
 
-      const weeksInYear = weeks.length;
-      // Reverse array so Sunday appears at top (ApexCharts displays y-axis from bottom to top)
-      const days = ['Sat', 'Fri', 'Thu', 'Wed', 'Tue', 'Mon', 'Sun']; // Sunday at top, Saturday at bottom
+      const totalWeeks = weeks.length;
+      const daysOfWeek = ['Sat', 'Fri', 'Thu', 'Wed', 'Tue', 'Mon', 'Sun'];
 
-      // Generate data for each day, setting cells outside current year to 0
-      const generateYearlyData = (dayIndex) => {
-        // dayIndex: 0=Sat, 1=Fri, ..., 6=Sun
-        // Map to day offset: Sat=6, Fri=5, ..., Sun=0
+      const generateAttendanceData = (dayIndex) => {
         const dayOffset = 6 - dayIndex;
 
-        return Array.from({ length: weeksInYear }, (_, weekIndex) => {
-          // Calculate the actual date for this cell
+        return Array.from({ length: totalWeeks }, (_, weekIndex) => {
           const weekStartDate = weekDates[weekIndex];
           const cellDate = new Date(weekStartDate);
           cellDate.setDate(cellDate.getDate() + dayOffset);
 
-          // Check if date is within current year
-          const cellYear = cellDate.getFullYear();
-          if (cellYear !== currentYear) {
-            return 0; // No color for dates outside current year
+          if (cellDate.getFullYear() !== currentYear) {
+            return 0;
           }
 
-          // Placeholder data: you can replace this with real yearly data
-          return Math.floor(Math.random() * 5); // values 0–4
+          return Math.floor(Math.random() * 5);
         });
       };
 
-      const series = days.map((day, dayIndex) => ({
+      const series = daysOfWeek.map((day, dayIndex) => ({
         name: day,
-        data: generateYearlyData(dayIndex)
+        data: generateAttendanceData(dayIndex)
       }));
 
-      // Calculate dimensions for square cells
-      // Keep consistent size for all screens - allow horizontal scroll on mobile only
-      const isMobile = window.innerWidth < 768; // Mobile breakpoint
-      const numRows = days.length;
-      const cellSize = 22; // Consistent cell size for all screens
-      const gapWidth = 2; // Consistent gap width
-      const fontSize = '12px'; // Consistent font size
+      const isMobile = window.innerWidth < 768;
+      const numberOfRows = daysOfWeek.length;
+      const cellSize = 22;
+      const gapWidth = 2;
+      const fontSize = '13px';
+      const yAxisLabelPadding = 80;
+      const chartPadding = 20;
 
-      // Calculate fixed width only for mobile to prevent shrinking
-      // On desktop, let ApexCharts auto-size to fit container
-      const numCols = weeksInYear;
-      const calculatedWidth = numCols * (cellSize + gapWidth) + 80; // Extra space for y-axis labels
-      const padding = 20;
-      const calculatedHeight = numRows * cellSize + (numRows - 1) * gapWidth + padding;
+      const chartWidth = totalWeeks * (cellSize + gapWidth) + yAxisLabelPadding;
+      const chartHeight = numberOfRows * cellSize + (numberOfRows - 1) * gapWidth + chartPadding;
+
+      const getOrdinalSuffix = (number) => {
+        const suffixes = ['th', 'st', 'nd', 'rd'];
+        const value = number % 100;
+        return number + (suffixes[(value - 20) % 10] || suffixes[value] || suffixes[0]);
+      };
+
+      const getTooltipBackgroundColor = (value) => {
+        switch (value) {
+          case 1: return HEATMAP_COLORS.LOW;
+          case 2:
+          case 3: return HEATMAP_COLORS.MEDIUM;
+          case 4: return HEATMAP_COLORS.HIGH;
+          default: return HEATMAP_COLORS.NONE;
+        }
+      };
+
+      const formatTooltipDate = (date) => {
+        const monthName = monthNamesFull[date.getMonth()];
+        const day = getOrdinalSuffix(date.getDate());
+        return `${monthName} ${day}`;
+      };
+
+      const buildTooltip = (props, mode) => {
+        const { dataPointIndex, seriesIndex, series } = props;
+        const visitCount = series[seriesIndex][dataPointIndex];
+        const weekStartDate = weekDates[dataPointIndex];
+        const cellDate = new Date(weekStartDate);
+        const dayOffset = 6 - seriesIndex;
+        cellDate.setDate(cellDate.getDate() + dayOffset);
+
+        if (cellDate.getFullYear() !== currentYear) {
+          return '';
+        }
+
+        const dateLabel = formatTooltipDate(cellDate);
+        const originalSeriesName = props.ctx.opts.series[seriesIndex].name;
+
+        try {
+          props.ctx.opts.series[seriesIndex].name = '';
+
+          return buildHeatmapTooltip(props, {
+            mode,
+            wrapperExtClasses: 'min-w-28',
+            valuePrefix: '',
+            divider: '',
+            valuePostfix: ` visit${visitCount === 1 ? '' : 's'} on ${dateLabel}`,
+            markerExtClasses: '!rounded-full',
+            markerStyles: `background: ${getTooltipBackgroundColor(visitCount)}`
+          });
+        } finally {
+          props.ctx.opts.series[seriesIndex].name = originalSeriesName;
+        }
+      };
+
+      const colorScaleRanges = [
+        { from: 0, to: 0, color: HEATMAP_COLORS.NONE, foreColor: '#171717', name: 'Low' },
+        { from: 1, to: 1, color: HEATMAP_COLORS.LOW, foreColor: '#ffffff', name: 'Low' },
+        { from: 2, to: 3, color: HEATMAP_COLORS.MEDIUM, foreColor: '#ffffff', name: 'Medium' },
+        { from: 4, to: 4, color: HEATMAP_COLORS.HIGH, foreColor: '#ffffff', name: 'High' }
+      ];
 
       buildChart('#hs-pro-irhch', (mode) => ({
         chart: {
           type: 'heatmap',
-          height: calculatedHeight,
-          ...(isMobile && { width: calculatedWidth }), // Only set fixed width on mobile
+          height: chartHeight,
+          ...(isMobile && { width: chartWidth }),
           toolbar: { show: false }
         },
         dataLabels: {
           enabled: false,
         },
         stroke: {
-          width: gapWidth, // Responsive gap width
-          colors: ['#ffffff'] // White gaps - will be overridden by theme
+          width: gapWidth,
+          colors: ['#ffffff']
         },
         plotOptions: {
           heatmap: {
             shadeIntensity: 0,
-            radius: 3, // Consistent radius for all screens
+            radius: 3,
             useFillColorAsStroke: false,
             colorScale: {
-              ranges: [
-                { from: 0, to: 0, color: '#ffffff', foreColor: '#171717', name: 'Low' },
-                { from: 1, to: 1, color: '#bbf7d0', foreColor: '#ffffff', name: 'Low' },
-                { from: 2, to: 3, color: '#4ade80', foreColor: '#ffffff', name: 'Medium' },
-                { from: 4, to: 4, color: '#16a34a', foreColor: '#ffffff', name: 'High' }
-              ]
+              ranges: colorScaleRanges
             }
           }
         },
@@ -187,11 +219,8 @@
               fontSize: fontSize,
               fontFamily: 'Inter, ui-sans-serif'
             },
-            rotate: 0, // Keep labels straight for all screens
-            formatter: function (value) {
-              // Only show month labels (non-empty strings), hide empty ones
-              return value || '';
-            },
+            rotate: 0,
+            formatter: (value) => value || '',
             showDuplicates: false,
             hideOverlappingLabels: true
           },
@@ -202,7 +231,7 @@
           },
         },
         yaxis: {
-          categories: days,
+          categories: daysOfWeek,
           labels: {
             style: {
               fontSize: fontSize,
@@ -211,87 +240,21 @@
           }
         },
         grid: {
-          show: false, // Remove top and bottom border line of the chart
+          show: false,
         },
         legend: {
           show: false
         },
         tooltip: {
-          custom: function (props, b, c) {
-            const { dataPointIndex, seriesIndex, series } = props;
-            const val = series[seriesIndex][dataPointIndex];
-
-            // Calculate the actual date for this cell
-            // Since days array is reversed (Sat=0, Sun=6), map seriesIndex to day offset
-            // seriesIndex 0 = Sat (day 6), seriesIndex 6 = Sun (day 0)
-            const weekStartDate = weekDates[dataPointIndex];
-            const cellDate = new Date(weekStartDate);
-            const dayOffset = 6 - seriesIndex; // Map reversed index to day offset (0=Sun, 6=Sat)
-            cellDate.setDate(cellDate.getDate() + dayOffset);
-
-            // Skip dates outside the current year (shouldn't happen with filtered weeks, but safety check)
-            const cellYear = cellDate.getFullYear();
-            if (cellYear !== currentYear) {
-              return ''; // Don't show tooltip for dates outside current year
-            }
-
-            // Get month and date
-            const monthNamesFull = ['January', 'February', 'March', 'April', 'May', 'June',
-              'July', 'August', 'September', 'October', 'November', 'December'];
-            const monthName = monthNamesFull[cellDate.getMonth()];
-            const date = cellDate.getDate();
-
-            // Format date with ordinal (1st, 2nd, 3rd, etc.)
-            const getOrdinal = (n) => {
-              const s = ['th', 'st', 'nd', 'rd'];
-              const v = n % 100;
-              return n + (s[(v - 20) % 10] || s[v] || s[0]);
-            };
-
-            const bgc = () => {
-              switch (val) {
-                case 1:
-                  return '#bbf7d0';
-                case 2:
-                case 3:
-                  return '#4ade80';
-                case 4:
-                  return '#16a34a';
-                default:
-                  return '#fff';
-              }
-            };
-
-            // Format like GitHub: "X visits on [Month] [Date]"
-            const originalName = props.ctx.opts.series[seriesIndex].name;
-            const dateLabel = `${monthName} ${getOrdinal(date)}`;
-
-            // Temporarily modify series name - keep it minimal since value will be shown separately
-            props.ctx.opts.series[seriesIndex].name = '';
-
-            const result = buildHeatmapTooltip(props, {
-              mode,
-              wrapperExtClasses: 'min-w-28',
-              valuePrefix: '',
-              divider: '',
-              valuePostfix: ` visit${val === 1 ? '' : 's'} on ${dateLabel}`,
-              markerExtClasses: '!rounded-full',
-              markerStyles: `background: ${bgc()}`
-            });
-
-            // Restore original name
-            props.ctx.opts.series[seriesIndex].name = originalName;
-
-            return result;
-          }
+          custom: (props) => buildTooltip(props, mode)
         },
       }), {
         grid: {
-          show: false, // Ensure no grid border in light mode
+          show: false,
           borderColor: 'transparent'
         },
         stroke: {
-          colors: ['#ffffff'] // White gaps between cells in light mode
+          colors: ['#ffffff']
         },
         xaxis: {
           labels: {
@@ -309,11 +272,11 @@
         }
       }, {
         grid: {
-          show: false, // Ensure no grid border in dark mode
+          show: false,
           borderColor: 'transparent'
         },
         stroke: {
-          colors: ['#262626'] // Dark gaps between cells in dark mode
+          colors: ['#262626']
         },
         xaxis: {
           labels: {
