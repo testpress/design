@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Date Range Filter Demo</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  
+  <!-- Preline UI -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/preline@2.0.0/dist/preline.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/preline@2.0.0/dist/preline.min.js"></script>
+  
+  <!-- Day.js -->
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/isBetween.js"></script>
+  
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background-color: #f9fafb;
+      padding: 2rem;
+    }
+    .demo-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 2rem;
+      border-radius: 0.5rem;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <h1 class="text-2xl font-bold mb-6 text-stone-800">Question Reporter Filter Demo</h1>
+    
+    <!-- Filter Component -->
+    <div class="pb-4 grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5 border-b border-stone-200"
+         x-data="report_users_app()"
+         x-init="init()">
+
+      <form method="get" action="" class="relative" @submit.prevent="applySearch($event)">
+        <div class="relative">
+          <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-4">
+            <svg class="shrink-0 size-4 text-stone-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.3-4.3"/>
+            </svg>
+          </div>
+          <input type="text"
+                 name="search"
+                 placeholder="Search reportees"
+                 value=""
+                 @keydown.enter.prevent="applySearch($event.target.value)"
+                 class="py-[7px] pl-10 pe-8 block w-full bg-stone-100 border-transparent rounded-lg text-sm placeholder:text-stone-500 focus:border-green-500 focus:ring-green-600">
+        </div>
+      </form>
+       <div class="flex flex-wrap md:justify-end items-center gap-2">
+           <!-- Export Button -->
+          <button type="button" 
+                  @click="applyFiltersToExport('/export')"
+                  class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+            Export
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+          </button>
+
+      <div class="hs-dropdown [--auto-close:inside] inline-flex items-center">
+
+        <button id="hs-pro-dnic" type="button"
+                                 class="py-[9px] px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"
+                                 aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+          <span x-text="(fromDate || toDate) ? [fromDate, toDate].filter(Boolean).join(' - ') : 'Select Date Range'"></span>
+          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+
+        <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-79.5 sm:w-159 transition-[opacity,margin] duration opacity-0 hidden z-50 bg-white rounded-xl shadow-xl dark:bg-neutral-900"
+             role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-dnic">
+
+          <div class="sm:flex">
+            <div class="p-3 space-y-0.5">
+              <div class="grid grid-cols-5 items-center gap-x-3 mx-1.5 pb-3">
+                <div class="col-span-1">
+                  <button type="button" @click="prevMonth()" class="size-8 flex justify-center items-center text-stone-800 hover:bg-stone-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                  </button>
+                </div>
+
+                <div class="col-span-3 flex justify-center items-center gap-x-1">
+                  <div class="hs-dropdown relative inline-flex [--placement:bottom]">
+                    <button type="button" class="relative flex text-nowrap w-full cursor-pointer text-start font-medium text-stone-800 hover:text-stone-600 focus:outline-hidden dark:text-neutral-200">
+                      <span x-text="monthName"></span>
+                    </button>
+                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-32 max-h-56 overflow-y-auto hidden z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-1 space-y-0.5 dark:bg-neutral-900 dark:border-neutral-700">
+                      <template x-for="(m, index) in months" :key="index">
+                        <button type="button" class="w-full flex justify-between items-center p-2 text-sm text-stone-800 rounded-lg hover:bg-stone-100 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-200 dark:hover:bg-neutral-800" @click="currentMonth = index">
+                          <span x-text="m"></span>
+                          <span x-show="currentMonth === index"><svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                  <span class="text-stone-800 dark:text-neutral-200">/</span>
+                  <div class="hs-dropdown relative inline-flex [--placement:bottom]">
+                    <button type="button" class="relative flex text-nowrap w-full cursor-pointer text-start font-medium text-stone-800 hover:text-stone-600 focus:outline-hidden dark:text-neutral-200">
+                      <span x-text="currentYear"></span>
+                    </button>
+                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 max-h-56 overflow-y-auto hidden z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-1 space-y-0.5 dark:bg-neutral-900 dark:border-neutral-700"
+                         x-init="
+                           // Scroll on initial mount
+                           setTimeout(() => {
+                             const selected = $el.querySelector(`[x-text='${currentYear}']`);
+                             if (selected) selected.scrollIntoView({ block: 'center' });
+                           }, 100);
+                           // Watch for changes
+                           $watch('currentYear', () => {
+                             setTimeout(() => {
+                               const selected = $el.querySelector(`[x-text='${currentYear}']`);
+                               if (selected) selected.scrollIntoView({ block: 'center' });
+                             }, 50);
+                           });
+                         ">
+                      <template x-for="y in years" :key="y">
+                        <button type="button" class="w-full flex justify-between items-center p-2 text-sm text-stone-800 rounded-lg hover:bg-stone-100 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-200 dark:hover:bg-neutral-800" @click="currentYear = y">
+                          <span x-text="y"></span>
+                          <span x-show="currentYear === y"><svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-span-1"></div>
+              </div>
+
+              <div class="flex pb-1.5">
+                <template x-for="dayName in ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']">
+                  <span class="m-px w-10 block text-center text-sm text-stone-500 dark:text-neutral-500" x-text="dayName"></span>
+                </template>
+              </div>
+
+              <template x-for="week in Array(6).fill(0).map((_, i) => calendarDays.slice(i*7, (i+1)*7))">
+                <div class="flex">
+                  <template x-for="(dayObj, index) in week">
+                    <div class="w-full h-10 flex justify-center items-center"
+                         :class="{
+                                 'bg-stone-100 dark:bg-neutral-800': dayObj.isCurrentMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year),
+
+   'rounded-s-full': dayObj.isCurrentMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year) && (isRangeStart(dayObj.day, dayObj.month, dayObj.year) || index === 0),
+   'rounded-e-full': dayObj.isCurrentMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year) && (isRangeEnd(dayObj.day, dayObj.month, dayObj.year) || index === 6),
+
+
+   'bg-gradient-to-r from-white to-stone-100 dark:from-neutral-800 dark:to-neutral-900':
+   !dayObj.isCurrentMonth && dayObj.isLastDayOfPrevMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year),
+
+   'bg-gradient-to-l from-white to-stone-100 dark:from-neutral-900 dark:to-neutral-800':
+   !dayObj.isCurrentMonth && dayObj.isFirstDayOfNextMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year),
+
+   'bg-white dark:bg-neutral-900':
+   !dayObj.isCurrentMonth &&
+   !dayObj.isLastDayOfPrevMonth &&
+   !dayObj.isFirstDayOfNextMonth &&
+   !isDateInRange(dayObj.day, dayObj.month, dayObj.year)
+   }">
+
+                      <button type="button"
+                              @click="selectDate(dayObj.day, dayObj.month, dayObj.year)"
+                              :disabled="!dayObj.isCurrentMonth"
+                              :class="{
+                                      'bg-green-600 text-white font-medium': isRangeStart(dayObj.day, dayObj.month, dayObj.year) || isRangeEnd(dayObj.day, dayObj.month, dayObj.year),
+                                      'hover:border-green-600 hover:text-green-600': !isRangeStart(dayObj.day, dayObj.month, dayObj.year) && !isRangeEnd(dayObj.day, dayObj.month, dayObj.year),
+                                      'opacity-50 pointer-events-none': !dayObj.isCurrentMonth,
+                                      'border border-green-600 font-semibold': dayObj.isToday && !isDateInRange(dayObj.day, dayObj.month, dayObj.year)
+                                      }"
+                              class="m-px size-10 flex justify-center items-center border border-transparent text-sm text-stone-800 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden dark:text-neutral-200"
+                              x-text="dayObj.day">
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+            <!-- SECOND CALENDAR -->
+            <div class="p-3 space-y-0.5">
+              <div class="grid grid-cols-5 items-center gap-x-3 mx-1.5 pb-3">
+                <div class="col-span-1"></div>
+                <div class="col-span-3 flex justify-center items-center gap-x-1">
+                  <div class="hs-dropdown relative inline-flex [--placement:bottom]">
+                    <button type="button" class="relative flex text-nowrap w-full cursor-pointer text-start font-medium text-stone-800 hover:text-stone-600 focus:outline-hidden dark:text-neutral-200">
+                      <span x-text="nextMonthName"></span>
+                    </button>
+                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-32 max-h-56 overflow-y-auto hidden z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-1 space-y-0.5 dark:bg-neutral-900 dark:border-neutral-700">
+                      <template x-for="(m, index) in months" :key="index">
+                        <button type="button" class="w-full flex justify-between items-center p-2 text-sm text-stone-800 rounded-lg hover:bg-stone-100 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                                              @click="index === 0 ? (currentMonth = 11, currentYear--) : currentMonth = index - 1">
+                          <span x-text="m"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                  <span class="text-stone-800 dark:text-neutral-200">/</span>
+                  <div class="hs-dropdown relative inline-flex [--placement:bottom]">
+                    <button type="button" class="relative flex text-nowrap w-full cursor-pointer text-start font-medium text-stone-800 hover:text-stone-600 focus:outline-hidden dark:text-neutral-200">
+                      <span x-text="nextCalendarYear"></span>
+                    </button>
+                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-24 max-h-56 overflow-y-auto hidden z-50 bg-white border border-stone-200 rounded-lg shadow-lg p-1 space-y-0.5 dark:bg-neutral-900 dark:border-neutral-700"
+                         x-init="
+                           // Scroll on initial mount
+                           setTimeout(() => {
+                             const selected = $el.querySelector(`[x-text='${nextCalendarYear}']`);
+                             if (selected) selected.scrollIntoView({ block: 'center' });
+                           }, 100);
+                           // Watch for changes
+                           $watch('nextCalendarYear', () => {
+                             setTimeout(() => {
+                               const selected = $el.querySelector(`[x-text='${nextCalendarYear}']`);
+                               if (selected) selected.scrollIntoView({ block: 'center' });
+                             }, 50);
+                           });
+                         ">
+                      <template x-for="y in years" :key="y">
+                        <button type="button" class="w-full flex justify-between items-center p-2 text-sm text-stone-800 rounded-lg hover:bg-stone-100 focus:outline-hidden focus:bg-stone-100 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                                              @click="currentMonth === 11 ? currentYear = y - 1 : currentYear = y">
+                          <span x-text="y"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-span-1 flex justify-end">
+                  <button type="button" @click="nextMonth()" class="size-8 flex justify-center items-center text-stone-800 hover:bg-stone-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-100 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <div class="flex pb-1.5">
+                <template x-for="dayName in ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']">
+                  <span class="m-px w-10 block text-center text-sm text-stone-500 dark:text-neutral-500" x-text="dayName"></span>
+                </template>
+              </div>
+
+              <template x-for="week in Array(6).fill(0).map((_, i) => calendarDays2.slice(i*7, (i+1)*7))">
+                <div class="flex">
+                  <template x-for="(dayObj, index) in week">
+                    <div class="w-full h-10 flex justify-center items-center"
+                         :class="{
+                                 'bg-stone-100 dark:bg-neutral-800': dayObj.isCurrentMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year),
+
+   'rounded-s-full': dayObj.isCurrentMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year) && (isRangeStart(dayObj.day, dayObj.month, dayObj.year) || index === 0),
+   'rounded-e-full': dayObj.isCurrentMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year) && (isRangeEnd(dayObj.day, dayObj.month, dayObj.year) || index === 6),
+
+
+   'bg-gradient-to-r from-white to-stone-100 dark:from-neutral-800 dark:to-neutral-900':
+   !dayObj.isCurrentMonth && dayObj.isLastDayOfPrevMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year),
+
+   'bg-gradient-to-l from-white to-stone-100 dark:from-neutral-900 dark:to-neutral-800':
+   !dayObj.isCurrentMonth && dayObj.isFirstDayOfNextMonth && isDateInRange(dayObj.day, dayObj.month, dayObj.year),
+
+   'bg-white dark:bg-neutral-900':
+   !dayObj.isCurrentMonth &&
+   !dayObj.isLastDayOfPrevMonth &&
+   !dayObj.isFirstDayOfNextMonth &&
+   !isDateInRange(dayObj.day, dayObj.month, dayObj.year)
+   }">
+
+                      <button type="button"
+                              @click="selectDate(dayObj.day, dayObj.month, dayObj.year)"
+                              :disabled="!dayObj.isCurrentMonth"
+                              :class="{
+                                      'bg-green-600 text-white font-medium': isRangeStart(dayObj.day, dayObj.month, dayObj.year) || isRangeEnd(dayObj.day, dayObj.month, dayObj.year),
+                                      'hover:border-green-600 hover:text-green-600': !isRangeStart(dayObj.day, dayObj.month, dayObj.year) && !isRangeEnd(dayObj.day, dayObj.month, dayObj.year),
+                                      'opacity-50 pointer-events-none': !dayObj.isCurrentMonth,
+                                      'border border-green-600 font-semibold': dayObj.isToday && !isDateInRange(dayObj.day, dayObj.month, dayObj.year),
+                                      }"
+                              class="m-px size-10 flex justify-center items-center border border-transparent text-sm text-stone-800 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden dark:text-neutral-200"
+                              x-text="dayObj.day">
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div class="pt-4 flex justify-between gap-x-2 p-2">
+            <button type="button" 
+                    @click="fromDate = ''; toDate = ''; handleDateChange();" 
+                    class="py-2 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+              Clear
+            </button>
+            <div class="flex gap-x-2">
+              <button type="button" 
+                      class="py-2 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg border border-stone-200 bg-white text-stone-800 shadow-2xs hover:bg-stone-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-stone-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"
+                      data-hs-overlay="#hs-pro-dnic">
+                Cancel
+              </button>
+              <button type="button" 
+                      @click="handleDateChange()" 
+                      class="py-2 px-3 inline-flex justify-center items-center gap-x-2 text-xs font-medium rounded-lg border border-transparent bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:ring-2 focus:ring-green-500">
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Result Display -->
+    <div class="mt-6 p-4 bg-stone-50 rounded-lg" x-data="report_users_app()">
+      <h2 class="text-lg font-semibold mb-2 text-stone-800">Current Filter State</h2>
+      <div class="space-y-1 text-sm text-stone-600">
+        <p><strong>Date From:</strong> <span x-text="fromDate || 'Not selected'"></span></p>
+        <p><strong>Date To:</strong> <span x-text="toDate || 'Not selected'"></span></p>
+        <p><strong>Reporters Count:</strong> <span x-text="reportersCount"></span></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    dayjs.extend(dayjs_plugin_isBetween);
+    function report_users_app() {
+      return {
+        showSuggestions: false,
+        reportersCount: 42,
+        currentOrdering: '',
+        months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+
+        today: dayjs(),
+        currentMonth: dayjs().month(),
+        currentYear: dayjs().year(),
+
+        fromDate: "",
+        toDate: "",
+
+        init() {
+          const params = new URLSearchParams(window.location.search);
+
+          this.fromDate = params.get("date_from") || "";
+          this.toDate = params.get("date_to") || "";
+
+          if (this.fromDate) {
+            const from = dayjs(this.fromDate);
+            this.currentMonth = from.month();
+            this.currentYear = from.year();
+          }
+        },
+
+        makeDate(day, month, year) {
+          return dayjs().year(year).month(month).date(day);
+        },
+
+        getMonthObj(offset = 0) {
+          return dayjs().year(this.currentYear).month(this.currentMonth).add(offset, "month");
+        },
+
+        get nextMonthObj() {
+          return this.getMonthObj(1);
+        },
+
+        get monthName() {
+          return dayjs().month(this.currentMonth).format("MMMM");
+        },
+
+        get nextMonthName() {
+          return this.nextMonthObj.format("MMMM");
+        },
+
+        get nextCalendarMonth() {
+          return this.nextMonthObj.month();
+        },
+
+        get nextCalendarYear() {
+          return this.nextMonthObj.year();
+        },
+
+        get years() {
+          const now = dayjs().year();
+          return Array.from({ length: 101 }, (_, i) => now - 50 + i);
+        },
+
+        generateCalendarDays(year, month) {
+          const start = dayjs().year(year).month(month).startOf("month");
+          const firstWeekday = start.day() === 0 ? 7 : start.day();
+          const gridStart = start.subtract(firstWeekday - 1, "day");
+
+          return Array.from({ length: 42 }, (_, i) => {
+            const d = gridStart.add(i, "day");
+
+            return {
+              day: d.date(),
+              month: d.month(),
+              year: d.year(),
+              isCurrentMonth: d.month() === month,
+              isToday: d.isSame(this.today, "day"),
+              isLastDayOfPrevMonth: d.isSame(start.subtract(1, "day"), "day"),
+              isFirstDayOfNextMonth: d.isSame(start.add(1, "month"), "day"),
+            };
+          });
+        },
+
+        get calendarDays() {
+          return this.generateCalendarDays(this.currentYear, this.currentMonth);
+        },
+
+        get calendarDays2() {
+          return this.generateCalendarDays(this.nextCalendarYear, this.nextCalendarMonth);
+        },
+
+        prevMonth() {
+          const d = this.getMonthObj(-1);
+          this.currentMonth = d.month();
+          this.currentYear = d.year();
+        },
+
+        nextMonth() {
+          const d = this.getMonthObj(1);
+          this.currentMonth = d.month();
+          this.currentYear = d.year();
+        },
+
+        selectDate(day, month, year) {
+          const picked = this.makeDate(day, month, year).format("YYYY-MM-DD");
+
+          if (!this.fromDate || (this.fromDate && this.toDate)) {
+            this.fromDate = picked;
+            this.toDate = "";
+            return;
+          }
+
+          this.toDate = picked;
+
+          if (dayjs(this.fromDate).isAfter(this.toDate)) {
+            [this.fromDate, this.toDate] = [this.toDate, this.fromDate];
+          }
+        },
+
+        isDateInRange(day, month, year) {
+          if (!this.fromDate || !this.toDate) return false;
+          return this.makeDate(day, month, year).isBetween(this.fromDate, this.toDate, "day", "[]");
+        },
+
+        isRangeStart(day, month, year) {
+          return this.fromDate &&
+            this.makeDate(day, month, year).isSame(this.fromDate, "day");
+        },
+
+        isRangeEnd(day, month, year) {
+          return this.toDate &&
+            this.makeDate(day, month, year).isSame(this.toDate, "day");
+        },
+
+        applySearch(eventOrValue) {
+          const q = typeof eventOrValue === "string"
+            ? eventOrValue.trim()
+            : eventOrValue.target.querySelector('input[name="search"]').value.trim();
+
+          const params = new URLSearchParams(window.location.search);
+
+          q ? params.set("search", q) : params.delete("search");
+          params.delete("page");
+
+          window.location.href = `${window.location.pathname}?${params.toString()}`;
+        },
+
+        applyOrdering(ordering) {
+          const params = new URLSearchParams(window.location.search);
+          params.set("o", ordering);
+          params.delete("page");
+          window.location.href = `${window.location.pathname}?${params.toString()}`;
+        },
+
+        applyFiltersToExport(path, extraParams = {}) {
+          const params = new URLSearchParams(window.location.search);
+
+          this.fromDate ? params.set("date_from", this.fromDate) : params.delete("date_from");
+          this.toDate ? params.set("date_to", this.toDate) : params.delete("date_to");
+
+          Object.entries(extraParams).forEach(([k, v]) => {
+            if (v !== null && v !== undefined) params.set(k, v);
+          });
+
+          // For demo purposes, just show an alert instead of redirecting
+          alert(`Export URL: ${path}?${params.toString()}`);
+          // window.location.href = `${path}?${params.toString()}`;
+        },
+
+        handleDateChange() {
+          const params = new URLSearchParams(window.location.search);
+
+          this.fromDate ? params.set("date_from", this.fromDate) : params.delete("date_from");
+          this.toDate ? params.set("date_to", this.toDate) : params.delete("date_to");
+
+          params.delete("page");
+
+          alert(`Filter applied! Date range: ${this.fromDate || 'none'} to ${this.toDate || 'none'}`);
+          // window.location.href = `${window.location.pathname}?${params.toString()}`;
+        },
+
+        resetFilters() {
+          window.location.href = `${window.location.pathname}`;
+        },
+
+        calculateActiveFilterCount() {
+          const params = new URLSearchParams(window.location.search);
+          return ["search", "date_from", "date_to"].filter(k => params.get(k)).length;
+        },
+
+        apply_pagination(page) {
+          const params = new URLSearchParams(window.location.search);
+          params.set("page", page);
+          window.location.href = `${window.location.pathname}?${params.toString()}`;
+        },
+      };
+    }
+  </script>
+</body>
+</html>
