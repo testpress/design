@@ -27,7 +27,9 @@ function examReviewComponent() {
     showReportQuestionModal:null,
     showReflectionToast: false,
     showPostReflectionGuide: false,
-    postReflectionGuideTimeoutId: null,
+    autoHideInterval: null,
+    progressValue: 100,
+    isHoveringPostReflectionGuideToast: false,
     folders: [
     { 'name': 'Questions' },
     { 'name': 'Videos' },
@@ -259,16 +261,34 @@ function examReviewComponent() {
       return question.has_reflected === true;
     },
 
+    startPostReflectionAutoHide() {
+      this.progressValue = 100;
+      this.isHoveringPostReflectionGuideToast = false;
+      clearInterval(this.autoHideInterval);
+      
+      const duration = 5000;
+      const interval = 50;
+      const step = 100 / (duration / interval);
+
+      this.autoHideInterval = setInterval(() => {
+        if (!this.isHoveringPostReflectionGuideToast) {
+          this.progressValue -= step;
+          if (this.progressValue <= 0) {
+            this.progressValue = 0;
+            this.showPostReflectionGuide = false;
+            clearInterval(this.autoHideInterval);
+          }
+        }
+      }, interval);
+    },
+
     saveReflection() {
       if (this.currentQuestion) {
         this.currentQuestion.has_reflected = true;
         this.showReflectionToast = false;
         
         this.showPostReflectionGuide = true;
-        clearTimeout(this.postReflectionGuideTimeoutId);
-        this.postReflectionGuideTimeoutId = setTimeout(() => {
-          this.showPostReflectionGuide = false;
-        }, 6000);
+        this.startPostReflectionAutoHide();
       }
     },
 
