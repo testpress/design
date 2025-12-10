@@ -1,0 +1,342 @@
+<script>
+function uuid() {
+  return 'id-' + Math.random().toString(36).slice(2, 9);
+}
+
+function reportBuilder() {
+  const defaultGroup = (title) => ({
+    id: uuid(),
+    title,
+    description: '',
+    maximum_marks: '',
+    minimum_marks: '',
+    rounding_precision: 1,
+    show_average: true,
+    show_total: true,
+    items: []
+  });
+
+  const defaultSection = (title, type = 'scholastic') => ({
+    id: uuid(),
+    title,
+    description: '',
+    section_type: type,
+    show_total_score: true,
+    groups: [defaultGroup('English'), defaultGroup('Math')]
+  });
+
+  return {
+    report: {
+      title: 'SAT Progress Report',
+      description: 'Auto-computed projection using weekly practice exams.',
+      course: 'SAT Foundation',
+      state: 'draft',
+      remarks_enabled: true
+    },
+    sections: [defaultSection('SAT Projection')],
+    selectedSectionId: null,
+    selectedGroupId: null,
+    sectionModal: {
+      mode: 'create',
+      form: {
+        title: '',
+        description: '',
+        section_type: 'scholastic',
+        show_total_score: true
+      },
+      editingId: null
+    },
+    groupModal: {
+      mode: 'create',
+      sectionId: null,
+      editingId: null,
+      form: {
+        title: '',
+        description: '',
+        maximum_marks: '',
+        minimum_marks: '',
+        rounding_precision: 1,
+        show_average: true,
+        show_total: true
+      }
+    },
+    itemModal: {
+      mode: 'create',
+      groupId: null,
+      editingId: null,
+      form: {
+        item_type: 'scholastic',
+        content_type: 'exam',
+        title: '',
+        exam: '',
+        exam_section: '',
+        chapter_content: '',
+        max_score: '',
+        min_score: '',
+        order: 1
+      }
+    },
+
+    init() {
+      this.selectedSectionId = this.sections[0].id;
+      this.selectedGroupId = this.sections[0].groups[0].id;
+    },
+
+    get activeSection() {
+      return this.sections.find((s) => s.id === this.selectedSectionId) || this.sections[0];
+    },
+
+    get activeGroupList() {
+      return this.activeSection ? this.activeSection.groups : [];
+    },
+
+    get activeGroup() {
+      return this.activeGroupList.find((g) => g.id === this.selectedGroupId) || this.activeGroupList[0];
+    },
+
+    selectSection(id) {
+      this.selectedSectionId = id;
+      const firstGroup = (this.activeSection?.groups || [])[0];
+      this.selectedGroupId = firstGroup ? firstGroup.id : null;
+    },
+
+    addSection() {
+      const section = defaultSection('New Section', 'scholastic');
+      this.sections.push(section);
+      this.selectSection(section.id);
+    },
+
+    moveSection(index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= this.sections.length) return;
+      const reordered = [...this.sections];
+      [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+      this.sections = reordered;
+    },
+
+    deleteSection(index) {
+      if (confirm('Are you sure you want to delete this section?')) {
+        this.sections.splice(index, 1);
+        if (this.sections.length > 0) {
+          this.selectSection(this.sections[0].id);
+        } else {
+          this.selectedSectionId = null;
+          this.selectedGroupId = null;
+        }
+      }
+    },
+
+    moveGroup(sectionId, index, direction) {
+      const section = this.sections.find((s) => s.id === sectionId);
+      if (!section) return;
+      const target = index + direction;
+      if (target < 0 || target >= section.groups.length) return;
+      [section.groups[index], section.groups[target]] = [section.groups[target], section.groups[index]];
+    },
+
+    moveItem(index, direction) {
+      if (!this.activeGroup) return;
+      const target = index + direction;
+      if (target < 0 || target >= this.activeGroup.items.length) return;
+      [this.activeGroup.items[index], this.activeGroup.items[target]] = [this.activeGroup.items[target], this.activeGroup.items[index]];
+    },
+
+    removeItem(index) {
+      if (!this.activeGroup) return;
+      this.activeGroup.items.splice(index, 1);
+    },
+
+    saveDraft() {
+      alert('Report draft saved (UI demo).');
+    },
+
+    publish() {
+      alert('Report published (UI demo).');
+    },
+
+    // Section modal
+    openSectionModal(id = null) {
+      if (id) {
+        const section = this.sections.find((s) => s.id === id);
+        if (!section) return;
+        this.sectionModal.mode = 'edit';
+        this.sectionModal.editingId = id;
+        this.sectionModal.form = { title: section.title, description: section.description, section_type: section.section_type, show_total_score: section.show_total_score };
+      } else {
+        this.sectionModal.mode = 'create';
+        this.sectionModal.editingId = null;
+        this.sectionModal.form = { title: '', description: '', section_type: 'scholastic', show_total_score: true };
+      }
+      window.HSOverlay?.open('#section-modal');
+    },
+    resetSectionModal() {
+      if (this.sectionModal.mode === 'edit' && this.sectionModal.editingId) {
+        const section = this.sections.find((s) => s.id === this.sectionModal.editingId);
+        if (section) {
+          this.sectionModal.form = { title: section.title, description: section.description, section_type: section.section_type, show_total_score: section.show_total_score };
+        }
+      } else {
+        this.sectionModal.form = { title: '', description: '', section_type: 'scholastic', show_total_score: true };
+      }
+    },
+    saveSectionModal() {
+      if (this.sectionModal.mode === 'edit' && this.sectionModal.editingId) {
+        const section = this.sections.find((s) => s.id === this.sectionModal.editingId);
+        if (section) {
+          section.title = this.sectionModal.form.title;
+          section.description = this.sectionModal.form.description;
+          section.section_type = this.sectionModal.form.section_type;
+          section.show_total_score = this.sectionModal.form.show_total_score;
+        }
+      } else {
+        const newSection = {
+          id: uuid(),
+          title: this.sectionModal.form.title || 'Untitled section',
+          description: this.sectionModal.form.description,
+          section_type: this.sectionModal.form.section_type,
+          show_total_score: this.sectionModal.form.show_total_score,
+          groups: []
+        };
+        this.sections.push(newSection);
+        this.selectedSectionId = newSection.id;
+        this.selectedGroupId = null;
+      }
+      window.HSOverlay?.close('#section-modal');
+    },
+
+    // Group modal
+    openGroupModal(sectionId, groupId = null) {
+      if (!sectionId) return;
+      this.groupModal.sectionId = sectionId;
+      if (groupId) {
+        const group = this.sections.find((s) => s.id === sectionId)?.groups.find((g) => g.id === groupId);
+        if (!group) return;
+        this.groupModal.mode = 'edit';
+        this.groupModal.editingId = groupId;
+        this.groupModal.form = {
+          title: group.title,
+          description: group.description,
+          maximum_marks: group.maximum_marks,
+          minimum_marks: group.minimum_marks,
+          rounding_precision: group.rounding_precision,
+          show_average: group.show_average,
+          show_total: group.show_total
+        };
+      } else {
+        this.groupModal.mode = 'create';
+        this.groupModal.editingId = null;
+        this.groupModal.form = { title: '', description: '', maximum_marks: '', minimum_marks: '', rounding_precision: 1, show_average: true, show_total: true };
+      }
+      window.HSOverlay?.open('#group-modal');
+    },
+    resetGroupModal() {
+      if (this.groupModal.mode === 'edit' && this.groupModal.sectionId && this.groupModal.editingId) {
+        const group = this.sections.find((s) => s.id === this.groupModal.sectionId)?.groups.find((g) => g.id === this.groupModal.editingId);
+        if (group) {
+          this.groupModal.form = {
+            title: group.title,
+            description: group.description,
+            maximum_marks: group.maximum_marks,
+            minimum_marks: group.minimum_marks,
+            rounding_precision: group.rounding_precision,
+            show_average: group.show_average,
+            show_total: group.show_total
+          };
+        }
+      } else {
+        this.groupModal.form = { title: '', description: '', maximum_marks: '', minimum_marks: '', rounding_precision: 1, show_average: true, show_total: true };
+      }
+    },
+    saveGroupModal() {
+      const section = this.sections.find((s) => s.id === this.groupModal.sectionId);
+      if (!section) return;
+      if (this.groupModal.mode === 'edit' && this.groupModal.editingId) {
+        const group = section.groups.find((g) => g.id === this.groupModal.editingId);
+        if (group) {
+          Object.assign(group, this.groupModal.form);
+        }
+      } else {
+        const group = { id: uuid(), ...this.groupModal.form, title: this.groupModal.form.title || 'Untitled group', items: [] };
+        section.groups.push(group);
+        this.selectedGroupId = group.id;
+      }
+      window.HSOverlay?.close('#group-modal');
+    },
+
+    // Item modal
+    openItemModal(itemId = null) {
+      if (!this.activeGroup) return;
+      this.itemModal.groupId = this.activeGroup.id;
+      if (itemId) {
+        const item = this.activeGroup.items.find((i) => i.id === itemId);
+        if (!item) return;
+        this.itemModal.mode = 'edit';
+        this.itemModal.editingId = itemId;
+        this.itemModal.form = { ...item };
+      } else {
+        this.itemModal.mode = 'create';
+        this.itemModal.editingId = null;
+        this.itemModal.form = {
+          item_type: 'scholastic',
+          content_type: 'exam',
+          title: '',
+          exam: '',
+          exam_section: '',
+          chapter_content: '',
+          max_score: '',
+          min_score: '',
+          order: 1
+        };
+      }
+      window.HSOverlay?.open('#item-modal');
+    },
+    resetItemModal() {
+      if (this.itemModal.mode === 'edit' && this.itemModal.editingId && this.activeGroup) {
+        const item = this.activeGroup.items.find((i) => i.id === this.itemModal.editingId);
+        if (item) this.itemModal.form = { ...item };
+      } else {
+        this.itemModal.form = {
+          item_type: 'scholastic',
+          content_type: 'exam',
+          title: '',
+          exam: '',
+          exam_section: '',
+          chapter_content: '',
+          max_score: '',
+          min_score: '',
+          order: 1
+        };
+      }
+    },
+    saveItemModal() {
+      if (!this.activeGroup) return;
+      const duplicate = this.activeGroup.items.some((item) => {
+        if (this.itemModal.mode === 'edit' && item.id === this.itemModal.editingId) return false;
+        return (
+          item.item_type === this.itemModal.form.item_type &&
+          item.content_type === this.itemModal.form.content_type &&
+          item.exam === this.itemModal.form.exam &&
+          item.exam_section === this.itemModal.form.exam_section &&
+          item.chapter_content === this.itemModal.form.chapter_content
+        );
+      });
+      if (duplicate) {
+        alert('This item is already added to the selected group.');
+        return;
+      }
+      if (this.itemModal.mode === 'edit' && this.itemModal.editingId) {
+        const item = this.activeGroup.items.find((i) => i.id === this.itemModal.editingId);
+        if (item) Object.assign(item, this.itemModal.form);
+      } else {
+        this.activeGroup.items.push({
+          id: uuid(),
+          ...this.itemModal.form,
+          title: this.itemModal.form.title || 'Untitled item'
+        });
+      }
+      window.HSOverlay?.close('#item-modal');
+    }
+  };
+}
+</script>
+
