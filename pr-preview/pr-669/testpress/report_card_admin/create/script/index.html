@@ -46,6 +46,7 @@
       sectionModal: { mode: 'create', editingId: null, form: {} },
       groupModal:   { mode: 'create', editingId: null, sectionId: null, form: {} },
       itemModal:    { mode: 'create', editingId: null, groupId: null, form: {} },
+      confirmationModal: { title: '', message: '', action: null },
 
       init() {
         if (this.sections.length > 0) {
@@ -85,16 +86,19 @@
       },
 
       deleteSection(index) {
-        if (!confirm('Delete this section? This action cannot be undone.')) return;
-        
-        this.sections.splice(index, 1);
-        
-        if (this.sections.length > 0) {
-          this.selectSection(this.sections[0].id);
-        } else {
-          this.selectedSectionId = null;
-          this.selectedGroupId = null;
-        }
+        this.openConfirmationModal(
+          'Delete Section',
+          'Are you sure you want to delete this section? This action cannot be undone.',
+          () => {
+            this.sections.splice(index, 1);
+            if (this.sections.length > 0) {
+              this.selectSection(this.sections[0].id);
+            } else {
+              this.selectedSectionId = null;
+              this.selectedGroupId = null;
+            }
+          }
+        );
       },
 
       moveGroup(sectionId, index, direction) {
@@ -105,13 +109,17 @@
       deleteGroup(sectionId, index) {
         const section = this.sections.find(s => s.id === sectionId);
         if (!section) return;
-        
-        if (confirm('Delete this group?')) {
-          section.groups.splice(index, 1);
-          if (!section.groups.find(g => g.id === this.selectedGroupId)) {
-            this.selectedGroupId = section.groups.length ? section.groups[0].id : null;
+
+        this.openConfirmationModal(
+          'Delete Group',
+          'Are you sure you want to delete this group?',
+          () => {
+             section.groups.splice(index, 1);
+             if (!section.groups.find(g => g.id === this.selectedGroupId)) {
+               this.selectedGroupId = section.groups.length ? section.groups[0].id : null;
+             }
           }
-        }
+        );
       },
 
       moveItem(index, direction) {
@@ -119,9 +127,15 @@
       },
 
       removeItem(index) {
-        if (this.activeGroup && confirm('Remove this item?')) {
-          this.activeGroup.items.splice(index, 1);
-        }
+        if (!this.activeGroup) return;
+
+        this.openConfirmationModal(
+          'Remove Item',
+          'Are you sure you want to remove this item?',
+          () => {
+            this.activeGroup.items.splice(index, 1);
+          }
+        );
       },
 
       saveDraft() {
@@ -254,6 +268,21 @@
         }
         window.HSOverlay?.close('#item-modal');
         this.$nextTick(() => window.HSDropdown?.autoInit());
+      },
+
+      openConfirmationModal(title, message, action) {
+        this.confirmationModal.title = title;
+        this.confirmationModal.message = message;
+        this.confirmationModal.action = action;
+        window.HSOverlay?.open('#confirmation-modal');
+      },
+
+      confirmAction() {
+        if (this.confirmationModal.action) {
+          this.confirmationModal.action();
+        }
+        window.HSOverlay?.close('#confirmation-modal');
+        this.confirmationModal.action = null; // Reset action
       }
     };
   }
