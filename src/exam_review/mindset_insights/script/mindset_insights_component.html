@@ -57,7 +57,8 @@
       postTestNotes: [],
       sections: [],
       selectedSectionId: null,
-      errorSummaryForChart: { labels: [], series: [], totalErrors: 0, bySubject: [] },
+      errorSummaryForChart: { labels: [], series: [], totalErrors: 0, totalIncorrect: 0, bySubject: [] },
+      showReflectionReminderToast: false,
       pathway: {
         topErrors: [],
         mindsetBarriers: [],
@@ -107,6 +108,7 @@
         const summary = errorReasons.summary || {};
         const bySection = Array.isArray(errorReasons.bySection) ? errorReasons.bySection : [];
         this.pathway.totalErrors = errorReasons.totalErrors || 0;
+        const overallTotalIncorrect = errorReasons.totalIncorrect || errorReasons.totalErrors || 0;
         this.sections = [];
         if (summary.series && summary.series.length > 0) {
           this.sections.push({
@@ -117,6 +119,7 @@
               labels: summary.labels,
               series: summary.series,
               totalErrors: this.pathway.totalErrors,
+              totalIncorrect: overallTotalIncorrect,
               bySubject: []
             }
           });
@@ -135,6 +138,7 @@
                 labels: subject.labels,
                 series: subject.series,
                 totalErrors: subject.errors || 0,
+                totalIncorrect: subject.totalIncorrect || subject.errors || 0,
                 bySubject: subTopics
               }
             });
@@ -165,10 +169,26 @@
       changeSection(renderChart = true) {
         const selected = this.sections.find(s => s.section_id === this.selectedSectionId);
         if (!selected) {
-          this.errorSummaryForChart = { labels: [], series: [], totalErrors: 0, bySubject: [] };
+          this.errorSummaryForChart = { labels: [], series: [], totalErrors: 0, totalIncorrect: 0, bySubject: [] };
+          this.showReflectionReminderToast = false;
           return;
         }
         this.errorSummaryForChart = selected.data;
+        
+        // Re-trigger toast animation on every section change
+        const hasPendingReflections = this.errorSummaryForChart.totalErrors < this.errorSummaryForChart.totalIncorrect;
+        
+        // Hide first to reset animation
+        this.showReflectionReminderToast = false;
+        
+        // Show with animation after a brief delay
+        if (hasPendingReflections) {
+          this.$nextTick(() => {
+            setTimeout(() => {
+              this.showReflectionReminderToast = true;
+            }, 50);
+          });
+        }
 
         if (renderChart) {
           this.$nextTick(() => {
