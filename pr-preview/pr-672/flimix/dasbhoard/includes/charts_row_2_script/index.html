@@ -1,0 +1,139 @@
+<script>
+  window.addEventListener('load', () => {
+    // Donut Chart Helper Functions
+    function renderDonutChart(chartId, seriesData, seriesLabels, chartColors, valueLabel = 'Count') {
+      buildChart(chartId, (mode) => getDonutChartOptions(seriesData, seriesLabels, valueLabel),
+        getDonutThemeOptions(chartColors), getDonutThemeOptions(chartColors));
+    }
+
+    function getDonutChartOptions(seriesData, seriesLabels, valueLabel) {
+      return {
+        chart: getDonutChartBaseConfig(),
+        plotOptions: getDonutChartPlotOptions(),
+        series: seriesData,
+        labels: seriesLabels,
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        stroke: { width: 5 },
+        grid: getGridPadding(),
+        states: getChartStates(),
+        tooltip: getCustomTooltip(seriesData, seriesLabels, valueLabel)
+      };
+    }
+
+    function getDonutChartBaseConfig() {
+      return {
+        height: 230,
+        width: '100%',
+        type: 'donut',
+        zoom: { enabled: false },
+        events: {
+          dataPointSelection: (event, chartContext, config) => {
+            chartContext.toggleDataPointSelection(config.seriesIndex);
+          }
+        }
+      };
+    }
+
+    function getDonutChartPlotOptions() {
+      return {
+        pie: {
+          donut: {
+            size: '76%'
+          }
+        }
+      };
+    }
+
+    function getGridPadding() {
+      return {
+        padding: {
+          top: -12,
+          bottom: -11,
+          left: -12,
+          right: -12
+        }
+      };
+    }
+
+    function getChartStates() {
+      return {
+        hover: {
+          filter: { type: 'none', value: 0 }
+        },
+        active: {
+          allowMultipleDataPointsSelection: false,
+        }
+      };
+    }
+
+    function getCustomTooltip(seriesData, seriesLabels, valueLabel) {
+      return {
+        enabled: true,
+        custom: ({ seriesIndex, w }) => {
+          if (seriesIndex < 0) return '';
+          const label = seriesLabels[seriesIndex];
+          const value = seriesData[seriesIndex];
+          const total = seriesData.reduce((a, b) => a + b, 0);
+          const percentage = ((value / total) * 100).toFixed(1);
+          const color = w.globals.colors[seriesIndex];
+
+          // Format value based on label type
+          let formattedValue = value.toLocaleString();
+          if (valueLabel === 'Revenue') {
+            if (value >= 100000) {
+              formattedValue = `₹${(value / 100000).toFixed(2)}L`;
+            } else if (value >= 1000) {
+              formattedValue = `₹${(value / 1000).toFixed(1)}k`;
+            } else {
+              formattedValue = `₹${value}`;
+            }
+          }
+
+          return `
+            <div class="border border-gray-300 bg-white w-36 text-gray-900 shadow-xl dark:bg-neutral-800 dark:border-neutral-700">
+              <div class="px-2 py-1.5 font-semibold text-[13px] flex items-center dark:text-neutral-200">
+                <span>${label}</span>
+                <span class="ms-auto">${percentage}%</span>
+              </div>
+              <div class="border-t border-gray-200 dark:border-neutral-700"></div>
+              <div class="space-y-1.5 p-2">
+                <div class="flex items-center gap-x-2 text-xs text-gray-600 dark:text-neutral-400">
+                  <span class="w-3 h-3 rounded-sm inline-block" style="background:${color}"></span>
+                  <span>${valueLabel}</span>
+                  <span class="ms-auto">${formattedValue}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      };
+    }
+
+    function getDonutThemeOptions(chartColors) {
+      return {
+        colors: chartColors,
+        stroke: {
+          colors: ['#ffffff']
+        }
+      };
+    }
+
+    // Subscription Status Chart
+    renderDonutChart(
+      '#hs-subscription-status-chart',
+      [18234, 1234, 567, 890], // Active, Expired, Cancelled, Trial
+      ['Active', 'Expired', 'Cancelled', 'Trial'],
+      ['#16a34a', '#6b7280', '#ef4444', '#f59e0b'] // Green, Gray, Red, Orange
+    );
+
+    // Revenue by Payment Method Chart (without Cash)
+    renderDonutChart(
+      '#hs-revenue-by-payment-method-chart',
+      [560000, 420000, 280000, 150000], // Card, UPI, Net Banking, Wallet
+      ['Card', 'UPI', 'Net Banking', 'Wallet'],
+      ['#3b82f6', '#16a34a', '#f59e0b', '#8b5cf6'], // Blue, Green, Orange, Purple
+      'Revenue'
+    );
+  });
+</script>
