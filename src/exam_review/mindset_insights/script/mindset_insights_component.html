@@ -57,7 +57,8 @@
       postTestNotes: [],
       sections: [],
       selectedSectionId: null,
-      errorSummaryForChart: { labels: [], series: [], totalErrors: 0, bySubject: [] },
+      errorSummaryForChart: { labels: [], series: [], totalErrors: 0, totalIncorrect: 0, bySubject: [] },
+      showReflectionReminderToast: false,
       pathway: {
         topErrors: [],
         mindsetBarriers: [],
@@ -93,6 +94,12 @@
           });
         });
       },
+
+      get pendingReflectionsCount() {
+        if (!this.errorSummaryForChart) return 0;
+        return this.errorSummaryForChart.totalIncorrect - this.errorSummaryForChart.totalErrors;
+      },
+
       processReflections(src) {
         const pre = src.preTestAnswers || {};
         this.preTestRatings = Array.isArray(pre.scale_based) ? pre.scale_based : [];
@@ -107,6 +114,7 @@
         const summary = errorReasons.summary || {};
         const bySection = Array.isArray(errorReasons.bySection) ? errorReasons.bySection : [];
         this.pathway.totalErrors = errorReasons.totalErrors || 0;
+        const overallTotalIncorrect = errorReasons.totalIncorrect || errorReasons.totalErrors || 0;
         this.sections = [];
         if (summary.series && summary.series.length > 0) {
           this.sections.push({
@@ -117,6 +125,7 @@
               labels: summary.labels,
               series: summary.series,
               totalErrors: this.pathway.totalErrors,
+              totalIncorrect: overallTotalIncorrect,
               bySubject: []
             }
           });
@@ -135,6 +144,7 @@
                 labels: subject.labels,
                 series: subject.series,
                 totalErrors: subject.errors || 0,
+                totalIncorrect: subject.totalIncorrect || subject.errors || 0,
                 bySubject: subTopics
               }
             });
@@ -165,10 +175,23 @@
       changeSection(renderChart = true) {
         const selected = this.sections.find(s => s.section_id === this.selectedSectionId);
         if (!selected) {
-          this.errorSummaryForChart = { labels: [], series: [], totalErrors: 0, bySubject: [] };
+          this.errorSummaryForChart = { labels: [], series: [], totalErrors: 0, totalIncorrect: 0, bySubject: [] };
+          this.showReflectionReminderToast = false;
           return;
         }
         this.errorSummaryForChart = selected.data;
+        
+        const hasPendingReflections = this.errorSummaryForChart.totalErrors < this.errorSummaryForChart.totalIncorrect;
+        this.showReflectionReminderToast = false;
+        
+        if (hasPendingReflections) {
+          this.$nextTick(() => {
+            const TOAST_ANIMATION_RETRIGGER_DELAY_MS = 50;
+            setTimeout(() => {
+              this.showReflectionReminderToast = true;
+            }, TOAST_ANIMATION_RETRIGGER_DELAY_MS);
+          });
+        }
 
         if (renderChart) {
           this.$nextTick(() => {
