@@ -35,7 +35,7 @@
       report: {
         title: 'SAT Progress Report',
         description: 'Auto-computed projection using weekly practice exams.',
-        course: "1",
+        course: 'SAT Foundation',
         state: 'draft',
         remarks_enabled: true
       },
@@ -45,7 +45,7 @@
 
       sectionModal: { mode: 'create', editingId: null, form: {} },
       groupModal:   { mode: 'create', editingId: null, sectionId: null, form: {} },
-      itemModal:    { mode: 'create', editingId: null, groupId: null, form: {}, error: null },
+      itemModal:    { mode: 'create', editingId: null, groupId: null, form: {} },
       confirmationModal: { title: '', message: '', action: null },
 
       init() {
@@ -220,12 +220,18 @@
         this.itemModal.groupId = this.activeGroup.id;
         this.itemModal.mode = itemId ? 'edit' : 'create';
         this.itemModal.editingId = itemId;
-        this.itemModal.error = null;
 
         const defaults = {
-          item_type: 'scholastic', content_type: 'exam', title: '',
-          exam: [], exam_section: [], chapter_content: [],
-          max_score: '', min_score: ''
+          item_type: 'scholastic',
+          content_type: 'exam',
+          exam: [],
+          exam_section: '', 
+          chapter_content: [],
+          title: '',
+          scoring_type: 'grade',
+          maximum_marks: '',
+          total_classes: '',
+          remarks_enabled: false
         };
 
         if (itemId) {
@@ -234,39 +240,49 @@
         } else {
           this.itemModal.form = defaults;
         }
+        this.$nextTick(() => window.HSDropdown?.autoInit());
       },
 
       saveItemModal() {
         if (!this.activeGroup) return;
 
-        this.itemModal.error = null;
-        const isDuplicate = this.activeGroup.items.some(item => {
-          if (this.itemModal.mode === 'edit' && item.id === this.itemModal.editingId) {
-            return false;
-          }
-          return item.title === this.itemModal.form.title &&
-                 item.content_type === this.itemModal.form.content_type;
-        });
+        const form = this.itemModal.form;
+        
+        if (this.itemModal.mode === 'create' && form.item_type === 'scholastic') {
+            let itemsToCreate = [];
 
-        if (isDuplicate) {
-          this.itemModal.error = 'An item with this title and type already exists in this group.';
-          return;
-        }
+            if (form.content_type === 'exam' && Array.isArray(form.exam) && form.exam.length > 0) {
+               form.exam.forEach(ex => {
+                   itemsToCreate.push({ ...form, exam: ex, title: 'Exam ' + ex }); // Mock title logic
+               });
+            } else if (form.content_type === 'chapter_content' && Array.isArray(form.chapter_content) && form.chapter_content.length > 0) {
+               form.chapter_content.forEach(cc => {
+                   itemsToCreate.push({ ...form, chapter_content: cc, title: 'Content ' + cc });
+               });
+            } else {
+               itemsToCreate.push({ ...form, title: form.title || 'New Item' });
+            }
 
-        if (this.itemModal.mode === 'edit') {
-          const item = this.activeGroup.items.find(i => i.id === this.itemModal.editingId);
-          if (item) Object.assign(item, this.itemModal.form);
+            itemsToCreate.forEach(newItem => {
+                this.activeGroup.items.push({
+                    id: generateId(),
+                    ...newItem
+                });
+            });
+
         } else {
-          this.activeGroup.items.push({
-            id: generateId(),
-            ...this.itemModal.form,
-            title: this.itemModal.form.title || 'Untitled item'
-          });
+            if (this.itemModal.mode === 'edit') {
+              const item = this.activeGroup.items.find(i => i.id === this.itemModal.editingId);
+              if (item) Object.assign(item, form);
+            } else {
+              this.activeGroup.items.push({
+                id: generateId(),
+                ...form,
+                title: form.title || 'New Item'
+              });
+            }
         }
-        this.$nextTick(() => {
-          window.HSDropdown?.autoInit();
-          window.HSOverlay?.close('#item-modal');
-        });
+        this.$nextTick(() => window.HSDropdown?.autoInit());
       },
 
       openConfirmationModal(title, message, action) {
