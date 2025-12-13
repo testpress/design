@@ -1,0 +1,298 @@
+<script>
+function examReviewComponent() {
+  return {
+    exam: {
+      name: "Real CAT 2025 - Take Home Mock Test 01",
+      sections: [
+        { name: "Quantitative Aptitude", slug: "quantitative_aptitude", questions: [], loaded: false },
+        { name: "Verbal Ability", slug: "verbal_ability", questions: [], loaded: false },
+        { name: "Logical Reasoning", slug: "logical_reasoning", questions: [], loaded: false }
+      ]
+    },
+
+    currentSectionIndex: 0,
+    currentQuestionIndex: 0,
+
+    showAllSolutions: false,
+    filter: "all",
+    selected_filter: "all",
+    isFetching: false,
+    touchStartX: 0,
+    touchEndX: 0,
+    swipeThreshold: 30,
+    isSwapping:false,
+    newFolderName:'',
+    searchFolder:'',
+    showQuestionComment:null,
+    showReportQuestionModal:null,
+    showReflectionToast: false,
+    showPostReflectionGuide: false,
+    autoHideInterval: null,
+    progressValue: 100,
+    isHoveringPostReflectionGuideToast: false,
+    folders: [
+    { 'name': 'Questions' },
+    { 'name': 'Videos' },
+    { 'name': 'Posts' },
+    { 'name': 'Downloads' }
+  ],
+
+    init() {
+      this.selectSection(0);
+      this.addTouchEvent();
+      this.addKeydownEvent();
+    },
+
+    get currentSection() {
+      return this.exam.sections[this.currentSectionIndex];
+    },
+
+    get currentQuestion() {
+      const questions = this.filteredQuestions;
+      return questions[this.currentQuestionIndex] || {};
+    },
+
+    get unreflectedCount() {
+      if (!this.currentSection || !this.currentSection.questions) return 0;
+      return this.currentSection.questions.filter(q => 
+        (q.response_status === 'incorrect' || q.response_status === 'unanswered') && 
+        !q.has_reflected
+      ).length;
+    },
+
+    get hasAnyReflectedQuestions() {
+      return this.exam.sections.some(section => 
+        section.loaded && section.questions.some(q => q.has_reflected)
+      );
+    },
+
+    async selectSection(index) {
+      this.currentSectionIndex = index;
+      this.currentQuestionIndex = 0;
+
+      const section = this.exam.sections[index];
+      const previewPath = window.location.pathname.match(/(\/pr-preview\/pr-\d+)?/)[0] || '' 
+      if (!section.loaded) {
+        this.isFetching = true;
+
+        // Simulate delay for loader visibility
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        const res = await fetch(`${previewPath}/api/exam/${section.slug}.json`);
+        const data = await res.json();
+
+        this.exam.sections[index].questions = data.questions;
+        this.exam.sections[index].loaded = true;
+        this.isFetching = false;
+      }
+
+      this.scrollToTop();
+      this.$watch('currentQuestion', () => {
+          this.$nextTick(() => this.checkCurrentQuestionForReflection());
+      });
+    },
+
+    addTouchEvent() {
+        document.addEventListener('touchstart', e => {
+          this.touchStartX = e.changedTouches[0].screenX;
+        });
+        document.addEventListener('touchend', e => {
+          this.touchEndX = e.changedTouches[0].screenX;
+          this.handleSwipe();
+        });
+    },
+
+    
+    handleSwipe() {
+      if (this.isSwiping) return;
+      this.isSwiping = true;
+      const deltaX = this.touchEndX - this.touchStartX;
+      if (Math.abs(deltaX) > this.swipeThreshold) {
+        if (deltaX > 0) {
+          if (this.currentQuestionIndex > 0) {
+            this.goToQuestion(this.currentQuestionIndex - 1);
+        }
+        } else {
+        if (this.currentQuestionIndex < this.currentSection.questions.length - 1) {
+          this.goToQuestion(this.currentQuestionIndex + 1);
+        }
+        }
+      }
+      setTimeout(() => {
+        this.isSwiping = false;
+      }, 300);
+     },
+
+     addKeydownEvent() {
+      document.addEventListener('keydown', this.handleKeydown.bind(this));
+    },
+
+    handleKeydown(event) {
+      if(this.isSwapping) return
+      this.isSwapping = true;
+      if (event.key === 'ArrowLeft') {
+        if (this.currentQuestionIndex > 0) {
+          this.goToQuestion(this.currentQuestionIndex - 1);
+        }
+      } else if (event.key === 'ArrowRight') {
+        if (this.currentQuestionIndex < this.currentSection.questions.length - 1) {
+          this.goToQuestion(this.currentQuestionIndex + 1);
+        }
+      }
+      setTimeout(() => {
+    this.isSwapping = false;
+    }, 300);
+    },
+
+
+    goToQuestion(index) {
+      this.currentQuestionIndex = index;
+      this.showPostReflectionGuide = false;
+      this.scrollToTop();
+    },
+
+    setFilter(status) {
+      this.filter = status;
+      this.currentQuestionIndex = 0;
+    },
+
+    checkCurrentQuestionForReflection() {
+      const status = this.getQuestionStatus(this.currentQuestion);
+      this.showReflectionToast = (status === 'incorrect' || status === 'unanswered');
+    },
+    
+    get filteredQuestions() {
+      return this.currentSection.questions.filter(q => {
+        if (this.filter === 'correct') {
+          return q.response_status === 'correct';
+        }
+        if (this.filter === 'incorrect') {
+          return q.response_status === 'incorrect';
+        }
+        if (this.filter === 'unanswered') {
+          return q.response_status === 'unanswered';
+        }
+
+        if (this.filter === 'pending_evaluation') {
+          return q.response_status === 'pending_evaluation';
+        }
+        // 'All'
+        return true;
+      });
+    },
+
+    scrollToTop() {
+      window.scrollTo(0,0);
+    },
+
+    getQuestionStatus(question) {
+      return question.response_status || 'unanswered';
+    },
+
+    get currentSectionStats() {
+      const stats = {
+        total: this.currentSection.questions.length,
+        correct: 0,
+        incorrect: 0,
+        unanswered: 0,
+        pending_evaluation: 0
+      };
+
+      for (const q of this.currentSection.questions) {
+        const status = this.getQuestionStatus(q);
+        if (stats[status] !== undefined) stats[status]++;
+      }
+
+      return stats;
+    },
+
+    getGapFillHTML() {
+      if (this.currentQuestion.type !== 'gap_fill') return '';
+
+      const text = this.currentQuestion.question;
+      const blanks = (text.match(/\[BLANK_\d+\]/g) || []).length;
+      const parts = text.split(/\[BLANK_\d+\]/g);
+
+      return parts.map((part, index) => {
+        const userAns = this.currentQuestion.user_answer?.[index] || '';
+        const correctAns = this.currentQuestion.correct_answer?.[index] || '';
+        const isCorrect = userAns.trim().toLowerCase() === correctAns.trim().toLowerCase();
+
+        const answerSpan = index < blanks
+          ? `<span class="${isCorrect ? 'border-b-2 border-emerald-500 text-emerald-500' : 'border-b-2 border-red-500 text-red-500'} font-medium px-1">${userAns}</span>`
+          : '';
+
+        return `${part}${answerSpan}`;
+      }).join('');
+    },
+
+    getGapFillCorrectHTML() {
+      if (this.currentQuestion.type !== 'gap_fill') return '';
+
+      const text = this.currentQuestion.question;
+      const blanks = (text.match(/\[BLANK_\d+\]/g) || []).length;
+      const parts = text.split(/\[BLANK_\d+\]/g);
+
+      return parts.map((part, index) => {
+        const correctAns = this.currentQuestion.correct_answer?.[index] || '';
+
+        const answerSpan = index < blanks
+          ? `<span class="border-b-2 border-gray-500 text-gray-800 font-medium px-1">${correctAns}</span>`
+          : '';
+
+        return `${part}${answerSpan}`;
+      }).join('');
+    },
+
+
+    filterQuestionsByStatus(status) {
+      return this.currentSection.questions.filter(q => this.getQuestionStatus(q) === status);
+    },
+
+    getExplanation(question) {
+      return question.explanation || null;
+    },
+
+    getFeedback(question) {
+      return question.feedback || null;
+    },
+
+    hasReflection(question) {
+      return question.has_reflected === true;
+    },
+
+    startPostReflectionAutoHide() {
+      const DURATION = 5000;
+      const INTERVAL = 50;
+
+      this.progressValue = 100;
+      this.isHoveringPostReflectionGuideToast = false;
+      clearInterval(this.autoHideInterval);
+      
+      const step = 100 / (DURATION / INTERVAL);
+
+      this.autoHideInterval = setInterval(() => {
+        if (!this.isHoveringPostReflectionGuideToast) {
+          this.progressValue -= step;
+          if (this.progressValue <= 0) {
+            this.progressValue = 0;
+            this.showPostReflectionGuide = false;
+            clearInterval(this.autoHideInterval);
+          }
+        }
+      }, INTERVAL);
+    },
+
+    saveReflection() {
+      if (this.currentQuestion) {
+        this.currentQuestion.has_reflected = true;
+        this.showReflectionToast = false;
+        
+        this.showPostReflectionGuide = true;
+        this.startPostReflectionAutoHide();
+      }
+    },
+
+  };
+}
+</script>
