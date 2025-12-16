@@ -1,0 +1,154 @@
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 lg:gap-5">
+  {% for product in products %}
+  <div
+    x-data="{
+      popoverOpen_{{ product.id }}: false,
+      popoverArrow_{{ product.id }}: true,
+      popoverPosition_{{ product.id }}: 'right',
+      popoverOffset_{{ product.id }}: 8,
+      closeTimeout: null,
+      active_popover: null,
+
+      popoverHeightCalculate_{{ product.id }}() {
+          this.$refs.popover_{{ product.id }}.classList.add('invisible'); 
+          this.popoverOpen_{{ product.id }} = false; 
+          let that = this;
+          $nextTick(function(){ 
+              that.popoverOpen_{{ product.id }} = false; 
+              that.$refs.popover_{{ product.id }}.classList.remove('invisible');
+              that.$refs.popoverInner_{{ product.id }}.setAttribute('x-transition', '');
+              that.popoverPositionCalculate();
+          });
+      },
+
+      popoverPositionCalculate() {
+          const buttonRect = this.$refs.popoverButton_{{ product.id }}.getBoundingClientRect();
+          const popoverWidth = 384;
+          const offset = this.popoverOffset_{{ product.id }};
+          const viewportWidth = window.innerWidth;
+
+          // Decide left or right based on available width
+          if (viewportWidth - (buttonRect.right + offset + popoverWidth) > 0) {
+              this.popoverPosition_{{ product.id }} = 'right';
+          } else {
+              this.popoverPosition_{{ product.id }} = 'left';
+          }
+      }
+  }"
+    class="relative"
+  >
+    <a href="{{ '/testpress/product_detail' | url }}">
+      <div
+        class="flex flex-col justify-between p-1 bg-white border border-gray-200 rounded-2xl dark:bg-neutral-900 dark:border-neutral-700"
+        x-ref="popoverButton_{{ product.id }}"
+        @mouseenter="popoverOpen_{{ product.id }} = true"
+        @mouseleave="popoverOpen_{{ product.id }} = false"
+      >
+        <!-- Product Image -->
+        <div class="relative w-full group">
+          <img
+            class="bg-gray-100 w-full object-cover rounded-xl dark:bg-neutral-800 group-hover:scale-105 transition-transform duration-500 ease-in-out"
+            src="{{ product.image }}"
+            alt="Store Image"
+          />
+        </div>
+
+        <!-- Product Info -->
+        <div class="p-4 space-y-3">
+          <!-- Name + Description Tooltip -->
+          <div class="space-y-2">
+            <div class="hs-tooltip [--placement:bottom] inline">
+              <div class="text-sm flex items-center space-x-2">
+                <!-- Product Name -->
+                <div
+                  class="hs-tooltip inline-block max-w-full"
+                  @mouseenter="clearTimeout(this.closeTimeout); active_popover={{ product.id}}, popoverOpen_{{ product.id }} = true"
+                  @mouseleave="this.closeTimeout = setTimeout(() => popoverOpen_{{ product.id }} = false, 300)"
+                >
+                  <h2
+                    class="hs-tooltip-toggle font-medium text-gray-800 dark:text-neutral-200 line-clamp-2 max-w-full h-12"
+                  >
+                    {{ product.name }}
+                  </h2>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chapters + Contents -->
+            <ul class="text-sm text-gray-500 flex space-x-2">
+              <li>{{ product.chapters }} chapters</li>
+              <li>·</li>
+              <li>{{ product.contents }} contents</li>
+            </ul>
+          </div>
+
+          <!-- Price -->
+          <div class="flex items-center space-x-2 mt-auto">
+            <div class="text-gray-900 font-semibold">{{ product.price }}</div>
+            <div class="text-sm text-gray-500 line-through">
+              {{ product.anchor_price }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </a>
+
+    <!-- Popover -->
+    <div
+      x-ref="popover_{{ product.id }}"
+      x-cloak
+      x-show="popoverOpen_{{ product.id }} && active_popover=={{ product.id }}"
+      x-init="$nextTick(() => popoverHeightCalculate_{{ product.id }}())"
+      x-trap.inert="popoverOpen_{{ product.id }}"
+      @mouseenter="popoverOpen_{{ product.id }} = true"
+      @mouseleave="popoverOpen_{{ product.id }} = false "
+      @click.away="popoverOpen_{{ product.id }} = false"
+      @keydown.escape.window="popoverOpen_{{ product.id }} = false"
+      :class="{
+            'left-full ml-2 top-1/2 -translate-y-1/2': popoverPosition_{{ product.id }} == 'right',
+            'right-full mr-2 top-1/2 -translate-y-1/2': popoverPosition_{{ product.id }} == 'left'
+        }"
+      class="absolute z-[99]"
+      style="width: 24rem"
+    >
+      <div
+        x-ref="popoverInner_{{ product.id }}"
+        x-cloak
+        x-show="popoverOpen_{{ product.id }}"
+        class="relative w-full p-5 bg-white border rounded-md border-neutral-200/70 shadow-lg"
+      >
+        <!-- Right Arrow -->
+        <div
+          x-cloak
+          x-show="popoverArrow_{{ product.id }} && popoverPosition_{{ product.id }} == 'right'"
+          class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2"
+        >
+          <div
+            class="w-2.5 h-2.5 transform rotate-45 bg-white border-l border-b rounded-sm"
+          ></div>
+        </div>
+
+        <!-- Left Arrow -->
+        <div
+          x-cloak
+          x-show="popoverArrow_{{ product.id }} && popoverPosition_{{ product.id }} == 'left' "
+          class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2"
+        >
+          <div
+            class="w-2.5 h-2.5 transform rotate-45 bg-white border-t border-r rounded-sm"
+          ></div>
+        </div>
+
+        <div class="group relative grow max-h-72 overflow-y-auto">
+          <h3 class="text-lg/6 font-semibold text-gray-900">
+            {{ product.name }}
+          </h3>
+          <div class="mt-5 prose prose-sm max-w-none">
+            {{ product.description|safe }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
