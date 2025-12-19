@@ -58,7 +58,10 @@
       sections: [],
       selectedSectionId: null,
       errorSummaryForChart: { labels: [], series: [], totalErrors: 0, totalIncorrect: 0, bySubject: [] },
+      questionsWithMistakeReasons: [],
       showReflectionReminderToast: false,
+      selectedErrorReason: null,
+      showQuestionsView: false,
       pathway: {
         topErrors: [],
         mindsetBarriers: [],
@@ -150,6 +153,29 @@
             });
           }
         });
+
+        // Process questions with mistake reasons
+        this.processQuestionsWithMistakeReasons(src);
+      },
+
+      processQuestionsWithMistakeReasons(src) {
+        const questions = src.questionsWithMistakeReasons || [];
+        this.questionsWithMistakeReasons = questions.map(q => ({
+          id: q.id,
+          question: q.question,
+          type: q.type || 'mcq',
+          user_answer: q.user_answer,
+          correct_answer: q.correct_answer,
+          response_status: q.response_status || 'incorrect',
+          section_name: q.section_name,
+          explanation: q.explanation,
+          feedback: q.feedback,
+          mistake_reason: q.mistake_reason ? {
+            name: q.mistake_reason.name,
+            description: q.mistake_reason.description
+          } : null,
+          reflection_notes: q.reflection_notes
+        }));
       },
 
       processPathway(src) {
@@ -197,6 +223,7 @@
           this.$nextTick(() => {
             this.renderErrorChart();
             this.renderSubjectErrorCharts();
+            this.syncContainerHeights();
           });
         }
       },
@@ -274,6 +301,45 @@
       sanitizeScore(score, min = 1, max = 5) {
         const s = parseInt(score, 10) || 1;
         return Math.max(min, Math.min(max, s));
+      },
+
+      showQuestionsForReason(reasonLabel) {
+        this.selectedErrorReason = reasonLabel;
+        this.showQuestionsView = true;
+        this.$nextTick(() => {
+          this.syncContainerHeights();
+        });
+      },
+
+      hideQuestionsView() {
+        this.showQuestionsView = false;
+        this.selectedErrorReason = null;
+      },
+
+      syncContainerHeights() {
+        this.$nextTick(() => {
+          const errorSummary = this.$refs?.errorSummaryContainer;
+          const questionsContainer = this.$refs?.questionsContainer;
+          const containerWrapper = this.$refs?.containerWrapper;
+          if (errorSummary) {
+            const height = errorSummary.offsetHeight;
+            if (questionsContainer) {
+              questionsContainer.style.height = `${height}px`;
+            }
+            if (containerWrapper) {
+              containerWrapper.style.minHeight = `${height}px`;
+            }
+          }
+        });
+      },
+
+      get filteredQuestionsByReason() {
+        if (!this.selectedErrorReason || !this.data?.questionsWithMistakeReasons) {
+          return this.data?.questionsWithMistakeReasons || [];
+        }
+        return this.data.questionsWithMistakeReasons.filter(q => {
+          return q.mistake_reason?.name === this.selectedErrorReason;
+        });
       }
     };
   }
