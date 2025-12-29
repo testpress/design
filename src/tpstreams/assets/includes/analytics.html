@@ -1,8 +1,4 @@
-<div x-data="chartComponent()" x-show="!disableAnalytics" x-init="$nextTick(() => {
-    if (window.HSSelect) {
-      HSSelect.autoInit();
-    }
-  })">
+<div x-data="chartComponent()" x-show="!disableAnalytics">
   <div class="flex items-center justify-end mt-4">
     <div class="flex items-center">
     <button type="button"
@@ -23,19 +19,49 @@
       <span class="font-medium text-gray-900">Split Charts</span>
     </span>
     </div>
-    <div>
-        <form method="get">
-          <input type="hidden" name="tab" value="analytics" />
-          <input
-            type="month"
-            name="month"
-            value="{{ selected_month }}"
-            min="{{ first_month }}"
-            max="{{ latest_month }}"
-            class="block ml-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 cursor-pointer hover:bg-gray-50 transition-colors"
-          />
-        </form>
+    <div x-data="monthPicker()" class="relative ml-2">
+      <button
+        type="button"
+        @click="isOpen = !isOpen"
+        class="w-48 inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-500 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-600">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-6 mr-2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+      </svg>
+
+        <span x-text="displayText"></span>
+      </button>
+
+      <div
+        x-show="isOpen"
+        @click.away="isOpen = false"
+        class="absolute right-0 z-50 w-72 p-4 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg"
+        x-transition>
+
+        <!-- Year navigation -->
+        <div class="flex items-center justify-between mb-4">
+          <button @click="currentYear--" class="p-2 rounded hover:bg-gray-100">
+            ‹
+          </button>
+          <span class="text-lg font-semibold" x-text="currentYear"></span>
+          <button @click="currentYear++" class="p-2 rounded hover:bg-gray-100">
+            ›
+          </button>
+        </div>
+
+        <!-- Months -->
+        <div class="grid grid-cols-4 gap-2">
+          <template x-for="(month, index) in months" :key="index">
+            <button
+              type="button"
+              @click="selectMonth(index)"
+              class="py-2 text-sm font-medium rounded hover:bg-blue-50 hover:text-blue-600"
+              x-text="month">
+            </button>
+          </template>
+        </div>
+
       </div>
+    </div>
     </div>
 
   <div class="flex justify-center">
@@ -53,3 +79,30 @@
     {% include "./analytics_devices.html" %}
   </div>
 </div>
+{% raw %}
+<script>
+function monthPicker() {
+  return {
+    isOpen: false,
+    selectedMonth: '',
+    currentYear: new Date().getFullYear(),
+    months: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+
+    get displayText() {
+      if (!this.selectedMonth) return 'Select month';
+      const [year, month] = this.selectedMonth.split('-');
+      return `${this.months[month - 1]} ${year}`;
+    },
+
+    selectMonth(index) {
+      const month = String(index + 1).padStart(2, '0');
+      this.selectedMonth = `${this.currentYear}-${month}`;
+      this.isOpen = false;
+
+      // Design-only hook
+      console.log('Selected month:', this.selectedMonth);
+    }
+  };
+}
+</script>
+{% endraw %}
