@@ -50,22 +50,22 @@
       colorMapper: null,
 
       init() {
-        requestAnimationFrame(() => {
-          const src = this.data || {};
-          this.pathway.totalErrors = src.totalErrors || 0;
-          this.chartData = src.summary || { labels: [], series: [], ids: [], examCounts: [] };
-          this.colorMapper = new ColorMapper(this.chartData.labels);
-          this.processTopErrors(src.topErrors);
-          this.$nextTick(() => this.renderCharts());
-        });
+        const src = this.data || {};
+        this.pathway.totalErrors = src.totalErrors || 0;
+        this.chartData = src.summary || { labels: [], series: [], ids: [], examCounts: [] };
+        this.colorMapper = new ColorMapper(this.chartData.labels);
+        this.processTopErrors(src.topErrors);
+        this.$nextTick(() => this.renderCharts());
       },
 
       processTopErrors(topErrors) {
-        this.pathway.topErrors = (topErrors || []).map(err => ({
+        const top3Items = (topErrors || []).slice(0, 3);
+        const top3TotalCount = top3Items.reduce((sum, err) => sum + (err.count || 0), 0);
+        this.pathway.topErrors = top3Items.map(err => ({
           ...err,
           reason: err.label,
-          percentage: this.pathway.totalErrors > 0 ? Math.round((err.count / this.pathway.totalErrors) * 100) : 0,
-          recommendation: RECOMMENDATION_MAPPING[err.id] || "If you want, you could review these questions to see if a recurring pattern emerges."
+          percentage: top3TotalCount > 0 ? Math.round((err.count / top3TotalCount) * 100) : 0,
+          recommendation: err.suggestedImprovement || RECOMMENDATION_MAPPING[err.id] || "If you want, you could review these questions to see if a recurring pattern emerges."
         }));
       },
 
@@ -75,23 +75,25 @@
         const topErrors = this.pathway.topErrors;
         if (!topErrors.length) return;
 
-        const prelineSeries = [
-          { name: "Top Barrier", data: [[8.5, 7.5, 90]] },
-          { name: "Second Barrier", data: [[4.5, 7, 70]] },
-          { name: "Third Barrier", data: [[6.2, 5.2, 40]] }
+        const positions = [
+          { x: 8.5, y: 7.5, s: 90},
+          { x: 4.5, y: 7, s: 70 },
+          { x: 6.2, y: 5.2, s: 40 }
         ];
 
-        const chartColors = [];
-        const actualPercentages = [];
-        topErrors.slice(0, 3).forEach((error, index) => {
-          if (prelineSeries[index]) {
-            prelineSeries[index].name = error.reason;
-            chartColors[index] = this.colorMapper.getColor(error.reason);
-            actualPercentages[index] = error.percentage;
-          }
-        });
+        const bubbleSeries = topErrors.map((error, index) => ({
+          name: error.reason,
+          data: [[ 
+            positions[index]?.x || 5, 
+            positions[index]?.y || 5, 
+            positions[index]?.s || error.percentage * 1.8
+          ]]
+        }));
 
-        renderBubbleChart('#consolidated-bubble-chart', prelineSeries.slice(0, Math.min(topErrors.length, 3)), chartColors, actualPercentages);
+        const chartColors = topErrors.map(error => this.colorMapper.getColor(error.reason));
+        const actualPercentages = topErrors.map(error => error.percentage);
+
+        renderBubbleChart('#consolidated-bubble-chart', bubbleSeries, chartColors, actualPercentages);
       }
     };
   }
