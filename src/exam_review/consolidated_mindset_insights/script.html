@@ -55,6 +55,15 @@
       chartData: { labels: [], series: [], ids: [], examCounts: [] },
       pathway: { topErrors: [], totalErrors: 0 },
       colorMapper: null,
+      isQuizOpen: false,
+      questions: [],
+      currentIndex: 0,
+      selectedIdx: null,
+      hasAnswered: false,
+      selectedReasonId: null,
+      selectedReasonLabel: '',
+      isCrossExam: true,
+      touchStartX: 0,
 
       init() {
         const src = this.data || {};
@@ -63,6 +72,67 @@
         this.colorMapper = new ColorMapper(this.chartData.labels);
         this.processTopErrors(src.topErrors);
         this.$nextTick(() => this.renderCharts());
+      },
+
+      startPractice(reasonId) {
+        this.selectedReasonId = reasonId;
+        const reasonIdx = this.chartData.ids.indexOf(reasonId);
+        this.selectedReasonLabel = reasonIdx !== -1 ? this.chartData.labels[reasonIdx] : 'Practice';
+        
+        const allQuestions = this.data.questions || [];
+        this.questions = allQuestions
+          .filter(q => q.reasonId === reasonId)
+          .slice(0, 10);
+
+        if (this.questions.length > 0) {
+          this.currentIndex = 0;
+          this.hasAnswered = false;
+          this.selectedIdx = null;
+          this.isQuizOpen = true;
+          document.body.style.overflow = 'hidden';
+        } else {
+          alert("No practice questions found for this reason.");
+        }
+      },
+
+      selectOption(idx) {
+        if (this.hasAnswered) return;
+        this.selectedIdx = idx;
+        this.hasAnswered = true;
+      },
+
+      nextQuestion() {
+        if (this.currentIndex < this.questions.length - 1) {
+          this.currentIndex++;
+          this.hasAnswered = false;
+          this.selectedIdx = null;
+          const container = this.$root.querySelector('.overflow-y-auto');
+          if(container) container.scrollTop = 0;
+        } else {
+          this.closeQuiz();
+        }
+      },
+
+      closeQuiz() {
+        this.isQuizOpen = false;
+        document.body.style.overflow = 'auto';
+        setTimeout(() => {
+          this.questions = [];
+          this.currentIndex = 0;
+          this.hasAnswered = false;
+        }, 500);
+      },
+
+      handleTouchStart(e) { this.touchStartX = e.changedTouches[0].screenX; },
+      handleTouchEnd(e) {
+        const diff = this.touchStartX - e.changedTouches[0].screenX;
+        if (diff > 50 && this.hasAnswered) {
+           this.nextQuestion(); 
+        }
+      },
+
+      getRecommendation() {
+        return RECOMMENDATION_MAPPING[this.selectedReasonId] || "";
       },
 
       processTopErrors(topErrors) {
