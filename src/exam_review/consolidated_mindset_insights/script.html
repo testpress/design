@@ -1,0 +1,107 @@
+<script>
+  const COLOR_PALETTE = [
+    '#3B82F6',
+    '#6366F1',
+    '#8B5CF6',
+    '#EC4899',
+    '#F43F5E',
+    '#F97316',
+    '#EAB308',
+    '#22C55E',
+    '#10B981',
+    '#14B8A6',
+    '#06B6D4',
+    '#64748B',
+    '#9CA3AF',
+    '#F87171',
+    '#A78BFA',
+  ];
+  class ColorMapper {
+    constructor(baseLabels = []) {
+      this.mapping = {};
+      this.colorIndex = 0;
+      baseLabels.forEach(label => this.getColor(label));
+    }
+    getColor(label) {
+      if (!this.mapping[label]) {
+        this.mapping[label] = COLOR_PALETTE[this.colorIndex % COLOR_PALETTE.length];
+        this.colorIndex++;
+      }
+      return this.mapping[label];
+    }
+    getColorsForLabels(labels = []) {
+      return labels.map(label => this.getColor(label));
+    }
+  }
+
+  const RECOMMENDATION_MAPPING = {
+    'didnt_understand_question': "If you'd like, try pausing for a few seconds to restate the question in your own words before solving. Many students find that rephrasing clarifies what the question is *really* asking.",
+    'didnt_know_strategy': "If you want, you could try identifying what kind of problem this is before solving it. Noting the pattern first often makes the right approach easier to spot.",
+    'didnt_know_key_information': "If you'd like, note the exact fact or concept you were missing and do a quick refresher on just that one idea. Filling a single gap is often enough to unlock similar questions next time.",
+    'used_wrong_strategy': "If you want, you could compare your approach with the solution's approach and ask: 'At what point did they choose differently?' Spotting that fork helps avoid repeating the same strategy next time.",
+    'execution_mistake': "If you'd like, try adding a quick checkpoint during solving—after a calculation or step—to verify you're still on track. Small pauses can prevent small slips.",
+    'missed_question_detail': "If you want, you could try scanning the question once specifically for constraints or qualifiers (like 'only', 'except', or units) before solving. Many students catch hidden details this way.",
+    'misread_options': "If you'd like, try reading each option carefully and matching it back to what you *intended* to answer. This helps avoid choosing a nearby or look-alike option by accident.",
+    'rushed': "If you want, consider slowing down slightly on the first read and speeding up only after you're clear on the question. Many students find this tradeoff improves accuracy without costing time.",
+    'running_out_of_time': "If you'd like, you could try deciding earlier which questions to skip and return to. Protecting time for stronger questions often leads to better overall scores.",
+    'didnt_answer': "If you want, you could set a soft time limit per question and make a best attempt before moving on. Even partial reasoning improves your odds compared to leaving it blank.",
+    'marking_error': "If you'd like, try adding a final 'intent check'—quickly confirm that the option you clicked matches the one you solved for. This small habit prevents avoidable losses.",
+    'other': "If you want, briefly note what caused the issue this time. Patterns become easier to fix once the reason is clear—even if it doesn't fit a standard category."
+  };
+
+  function consolidatedMindsetComponent() {
+    return {
+      data: {{ consolidated_mindset_report | dump | safe }},
+      chartData: { labels: [], series: [], ids: [], examCounts: [] },
+      pathway: { topErrors: [], totalErrors: 0 },
+      colorMapper: null,
+
+      init() {
+        const src = this.data || {};
+        this.pathway.totalErrors = src.totalErrors || 0;
+        this.chartData = src.summary || { labels: [], series: [], ids: [], examCounts: [] };
+        this.colorMapper = new ColorMapper(this.chartData.labels);
+        this.processTopErrors(src.topErrors);
+        this.$nextTick(() => this.renderCharts());
+      },
+
+      processTopErrors(topErrors) {
+        const top3Items = (topErrors || []).slice(0, 3);
+        const top3TotalCount = top3Items.reduce((sum, err) => sum + (err.count || 0), 0);
+        this.pathway.topErrors = top3Items.map(err => ({
+          ...err,
+          reason: err.label,
+          percentage: top3TotalCount > 0 ? Math.round((err.count / top3TotalCount) * 100) : 0,
+          recommendation: err.suggestedImprovement || RECOMMENDATION_MAPPING[err.id] || "If you want, you could review these questions to see if a recurring pattern emerges."
+        }));
+      },
+
+      renderCharts() {
+        renderPieChart('#consolidated-error-chart', this.chartData.series, this.chartData.labels, this.colorMapper.getColorsForLabels(this.chartData.labels), 280, 280);
+
+        const topErrors = this.pathway.topErrors;
+        if (!topErrors.length) return;
+
+        const positions = [
+          { x: 8.5, y: 7.5, s: 90},
+          { x: 4.5, y: 7, s: 70 },
+          { x: 6.2, y: 5.2, s: 40 }
+        ];
+
+        const bubbleSeries = topErrors.map((error, index) => ({
+          name: error.reason,
+          data: [[ 
+            positions[index]?.x || 5, 
+            positions[index]?.y || 5, 
+            positions[index]?.s || error.percentage * 1.8
+          ]]
+        }));
+
+        const chartColors = topErrors.map(error => this.colorMapper.getColor(error.reason));
+        const actualPercentages = topErrors.map(error => error.percentage);
+
+        renderBubbleChart('#consolidated-bubble-chart', bubbleSeries, chartColors, actualPercentages);
+      }
+    };
+  }
+</script>
