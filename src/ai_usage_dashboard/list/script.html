@@ -1,198 +1,250 @@
-<script src="https://preline.co/pro/assets/vendor/lodash/lodash.min.js"></script>
-<script src="https://preline.co/pro/assets/vendor/apexcharts/dist/apexcharts.min.js"></script>
-<script src="https://preline.co/pro/assets/js/hs-apexcharts-helpers.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.js"></script>
 
 <script>
-  window.addEventListener('load', () => {
-    // Apex Stacked Column Chart
-    (function () {
-      window.chartInstance = buildChart('#hs-pro-iresscch', (mode) => ({
-        chart: {
-          type: 'bar',
-          height: 240,
-          stacked: true,
-          toolbar: {
+  // Initialize ECharts Daily Requests Chart
+  (function () {
+    // Declare chart instance globally for toggle function
+    let dailyRequestsChart;
+
+    // Wait for DOM to be fully loaded
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initDailyRequestsChart);
+    } else {
+      initDailyRequestsChart();
+    }
+
+    function initDailyRequestsChart() {
+      const chartDom = document.getElementById('hs-pro-iresscch');
+      if (!chartDom || typeof echarts === 'undefined') {
+        console.warn('ECharts not loaded or chart container not found');
+        return;
+      }
+
+      // Initialize chart
+      dailyRequestsChart = echarts.init(chartDom);
+
+      // Data for daily requests
+      const dates = ['25 July', '26 July', '27 July', '28 July', '29 July', '30 July', '31 July', '1 Aug'];
+      const academic = [120, 135, 145, 130, 150, 140, 160, 125];
+      const nonAcademic = [12, 15, 18, 14, 16, 15, 20, 12];
+
+      // Calculate total requests (academic + non-academic)
+      const totalRequests = academic.map((val, idx) => val + nonAcademic[idx]);
+
+      // Define colors map for tooltip (Tailwind 400)
+      const seriesColors = {
+        'Total Requests': '#60a5fa', // blue-400
+        'Academic': '#34d399', // emerald-400
+        'Non-Academic': '#f87171' // red-400
+      };
+
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderColor: '#e5e7eb',
+          borderWidth: 1,
+          textStyle: {
+            color: '#1f2937',
+            fontSize: 13
+          },
+          formatter: function (params) {
+            let result = params[0].axisValue + '<br/>';
+            params.forEach(function (item) {
+              // Get color from seriesColors map
+              const seriesColor = seriesColors[item.seriesName] || item.color || '#000';
+              const marker = '<span style="display:inline-block;margin-right:4px;border-radius:4px;width:10px;height:10px;background-color:' + seriesColor + ';"></span>';
+              result += marker + item.seriesName + ': ' + item.value + '<br/>';
+            });
+            return result;
+          }
+        },
+        grid: {
+          left: '6%',
+          right: '2%',
+          bottom: '8%',
+          top: '8%',
+          containLabel: false
+        },
+        graphic: [
+          {
+            type: 'rect',
+            left: '8%',
+            right: '4%',
+            top: '5%',
+            bottom: '8%',
+            style: {
+              fill: '#eff6ff'
+            },
+            z: -1
+          }
+        ],
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: dates,
+          axisLine: {
             show: false
           },
-          zoom: {
-            enabled: false
+          axisTick: {
+            show: false
+          },
+          axisLabel: {
+            color: '#475569',
+            fontSize: 12,
+            fontWeight: 400
+          }
+        },
+        yAxis: {
+          type: 'value',
+
+          axisLine: {
+            show: false
+          },
+          axisTick: {
+            show: false
+          },
+          axisLabel: {
+            color: '#475569',
+            fontSize: 12,
+            fontWeight: 400
+          },
+          splitLine: {
+            lineStyle: {
+              color: '#cbd5e1',
+              type: 'dashed',
+              width: 1
+            }
           }
         },
         series: [
           {
+            name: 'Total Requests',
+            type: 'line',
+            data: totalRequests,
+            smooth: true,
+            lineStyle: {
+              color: '#60a5fa', // blue-400
+              width: 3
+            },
+            itemStyle: {
+              color: '#ffffff',
+              borderWidth: 3,
+              borderColor: '#60a5fa' // blue-400
+            },
+            symbol: 'circle',
+            symbolSize: 10,
+            showSymbol: true,
+            areaStyle: {
+              color: {
+                type: 'linear',
+                x: 0,
+                y: 0,
+                x2: 0,
+                y2: 1,
+                colorStops: [{
+                  offset: 0,
+                  color: 'rgba(96, 165, 250, 0.3)' // blue-400
+                }, {
+                  offset: 1,
+                  color: 'rgba(96, 165, 250, 0.05)' // blue-400
+                }]
+              }
+            }
+          },
+          {
             name: 'Academic',
-            data: [120, 135, 145, 130, 150, 140, 160, 125]
-          },
-          {
-            name: 'Mild Non-Academic',
-            data: [12, 15, 18, 14, 16, 15, 20, 12]
-          },
-          {
-            name: 'Entertainment',
-            data: [8, 10, 12, 9, 11, 10, 15, 8]
-          },
-          {
-            name: 'Serious Misuse',
-            data: [3, 5, 4, 6, 4, 5, 7, 3]
-          }
-        ],
-        colors: [
-          '#10b981', // Green - Academic
-          '#f59e0b', // Yellow/Amber - Mild Non-Academic
-          '#f97316', // Orange - Entertainment
-          '#ef4444'  // Red - Serious Misuse
-        ],
-        plotOptions: {
-          bar: {
-            horizontal: false,
-            columnWidth: '50%',
-            borderRadius: 3,
-          }
-        },
-        legend: {
-          show: false
-        },
-        dataLabels: {
-          enabled: false
-        },
-        stroke: {
-          show: true,
-          width: 0,
-          colors: ['transparent']
-        },
-        xaxis: {
-          categories: [
-            '25 July',
-            '26 July',
-            '27 July',
-            '28 July',
-            '29 July',
-            '30 July',
-            '31 July',
-            '1 June'
-          ],
-          axisBorder: {
-            show: false
-          },
-          axisTicks: {
-            show: false
-          },
-          crosshairs: {
-            show: false
-          },
-          labels: {
-            style: {
-              colors: 'oklch(0.707 0.022 261.325)',
-              fontSize: '13px',
-              fontFamily: 'Inter, ui-sans-serif',
-              fontWeight: 400
+            type: 'line',
+            data: academic,
+            smooth: true,
+            lineStyle: {
+              color: '#34d399', // emerald-400
+              width: 2.5
             },
-          }
-        },
-        yaxis: {
-          labels: {
-            align: 'left',
-            minWidth: 0,
-            maxWidth: 140,
-            style: {
-              colors: 'oklch(0.707 0.022 261.325)',
-              fontSize: '13px',
-              fontFamily: 'Inter, ui-sans-serif',
-              fontWeight: 400
+            itemStyle: {
+              color: '#ffffff',
+              borderWidth: 3,
+              borderColor: '#34d399' // emerald-400
             },
-            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+            symbol: 'circle',
+            symbolSize: 10,
+            showSymbol: true
+          },
+          {
+            name: 'Non-Academic',
+            type: 'line',
+            data: nonAcademic,
+            smooth: true,
+            lineStyle: {
+              color: '#f87171', // red-400
+              width: 2.5
+            },
+            itemStyle: {
+              color: '#ffffff',
+              borderWidth: 3,
+              borderColor: '#f87171' // red-400
+            },
+            symbol: 'circle',
+            symbolSize: 10,
+            showSymbol: true
           }
-        },
-        tooltip: {
-          custom: function (props) {
-            const { categories } = props.ctx.opts.xaxis;
-            const { dataPointIndex } = props;
+        ]
+      };
 
-            return buildTooltip(props, {
-              title: categories[dataPointIndex],
-              mode,
-              valuePrefix: '',
-              hasCategory: false,
-              hasTextLabel: true,
-              wrapperExtClasses: 'min-w-28',
-              labelDivider: ':',
-              labelExtClasses: 'ms-2'
-            });
-          }
-        },
-        states: {
-          hover: {
-            filter: {
-              type: 'darken',
-              value: 0.9
-            }
-          }
-        },
-      }), {
-        colors: [
-          '#10b981', // Emerald - Academic
-          '#f59e0b', // Amber - Mild Non-Academic
-          '#f97316', // Orange - Entertainment
-          '#dc2626'  // Red-600 - Serious Misuse (softer red)
-        ],
-        grid: {
-          borderColor: 'oklch(0.928 0.006 264.531)'
-        },
-        xaxis: {
-          labels: {
-            style: {
-              colors: 'oklch(0.707 0.022 261.325)'
-            }
-          }
-        },
-        yaxis: {
-          labels: {
-            style: {
-              colors: 'oklch(0.707 0.022 261.325)'
-            }
-          }
-        }
-      }, {
-        grid: {
-          borderColor: 'oklch(0.371 0 0)'
-        },
-        xaxis: {
-          labels: {
-            style: {
-              colors: 'oklch(0.556 0 0)',
-            }
-          }
-        },
-        yaxis: {
-          labels: {
-            style: {
-              colors: 'oklch(0.556 0 0)'
-            }
-          }
-        }
+      dailyRequestsChart.setOption(option);
+      window.dailyRequestsChart = dailyRequestsChart; // Store globally for toggle
+
+      // Responsive resize with debouncing
+      let resizeTimer;
+      window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+          dailyRequestsChart.resize();
+        }, 100);
       });
-    })();
-  });
+
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', function () {
+        dailyRequestsChart.dispose();
+      });
+    }
+  })();
 
   // Toggle series visibility on legend click
   function toggleSeries(seriesName) {
-    if (window.chartInstance) {
-      const seriesIndex = {
-        'Academic': 0,
-        'Mild Non-Academic': 1,
-        'Entertainment': 2,
-        'Serious Misuse': 3
-      }[seriesName];
+    if (window.dailyRequestsChart) {
+      const option = window.dailyRequestsChart.getOption();
+      const seriesIndex = option.series.findIndex(s => s.name === seriesName);
 
-      if (seriesIndex !== undefined) {
-        window.chartInstance.toggleSeries(seriesName);
+      if (seriesIndex !== -1) {
+        // Get current series config
+        const currentSeries = option.series[seriesIndex];
+        const isVisible = !currentSeries.lineStyle || !currentSeries.lineStyle.opacity || currentSeries.lineStyle.opacity === 1;
+
+        // Toggle visibility by setting opacity
+        if (!currentSeries.lineStyle) {
+          currentSeries.lineStyle = {};
+        }
+        if (!currentSeries.itemStyle) {
+          currentSeries.itemStyle = {};
+        }
+
+        currentSeries.lineStyle.opacity = isVisible ? 0.3 : 1;
+        currentSeries.itemStyle.opacity = isVisible ? 0.3 : 1;
+
+        // Also toggle areaStyle opacity for Total Requests
+        if (currentSeries.areaStyle) {
+          currentSeries.areaStyle.opacity = isVisible ? 0.1 : 0.3;
+        }
+
+        // Update chart
+        window.dailyRequestsChart.setOption(option);
 
         // Toggle legend opacity
         const legendId = {
+          'Total Requests': 'legend-total',
           'Academic': 'legend-academic',
-          'Mild Non-Academic': 'legend-mild',
-          'Entertainment': 'legend-entertainment',
-          'Serious Misuse': 'legend-serious'
+          'Non-Academic': 'legend-non-academic'
         }[seriesName];
 
         const legendElement = document.getElementById(legendId);
