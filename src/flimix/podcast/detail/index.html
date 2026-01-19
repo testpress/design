@@ -35,6 +35,7 @@ customer_view: "Podcast detail"
       showPlayer: false,
       selectedEpisode: null,
       currentEpisodeTitle: '',
+      isPlaying: false,
       episodes: [
         { id: 2043, title: 'The Future of AI and Human Consciousness', duration: '2h 45m', date: 'Jan 5, 2026' },
         { id: 2042, title: 'Ancient Civilizations and Modern Mysteries', duration: '3h 12m', date: 'Jan 2, 2026' },
@@ -42,14 +43,58 @@ customer_view: "Podcast detail"
         { id: 2040, title: 'Comedy, Creativity, and Life Lessons', duration: '2h 55m', date: 'Dec 27, 2025' }
       ],
 
+      init() {
+        // Listen for audio play/pause events to sync state
+        this.$nextTick(() => {
+          const audio = document.getElementById('audio');
+          if (audio) {
+            audio.addEventListener('play', () => {
+              this.isPlaying = true;
+            });
+            audio.addEventListener('pause', () => {
+              this.isPlaying = false;
+            });
+          }
+        });
+      },
+
       playEpisode(episodeId) {
         const episode = this.episodes.find(ep => ep.id === episodeId);
         if (episode) {
-          this.selectedEpisode = episodeId;
-          this.currentEpisodeTitle = episode.title;
-          this.showPlayer = true;
+          // If clicking the same episode, toggle play/pause
+          if (this.selectedEpisode === episodeId) {
+            this.$nextTick(() => {
+              const audio = document.getElementById('audio');
+              if (audio) {
+                if (this.isPlaying) {
+                  audio.pause();
+                } else {
+                  audio.play();
+                }
+              }
+            });
+          } else {
+            // Different episode - load and play it
+            this.selectedEpisode = episodeId;
+            this.currentEpisodeTitle = episode.title;
+            this.showPlayer = true;
 
-          // Initialize or update audio player
+            this.$nextTick(() => {
+              const audio = document.getElementById('audio');
+              if (audio) {
+                audio.play();
+              }
+            });
+          }
+        }
+      },
+
+      previousEpisode() {
+        const currentIndex = this.episodes.findIndex(ep => ep.id === this.selectedEpisode);
+        if (currentIndex > 0) {
+          const prevEpisode = this.episodes[currentIndex - 1];
+          this.selectedEpisode = prevEpisode.id;
+          this.currentEpisodeTitle = prevEpisode.title;
           this.$nextTick(() => {
             const audio = document.getElementById('audio');
             if (audio) {
@@ -59,17 +104,18 @@ customer_view: "Podcast detail"
         }
       },
 
-      previousEpisode() {
-        const currentIndex = this.episodes.findIndex(ep => ep.id === this.selectedEpisode);
-        if (currentIndex > 0) {
-          this.playEpisode(this.episodes[currentIndex - 1].id);
-        }
-      },
-
       nextEpisode() {
         const currentIndex = this.episodes.findIndex(ep => ep.id === this.selectedEpisode);
         if (currentIndex < this.episodes.length - 1) {
-          this.playEpisode(this.episodes[currentIndex + 1].id);
+          const nextEpisode = this.episodes[currentIndex + 1];
+          this.selectedEpisode = nextEpisode.id;
+          this.currentEpisodeTitle = nextEpisode.title;
+          this.$nextTick(() => {
+            const audio = document.getElementById('audio');
+            if (audio) {
+              audio.play();
+            }
+          });
         }
       }
     }
