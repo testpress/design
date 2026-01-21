@@ -1,0 +1,236 @@
+---
+tags: simba
+role: "Team Lead"
+view: "Exam Attendance Report"
+date: 2024-08-20
+parent_page: Overview
+current_page: Exam Attendance Report
+tailwindv4: true
+batch_limit: 4
+---
+
+{% extends "src/simba/base.html" %} {% block title %} Exam Attendance Report | Simba {% endblock title %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://preline.co/assets/vendor/apexcharts/dist/apexcharts.css">
+<style type="text/css">
+  .apexcharts-tooltip.apexcharts-theme-light {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .vc {
+    z-index: 100;
+  }
+</style>
+{% endblock extra_head %}
+{% block content %}
+<div class="max-w-[85rem] px-4 sm:px-6 lg:px-8 mx-auto">
+  {% include 'src/simba/partials/breadcrumb.html' %}
+  <div class="py-2 sm:pb-0 sm:pt-5 space-y-5">
+    {% include './includes/header.html' %}
+    {% include './includes/filter_pills.html' %}
+    {% include './includes/stats.html' %}
+    {% include './includes/attendance_trend_chart.html' %}
+    {% include './includes/attendance_table.html' %}
+  </div>
+</div>
+{% include './includes/filter_offcanvas.html' %}
+{% endblock content %}
+
+{% block extra_scripts %}
+<script src="https://preline.co/assets/vendor/vanilla-calendar-pro/index.js"></script>
+<script src="https://preline.co/assets/vendor/@floating-ui/core/dist/floating-ui.core.umd.min.js"></script>
+<script src="https://preline.co/assets/vendor/@floating-ui/dom/dist/floating-ui.dom.umd.min.js"></script>
+<script src="https://preline.co/assets/vendor/preline/dist/index.js?v=3.0.1"></script>
+<script src="https://preline.co/assets/vendor/lodash/lodash.min.js"></script>
+<script src="https://preline.co/assets/vendor/apexcharts/dist/apexcharts.min.js"></script>
+<script src="https://preline.co/assets/vendor/preline/dist/helper-apexcharts.js"></script>
+<script>
+  window.addEventListener('load', () => {
+    const ATTENDANCE_TREND_CHART = {
+      selector: '#hs-total-sales-line-chart',
+      height: { desktop: 250, mobile: 150 },
+      mobileBreakpoint: 568,
+      series: [
+        {
+          name: 'Attempted',
+          data: [200, 200, 240, 350, 200, 350, 200, 250, 285, 220]
+        },
+        {
+          name: 'Not Attempted',
+          data: [150, 230, 382, 204, 269, 290, 200, 250, 200, 225]
+        }
+      ],
+      categories: [
+        '1st Oct',
+        '3rd Oct',
+        '6th Oct',
+        '9th Oct',
+        '12th Oct',
+        '15th Oct',
+        '18th Oct',
+        '21st Oct',
+        '24th Oct',
+        '27th Oct'
+      ],
+      yAxis: {
+        min: 0,
+        max: 500,
+        tickAmount: 4,
+        labelMinWidth: 0,
+        labelMaxWidth: 140,
+        mobileLabelFontSize: '11px'
+      },
+      typography: {
+        fontFamily: 'Inter, ui-sans-serif',
+        fontWeight: 400,
+        yLabelFontSize: '12px'
+      },
+      theme: {
+        light: {
+          primary: '#16a34a',
+          secondary: '#d4d4d4',
+          axisText: '#a8a29e',
+          gridBorder: '#e5e5e5'
+        },
+        dark: {
+          primary: '#22c55e',
+          secondary: '#737373',
+          axisText: '#a3a3a3',
+          gridBorder: '#404040'
+        }
+      }
+    };
+
+    const formatK = (value) => value >= 1000 ? `${value / 1000}k` : value;
+
+    function buildAxisLabelTextStyle(mode, fontSize) {
+      const axisText =
+        mode === 'dark'
+          ? ATTENDANCE_TREND_CHART.theme.dark.axisText
+          : ATTENDANCE_TREND_CHART.theme.light.axisText;
+
+      return {
+        colors: axisText,
+        fontSize,
+        fontFamily: ATTENDANCE_TREND_CHART.typography.fontFamily,
+        fontWeight: ATTENDANCE_TREND_CHART.typography.fontWeight
+      };
+    }
+
+    function buildChartOptions(mode) {
+      return {
+        chart: {
+          height: ATTENDANCE_TREND_CHART.height.desktop,
+          type: 'line',
+          toolbar: { show: false },
+          zoom: { enabled: false }
+        },
+        series: ATTENDANCE_TREND_CHART.series,
+        dataLabels: { enabled: false },
+        stroke: {
+          curve: 'smooth',
+          width: [3, 3],
+          dashArray: [0, 0]
+        },
+        grid: {
+          strokeDashArray: 0,
+          padding: { top: 0, right: 0 }
+        },
+        title: { show: false },
+        legend: { show: false },
+        xaxis: {
+          type: 'category',
+          categories: ATTENDANCE_TREND_CHART.categories,
+          axisBorder: { show: false },
+          axisTicks: { show: false, height: 0 },
+          labels: { show: false, maxHeight: 0 },
+          tooltip: { enabled: false }
+        },
+        yaxis: {
+          min: ATTENDANCE_TREND_CHART.yAxis.min,
+          max: ATTENDANCE_TREND_CHART.yAxis.max,
+          tickAmount: ATTENDANCE_TREND_CHART.yAxis.tickAmount,
+          labels: {
+            align: 'left',
+            minWidth: ATTENDANCE_TREND_CHART.yAxis.labelMinWidth,
+            maxWidth: ATTENDANCE_TREND_CHART.yAxis.labelMaxWidth,
+            style: buildAxisLabelTextStyle(mode, ATTENDANCE_TREND_CHART.typography.yLabelFontSize),
+            formatter: formatK
+          }
+        },
+        tooltip: {
+          custom: function (props) {
+            return buildTooltipCompareTwoAlt(props, {
+              title: 'Accretion',
+              mode,
+              hasTextLabel: true,
+              wrapperExtClasses: 'min-w-28',
+              valuePrefix: '',
+              labelDivider: ':',
+              labelExtClasses: 'ms-2'
+            });
+          }
+        },
+        responsive: [{
+          breakpoint: ATTENDANCE_TREND_CHART.mobileBreakpoint,
+          options: {
+            chart: { height: ATTENDANCE_TREND_CHART.height.mobile },
+            labels: {
+              style: buildAxisLabelTextStyle(mode, ATTENDANCE_TREND_CHART.yAxis.mobileLabelFontSize),
+              offsetX: -2,
+              formatter: (title) => title.slice(0, 3)
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: ATTENDANCE_TREND_CHART.yAxis.labelMinWidth,
+                maxWidth: ATTENDANCE_TREND_CHART.yAxis.labelMaxWidth,
+                style: buildAxisLabelTextStyle(mode, ATTENDANCE_TREND_CHART.yAxis.mobileLabelFontSize),
+                formatter: formatK
+              }
+            }
+          }
+        }]
+      };
+    }
+
+    function buildThemeOverrides(mode) {
+      const theme =
+        mode === 'dark'
+          ? ATTENDANCE_TREND_CHART.theme.dark
+          : ATTENDANCE_TREND_CHART.theme.light;
+
+      return {
+        colors: [theme.primary, theme.secondary],
+        grid: {
+          borderColor: theme.gridBorder
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: theme.axisText
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: theme.axisText
+            }
+          }
+        }
+      };
+    }
+
+    buildChart(
+      ATTENDANCE_TREND_CHART.selector,
+      buildChartOptions,
+      buildThemeOverrides('light'),
+      buildThemeOverrides('dark')
+    );
+  });
+</script>
+
+{% endblock extra_scripts %}
