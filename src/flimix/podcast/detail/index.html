@@ -1,0 +1,125 @@
+---
+permalink: flimix/podcasts/detail/
+tags: flimix
+customer_view: "Podcast detail"
+---
+
+{% extends "src/flimix/layouts/viewer_layout.html" %}
+
+{% block extra_head %}
+<script type="module" src="https://cdn.jsdelivr.net/npm/media-chrome@4/+esm"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/media-chrome/menu/+esm"></script>
+{% endblock extra_head %}
+
+
+{% block main_content %}
+<div x-data="podcastPlayer()">
+  <div class="max-w-[85rem] mx-auto py-16 px-4 sm:px-6 lg:px-8 space-y-16"
+    :class="showPlayer ? 'pb-[280px] md:pb-50' : ''">
+    {% include "./content.html" %}
+    {% include "./episodes.html" %}
+  </div>
+
+  <!-- Sticky Audio Player -->
+  <footer x-cloak x-show="showPlayer" x-transition class="fixed bottom-0 left-0 right-0 z-50 shadow-2xl">
+    {% include "./player.html" %}
+  </footer>
+</div>
+
+{% endblock main_content %}
+
+{% block script %}
+<script>
+  function podcastPlayer() {
+    return {
+      showPlayer: false,
+      selectedEpisode: null,
+      currentEpisodeTitle: '',
+      isPlaying: false,
+      episodes: [
+        { id: 2043, title: 'The Future of AI and Human Consciousness', duration: '2h 45m', date: 'Jan 5, 2026' },
+        { id: 2042, title: 'Ancient Civilizations and Modern Mysteries', duration: '3h 12m', date: 'Jan 2, 2026' },
+        { id: 2041, title: 'The Science of Peak Performance', duration: '2h 28m', date: 'Dec 30, 2025' },
+        { id: 2040, title: 'Comedy, Creativity, and Life Lessons', duration: '2h 55m', date: 'Dec 27, 2025' }
+      ],
+
+      init() {
+        // Listen for audio play/pause events to sync state
+        this.$nextTick(() => {
+          const audio = document.getElementById('audio');
+          if (audio) {
+            audio.addEventListener('play', () => {
+              this.isPlaying = true;
+            });
+            audio.addEventListener('pause', () => {
+              this.isPlaying = false;
+            });
+          }
+        });
+      },
+
+      playEpisode(episodeId) {
+        const episode = this.episodes.find(ep => ep.id === episodeId);
+        if (episode) {
+          // If clicking the same episode, toggle play/pause
+          if (this.selectedEpisode === episodeId) {
+            this.$nextTick(() => {
+              const audio = document.getElementById('audio');
+              if (audio) {
+                if (this.isPlaying) {
+                  audio.pause();
+                } else {
+                  audio.play();
+                }
+              }
+            });
+          } else {
+            // Different episode - load and play it
+            this.selectedEpisode = episodeId;
+            this.currentEpisodeTitle = episode.title;
+            this.showPlayer = true;
+
+            this.$nextTick(() => {
+              const audio = document.getElementById('audio');
+              if (audio) {
+                audio.play();
+              }
+            });
+          }
+        }
+      },
+
+      previousEpisode() {
+        const currentIndex = this.episodes.findIndex(ep => ep.id === this.selectedEpisode);
+        if (currentIndex > 0) {
+          const prevEpisode = this.episodes[currentIndex - 1];
+          this.selectedEpisode = prevEpisode.id;
+          this.currentEpisodeTitle = prevEpisode.title;
+          this.$nextTick(() => {
+            const audio = document.getElementById('audio');
+            if (audio) {
+              audio.play();
+            }
+          });
+        }
+      },
+
+      nextEpisode() {
+        const currentIndex = this.episodes.findIndex(ep => ep.id === this.selectedEpisode);
+        if (currentIndex < this.episodes.length - 1) {
+          const nextEpisode = this.episodes[currentIndex + 1];
+          this.selectedEpisode = nextEpisode.id;
+          this.currentEpisodeTitle = nextEpisode.title;
+          this.$nextTick(() => {
+            const audio = document.getElementById('audio');
+            if (audio) {
+              audio.play();
+            }
+          });
+        }
+      }
+    }
+  }
+
+</script>
+{% endblock script %}
