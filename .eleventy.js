@@ -3,7 +3,7 @@ const filter = require("./js/filter");
 module.exports = config => {
     config.addPassthroughCopy("img");
     config.addPassthroughCopy("CNAME");
-    
+
     config.addPassthroughCopy("css/prism.css");
     config.addPassthroughCopy("css/settings.css");
     config.addPassthroughCopy("css/video-js.css");
@@ -41,30 +41,13 @@ module.exports = config => {
     config.addFilter("filter", filter);
     config.addPassthroughCopy({ "src/api": "api" });
     config.addPassthroughCopy("css/simba.css");
-    config.addPassthroughCopy({
-        "src/simba/node_modules/preline/dist/preline.js":
-            "src/simba/node_modules/preline/dist/preline.js",
-    });
-    config.addPassthroughCopy({
-        "src/simba/node_modules/apexcharts/dist/apexcharts.css":
-            "src/simba/node_modules/apexcharts/dist/apexcharts.css",
-    });
-    config.addPassthroughCopy({
-        "src/simba/node_modules/lodash/lodash.min.js":
-            "src/simba/node_modules/lodash/lodash.min.js",
-    });
-    config.addPassthroughCopy({
-        "src/simba/node_modules/apexcharts/dist/apexcharts.min.js":
-            "src/simba/node_modules/apexcharts/dist/apexcharts.min.js",
-    });
-    config.addPassthroughCopy({
-        "src/simba/node_modules/clipboard/dist/clipboard.min.js":
-            "src/simba/node_modules/clipboard/dist/clipboard.min.js",
-    });
-    config.addPassthroughCopy({
-        "src/simba/node_modules/preline/dist/helper-clipboard.js":
-            "src/simba/node_modules/preline/dist/helper-clipboard.js",
-    });
+    config.addPassthroughCopy("src/simba/node_modules/preline/dist/preline.js");
+    config.addPassthroughCopy("src/simba/node_modules/apexcharts/dist/apexcharts.css");
+    config.addPassthroughCopy("src/simba/node_modules/lodash/lodash.min.js");
+    config.addPassthroughCopy("src/simba/node_modules/apexcharts/dist/apexcharts.min.js");
+    config.addPassthroughCopy("src/simba/node_modules/clipboard/dist/clipboard.min.js");
+    config.addPassthroughCopy("src/simba/node_modules/preline/dist/helper-clipboard.js");
+    config.addPassthroughCopy("src/simba/node_modules/preline/dist/hs-apexcharts-helpers.js");
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
