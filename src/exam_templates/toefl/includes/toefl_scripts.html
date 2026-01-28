@@ -1,0 +1,337 @@
+<script>
+  function getQueryParams(paramName) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(paramName);
+  };
+
+
+  function headerData() {
+    return {
+      showPauseButton: false,
+      showExitSectionButton: false,
+      showHelpButton: false,
+      showReviewButton: false,
+      showBackButton: false,
+      showContinueButton: false,
+      showNextButton: false,
+      showReturnButton: false,
+      showVolumeButton: false,
+      showVolumeDropdown: false,
+      showOkButton: false,
+      showViewTextButton: false,
+      showViewQuestionButton: false,
+      showQuestionHeader: false,
+      userSelectedAnswers: [],
+      activeSectionName: "Reading",
+      index: 0,
+      examTimer: null,
+      audioVolume: 0.3,
+
+      showPauseModal: false,
+      showExitSectionModal: false,
+
+      resetHeaderTabsVisibility() {
+        this.showPauseButton = false;
+        this.showExitSectionButton = false;
+        this.showHelpButton = false;
+        this.showReviewButton = false;
+        this.showBackButton = false;
+        this.showContinueButton = false;
+        this.showNextButton = false;
+        this.showReturnButton = false;
+        this.showOkButton = false;
+        this.showVolumeButton = false;
+      },
+
+      setVolume() {
+        const elements = document.querySelectorAll("audio, video");
+        
+        elements.forEach((element) => {
+          element.volume = this.audioVolume
+        })
+      },
+
+      onClickHelp() {
+        this.instructionPage = 3;
+      },
+
+      onViewText() {
+        
+      }
+    }
+  };
+
+  function videoPlayerData() {
+    return {
+      playbackProgress: 0,
+
+      updateProgress(element) {
+        const duration = element.duration;
+        const currentTime = element.currentTime;
+        this.playbackProgress = (currentTime / duration) * 100;
+      }
+    };
+  }
+
+  function instructionsData() {
+    return {
+      instructionPage: getQueryParams("instructionPage") ? parseInt(getQueryParams("instructionPage")) : parseInt("{{instructionPage}}"),
+      isQuestionShown: false,
+
+      instruction: {
+        ["x-html"]() {
+          this.resetHeaderTabsVisibility();
+          switch (this.instructionPage) {
+            case 1:
+              return `{% include "./instructions/exam_instructions.html" %}`;
+            case 2:
+              return `{% include "./instructions/reading_section/instructions.html" %}`;
+            case 3:
+              return `{% include "./instructions/reading_section/help_pages/base.html" %}`;
+            case 4:
+              this.activeSectionName = "Listening";
+              return `{% include "./instructions/listening_section/put_on_headset.html" %}`;
+            case 5:
+              this.activeSectionName = "Listening";
+              return `{% include "./instructions/listening_section/changing_the_volume.html" %}`;
+            case 6:
+              this.activeSectionName = "Listening";
+              return `{% include "./instructions/listening_section/section_instructions.html" %}`;
+            case 7:
+              this.activeSectionName = "Listening";
+              return `{% include "./instructions/listening_section/lectures/1.html" %}`;
+            default:
+              return "";
+          }
+        },
+      },
+
+      readingSectionHelpPages: [
+        {"name": "Testing Tools", "id": 1},
+        {"name": "Reading The Passage", "id": 2},
+        {"name": "General Directions", "id": 3},
+        {"name": "Section Directions", "id": 4},
+      ],
+
+      onClickNext() {
+        if ((this.instructionPage < 2) || (3 < this.instructionPage && this.instructionPage < 7)) {
+          this.resetHeaderTabsVisibility();
+          this.instructionPage++;
+        }
+      },
+
+      onClickContinue() {
+        if ((this.instructionPage < 2) || (3 < this.instructionPage && this.instructionPage < 7)) {
+          this.resetHeaderTabsVisibility();
+          this.instructionPage++;
+        }
+        else {
+          window.location = "{{'/exam_templates/toefl/question/'|url}}";
+        }
+      },
+
+      onClickReturn() {
+        if (this.instructionPage == 3) {
+          this.instructionPage--;
+        } 
+      },
+
+      onClickPrevious() {
+        if (this.instructionPage >= 2) this.instructionPage--;
+      },
+    }
+  };
+
+
+  function getUserSelectedAnswersForSection(section) {
+    const all_questions = JSON.parse(JSON.stringify({{ toefl_user_selected_answers |dump |safe }}));
+    return all_questions.filter((question) => question["section"] == section);
+  };
+
+
+  function questionsData() {
+    return {
+      userSelectedAnswers: [],
+      currentUserSelectedAnswer: {},
+      index: 0,
+
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+      examTimer: "00:00:00",
+      timerObject: null,
+
+      sections: ["Reading", "Listening"],
+      currentSectionIndex: getQueryParams("section") ? parseInt(getQueryParams("section")) : 0,
+
+      isQuestionShown: true,
+
+      init() {
+        this.showQuestionHeader = true;
+        this.userSelectedAnswers = getUserSelectedAnswersForSection(this.currentSectionIndex);
+        this.currentUserSelectedAnswer = this.userSelectedAnswers[0];
+        this.activeSectionName = this.sections[this.currentSectionIndex];
+        this.startTimer();
+      },
+
+      startTimer() {
+        if (this.timerObject) return; // Prevent multiple intervals
+
+        this.timerObject = setInterval(() => {
+          this.seconds++;
+          if (this.seconds === 60) {
+              this.seconds = 0;
+              this.minutes++;
+          }
+          if (this.minutes === 60) {
+              this.minutes = 0;
+              this.hours++;
+          }
+
+          this.examTimer = this.formatTime(this.hours) + ":" + this.formatTime(this.minutes) + ":" + this.formatTime(this.seconds);
+        }, 1000);
+      },
+
+      pauseTimer() {
+        clearInterval(this.timerObject);
+        this.timerObject = null;
+      },
+
+      stopTimer() {
+        this.pauseTimer();
+        this.hours = 0;
+        this.minutes = 0;
+        this.seconds = 0;
+        this.examTimer = "00:00:00";
+      },
+
+      formatTime(unit) {
+        return String(unit).padStart(2, '0');
+      },
+
+      onClickNext() {
+        if (this.index < this.userSelectedAnswers.length - 1) {
+          this.currentUserSelectedAnswer = this.userSelectedAnswers[++this.index];
+        } 
+        else if (this.hasNextSection()) {
+          window.location = "{{'/exam_templates/toefl/?instructionPage=4'|url}}";
+        }
+        else {
+          window.location = "{{'/exam_templates/toefl/end_exam/'|url}}";
+        }
+      },
+
+      hasNextSection() {
+        return this.currentSectionIndex < this.sections.length - 1;
+      },
+
+      onClickPrevious() {
+        if (this.index) {
+          this.currentUserSelectedAnswer = this.userSelectedAnswers[--this.index];
+        }
+      },
+
+      showPreviousButton() {
+        return this.index >= 1;
+      },
+
+      endSection() {
+        this.instructionPage = 4;
+      },
+
+      questionChanged() {
+        this.displayQuestionActionButtons();
+        this.markParagraphIfNeeded();
+        this.scrollDirectionToTop();
+      },
+
+      showDirection() {
+        return Boolean(this.currentUserSelectedAnswer.question.direction);
+      },
+
+      displayQuestionActionButtons() {
+        this.showPauseButton=true;
+        this.showExitSectionButton=true;
+        this.showHelpButton=true;
+        this.showNextButton=true;
+      
+        if (this.currentSectionIndex == 1) {
+          this.showVolumeButton=true;
+          this.showOkButton=true;
+        }
+        else {
+          this.showReviewButton=true;
+          this.showBackButton=true;
+
+          if (this.currentUserSelectedAnswer.question.type == "drag_and_drop") {
+            this.showViewTextButton = true;
+          }
+        }
+      },
+
+      markParagraphIfNeeded() {
+        const direction = document.getElementById("direction_div");
+        if (!direction) return;
+
+        if (this.currentSectionIndex == 0 && this.currentUserSelectedAnswer.question.direction) {
+          if (this.currentUserSelectedAnswer.question.target_paragraph_id) {
+            const paragraph = document.getElementById(this.currentUserSelectedAnswer.question.target_paragraph_id);
+            if (paragraph) {
+              paragraph.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="inline-block w-6 h-6 mr-1"><path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Zm4.28 10.28a.75.75 0 0 0 0-1.06l-3-3a.75.75 0 1 0-1.06 1.06l1.72 1.72H8.25a.75.75 0 0 0 0 1.5h5.69l-1.72 1.72a.75.75 0 1 0 1.06 1.06l3-3Z" clip-rule="evenodd" /></svg>` + paragraph.innerHTML;
+              setTimeout(() => paragraph.scrollIntoView({ behavior: 'instant' }), 500);
+            } 
+          }
+
+          else if (document.getElementById("highlighted_excerpt")) {
+            const highlightedText = document.getElementById("highlighted_excerpt").textContent;
+            this.highlightDirectionText(highlightedText);
+          }
+
+          else if (this.currentUserSelectedAnswer.question.highlighted_text) {
+            this.highlightDirectionText(this.currentUserSelectedAnswer.question.highlighted_text);
+          }
+
+          else if (this.currentUserSelectedAnswer.question.type == "insert_sentence") {
+            this.currentUserSelectedAnswer.question.question_html = this.currentUserSelectedAnswer.question.question_html.replaceAll("[]", `[<span class='inline-block w-4 h-4 bg-black dark:bg-gray-700'></span>]`);
+            direction.innerHTML = direction.innerHTML.replaceAll("[]", `<span class='inline-block w-4 h-4 bg-black dark:bg-gray-700' @click="insertTextInPassage($el)"></span>`);
+          }
+        }
+      },
+
+      highlightDirectionText(text) {
+        const direction = document.getElementById("direction_div");
+        if (direction.innerHTML.includes(text)) {
+          direction.innerHTML = direction.innerHTML.replace(text, `<span class='bg-black text-white pt-1'>${text}</span>`);
+        }
+      },
+
+      scrollDirectionToTop() {
+        const direction = document.getElementById("direction_div");
+        if (direction) {
+          direction.scrollTo({top: 0});
+        }
+      },
+
+      insertTextInPassage(element) {
+        for (span of document.querySelectorAll(".inserted-sentence")) {
+          span.outerHTML = `<span class='inline-block w-4 h-4 bg-black dark:bg-gray-700' @click="insertTextInPassage($el)"></span>`;
+        }
+        element.outerHTML = `<span class="inserted-sentence font-bold">${this.currentUserSelectedAnswer.question.sentence_to_add}</span>`;
+      },
+    };
+  };
+
+  function dragAndDropData() {
+    return {
+      textDragStarted(event) {
+        event.dataTransfer.setData('text/plain', event.target.textContent);
+      },
+
+      textDroppedInBox(event, droppedInBox) {
+        event.preventDefault();
+        const data = event.dataTransfer.getData('text/plain');
+        droppedInBox.textContent = data;
+      },
+    };
+  }
+</script>
