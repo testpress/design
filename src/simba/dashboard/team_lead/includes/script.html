@@ -78,15 +78,11 @@
       }
     };
 
-    const DATE_PICKER_CONFIG = {
-      SELECTOR: '#hs-pro-vcead',
-      TODAY_BUTTON: '#hs-pro-vcead-today',
-      PREV_BUTTON: '#hs-pro-vcead-prev',
-      NEXT_BUTTON: '#hs-pro-vcead-next',
-      DATE_FORMAT: {
-        LOCALE: 'en-US',
-        TODAY_PREFIX: 'Today, '
-      }
+    const DATE_PICKER_SELECTORS = {
+      INPUT: '#hs-datepicker-with-navigation-controls',
+      TODAY_BUTTON: '#hs-datepicker-with-navigation-controls-today',
+      PREV_BUTTON: '#hs-datepicker-with-navigation-controls-prev',
+      NEXT_BUTTON: '#hs-datepicker-with-navigation-controls-next'
     };
 
     const VALUE_FORMATTER = {
@@ -332,34 +328,41 @@
     // DATE PICKER FUNCTIONS
     // ============================================================================
     function initializeDatePicker() {
-      const datepickerInstance = HSDatepicker.getInstance(DATE_PICKER_CONFIG.SELECTOR, true);
+      const datepickerInstance = HSDatepicker.getInstance(DATE_PICKER_SELECTORS.INPUT, true);
+
+      if (!datepickerInstance || !datepickerInstance.element || !datepickerInstance.element.vanillaCalendar) {
+        return;
+      }
+
       const element = datepickerInstance.element;
       const vanillaCalendar = element.vanillaCalendar;
-      const todayButton = document.querySelector(DATE_PICKER_CONFIG.TODAY_BUTTON);
-      const prevButton = document.querySelector(DATE_PICKER_CONFIG.PREV_BUTTON);
-      const nextButton = document.querySelector(DATE_PICKER_CONFIG.NEXT_BUTTON);
+      const todayButton = document.querySelector(DATE_PICKER_SELECTORS.TODAY_BUTTON);
+      const prevButton = document.querySelector(DATE_PICKER_SELECTORS.PREV_BUTTON);
+      const nextButton = document.querySelector(DATE_PICKER_SELECTORS.NEXT_BUTTON);
 
       if (!todayButton || !prevButton || !nextButton) {
         return;
       }
 
-      const datePickerController = createDatePickerController(element, vanillaCalendar);
-
-      todayButton.addEventListener('click', () => {
-        datePickerController.updateDate(['today']);
-      });
-
-      prevButton.addEventListener('click', () => {
-        datePickerController.navigateDate(-1);
-      });
-
-      nextButton.addEventListener('click', () => {
-        datePickerController.navigateDate(1);
-      });
-    }
-
-    function createDatePickerController(element, vanillaCalendar) {
       function getCurrentDate() {
+        if (vanillaCalendar.context && vanillaCalendar.context.selectedDates) {
+          const contextDates = vanillaCalendar.context.selectedDates;
+
+          if (contextDates && contextDates.length > 0) {
+            const dateString = contextDates[0];
+
+            if (dateString === 'today') {
+              return new Date();
+            }
+
+            const date = new Date(dateString);
+
+            if (!isNaN(date.getTime())) {
+              return date;
+            }
+          }
+        }
+
         const currentState = element.getCurrentState();
 
         if (currentState.selectedDates && currentState.selectedDates.length > 0) {
@@ -370,6 +373,23 @@
           }
 
           const date = new Date(dateString);
+
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        const selectedDates = vanillaCalendar.selectedDates;
+
+        if (selectedDates && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+
+          if (dateString === 'today') {
+            return new Date();
+          }
+
+          const date = new Date(dateString);
+
           if (!isNaN(date.getTime())) {
             return date;
           }
@@ -382,37 +402,36 @@
         if (!date || isNaN(date.getTime())) {
           return new Date().toISOString().split('T')[0];
         }
+
         return date.toISOString().split('T')[0];
       }
 
-      function formatDateForDisplay(date) {
-        const dayName = date.toLocaleDateString(DATE_PICKER_CONFIG.DATE_FORMAT.LOCALE, { weekday: 'long' });
-        const day = date.getDate();
-        const month = date.toLocaleDateString(DATE_PICKER_CONFIG.DATE_FORMAT.LOCALE, { month: 'long' });
-        const year = date.getFullYear();
-        return `${dayName}, ${day} ${month} ${year}`;
-      }
-
-      function formatTodayForDisplay() {
-        const today = new Date();
-        return DATE_PICKER_CONFIG.DATE_FORMAT.TODAY_PREFIX +
-          today.getDate() + ' ' +
-          today.toLocaleDateString(DATE_PICKER_CONFIG.DATE_FORMAT.LOCALE, { month: 'long' }) + ' ' +
-          today.getFullYear();
-      }
-
       function updateDate(selectedDates) {
-        vanillaCalendar.set({ selectedDates: selectedDates });
+        if (selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
 
-        const inputElement = document.querySelector(DATE_PICKER_CONFIG.SELECTOR);
-        if (!inputElement || selectedDates.length === 0) {
-          return;
+          vanillaCalendar.set({
+            selectedDates: selectedDates,
+            selectedMonth: date.getMonth(),
+            selectedYear: date.getFullYear()
+          });
+        } else {
+          vanillaCalendar.set({ selectedDates: selectedDates });
         }
 
-        const dateString = selectedDates[0];
-        inputElement.value = dateString === 'today'
-          ? formatTodayForDisplay()
-          : formatDateForDisplay(new Date(dateString));
+        const inputElement = document.querySelector(DATE_PICKER_SELECTORS.INPUT);
+
+        if (inputElement && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
+          const formattedValue = element.formatDate(date);
+          inputElement.value = formattedValue;
+        }
+
+        if (!inputElement) {
+          return;
+        }
 
         const changeEvent = new CustomEvent('change', {
           detail: {
@@ -425,17 +444,25 @@
         inputElement.dispatchEvent(changeEvent);
       }
 
-      function navigateDate(daysOffset) {
-        const currentDate = getCurrentDate();
-        currentDate.setDate(currentDate.getDate() + daysOffset);
-        const formattedDate = formatDateToISO(currentDate);
-        updateDate([formattedDate]);
-      }
+      todayButton.addEventListener('click', () => {
+        const today = new Date();
+        const todayStr = formatDateToISO(today);
+        updateDate([todayStr]);
+      });
 
-      return {
-        updateDate,
-        navigateDate
-      };
+      prevButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() - 1);
+        const prevDate = formatDateToISO(currentDate);
+        updateDate([prevDate]);
+      });
+
+      nextButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() + 1);
+        const nextDate = formatDateToISO(currentDate);
+        updateDate([nextDate]);
+      });
     }
 
     // ============================================================================
@@ -469,9 +496,6 @@
     // ============================================================================
     window.addEventListener('load', () => {
       initializeCharts();
-    });
-
-    window.addEventListener('load', () => {
       requestAnimationFrame(() => {
         initializeDatePicker();
       });
