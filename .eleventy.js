@@ -47,7 +47,7 @@ module.exports = config => {
     config.addPassthroughCopy("src/simba/node_modules/apexcharts/dist/apexcharts.min.js");
     config.addPassthroughCopy("src/simba/node_modules/clipboard/dist/clipboard.min.js");
     config.addPassthroughCopy("src/simba/node_modules/preline/dist/helper-clipboard.js");
-    config.addPassthroughCopy("src/simba/node_modules/preline/dist/hs-apexcharts-helpers.js");
+    config.addPassthroughCopy("src/simba/node_modules/preline/dist/helper-apexcharts.js");
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
