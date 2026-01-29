@@ -1,0 +1,504 @@
+<script>
+  (function () {
+    'use strict';
+
+    // ============================================================================
+    // CONSTANTS
+    // ============================================================================
+    const CHART_CONFIG = {
+      SCORE_DISTRIBUTION: {
+        SELECTOR: '#score-distribution-chart',
+        HEIGHT: {
+          DESKTOP: 300,
+          MOBILE: 200
+        },
+        SERIES_NAME: 'Students',
+        DATA: [1, 2, 3, 4, 6, 5, 4, 3, 1, 1],
+        SCORE_RANGES: ['0-20', '21-40', '21-30', '31-40', '41-50', '51-60', '61-70', '71-80', '81-90', '91-100'],
+        X_AXIS_TITLE: 'Score (%)',
+        Y_AXIS_TITLE: 'Students',
+        MOBILE_BREAKPOINT: 568,
+        LABEL_TRUNCATE_LENGTH: 3
+      },
+      ATTENDANCE_DONUT: {
+        SELECTOR: '#hs-pro-crbch',
+        HEIGHT: 350,
+        SERIES: [44, 56],
+        LABELS: ['Attended', 'Not Attended'],
+        DONUT_SIZE: '80%',
+        START_ANGLE: -90,
+        END_ANGLE: 90
+      }
+    };
+
+    const STYLING = {
+      FONT: {
+        FAMILY: 'Inter, ui-sans-serif',
+        SIZE: {
+          LARGE: '13px',
+          SMALL: '11px'
+        },
+        WEIGHT: 400
+      },
+      COLORS: {
+        LIGHT: {
+          PRIMARY: '#16a34a',
+          SECONDARY: '#dadada',
+          TEXT: '#a8a29e',
+          GRID_BORDER: '#e5e5e5',
+          STROKE: 'rgb(255, 255, 255)',
+          TRACK_BACKGROUND: 'oklch(96.7% 0.003 264.542)',
+          TITLE: 'oklch(.444 .011 73.639)',
+          TOOLTIP: ['#fff', '#fff', '#fff', 'oklch(27.8% 0.033 256.848)']
+        },
+        DARK: {
+          PRIMARY: '#22c55e',
+          SECONDARY: '#676767',
+          TEXT: '#a3a3a3',
+          GRID_BORDER: '#44403c',
+          STROKE: 'oklch(26.9% 0 0)',
+          TRACK_BACKGROUND: 'oklch(37.1% 0 0)',
+          TITLE: 'oklch(.444 .011 73.639)',
+          TOOLTIP: ['#fff', '#fff', 'oklch(43.2% 0.232 292.759)', 'oklch(92.2% 0 0)']
+        }
+      },
+      GRADIENT: {
+        SHADE_INTENSITY: 0.1,
+        OPACITY_FROM: 0.5,
+        OPACITY_TO: 0,
+        STOPS: [50, 100, 100, 100]
+      },
+      GRID: {
+        STROKE_DASH_ARRAY: 2
+      },
+      AXIS: {
+        LABEL_MAX_WIDTH: 140,
+        LABEL_MIN_WIDTH: 0,
+        MOBILE_OFFSET_X: -2
+      }
+    };
+
+    const DATE_PICKER_SELECTORS = {
+      INPUT: '#hs-datepicker-with-navigation-controls',
+      TODAY_BUTTON: '#hs-datepicker-with-navigation-controls-today',
+      PREV_BUTTON: '#hs-datepicker-with-navigation-controls-prev',
+      NEXT_BUTTON: '#hs-datepicker-with-navigation-controls-next'
+    };
+
+    const VALUE_FORMATTER = {
+      THOUSAND_THRESHOLD: 1000,
+      formatLargeNumber: (value) => value >= VALUE_FORMATTER.THOUSAND_THRESHOLD ? `${value / VALUE_FORMATTER.THOUSAND_THRESHOLD}k` : value
+    };
+
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+    function createTypographyStyle(fontSize, color) {
+      return {
+        colors: color,
+        fontSize: fontSize,
+        fontFamily: STYLING.FONT.FAMILY,
+        fontWeight: STYLING.FONT.WEIGHT
+      };
+    }
+
+    function createAxisTitleStyle(text, color) {
+      return {
+        text: text,
+        style: createTypographyStyle(STYLING.FONT.SIZE.LARGE, color)
+      };
+    }
+
+    function createAxisLabelsStyle(color, fontSize = STYLING.FONT.SIZE.SMALL) {
+      return {
+        style: createTypographyStyle(fontSize, color)
+      };
+    }
+
+    function createGradientFill(shadeIntensity, opacityFrom, opacityTo, stops) {
+      return {
+        type: 'gradient',
+        gradient: {
+          shadeIntensity: shadeIntensity,
+          opacityFrom: opacityFrom,
+          opacityTo: opacityTo,
+          stops: stops
+        }
+      };
+    }
+
+    function createTooltipConfig(mode, categories, dataPointIndex) {
+      const title = categories[dataPointIndex];
+      return {
+        title: title,
+        mode: mode,
+        valuePrefix: '',
+        hasCategory: false,
+        hasTextLabel: true,
+        wrapperExtClasses: 'min-w-32.5',
+        labelDivider: ':',
+        labelExtClasses: 'ms-2'
+      };
+    }
+
+    // ============================================================================
+    // CHART CONFIGURATION BUILDERS
+    // ============================================================================
+    function buildScoreDistributionChartConfig(mode) {
+      const colors = mode === 'dark' ? STYLING.COLORS.DARK : STYLING.COLORS.LIGHT;
+      const titleColor = colors.TITLE;
+      const labelColor = colors.TEXT;
+
+      return {
+        chart: {
+          height: CHART_CONFIG.SCORE_DISTRIBUTION.HEIGHT.DESKTOP,
+          type: 'area',
+          toolbar: { show: false },
+          zoom: { enabled: false }
+        },
+        series: [{
+          name: CHART_CONFIG.SCORE_DISTRIBUTION.SERIES_NAME,
+          data: CHART_CONFIG.SCORE_DISTRIBUTION.DATA
+        }],
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            type: 'vertical',
+            shadeIntensity: 1,
+            opacityFrom: 0.2,
+            opacityTo: 0.8
+          }
+        },
+        xaxis: {
+          title: createAxisTitleStyle(CHART_CONFIG.SCORE_DISTRIBUTION.X_AXIS_TITLE, titleColor),
+          type: 'category',
+          tickPlacement: 'on',
+          categories: CHART_CONFIG.SCORE_DISTRIBUTION.SCORE_RANGES,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: {
+            stroke: { dashArray: 0 },
+            dropShadow: { show: false }
+          },
+          tooltip: { enabled: false },
+          labels: createAxisLabelsStyle(labelColor, STYLING.FONT.SIZE.LARGE)
+        },
+        yaxis: {
+          title: createAxisTitleStyle(CHART_CONFIG.SCORE_DISTRIBUTION.Y_AXIS_TITLE, titleColor),
+          labels: {
+            align: 'left',
+            minWidth: STYLING.AXIS.LABEL_MIN_WIDTH,
+            maxWidth: STYLING.AXIS.LABEL_MAX_WIDTH,
+            ...createAxisLabelsStyle(labelColor),
+            formatter: VALUE_FORMATTER.formatLargeNumber
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: (value) => `$${VALUE_FORMATTER.formatLargeNumber(value)}`
+          },
+          custom: function (props) {
+            const { categories } = props.ctx.opts.xaxis;
+            const { dataPointIndex } = props;
+            const tooltipConfig = createTooltipConfig(mode, categories, dataPointIndex);
+            return buildTooltip(props, tooltipConfig);
+          }
+        },
+        responsive: [{
+          breakpoint: CHART_CONFIG.SCORE_DISTRIBUTION.MOBILE_BREAKPOINT,
+          options: {
+            chart: {
+              height: CHART_CONFIG.SCORE_DISTRIBUTION.HEIGHT.MOBILE
+            },
+            labels: {
+              ...createAxisLabelsStyle(labelColor),
+              offsetX: STYLING.AXIS.MOBILE_OFFSET_X,
+              formatter: (title) => title.slice(0, CHART_CONFIG.SCORE_DISTRIBUTION.LABEL_TRUNCATE_LENGTH)
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: STYLING.AXIS.LABEL_MIN_WIDTH,
+                maxWidth: STYLING.AXIS.LABEL_MAX_WIDTH,
+                ...createAxisLabelsStyle(labelColor),
+                formatter: VALUE_FORMATTER.formatLargeNumber
+              }
+            }
+          }
+        }]
+      };
+    }
+
+    function buildScoreDistributionThemeConfig(mode) {
+      const colors = mode === 'dark' ? STYLING.COLORS.DARK : STYLING.COLORS.LIGHT;
+
+      return {
+        colors: [colors.PRIMARY],
+        fill: createGradientFill(
+          STYLING.GRADIENT.SHADE_INTENSITY,
+          STYLING.GRADIENT.OPACITY_FROM,
+          STYLING.GRADIENT.OPACITY_TO,
+          STYLING.GRADIENT.STOPS
+        ),
+        grid: {
+          strokeDashArray: STYLING.GRID.STROKE_DASH_ARRAY,
+          borderColor: colors.GRID_BORDER
+        },
+        xaxis: {
+          labels: createAxisLabelsStyle(colors.TEXT)
+        },
+        yaxis: {
+          labels: createAxisLabelsStyle(colors.TEXT)
+        }
+      };
+    }
+
+    function buildAttendanceDonutChartConfig(mode) {
+      const tooltipColors = mode === 'dark'
+        ? STYLING.COLORS.DARK.TOOLTIP
+        : STYLING.COLORS.LIGHT.TOOLTIP;
+
+      return {
+        chart: {
+          height: CHART_CONFIG.ATTENDANCE_DONUT.HEIGHT,
+          type: 'donut'
+        },
+        plotOptions: {
+          pie: {
+            startAngle: CHART_CONFIG.ATTENDANCE_DONUT.START_ANGLE,
+            endAngle: CHART_CONFIG.ATTENDANCE_DONUT.END_ANGLE,
+            donut: {
+              size: CHART_CONFIG.ATTENDANCE_DONUT.DONUT_SIZE
+            },
+            dataLabels: {
+              show: false
+            }
+          }
+        },
+        series: CHART_CONFIG.ATTENDANCE_DONUT.SERIES,
+        labels: CHART_CONFIG.ATTENDANCE_DONUT.LABELS,
+        legend: { show: false },
+        stroke: { lineCap: 'round' },
+        dataLabels: { enabled: false },
+        states: {
+          hover: {
+            filter: { type: 'none' }
+          }
+        },
+        grid: {
+          padding: {
+            top: 20,
+            bottom: -140
+          }
+        },
+        tooltip: {
+          enabled: true,
+          custom: function (props) {
+            return buildTooltipForDonut(props, tooltipColors);
+          }
+        }
+      };
+    }
+
+    function buildAttendanceDonutThemeConfig(mode) {
+      const colors = mode === 'dark' ? STYLING.COLORS.DARK : STYLING.COLORS.LIGHT;
+
+      return {
+        colors: [colors.PRIMARY, colors.SECONDARY],
+        stroke: {
+          colors: [colors.STROKE]
+        },
+        plotOptions: {
+          radialBar: {
+            track: {
+              background: colors.TRACK_BACKGROUND
+            }
+          }
+        }
+      };
+    }
+
+    // ============================================================================
+    // DATE PICKER FUNCTIONS
+    // ============================================================================
+    function initializeDatePicker() {
+      const datepickerInstance = HSDatepicker.getInstance(DATE_PICKER_SELECTORS.INPUT, true);
+
+      if (!datepickerInstance || !datepickerInstance.element || !datepickerInstance.element.vanillaCalendar) {
+        return;
+      }
+
+      const element = datepickerInstance.element;
+      const vanillaCalendar = element.vanillaCalendar;
+      const todayButton = document.querySelector(DATE_PICKER_SELECTORS.TODAY_BUTTON);
+      const prevButton = document.querySelector(DATE_PICKER_SELECTORS.PREV_BUTTON);
+      const nextButton = document.querySelector(DATE_PICKER_SELECTORS.NEXT_BUTTON);
+
+      if (!todayButton || !prevButton || !nextButton) {
+        return;
+      }
+
+      function getCurrentDate() {
+        if (vanillaCalendar.context && vanillaCalendar.context.selectedDates) {
+          const contextDates = vanillaCalendar.context.selectedDates;
+
+          if (contextDates && contextDates.length > 0) {
+            const dateString = contextDates[0];
+
+            if (dateString === 'today') {
+              return new Date();
+            }
+
+            const date = new Date(dateString);
+
+            if (!isNaN(date.getTime())) {
+              return date;
+            }
+          }
+        }
+
+        const currentState = element.getCurrentState();
+
+        if (currentState.selectedDates && currentState.selectedDates.length > 0) {
+          const dateString = currentState.selectedDates[0];
+
+          if (dateString === 'today') {
+            return new Date();
+          }
+
+          const date = new Date(dateString);
+
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        const selectedDates = vanillaCalendar.selectedDates;
+
+        if (selectedDates && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+
+          if (dateString === 'today') {
+            return new Date();
+          }
+
+          const date = new Date(dateString);
+
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        return new Date();
+      }
+
+      function formatDateToISO(date) {
+        if (!date || isNaN(date.getTime())) {
+          return new Date().toISOString().split('T')[0];
+        }
+
+        return date.toISOString().split('T')[0];
+      }
+
+      function updateDate(selectedDates) {
+        if (selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
+
+          vanillaCalendar.set({
+            selectedDates: selectedDates,
+            selectedMonth: date.getMonth(),
+            selectedYear: date.getFullYear()
+          });
+        } else {
+          vanillaCalendar.set({ selectedDates: selectedDates });
+        }
+
+        const inputElement = document.querySelector(DATE_PICKER_SELECTORS.INPUT);
+
+        if (inputElement && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
+          const formattedValue = element.formatDate(date);
+          inputElement.value = formattedValue;
+        }
+
+        if (!inputElement) {
+          return;
+        }
+
+        const changeEvent = new CustomEvent('change', {
+          detail: {
+            selectedDates: selectedDates,
+            selectedTime: vanillaCalendar.context.selectedTime,
+            rest: vanillaCalendar.context
+          }
+        });
+
+        inputElement.dispatchEvent(changeEvent);
+      }
+
+      todayButton.addEventListener('click', () => {
+        const today = new Date();
+        const todayStr = formatDateToISO(today);
+        updateDate([todayStr]);
+      });
+
+      prevButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() - 1);
+        const prevDate = formatDateToISO(currentDate);
+        updateDate([prevDate]);
+      });
+
+      nextButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() + 1);
+        const nextDate = formatDateToISO(currentDate);
+        updateDate([nextDate]);
+      });
+    }
+
+    // ============================================================================
+    // INITIALIZATION
+    // ============================================================================
+    function initializeScoreDistributionChart() {
+      buildChart(
+        CHART_CONFIG.SCORE_DISTRIBUTION.SELECTOR,
+        buildScoreDistributionChartConfig,
+        buildScoreDistributionThemeConfig('light'),
+        buildScoreDistributionThemeConfig('dark')
+      );
+    }
+
+    function initializeAttendanceDonutChart() {
+      buildChart(
+        CHART_CONFIG.ATTENDANCE_DONUT.SELECTOR,
+        buildAttendanceDonutChartConfig,
+        buildAttendanceDonutThemeConfig('light'),
+        buildAttendanceDonutThemeConfig('dark')
+      );
+    }
+
+    function initializeCharts() {
+      initializeScoreDistributionChart();
+      initializeAttendanceDonutChart();
+    }
+
+    // ============================================================================
+    // MAIN ENTRY POINT
+    // ============================================================================
+    window.addEventListener('load', () => {
+      initializeCharts();
+      requestAnimationFrame(() => {
+        initializeDatePicker();
+      });
+    });
+  })();
+</script>
