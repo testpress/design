@@ -3,6 +3,7 @@ const filter = require("./js/filter");
 module.exports = config => {
     config.addPassthroughCopy("img");
     config.addPassthroughCopy("CNAME");
+
     config.addPassthroughCopy("css/prism.css");
     config.addPassthroughCopy("css/settings.css");
     config.addPassthroughCopy("css/video-js.css");
@@ -32,7 +33,6 @@ module.exports = config => {
     config.addPassthroughCopy("node_modules/vanilla-calendar-pro/index.js");
     config.addPassthroughCopy("node_modules/@preline/datepicker/index.js");
     config.addPassthroughCopy("css/preline-datepicker.src.css");
-    
     config.addPassthroughCopy("./tailwind.css")
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
@@ -40,6 +40,35 @@ module.exports = config => {
     config.addFilter("groupBy", groupBy);
     config.addFilter("filter", filter);
     config.addPassthroughCopy({ "src/api": "api" });
+    config.addPassthroughCopy("css/simba.css");
+    config.addPassthroughCopy({
+        "src/simba/node_modules/preline/dist/preline.js":
+            "src/simba/node_modules/preline/dist/preline.js",
+    });
+    config.addPassthroughCopy({
+        "src/simba/node_modules/apexcharts/dist/apexcharts.css":
+            "src/simba/node_modules/apexcharts/dist/apexcharts.css",
+    });
+    config.addPassthroughCopy({
+        "src/simba/node_modules/lodash/lodash.min.js":
+            "src/simba/node_modules/lodash/lodash.min.js",
+    });
+    config.addPassthroughCopy({
+        "src/simba/node_modules/apexcharts/dist/apexcharts.min.js":
+            "src/simba/node_modules/apexcharts/dist/apexcharts.min.js",
+    });
+    config.addPassthroughCopy({
+        "src/simba/node_modules/clipboard/dist/clipboard.min.js":
+            "src/simba/node_modules/clipboard/dist/clipboard.min.js",
+    });
+    config.addPassthroughCopy({
+        "src/simba/node_modules/preline/dist/helper-clipboard.js":
+            "src/simba/node_modules/preline/dist/helper-clipboard.js",
+    });
+    config.addPassthroughCopy({
+        "src/simba/node_modules/preline/dist/helper-apexcharts.js":
+            "src/simba/node_modules/preline/dist/helper-apexcharts.js",
+    });
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
