@@ -1,0 +1,171 @@
+<script src="https://preline.co/assets/vendor/lodash/lodash.min.js"></script>
+<script src="https://preline.co/assets/vendor/apexcharts/dist/apexcharts.min.js"></script>
+<script src="https://preline.co/assets/vendor/preline/dist/helper-apexcharts.js"></script>
+<script src="https://preline.co/assets/vendor/preline/dist/helper-shared.js"></script>
+
+<script>
+  const cartData = [
+    {% for usage in whatsapp_usage_log %}
+      { 
+        date: "{{ usage.date }}", 
+        cart_notification_count: {{ usage.cart_notification_count }} 
+      }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  // Convert string date to Date object
+  function parseDate(dateStr) {
+    return new Date(dateStr);
+  }
+
+  // Format date to "Jan 2"
+  function formatDate(date) {
+    const options = { month: 'short', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  }
+
+  // Group data by week (chunks of 7)
+  function groupByWeek(data) {
+    const weeks = [];
+    let week = [];
+
+    data.forEach((item, index) => {
+      week.push(item);
+      if (week.length === 7 || index === data.length - 1) {
+        weeks.push(week);
+        week = [];
+      }
+    });
+
+    return weeks.map(weekData => {
+      const start = parseDate(weekData[0].date);
+      const end = parseDate(weekData[weekData.length - 1].date);
+      const total = weekData.reduce((sum, d) => sum + d.cart_notification_count, 0);
+      return {
+        label: `${formatDate(start)} - ${formatDate(end)}`,
+        total
+      };
+    });
+  }
+
+  const weeklyData = groupByWeek(cartData);
+  window.Apex = {
+    currency: {
+      symbol: ''
+    }
+  };
+
+  window.addEventListener('load', () => {
+    // Apex Bar Chart
+    (function () {
+      buildChart('#hs-bar-chart', (mode) => ({
+        chart: {
+          type: 'bar',
+          height: 350,
+          toolbar: { show: false },
+          zoom: { enabled: false }
+        },
+        series: [
+          {
+            name: 'Cart Notifications',
+            data: weeklyData.map(item => item.total)
+          }
+        ],
+        fill: { pattern: { width: 6, height: 6, strokeWidth: 2 } },
+        grid: { strokeDashArray: 3 },
+        plotOptions: { bar: { horizontal: false, columnWidth: '50%', borderRadius: 2 } },
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        stroke: { show: true, width: 3, colors: ['transparent'] },
+        xaxis: {
+          categories: weeklyData.map(item => item.label),
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: false },
+          labels: {
+            style: {
+              colors: varToColor('--chart-colors-xaxis-labels'),
+              fontSize: '13px',
+              fontFamily: cssVarToValue('--font-sans'),
+              fontWeight: 400
+            },
+            offsetX: -2
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: varToColor('--chart-colors-yaxis-labels'),
+              fontSize: '13px',
+              fontFamily: cssVarToValue('--font-sans'),
+              fontWeight: 400
+            },
+            formatter: value => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        tooltip: {
+          custom: function (props) {
+            const { categories } = props.ctx.opts.xaxis;
+            const { dataPointIndex } = props;
+            return buildTooltip(props, {
+              title: categories[dataPointIndex],
+              mode,
+              hasCategory: false,
+              hasTextLabel: true,
+              valuePrefix: '',
+              wrapperExtClasses: 'min-w-28',
+              labelDivider: ':',
+              labelExtClasses: 'ms-2'
+            });
+          }
+        },
+        states: { hover: { filter: { type: 'darken', value: 0.9 } } },
+        responsive: [
+          {
+            breakpoint: 568,
+            options: {
+              chart: { height: 300 },
+              stroke: { width: 8 },
+              labels: {
+                style: {
+                  colors: varToColor('--chart-colors-labels'),
+                  fontSize: '11px',
+                  fontFamily: cssVarToValue('--font-sans'),
+                  fontWeight: 400
+                },
+                offsetX: -2
+              },
+              yaxis: {
+                labels: {
+                  align: 'left',
+                  minWidth: 0,
+                  maxWidth: 140,
+                  style: {
+                    colors: varToColor('--chart-colors-yaxis-labels'),
+                    fontSize: '11px',
+                    fontFamily: cssVarToValue('--font-sans'),
+                    fontWeight: 400
+                  },
+                  formatter: value => value >= 1000 ? `${value / 1000}k` : value
+                }
+              }
+            }
+          }
+        ]
+      }), () => ({
+        colors: [varToColor('--chart-colors-primary')],
+        grid: { borderColor: varToColor('--chart-colors-grid-border') },
+        xaxis: { labels: { style: { colors: varToColor('--chart-colors-xaxis-labels') } } },
+        yaxis: { labels: { style: { colors: varToColor('--chart-colors-yaxis-labels') } } }
+      }), () => ({
+        colors: [varToColor('--chart-colors-primary-inverse')],
+        grid: { borderColor: varToColor('--chart-colors-grid-border-inverse') },
+        xaxis: { labels: { style: { colors: varToColor('--chart-colors-xaxis-labels-inverse') } } },
+        yaxis: { labels: { style: { colors: varToColor('--chart-colors-yaxis-labels-inverse') } } }
+      }));
+    })();
+  });
+</script>
