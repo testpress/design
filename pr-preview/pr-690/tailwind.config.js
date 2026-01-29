@@ -6,6 +6,7 @@ const colors = require('tailwindcss/colors');
 module.exports = {
   content: [
     "./src/**/*.{html,js}",
+    "!./src/simba/**",
     "node_modules/preline/dist/*.js",
     "node_modules/@themesberg/tailwind-datepicker/dist/js/*.js"
   ],
