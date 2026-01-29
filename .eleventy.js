@@ -69,6 +69,10 @@ module.exports = config => {
         "src/simba/node_modules/preline/dist/helper-apexcharts.js":
             "src/simba/node_modules/preline/dist/helper-apexcharts.js",
     });
+    config.addPassthroughCopy({
+        "src/simba/node_modules/vanilla-calendar-pro/index.js":
+            "src/simba/node_modules/vanilla-calendar-pro/index.js",
+    });
     return {
         markdownTemplateEngine: 'njk',
         dataTemplateEngine: 'njk',
