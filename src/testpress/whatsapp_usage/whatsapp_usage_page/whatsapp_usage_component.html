@@ -1,0 +1,181 @@
+<script>
+  function whatsappUsageComponent() {
+    return {
+      selectedMonth: null,
+      monthOptions: [],
+      currentMonth: null,
+
+      // View toggle: 'graph' | 'table'
+      viewMode: 'graph',
+
+      // Daily usage data (stub: will be replaced by API). Shape: { 'YYYY-MM-DD': count }
+      usageByDate: {},
+
+      init() {
+        this.monthOptions = this.get_last_12_months();
+        this.currentMonth = this.monthOptions[0].value;
+
+        // Sync from URL ?month=YYYY-MM
+        const params = new URLSearchParams(window.location.search);
+        const monthParam = params.get('month');
+        if (monthParam) {
+          const normalized = monthParam.length === 7 ? monthParam : monthParam.slice(0, 7);
+          if (this.monthOptions.some(m => m.value === normalized)) {
+            this.selectedMonth = normalized;
+          } else {
+            this.selectedMonth = this.currentMonth;
+          }
+        } else {
+          this.selectedMonth = this.currentMonth;
+        }
+
+        // Keep URL in sync and refetch when selectedMonth changes
+        this.$watch('selectedMonth', (value) => {
+          if (!value) return;
+          const url = new URL(window.location);
+          url.searchParams.set('month', value);
+          const newUrl = url.pathname + url.search;
+          if (window.location.pathname + window.location.search !== newUrl) {
+            window.history.replaceState({}, '', newUrl);
+          }
+          this.fetchUsageForMonth();
+        });
+
+        this.fetchUsageForMonth();
+      },
+
+      get selectedMonthLabel() {
+        const match = this.monthOptions.find(
+          m => m.value === this.selectedMonth
+        );
+        return match ? match.label : '';
+      },
+
+      get_last_12_months() {
+        const months = [];
+        const now = new Date();
+
+        for (let i = 0; i < 12; i++) {
+          const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+
+          months.push({
+            label: date.toLocaleString('default', {
+              month: 'long',
+              year: 'numeric'
+            }),
+            value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+          });
+        }
+        return months;
+      },
+
+      get_previous_month() {
+        const [year, month] = this.selectedMonth.split('-').map(Number);
+        const date = new Date(year, month - 2, 1);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      },
+
+      get_next_month() {
+        if (this.selectedMonth === this.currentMonth) {
+          return this.currentMonth;
+        }
+
+        const [year, month] = this.selectedMonth.split('-').map(Number);
+        const date = new Date(year, month, 1);
+        const next = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        return next > this.currentMonth ? this.currentMonth : next;
+      },
+
+      goToPreviousMonth() {
+        const prev = this.get_previous_month();
+        if (this.monthOptions.some(m => m.value === prev)) {
+          this.selectedMonth = prev;
+          this.fetchUsageForMonth();
+        }
+      },
+
+      goToNextMonth() {
+        const next = this.get_next_month();
+        if (this.monthOptions.some(m => m.value === next)) {
+          this.selectedMonth = next;
+          this.fetchUsageForMonth();
+        }
+      },
+
+      // ---------- View toggle ----------
+      setViewMode(mode) {
+        this.viewMode = mode === 'table' ? 'table' : 'graph';
+      },
+
+      // ---------- Days of selected month (for graph x-axis and table rows) ----------
+      get daysInSelectedMonth() {
+        if (!this.selectedMonth) return [];
+        const [y, m] = this.selectedMonth.split('-').map(Number);
+        const date = new Date(y, m - 1, 1);
+        const days = [];
+        const daysInMonth = new Date(y, m, 0).getDate();
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dayStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          days.push({
+            date: dayStr,
+            dayOfMonth: d,
+            count: this.usageByDate[dayStr] ?? 0
+          });
+        }
+        return days;
+      },
+
+      // ---------- Stats (above graph/table) ----------
+      get totalNotifications() {
+        return this.daysInSelectedMonth.reduce((sum, day) => sum + day.count, 0);
+      },
+
+      get averagePerDay() {
+        const days = this.daysInSelectedMonth;
+        if (days.length === 0) return 0;
+        return Math.round((this.totalNotifications / days.length) * 10) / 10;
+      },
+
+      get highestDay() {
+        const days = this.daysInSelectedMonth;
+        if (days.length === 0) return null;
+        const best = days.reduce((a, b) => (a.count >= b.count ? a : b), days[0]);
+        return {
+          date: best.date,
+          label: new Date(best.date + 'T12:00:00').toLocaleDateString('default', { day: 'numeric', month: 'short', year: 'numeric' }),
+          count: best.count
+        };
+      },
+
+      get zeroUsageDays() {
+        return this.daysInSelectedMonth.filter(d => d.count === 0).length;
+      },
+
+      // ---------- Hardcoded data: deterministic "random" per date (no API) ----------
+      // Same date string always returns same count, so prev/next shows same stats per month.
+      dailyCountForDate(dateStr) {
+        let h = 0;
+        for (let i = 0; i < dateStr.length; i++) {
+          h = ((h << 5) - h) + dateStr.charCodeAt(i) | 0;
+        }
+        return Math.abs(h) % 501; // 0–500 per day
+      },
+
+      fetchUsageForMonth() {
+        if (!this.selectedMonth) {
+          this.usageByDate = {};
+          return;
+        }
+        const [y, m] = this.selectedMonth.split('-').map(Number);
+        const daysInMonth = new Date(y, m, 0).getDate();
+        const byDate = {};
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dayStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          byDate[dayStr] = this.dailyCountForDate(dayStr);
+        }
+        this.usageByDate = byDate;
+      }
+    };
+  }
+</script>
