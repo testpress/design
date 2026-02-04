@@ -1,4 +1,6 @@
 <script>
+  const READINESS_CACHE_KEY = 'sentinel_system_readiness_passed';
+
   function proctoring_test() {
     return {
       consent: false,
@@ -93,8 +95,19 @@
       },
 
       async runAll() {
+        try {
+          if (localStorage.getItem(READINESS_CACHE_KEY)) {
+            this.steps.forEach(s => { s.status = 'success'; s.error = ''; });
+            return;
+          }
+        } catch (_) { /* ignore localStorage errors */ }
         for (let step of this.steps) {
           await this.runStep(step);
+        }
+        if (this.allPassed) {
+          try {
+            localStorage.setItem(READINESS_CACHE_KEY, 'true');
+          } catch (_) { /* ignore */ }
         }
       },
 
@@ -130,15 +143,19 @@
 
       openIdentityModal() {
         if (this.identityVerifyTimeout) clearTimeout(this.identityVerifyTimeout);
-        this.identityStream = null;
         this.identityCapturedImage = null;
         this.identityModalOpen = true;
         this.identityStep = 'verifying';
         const self = this;
+        this.$nextTick(() => this.startCameraForIdentity());
         this.identityVerifyTimeout = setTimeout(() => {
+          if (self.identityStream) {
+            self.identityStream.getTracks().forEach(t => t.stop());
+            self.identityStream = null;
+          }
           self.identityStep = 'auto_failed';
           self.identityVerifyTimeout = null;
-        }, 3000);
+        }, 5000);
       },
 
       closeIdentityModal() {
