@@ -1,4 +1,55 @@
-<div class="mt-6 mb-6" x-data="{activeTab:'previous'}">
+<div class="mt-6 mb-6" x-data="{
+  activeTab:'previous',
+  showDownloadModal: false,
+  currentAttemptId: null,
+  currentCounts: { correct: 0, incorrect: 0, unanswered: 0 },
+  questionTypes: { correct: true, incorrect: true, unanswered: true },
+  solutionDisplay: 'with',
+  openDownloadModal(attemptId, correct, incorrect, unanswered) {
+    this.currentAttemptId = attemptId;
+    this.currentCounts = {
+      correct: parseInt(correct || '0'),
+      incorrect: parseInt(incorrect || '0'),
+      unanswered: parseInt(unanswered || '0')
+    };
+    this.showDownloadModal = true;
+  },
+  get totalSelected() {
+    let total = this.currentCounts.correct + this.currentCounts.incorrect + this.currentCounts.unanswered;
+    let selected = 0;
+    if (this.questionTypes.correct) selected += this.currentCounts.correct;
+    if (this.questionTypes.incorrect) selected += this.currentCounts.incorrect;
+    if (this.questionTypes.unanswered) selected += this.currentCounts.unanswered;
+    return { selected, total };
+  },
+  get hasSelection() {
+    return this.questionTypes.correct || this.questionTypes.incorrect || this.questionTypes.unanswered;
+  },
+  downloadPDF() {
+    const selectedTypes = [];
+    if (this.questionTypes.correct) selectedTypes.push('correct');
+    if (this.questionTypes.incorrect) selectedTypes.push('incorrect');
+    if (this.questionTypes.unanswered) selectedTypes.push('unanswered');
+    
+    if (selectedTypes.length === 0) {
+      alert('Please select at least one question type to download.');
+      return;
+    }
+    
+    if (!this.currentAttemptId) {
+      alert('Error: Attempt ID not found. Please try again.');
+      return;
+    }
+    
+    const params = new URLSearchParams();
+    params.append('question_types', selectedTypes.join(','));
+    params.append('include_solutions', this.solutionDisplay === 'with' ? 'true' : 'false');
+    
+    const downloadUrl = `/exam/download-pdf/${this.currentAttemptId}?${params.toString()}`;
+    window.location.href = downloadUrl;
+    this.showDownloadModal = false;
+  }
+}">
   <div class="px-4 lg:px-0 mt-8 border-b border-gray-200">
     <div class="sm:flex sm:items-baseline">
       <div class="mt-4 sm:mt-0">
