@@ -1,0 +1,226 @@
+<script>
+  const READINESS_CACHE_KEY = 'sentinel_system_readiness_passed';
+
+  function proctoring_test() {
+    return {
+      consent: false,
+      current_state: 'Proctoring Consent',
+      // Identity verification modal: verifying | auto_failed | manual_capture | photo_captured | submitting | success
+      identityModalOpen: false,
+      identityStep: 'verifying',
+      identityStream: null,
+      identityCapturedImage: null,
+      identityVerifyTimeout: null,
+      steps: [
+        {
+          key: 'browser', name: 'Browser Support', description: 'Checks if your browser supports camera, screen share, and WebRTC.', status: 'pending', error: '', run: async function () {
+            const supported = !!navigator.mediaDevices?.getUserMedia && !!navigator.mediaDevices?.getDisplayMedia && !!window.RTCPeerConnection;
+            if (!supported) throw new Error("Browser doesn’t support required APIs. Use Chrome/Edge.");
+          }
+        },
+        {
+          key: 'webcam', name: 'Webcam', description: 'Checks if camera permissions are enabled.', status: 'pending', error: '', run: async function () {
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+              stream.getTracks().forEach(t => t.stop());
+            } catch {
+              throw new Error("Camera access denied or not available.");
+            }
+          }
+        },
+        {
+          key: 'microphone', name: 'Microphone', description: 'Checks if microphone permissions are enabled.', status: 'pending', error: '', run: async function () {
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+              stream.getTracks().forEach(t => t.stop());
+            } catch {
+              throw new Error("Microphone access denied or not available.");
+            }
+          }
+        },
+        {
+          key: 'network',
+          name: 'Network',
+          description: 'Checks network stability.',
+          status: 'pending',
+          error: '',
+          run: async function () {
+            if (!navigator.onLine) {
+              throw new Error("No internet connection.");
+            }
+
+            const start = Date.now();
+
+            await new Promise((resolve, reject) => {
+              const img = new Image();
+              img.src = "https://www.google.com/favicon.ico?" + Date.now();
+
+              const timeout = setTimeout(() => reject(new Error("Network timeout (>5s).")), 5000);
+
+              img.onload = () => {
+                clearTimeout(timeout);
+                resolve();
+              };
+
+              img.onerror = () => {
+                clearTimeout(timeout);
+                reject(new Error("Network check failed (resource blocked)."));
+              };
+            });
+
+            const latency = Date.now() - start;
+            if (latency > 3000) {
+              throw new Error(`High latency detected (${latency}ms).`);
+            }
+          }
+        }
+      ],
+
+      get allPassed() {
+        return this.steps.every(s => s.status === 'success');
+      },
+
+      async runStep(step) {
+        step.status = 'checking';
+        step.error = '';
+        try {
+          // simulate 2s delay so UI updates
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await step.run();
+          step.status = 'success';
+        } catch (err) {
+          step.status = 'error';
+          step.error = err.message;
+        }
+      },
+
+      async runAll() {
+        try {
+          if (localStorage.getItem(READINESS_CACHE_KEY)) {
+            this.steps.forEach(s => { s.status = 'success'; s.error = ''; });
+            return;
+          }
+        } catch (_) { /* ignore localStorage errors */ }
+        for (let step of this.steps) {
+          await this.runStep(step);
+        }
+        if (this.allPassed) {
+          try {
+            localStorage.setItem(READINESS_CACHE_KEY, 'true');
+          } catch (_) { /* ignore */ }
+        }
+      },
+
+      async handleAction(step) {
+        if (step.key === 'network') {
+          // just re-run the test
+          await this.runStep(step);
+        } else if (step.key === 'webcam') {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(t => t.stop());
+            step.status = 'success';
+            step.error = '';
+          } catch {
+            step.status = 'error';
+            step.error = 'Camera access denied or not available.';
+          }
+        } else if (step.key === 'microphone') {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+            step.status = 'success';
+            step.error = '';
+          } catch {
+            step.status = 'error';
+            step.error = 'Microphone access denied or not available.';
+          }
+        } else if (step.key === 'browser') {
+          // Re-check browser features — no real "permission" to ask here
+          await this.runStep(step);
+        }
+      },
+
+      openIdentityModal() {
+        if (this.identityVerifyTimeout) clearTimeout(this.identityVerifyTimeout);
+        this.identityCapturedImage = null;
+        this.identityModalOpen = true;
+        this.identityStep = 'verifying';
+        const self = this;
+        this.$nextTick(() => this.startCameraForIdentity());
+        this.identityVerifyTimeout = setTimeout(() => {
+          if (self.identityStream) {
+            self.identityStream.getTracks().forEach(t => t.stop());
+            self.identityStream = null;
+          }
+          self.identityStep = 'auto_failed';
+          self.identityVerifyTimeout = null;
+        }, 5000);
+      },
+
+      closeIdentityModal() {
+        this.identityModalOpen = false;
+        if (this.identityVerifyTimeout) {
+          clearTimeout(this.identityVerifyTimeout);
+          this.identityVerifyTimeout = null;
+        }
+        if (this.identityStream) {
+          this.identityStream.getTracks().forEach(t => t.stop());
+          this.identityStream = null;
+        }
+        this.identityCapturedImage = null;
+        this.identityStep = 'verifying';
+      },
+
+      acceptManual() {
+        this.identityStep = 'manual_capture';
+        this.$nextTick(() => this.startCameraForIdentity());
+      },
+
+      startCameraForIdentity() {
+        const video = this.$refs.identityVideo;
+        if (!video) return;
+        if (this.identityStream) this.identityStream.getTracks().forEach(t => t.stop());
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            this.identityStream = stream;
+            video.srcObject = stream;
+            video.play();
+          })
+          .catch(() => { });
+      },
+
+      capturePhoto() {
+        const video = this.$refs.identityVideo;
+        if (!video || !this.identityStream) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        this.identityCapturedImage = canvas.toDataURL('image/jpeg');
+        this.identityStream.getTracks().forEach(t => t.stop());
+        this.identityStream = null;
+        this.identityStep = 'photo_captured';
+      },
+
+      retakePhoto() {
+        this.identityCapturedImage = null;
+        this.identityStep = 'manual_capture';
+        this.$nextTick(() => this.startCameraForIdentity());
+      },
+
+      submitForReview() {
+        this.identityStep = 'submitting';
+        const self = this;
+        setTimeout(() => {
+          self.identityStep = 'success';
+        }, 2000);
+      },
+
+      startExam() {
+        this.closeIdentityModal();
+        window.location.hash = '#exam';
+      }
+    }
+  }
+</script>
