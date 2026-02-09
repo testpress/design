@@ -1,0 +1,457 @@
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+  (function () {
+    const dateRangeSelect = document.getElementById('analytics-date-range');
+    let activeUsersChart = null;
+    let watchTimeChart = null;
+    let retentionChart = null;
+
+    function getActiveUsersData(range) {
+      const rangeKey = range || (dateRangeSelect ? dateRangeSelect.value : '30');
+
+      if (rangeKey === '7') {
+        // Last 7 days → daily active users
+        return {
+          categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          activeUsers: [8200, 8450, 8100, 8600, 8800, 9050, 8900],
+          granularityLabel: 'Daily active users (DAU)'
+        };
+      }
+
+      if (rangeKey === '90') {
+        // Last 3 months → weekly active users
+        return {
+          categories: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10', 'W11', 'W12', 'W13'],
+          activeUsers: [28500, 29200, 27800, 30100, 29500, 28800, 31000, 29800, 30500, 29200, 30800, 30200, 31500],
+          granularityLabel: 'Weekly active users (WAU)'
+        };
+      }
+
+      if (rangeKey === '365') {
+        // Last year → monthly active users
+        return {
+          categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+          activeUsers: [68000, 70200, 69500, 72000, 73500, 74800, 76200, 78000, 77200, 79000, 80500, 82000],
+          granularityLabel: 'Monthly active users (MAU)'
+        };
+      }
+
+      // Default: last 30 days → show as weekly buckets W1–W4
+      return {
+        categories: ['W1', 'W2', 'W3', 'W4'],
+        activeUsers: [26000, 27400, 26800, 28100],
+        granularityLabel: 'Weekly active users (WAU)'
+      };
+    }
+
+    function getWatchTimeData(range) {
+      const rangeKey = range || (dateRangeSelect ? dateRangeSelect.value : '30');
+
+      if (rangeKey === '7') {
+        // Last 7 days → daily watch time & sessions
+        return {
+          categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          watchTime: [4200, 4600, 4350, 4800, 5100, 5450, 5300], // in hours
+          sessions: [12000, 12800, 11800, 13200, 14000, 14800, 14500]
+        };
+      }
+
+      if (rangeKey === '90') {
+        // Last 3 months → weekly buckets
+        return {
+          categories: ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8', 'W9', 'W10', 'W11', 'W12', 'W13'],
+          watchTime: [29500, 30200, 28900, 31500, 30800, 30000, 32200, 31800, 32500, 31900, 33200, 32800, 34000],
+          sessions: [78000, 80200, 76500, 82000, 83500, 82800, 85200, 84500, 86000, 85200, 87500, 86800, 89000]
+        };
+      }
+
+      if (rangeKey === '365') {
+        // Last year → monthly buckets
+        return {
+          categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+          watchTime: [112000, 118000, 121000, 126000, 130000, 133000, 137000, 140000, 138000, 142000, 145000, 150000],
+          sessions: [320000, 330000, 340000, 352000, 360000, 368000, 378000, 385000, 380000, 392000, 400000, 410000]
+        };
+      }
+
+      // Default: last 30 days → weekly buckets W1–W4
+      return {
+        categories: ['W1', 'W2', 'W3', 'W4'],
+        watchTime: [28000, 29200, 28800, 30000],
+        sessions: [84000, 86200, 85500, 88000]
+      };
+    }
+
+    function getRetentionData() {
+      // Only support "Last 7 days" view for now.
+      // X-axis: Day 0–Day 6 (days after signup, cumulative).
+      // Y-axis: daily signup cohorts (newest on top).
+      // Color: retention % (y), Cell text & tooltip: active user count (active).
+
+      const xCategories = ['Day 0', 'Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6'];
+
+      // Mock data shaped so that newer cohorts have fewer observed days.
+      const cohorts = [
+        {
+          // Newest signup cohort – only Day 0 data is known.
+          label: 'Feb 9',
+          size: 220,
+          percents: [100, null, null, null, null, null, null],
+          actives:  [220, null, null, null, null, null, null]
+        },
+        {
+          label: 'Feb 8',
+          size: 240,
+          percents: [100, 68, null, null, null, null, null],
+          actives:  [240, 163, null, null, null, null, null]
+        },
+        {
+          label: 'Feb 7',
+          size: 260,
+          percents: [100, 66, 58, null, null, null, null],
+          actives:  [260, 172, 151, null, null, null, null]
+        },
+        {
+          label: 'Feb 6',
+          size: 280,
+          percents: [100, 64, 56, 50, null, null, null],
+          actives:  [280, 179, 157, 140, null, null, null]
+        },
+        {
+          label: 'Feb 5',
+          size: 300,
+          percents: [100, 62, 54, 48, 43, null, null],
+          actives:  [300, 186, 162, 144, 129, null, null]
+        },
+        {
+          label: 'Feb 4',
+          size: 320,
+          percents: [100, 60, 52, 46, 41, 37, null],
+          actives:  [320, 192, 166, 147, 131, 118, null]
+        },
+        {
+          // Oldest cohort – has full 7-day observation window.
+          label: 'Feb 3',
+          size: 340,
+          percents: [100, 58, 50, 44, 40, 36, 32],
+          actives:  [340, 197, 170, 150, 136, 122, 109]
+        }
+      ];
+
+      // Newest cohort first so it appears at the top of the heatmap.
+      const series = cohorts.map(cohort => ({
+        name: cohort.label,
+        data: xCategories.map((xLabel, idx) => ({
+          x: xLabel,
+          y: cohort.percents[idx] ?? null,
+          active: cohort.actives[idx] ?? null
+        }))
+      }));
+
+      return {
+        rangeKey: '7',
+        valueType: 'percent',
+        chartHeight: 350,
+        xCategories,
+        series
+      };
+    }
+
+    function renderRetentionChart(range) {
+      const data = getRetentionData(range);
+      const el = document.getElementById('analytics-retention-cohort-chart');
+      if (!el) return;
+
+      const isPercent = data.valueType === 'percent';
+      const isCumulativeRetention = data.rangeKey === '30' || data.rangeKey === '90';
+      const colorScaleRanges = isPercent
+        ? [
+            // Empty / future cells
+            { from: -0.01, to: 0, color: '#E5E7EB', name: 'Empty', foreColor: '#4B5563' },
+            // Very low: 0–9% (blue-50/100)
+            { from: 0.01, to: 9, color: '#EFF6FF', name: '0–9%', foreColor: '#111827' },
+            // Low: 10–24% (blue-100/200)
+            { from: 10, to: 24, color: '#DBEAFE', name: '10–24%', foreColor: '#111827' },
+            // Medium: 25–49% (blue-200/300)
+            { from: 25, to: 49, color: '#BFDBFE', name: '25–49%', foreColor: '#111827' },
+            // Medium‑high: 50–79% (blue-400)
+            { from: 50, to: 79, color: '#60A5FA', name: '50–79%', foreColor: '#F9FAFB' },
+            // High: 80–100% (blue-600, same family as #2563eb)
+            { from: 80, to: 100, color: '#2563EB', name: '80–100%', foreColor: '#F9FAFB' }
+          ]
+        : [
+            // Fallback for count-based mock data
+            { from: 0, to: 0, color: '#E5E7EB', name: 'No usage', foreColor: '#4B5563' },
+            { from: 1, to: 100, color: '#EFF6FF', name: 'Low', foreColor: '#111827' },
+            { from: 101, to: 500, color: '#DBEAFE', name: 'Medium', foreColor: '#111827' },
+            { from: 501, to: 2000, color: '#60A5FA', name: 'High', foreColor: '#F9FAFB' },
+            { from: 2001, to: 10000, color: '#2563EB', name: 'Very high', foreColor: '#F9FAFB' }
+          ];
+
+      const chartHeight = data.chartHeight || 350;
+      const options = {
+        chart: {
+          type: 'heatmap',
+          height: chartHeight,
+          toolbar: { show: false },
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        },
+        dataLabels: {
+          enabled: true,
+          formatter: function (val, opts) {
+            if (val === null || typeof val === 'undefined') return '';
+            // Always show ACTIVE USER COUNT in the cell
+            const sIdx = opts.seriesIndex;
+            const dIdx = opts.dataPointIndex;
+            const point = opts.w.config.series[sIdx].data[dIdx];
+            if (!point || typeof point !== 'object' || point.active == null) {
+              // Fallback to raw value if no count meta is provided
+              return String(val);
+            }
+            return String(point.active);
+          },
+          style: {
+            fontSize: '11px',
+            colors: ['#111827']
+          }
+        },
+        plotOptions: {
+          heatmap: {
+            shadeIntensity: 0.5,
+            radius: 4,
+            useFillColorAsStroke: false,
+            colorScale: {
+              ranges: colorScaleRanges
+            }
+          }
+        },
+        series: data.series,
+        xaxis: {
+          categories: data.xCategories,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { style: { colors: '#78716c', fontSize: '12px' } }
+        },
+        yaxis: {
+          labels: {
+            style: { colors: '#78716c', fontSize: '12px' }
+          }
+        },
+        legend: { show: false },
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 0,
+          xaxis: { lines: { show: true } },
+          yaxis: { lines: { show: true } }
+        },
+        tooltip: {
+          custom: function (opts) {
+            const { seriesIndex, dataPointIndex, w } = opts;
+            const cohort = w.globals.seriesNames[seriesIndex];
+            const checkpoint = w.globals.labels[dataPointIndex];
+            const point = w.config.series[seriesIndex].data[dataPointIndex];
+
+            if (!point || point.y === null || typeof point.y === 'undefined') {
+              return '<div class="p-2 text-xs font-medium text-stone-800 dark:text-neutral-200">' +
+                cohort + ' → ' + checkpoint + ': <strong>No data yet</strong></div>';
+            }
+
+            const active = point.active != null ? point.active : point.y;
+
+            return '<div class="p-2 text-xs font-medium text-stone-800 dark:text-neutral-200">' +
+              cohort + ' → ' + checkpoint + ': <strong>Active users: ' + active + '</strong></div>';
+          }
+        }
+      };
+
+      if (retentionChart) {
+        retentionChart.updateOptions(options);
+      } else {
+        retentionChart = new ApexCharts(el, options);
+        retentionChart.render();
+      }
+    }
+
+    function renderActiveUsersChart(range) {
+      const data = getActiveUsersData(range);
+      const el = document.getElementById('analytics-active-users-chart');
+      if (!el) return;
+
+      const values = data.activeUsers;
+      const minVal = Math.min.apply(null, values);
+      const maxVal = Math.max.apply(null, values);
+      const yMin = Math.floor(minVal / 1000) * 1000;
+      const yMax = Math.ceil(maxVal / 1000) * 1000;
+
+      const options = {
+        chart: {
+          type: 'line',
+          height: 300,
+          toolbar: { show: false },
+          zoom: { enabled: false },
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        },
+        series: [
+          { name: 'Active users', data: data.activeUsers }
+        ],
+        xaxis: {
+          categories: data.categories,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { style: { colors: '#78716c', fontSize: '12px' } }
+        },
+        yaxis: {
+          min: yMin,
+          max: yMax,
+          tickAmount: 2,
+          labels: {
+            style: { colors: '#78716c', fontSize: '12px' },
+            formatter: function (v) {
+              if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+              if (v >= 1000) return (v / 1000).toFixed(0) + 'k';
+              return v.toFixed(0);
+            }
+          }
+        },
+        legend: {
+          show: false
+        },
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 2,
+          xaxis: { lines: { show: false } }
+        },
+        colors: ['#2563eb'],
+        stroke: { curve: 'smooth', width: 3 },
+        markers: {
+          size: 4,
+          strokeWidth: 0,
+          strokeColors: '#fff',
+          hover: { size: 6 }
+        },
+        tooltip: {
+          shared: true,
+          intersect: false,
+          y: {
+            formatter: function (v) {
+              if (v >= 1000000) return (v / 1000000).toFixed(2) + 'M users';
+              if (v >= 1000) return (v / 1000).toFixed(1) + 'k users';
+              return v.toFixed(0) + ' users';
+            }
+          }
+        }
+      };
+
+      if (activeUsersChart) {
+        // When date range changes, we need to update series, axes,
+        // and y-axis bounds together so the chart rescales correctly.
+        activeUsersChart.updateOptions(options);
+      } else {
+        activeUsersChart = new ApexCharts(el, options);
+        activeUsersChart.render();
+      }
+    }
+
+    function renderWatchTimeChart(range) {
+      const data = getWatchTimeData(range);
+      const el = document.getElementById('analytics-watch-time-sessions-chart');
+      if (!el) return;
+
+      const options = {
+        chart: {
+          type: 'line',
+          height: 300,
+          toolbar: { show: false },
+          zoom: { enabled: false },
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        },
+        series: [
+          { name: 'Total watch time (hours)', data: data.watchTime },
+          { name: 'Sessions', data: data.sessions }
+        ],
+        xaxis: {
+          categories: data.categories,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { style: { colors: '#78716c', fontSize: '12px' } }
+        },
+        yaxis: {
+          labels: {
+            style: { colors: '#78716c', fontSize: '12px' },
+            formatter: function (v) {
+              if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+              if (v >= 1000) return (v / 1000).toFixed(0) + 'k';
+              return v.toFixed(0);
+            }
+          }
+        },
+        legend: {
+          position: 'bottom',
+          horizontalAlign: 'center',
+          fontSize: '13px',
+          fontWeight: 500,
+          labels: { colors: '#44403c' }
+        },
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 2,
+          xaxis: { lines: { show: false } }
+        },
+        colors: ['#10b981', '#2563eb'],
+        stroke: { curve: 'smooth', width: 3 },
+        markers: {
+          size: 4,
+          strokeWidth: 0,
+          strokeColors: '#fff',
+          hover: { size: 6 }
+        },
+        tooltip: {
+          shared: true,
+          intersect: false,
+          y: {
+            formatter: function (v, opts) {
+              const seriesIndex = opts.seriesIndex;
+              if (seriesIndex === 0) {
+                // watch time
+                if (v >= 1000) return (v / 1000).toFixed(1) + 'k hours';
+                return v.toFixed(0) + ' hours';
+              }
+              // sessions
+              if (v >= 1000000) return (v / 1000000).toFixed(2) + 'M sessions';
+              if (v >= 1000) return (v / 1000).toFixed(1) + 'k sessions';
+              return v.toFixed(0) + ' sessions';
+            }
+          }
+        }
+      };
+
+      if (watchTimeChart) {
+        watchTimeChart.updateOptions(options);
+      } else {
+        watchTimeChart = new ApexCharts(el, options);
+        watchTimeChart.render();
+      }
+    }
+
+    function updateUserAnalyticsCharts(range) {
+      renderActiveUsersChart(range);
+      renderWatchTimeChart(range);
+      renderRetentionChart(range);
+    }
+
+    if (dateRangeSelect) {
+      dateRangeSelect.addEventListener('change', function () {
+        updateUserAnalyticsCharts(this.value);
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () { updateUserAnalyticsCharts(); }, 100);
+      });
+    } else {
+      setTimeout(function () { updateUserAnalyticsCharts(); }, 100);
+    }
+  })();
+</script>
+
