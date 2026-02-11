@@ -28,7 +28,10 @@ module.exports = {
           700: 'rgb(var(--color-primary-700) / <alpha-value>)',
           800: 'rgb(var(--color-primary-800) / <alpha-value>)',
           900: 'rgb(var(--color-primary-900) / <alpha-value>)',
-        }
+        },
+        'surface': '#f6f3f4',
+        'surface-2': '#d1d5dc',
+        'layer': '#fff',
       }
     },
     aspectRatio: {
