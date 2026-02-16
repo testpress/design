@@ -78,10 +78,18 @@ Preline card with search, filter dropdown, sortable columns, row actions dropdow
                 </div>
               </div>
             </th>
-            <th scope="col" class="min-w-36">Date</th>
-            <th scope="col" class="min-w-42.5">Status</th>
-            <th scope="col" class="min-w-75">Product</th>
-            <th scope="col">Amount</th>
+            <th scope="col" class="min-w-36">
+              <span class="px-5 py-2.5 block w-full text-start text-sm font-normal text-gray-500 dark:text-neutral-400 text-nowrap whitespace-nowrap">Date</span>
+            </th>
+            <th scope="col" class="min-w-42.5">
+              <span class="px-5 py-2.5 block w-full text-start text-sm font-normal text-gray-500 dark:text-neutral-400 text-nowrap whitespace-nowrap">Status</span>
+            </th>
+            <th scope="col" class="min-w-75">
+              <span class="px-5 py-2.5 block w-full text-start text-sm font-normal text-gray-500 dark:text-neutral-400 text-nowrap whitespace-nowrap">Product</span>
+            </th>
+            <th scope="col">
+              <span class="px-5 py-2.5 block w-full text-start text-sm font-normal text-gray-500 dark:text-neutral-400 text-nowrap whitespace-nowrap">Amount</span>
+            </th>
             <th scope="col"></th>
           </tr>
         </thead>
@@ -92,7 +100,7 @@ Preline card with search, filter dropdown, sortable columns, row actions dropdow
             </td>
             <td class="size-px whitespace-nowrap px-4 py-1">
               <div class="w-full flex items-center gap-x-3">
-                <img class="shrink-0 size-9.5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-full" src="https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=320&h=320&fit=facearea&facepad=3" alt="Avatar" />
+                <img class="shrink-0 size-[2.375rem] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-full" src="https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=320&h=320&fit=facearea&facepad=3" alt="Avatar" />
                 <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">Amanda Harvey</span>
               </div>
             </td>
@@ -135,7 +143,7 @@ Preline card with search, filter dropdown, sortable columns, row actions dropdow
             </td>
             <td class="size-px whitespace-nowrap px-4 py-1">
               <div class="w-full flex items-center gap-x-3">
-                <span class="flex shrink-0 justify-center items-center size-9.5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-white text-xs font-medium uppercase rounded-full">Rd</span>
+                <span class="flex shrink-0 justify-center items-center size-[2.375rem] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-white text-xs font-medium uppercase rounded-full">Rd</span>
                 <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">Rachel Doe</span>
               </div>
             </td>
