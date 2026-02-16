@@ -80,9 +80,56 @@ Preline + Tailwind stats grid. Card layout: icon, label, value, optional subtitl
 
 - **Container:** `grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-5`
 - **Card:** `p-4 sm:p-5 bg-white border border-gray-200 rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700`
-- **Inside:** icon (colored, e.g. `text-blue-400`), label (`text-sm text-gray-500`), value (`text-lg md:text-xl font-semibold`), optional subtitle (`text-sm text-gray-500`)
+- **Inside:** icon (colored, e.g. `text-blue-400`), label (plain or badge), value (`text-lg md:text-xl font-semibold`), optional subtitle (`text-sm text-gray-500`)
 
-Icon colors used: `text-blue-400`, `text-yellow-400`, `text-green-400`, `text-purple-400`.
+**Label options:** plain `h2` with `text-sm text-gray-500`, or **badge** (bar + text):
+
+```html
+<span class="flex items-center gap-x-1.5 py-px">
+  <span class="w-1 h-3 bg-sky-500 rounded-full"></span>
+  <span class="font-medium text-[13px] text-sky-800 dark:text-sky-400">Label</span>
+</span>
+```
+
+Use `bg-{color}-500` for the bar and `text-{color}-800 dark:text-{color}-400` for the text. Icon colors: `text-blue-400`, `text-yellow-400`, `text-green-400`, `text-purple-400`.
+
+---
+
+## Colored stats (tinted card background)
+
+Same layout as above but each card has a tinted background and matching icon/label color. Use for dashboards where you want stronger visual separation between metrics.
+
+**Card:** `p-4 sm:p-5 bg-{color}-100 rounded-xl shadow-2xs dark:bg-{color}-500/20` (no border).  
+**Label (badge):** bar `w-1 h-3 bg-{color}-500 rounded-full` + text `font-medium text-[13px] text-{color}-800 dark:text-{color}-400`.  
+**Icon:** `size-6 text-{color}-500`.  
+**Value:** keep `text-gray-800 dark:text-neutral-200`.  
+**Subtitle:** keep `text-gray-500 dark:text-neutral-400`.  
+**Layout:** use `space-y-3` in the grow div so badge and value are spaced.
+
+Colors: `sky`, `amber`, `emerald`, `violet` (or `indigo`).
+
+```html
+<!-- Colored Stats Grid (with badge) -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 lg:gap-5">
+  <!-- Sky -->
+  <div class="p-4 sm:p-5 bg-sky-100 rounded-xl shadow-2xs dark:bg-sky-500/20">
+    <div class="sm:flex sm:gap-x-3">
+      <svg class="sm:order-2 mb-2 sm:mb-0 shrink-0 size-6 text-sky-500" ...></svg>
+      <div class="sm:order-1 grow space-y-3">
+        <span class="flex items-center gap-x-1.5 py-px">
+          <span class="w-1 h-3 bg-sky-500 rounded-full"></span>
+          <span class="font-medium text-[13px] text-sky-800 dark:text-sky-400">Label</span>
+        </span>
+        <p class="text-lg md:text-xl font-semibold text-gray-800 dark:text-neutral-200">156</p>
+      </div>
+    </div>
+    <div class="mt-1 flex items-center gap-x-2">
+      <span class="text-sm leading-5 text-gray-500 dark:text-neutral-400">Subtitle</span>
+    </div>
+  </div>
+  <!-- Amber, emerald, violet: same structure with bg-amber-500, bg-emerald-500, bg-violet-500 for bar and matching text-{color}-* -->
+</div>
+```
 
 ---
 
