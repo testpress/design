@@ -6,4 +6,6 @@ Instructions and reference for AI assistants working in this repo.
 
 - **preline/** — Preline UI components and usage
 - **tailwind/** — Tailwind CSS patterns and config
+- **font/** — Font usage and references
+- **git-commit-guideline.md** — How to write Git commit messages (seven rules)
 
