@@ -1,0 +1,91 @@
+---
+tags: testpress
+exam_board_view: Session Level Monitoring
+permalink: testpress/offline_center_exams/exam/centre/session/
+date: 2026-02-13
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+<div class="py-10 max-w-7xl mx-auto lg:px-8 px-4 space-y-5">
+  <div>
+    {% include "./breadcrumb.html" %}
+    <div class="p-5 space-y-4 flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+      {% include "./header.html" %}
+      {% include "./pipeline_stats.html" %}
+    </div>
+  </div>
+  {% include "./students_allocation.html" %}
+</div>
+{% endblock content %}
+
+{% block script %}
+<script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.1/dist/apexcharts.min.js"></script>
+<script>
+(function () {
+  var total = 300;
+  var pipeline = [
+    { id: 'session-pipeline-chart-scheduled', completed: 250, color: '#38bdf8', colorDark: '#7dd3fc' },
+    { id: 'session-pipeline-chart-registered', completed: 240, color: '#34d399', colorDark: '#6ee7b7' },
+    { id: 'session-pipeline-chart-biometrics', completed: 230, color: '#fbbf24', colorDark: '#fcd34d' },
+    { id: 'session-pipeline-chart-photo', completed: 220, color: '#fb923c', colorDark: '#fdba74' },
+    { id: 'session-pipeline-chart-present', completed: 210, color: '#818cf8', colorDark: '#a5b4fc' },
+    { id: 'session-pipeline-chart-absent', completed: 30, color: '#fb7185', colorDark: '#fda4af' }
+  ];
+  var pendingColor = '#e5e7eb';
+  var pendingColorDark = '#a3a3a3';
+
+  function getOptions(completed, totalVal, accentColor, size) {
+    size = size || 168;
+    var pending = totalVal - completed;
+    return {
+      chart: { type: 'donut', height: size, width: size, sparkline: { enabled: false } },
+      series: [completed, pending],
+      labels: ['Completed', 'Pending'],
+      legend: { show: false },
+      dataLabels: { enabled: false },
+      plotOptions: {
+        pie: {
+          donut: { size: '75%' },
+          expandOnClick: false
+        }
+      },
+      stroke: { width: 2, colors: ['#fff', '#fff'] },
+      colors: [accentColor, document.documentElement.classList.contains('dark') ? pendingColorDark : pendingColor],
+      states: { hover: { filter: { type: 'none' } }, active: { filter: { type: 'none' } } },
+      tooltip: { enabled: false }
+    };
+  }
+
+  function render() {
+    var isDark = document.documentElement.classList.contains('dark');
+    pipeline.forEach(function (item) {
+      var el = document.getElementById(item.id);
+      if (!el) return;
+      var wrapper = el.parentElement;
+      var size = (wrapper && wrapper.offsetWidth) ? wrapper.offsetWidth : 168;
+      var color = isDark ? item.colorDark : item.color;
+      var opts = getOptions(item.completed, total, color, size);
+      if (el._chart) {
+        el._chart.updateOptions(opts);
+        return;
+      }
+      el._chart = new ApexCharts(el, opts);
+      el._chart.render();
+    });
+  }
+
+  if (typeof ApexCharts !== 'undefined') {
+    render();
+    document.documentElement.addEventListener('theme-change', render);
+  } else {
+    window.addEventListener('load', function () {
+      if (typeof ApexCharts !== 'undefined') render();
+    });
+  }
+})();
+</script>
+{% endblock script %}
