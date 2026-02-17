@@ -638,8 +638,8 @@
   </button>
 </nav>
 <!-- End Nav Tab -->
-    <div class="grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5 border-gray-200 dark:border-neutral-700">
-  <div>
+    <div class="flex flex-wrap items-center gap-y-2 gap-x-5 border-gray-200 dark:border-neutral-700 justify-between">
+  <div class="grow min-w-0 max-w-md">
     <!-- Search Input -->
     <div class="relative">
       <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-3.5">
@@ -656,6 +656,18 @@
     </div>
     <!-- End Search Input -->
   </div>
+  <div x-show="activeTab === 'ready_to_start' && selectedCohorts.length > 0" x-cloak x-transition class="flex items-center shrink-0">
+    <button type="button" @click="openBulkPresentation()" data-hs-overlay="#cohort-start-presentation-modal"
+      class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+      <svg class="size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+        <path d="M16 3.128a4 4 0 0 1 0 7.744"/>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+        <circle cx="9" cy="7" r="4"/>
+      </svg>
+      Start group presentation
+    </button>
+  </div>
 </div>
 
     <div>
@@ -670,6 +682,16 @@
       <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
         <thead>
           <tr class="border-t border-gray-200 dark:border-neutral-700">
+            <!-- Checkbox Column -->
+            <th scope="col" class="w-[50px] px-4 py-2.5">
+              <div class="flex items-center">
+                <input type="checkbox" @change="toggleAllCohorts()"
+                  :checked="filteredReadyToStart.length > 0 && filteredReadyToStart.every(c => selectedCohorts.includes(c.id))"
+                  class="hs-datatable-select-row shrink-0 border-gray-300 rounded-sm text-green-600 focus:ring-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
+              </div>
+            </th>
+            <!-- End Checkbox Column -->
+
             <!-- Cohort Name Column -->
             <th scope="col" class="min-w-[200px]">
               <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
@@ -786,6 +808,16 @@
         <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
           <template x-for="cohort in filteredReadyToStart" :key="cohort.id">
             <tr>
+              <!-- Checkbox -->
+              <td class="size-px whitespace-nowrap px-4 py-3">
+                <div class="flex items-center">
+                  <input type="checkbox" :checked="selectedCohorts.includes(cohort.id)"
+                    @change="toggleCohortSelection(cohort.id)"
+                    class="hs-datatable-select-row shrink-0 border-gray-300 rounded-sm text-green-600 focus:ring-green-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-green-500 dark:checked:border-green-500 dark:focus:ring-offset-neutral-800">
+                </div>
+              </td>
+              <!-- End Checkbox -->
+
               <!-- Cohort Name -->
               <td class="size-px whitespace-nowrap px-5 py-3">
                 <div class="flex items-center gap-x-3">
@@ -814,10 +846,10 @@
 
               <!-- Action -->
               <td class="size-px whitespace-nowrap px-4 py-3 text-end">
-                <a :href="'/admin/courses/' + cohort.course_id + '/present/?cohort_id=' + cohort.id"
+                <button type="button" @click="openPresentationForCohort(cohort)" data-hs-overlay="#cohort-start-presentation-modal"
                   class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-xs hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
                   Start Presenting
-                </a>
+                </button>
               </td>
               <!-- End Action -->
             </tr>
@@ -1130,6 +1162,234 @@
       </div>
     </div>
   </div>
+
+  <!-- Start Presentation Modal (shared for single + group) -->
+<div id="cohort-start-presentation-modal"
+  class="hs-overlay hidden size-full fixed top-0 start-0 z-[30] overflow-x-hidden overflow-y-auto [--close-when-click-inside:true] pointer-events-none"
+  role="dialog" tabindex="-1" aria-labelledby="cohort-start-presentation-modal-label">
+  <div
+    class="hs-overlay-open:mt-7 hs-overlay-open:opacity-100 hs-overlay-open:duration-500 mt-0 opacity-0 ease-out transition-all sm:max-w-xl sm:w-full m-3 sm:mx-auto h-[calc(100%-3.5rem)] min-h-[calc(100%-3.5rem)] flex items-center">
+    <div
+      class="w-full max-h-full flex flex-col bg-white border border-gray-200 rounded-xl pointer-events-auto shadow-xl dark:bg-neutral-800 dark:border-neutral-700">
+
+      <!-- Header -->
+      <div class="py-2.5 px-4 border-b border-gray-200 dark:border-neutral-700">
+        <div class="flex justify-between items-start">
+          <div class="flex-1 min-w-0 pr-4">
+            <h3 id="cohort-start-presentation-modal-label"
+              class="font-medium text-gray-800 truncate line-clamp-1 dark:text-neutral-200">
+              Select Participants for <span x-text="presentationCourseName"></span>
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+              <span x-text="organizations.flatMap(o => o.cohorts).length"></span> cohort<span x-show="organizations.flatMap(o => o.cohorts).length !== 1">s</span> selected · 
+              <span x-text="organizations.flatMap(o => o.cohorts.flatMap(c => c.users)).length"></span> eligible user<span x-show="organizations.flatMap(o => o.cohorts.flatMap(c => c.users)).length !== 1">s</span> · 
+              Capacity <span x-text="maxBatchSize"></span>
+            </p>
+          </div>
+          <button type="button"
+            class="size-8 shrink-0 flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-200 dark:bg-neutral-700 dark:hover:bg-neutral-600 dark:text-neutral-400 dark:focus:bg-neutral-600"
+            aria-label="Close" data-hs-overlay="#cohort-start-presentation-modal">
+            <span class="sr-only">Close</span>
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <!-- End Header -->
+
+      <!-- Search Section -->
+      <div class="p-4 border-b border-gray-200 dark:border-neutral-700">
+        <!-- Search Input -->
+        <div class="relative w-full mb-3">
+          <input type="text" x-model="modalSearchQuery"
+            class="py-2 px-3 ps-9 block w-full bg-white border-gray-200 rounded-lg text-sm text-gray-800 placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-400"
+            placeholder="Search participants...">
+          <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+            <svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg"
+              width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+          </div>
+        </div>
+        <!-- End Search Input -->
+
+        <!-- Select All Checkbox -->
+        <div class="flex items-center justify-between">
+          <label class="flex items-center cursor-pointer">
+            <input type="checkbox"
+              class="shrink-0 size-4 border-gray-300 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-600 dark:checked:bg-emerald-500 dark:checked:border-emerald-500"
+              id="select-all-participants" :checked="allVisibleUsersSelected" @change="toggleSelectAllVisible()">
+            <span class="ms-2 text-sm text-gray-600 dark:text-neutral-400">
+              Select all (<span x-text="getAllVisibleUserIds().length"></span> participants)
+            </span>
+          </label>
+          <span class="text-sm font-medium" :class="selectedUsersCount >= maxBatchSize ? 'text-red-600 dark:text-red-400' : 'text-gray-700 dark:text-neutral-300'">
+            Selected <span x-text="selectedUsersCount"></span>/<span x-text="maxBatchSize"></span>
+          </span>
+        </div>
+        <!-- End Select All -->
+
+        <!-- Capacity Alert -->
+        <div x-show="selectedUsersCount >= maxBatchSize" x-cloak
+          class="mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-md flex items-center gap-2 dark:bg-red-900/10 dark:border-red-900/20">
+          <svg class="w-4 h-4 text-red-600 flex-shrink-0 dark:text-red-400" xmlns="http://www.w3.org/2000/svg"
+            width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" x2="12" y1="8" y2="12" />
+            <line x1="12" x2="12.01" y1="16" y2="16" />
+          </svg>
+          <p class="text-sm text-red-700 dark:text-red-300">
+            Maximum capacity of <span x-text="maxBatchSize"></span> reached. Deselect to add others.
+          </p>
+        </div>
+        <!-- End Capacity Alert -->
+      </div>
+      <!-- End Search Section -->
+
+      <!-- Body -->
+      <div
+        class="flex-1 min-h-[300px] max-h-[calc(85vh-200px)] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+        <div class="p-4">
+          
+          <!-- Loop through organizations -->
+          <template x-for="(org, orgIndex) in organizations" :key="org.id">
+            <div x-show="orgHasVisibleUsers(org)" :class="orgIndex > 0 ? 'mt-8' : ''">
+              
+              <!-- Organization Header with Select All -->
+              <div class="mb-4">
+                <div class="flex items-center gap-x-2 mb-1">
+                  <input type="checkbox"
+                    class="shrink-0 size-4 border-gray-300 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-600 dark:checked:bg-emerald-500 dark:checked:border-emerald-500"
+                    :id="'select-org-' + org.id"
+                    :checked="allVisibleInOrgSelected(org)"
+                    @change="toggleAllInOrg(org)">
+                  <label :for="'select-org-' + org.id" class="flex-1 text-sm font-semibold text-gray-800 dark:text-neutral-200 cursor-pointer truncate">
+                    <span x-text="org.name"></span>
+                  </label>
+                  <span class="text-xs font-medium text-gray-700 dark:text-neutral-300 whitespace-nowrap">
+                    <span x-text="selectedCountInOrg(org)"></span>/<span x-text="getVisibleUsersInOrg(org).length"></span>
+                  </span>
+                </div>
+                <div class="ps-6 text-xs text-gray-600 dark:text-neutral-400">
+                  ONO: <span x-text="org.ono_contact"></span>
+                </div>
+              </div>
+              
+              <!-- Loop through cohorts in organization -->
+              <template x-for="cohort in org.cohorts" :key="cohort.id">
+                <div x-show="cohortHasVisibleUsers(cohort)" class="mb-4 ps-4">
+                  
+                  <!-- Cohort Header with Select All -->
+                  <div class="flex items-center gap-x-2 mb-2">
+                    <input type="checkbox"
+                      class="shrink-0 size-4 border-gray-300 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-600 dark:checked:bg-emerald-500 dark:checked:border-emerald-500"
+                      :id="'select-cohort-' + cohort.id"
+                      :checked="allVisibleInCohortSelected(cohort)"
+                      @change="toggleAllInCohort(cohort)">
+                    <label :for="'select-cohort-' + cohort.id" class="flex-1 text-sm font-medium text-gray-700 dark:text-neutral-300 cursor-pointer truncate">
+                      <span x-text="cohort.name"></span>
+                    </label>
+                    <span class="text-xs font-medium text-gray-700 dark:text-neutral-300 whitespace-nowrap">
+                      <span x-text="selectedCountInCohort(cohort)"></span>/<span x-text="getVisibleUsersInCohort(cohort).length"></span> participants
+                    </span>
+                  </div>
+
+                  <!-- Users List -->
+                  <div class="space-y-1 ps-2">
+                    
+                    <template x-for="user in cohort.users" :key="user.id">
+                      <label x-show="matchesModalSearch(user)" 
+                        class="flex items-center gap-x-3 py-2 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-neutral-700 cursor-pointer transition-colors"
+                        :class="!canSelectMore() && !isUserSelected(user.id) ? 'opacity-50' : ''">
+                        <input type="checkbox"
+                          class="shrink-0 size-4 border-gray-300 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-600 dark:checked:bg-emerald-500 dark:checked:border-emerald-500"
+                          :checked="isUserSelected(user.id)"
+                          :disabled="!canSelectMore() && !isUserSelected(user.id)"
+                          @change="toggleUserSelection(user.id)">
+                        
+                        <!-- Avatar: Image if available, otherwise initial -->
+                        <img x-show="user.avatar" :src="user.avatar" :alt="user.name" 
+                          class="shrink-0 size-8 rounded-full object-cover">
+                        <span x-show="!user.avatar" 
+                          class="flex shrink-0 justify-center items-center size-8 text-xs font-semibold rounded-full text-white"
+                          :class="{
+                            'bg-blue-500': getAvatarNumber(user.id) % 5 === 0,
+                            'bg-indigo-500': getAvatarNumber(user.id) % 5 === 1,
+                            'bg-purple-500': getAvatarNumber(user.id) % 5 === 2,
+                            'bg-emerald-500': getAvatarNumber(user.id) % 5 === 3,
+                            'bg-orange-500': getAvatarNumber(user.id) % 5 === 4
+                          }"
+                          x-text="user.name.charAt(0).toUpperCase()">
+                        </span>
+                        
+                        <div class="grow min-w-0">
+                          <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="user.name"></span>
+                          <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="user.id"></span>
+                        </div>
+                      </label>
+                    </template>
+
+                  </div>
+                </div>
+              </template>
+
+            </div>
+          </template>
+
+          <!-- Empty State -->
+          <div x-show="!organizations.some(org => orgHasVisibleUsers(org))" class="flex flex-col items-center justify-center py-12 text-center">
+            <svg class="w-12 h-12 text-gray-400 dark:text-neutral-600 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <p class="text-sm text-gray-600 dark:text-neutral-400">No participants found</p>
+            <p class="text-xs text-gray-500 dark:text-neutral-500 mt-1">Try adjusting your search</p>
+          </div>
+
+        </div>
+      </div>
+      <!-- End Body -->
+
+      <!-- Footer -->
+      <div class="p-4 flex justify-between items-center gap-x-3 border-t border-gray-200 dark:border-neutral-700">
+        <div class="text-xs text-gray-600 dark:text-neutral-400">
+          <span x-show="selectedUsersCount === 0">Please select participants to continue</span>
+          <span x-show="selectedUsersCount > 0 && selectedUsersCount <= maxBatchSize">
+            <span x-text="selectedUsersCount"></span> participant<span x-show="selectedUsersCount !== 1">s</span> selected
+          </span>
+          <span x-show="selectedUsersCount > maxBatchSize" class="text-red-600 dark:text-red-400">
+            Exceeded capacity by <span x-text="selectedUsersCount - maxBatchSize"></span>
+          </span>
+        </div>
+        <div class="flex gap-x-2">
+          <button type="button"
+            class="py-2 px-3 inline-flex justify-center items-center text-start bg-white border border-gray-200 text-gray-800 text-sm font-medium rounded-lg shadow-xs align-middle hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"
+            data-hs-overlay="#cohort-start-presentation-modal">
+            Cancel
+          </button>
+          <button type="button"
+            class="py-2 px-3 inline-flex justify-center items-center gap-x-2 text-start bg-emerald-600 border border-emerald-600 text-white text-sm font-medium rounded-lg shadow-xs align-middle hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:ring-1 focus:ring-emerald-300 dark:focus:ring-emerald-500"
+            :disabled="!selectedUsersCount || selectedUsersCount > maxBatchSize">
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Start Presentation
+          </button>
+        </div>
+      </div>
+      <!-- End Footer -->
+
+    </div>
+  </div>
+</div>
+
+
 </div>
 
   </div>
@@ -1140,6 +1400,53 @@
     return {
       activeTab: 'ready_to_start',
       searchQuery: '',
+      selectedCohorts: [],
+      presentationMode: 'single', // 'single' | 'group'
+      maxBatchSize: 10,
+      selectedUsers: [],
+      modalSearchQuery: '',
+      presentationCohorts: [],
+
+      organizations: [
+        {
+          id: 'agile',
+          name: 'Agile Aviation Services Pvt. Ltd.',
+          ono_contact: 'Rajesh Kumar',
+          cohorts: [
+            {
+              id: 'agile-2026-02-11',
+              name: 'Agile ASPL - 11/02/2026',
+              users: [
+                { id: 'AGILE0006', name: 'Rajesh Kumar', avatar: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' },
+                { id: 'AGILE0007', name: 'Priya Sharma' },
+                { id: 'AGILE0008', name: 'Amit Patel', avatar: 'https://images.unsplash.com/photo-1601935111741-ae98b2b230b0?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' },
+                { id: 'AGILE0009', name: 'Sunita Verma' },
+                { id: 'AGILE0010', name: 'Vikram Singh', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' },
+                { id: 'AGILE0011', name: 'Anjali Desai' },
+                { id: 'AGILE0012', name: 'Rahul Mehta', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' }
+              ]
+            }
+          ]
+        },
+        {
+          id: 'skyway',
+          name: 'Skyway Ground Handling',
+          ono_contact: 'Priya Sharma',
+          cohorts: [
+            {
+              id: 'skyway-2026-02-12',
+              name: 'Skyway Batch - 12/02/2026',
+              users: [
+                { id: 'SKY0003', name: 'Michael Chen', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' },
+                { id: 'SKY0004', name: 'Sarah Johnson' },
+                { id: 'SKY0005', name: 'David Williams', avatar: 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' },
+                { id: 'SKY0006', name: 'Emily Brown' },
+                { id: 'SKY0007', name: 'James Anderson', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' }
+              ]
+            }
+          ]
+        }
+      ],
 
       readyToStart: [
         {
@@ -1284,6 +1591,31 @@
         );
       },
 
+      get selectedUsersCount() {
+        return this.selectedUsers.length;
+      },
+
+      get allVisibleUsersSelected() {
+        const visible = this.getAllVisibleUserIds();
+        if (visible.length === 0) return false;
+        // If we've selected as many as capacity allows, or all visible users, consider it "all selected"
+        const selectedVisibleCount = visible.filter(id => this.selectedUsers.includes(id)).length;
+        return selectedVisibleCount > 0 && (
+          selectedVisibleCount === visible.length || 
+          selectedVisibleCount >= this.maxBatchSize
+        );
+      },
+
+      get presentationCourseName() {
+        if (!this.presentationCohorts.length) return '';
+        return this.presentationCohorts[0].course_name || '';
+      },
+
+      get totalEligibleInSelection() {
+        return this.presentationCohorts.reduce((sum, cohort) =>
+          sum + (cohort.learners_count || 0), 0);
+      },
+
       get readyToStartCount() {
         return this.filteredReadyToStart.length;
       },
@@ -1306,6 +1638,162 @@
         // Filtering is handled by computed properties
       },
 
+      toggleAllCohorts() {
+        const allSelected = this.filteredReadyToStart.length > 0 &&
+          this.filteredReadyToStart.every(c => this.selectedCohorts.includes(c.id));
+        if (allSelected) {
+          this.selectedCohorts = this.selectedCohorts.filter(id =>
+            !this.filteredReadyToStart.some(c => c.id === id));
+        } else {
+          const idsToAdd = this.filteredReadyToStart.map(c => c.id).filter(id => !this.selectedCohorts.includes(id));
+          this.selectedCohorts = [...this.selectedCohorts, ...idsToAdd];
+        }
+      },
+
+      toggleCohortSelection(id) {
+        if (this.selectedCohorts.includes(id)) {
+          this.selectedCohorts = this.selectedCohorts.filter(cid => cid !== id);
+        } else {
+          this.selectedCohorts = [...this.selectedCohorts, id];
+        }
+      },
+
+      openPresentationForCohort(cohort) {
+        // Single-cohort flow: show exactly this cohort in the modal
+        this.presentationMode = 'single';
+        this.selectedCohorts = [cohort.id];
+        this.presentationCohorts = [cohort];
+        this.modalSearchQuery = '';
+      },
+
+      openBulkPresentation() {
+        if (!this.selectedCohorts.length) return;
+        // Group flow: show all selected cohorts in the modal
+        this.presentationMode = 'group';
+        this.presentationCohorts = this.readyToStart.filter(c =>
+          this.selectedCohorts.includes(c.id)
+        );
+        this.modalSearchQuery = '';
+      },
+
+      canSelectMore(countToAdd = 1) {
+        return this.selectedUsers.length + countToAdd <= this.maxBatchSize;
+      },
+
+      isUserSelected(userId) {
+        return this.selectedUsers.includes(userId);
+      },
+
+      toggleUserSelection(userId) {
+        if (this.isUserSelected(userId)) {
+          this.selectedUsers = this.selectedUsers.filter(id => id !== userId);
+        } else if (this.canSelectMore()) {
+          this.selectedUsers = [...this.selectedUsers, userId];
+        }
+      },
+
+      selectedCountInCohort(cohort) {
+        return cohort.users.filter(u => this.selectedUsers.includes(u.id)).length;
+      },
+
+      selectedCountInOrg(org) {
+        return org.cohorts.reduce((sum, cohort) => sum + this.selectedCountInCohort(cohort), 0);
+      },
+
+      toggleAllInCohort(cohort) {
+        // Only toggle visible users (respects search filter)
+        const visibleUsers = this.getVisibleUsersInCohort(cohort);
+        const userIds = visibleUsers.map(u => u.id);
+        const allSelected = userIds.length > 0 && userIds.every(id => this.selectedUsers.includes(id));
+        if (allSelected) {
+          this.selectedUsers = this.selectedUsers.filter(id => !userIds.includes(id));
+        } else {
+          userIds.forEach(id => {
+            if (!this.selectedUsers.includes(id) && this.canSelectMore()) {
+              this.selectedUsers = [...this.selectedUsers, id];
+            }
+          });
+        }
+      },
+
+      toggleAllInOrg(org) {
+        // Only toggle visible users (respects search filter)
+        const visibleUsers = this.getVisibleUsersInOrg(org);
+        const userIds = visibleUsers.map(u => u.id);
+        const allSelected = userIds.length > 0 && userIds.every(id => this.selectedUsers.includes(id));
+        if (allSelected) {
+          this.selectedUsers = this.selectedUsers.filter(id => !userIds.includes(id));
+        } else {
+          userIds.forEach(id => {
+            if (!this.selectedUsers.includes(id) && this.canSelectMore()) {
+              this.selectedUsers = [...this.selectedUsers, id];
+            }
+          });
+        }
+      },
+
+      matchesModalSearch(user) {
+        if (!this.modalSearchQuery || !this.modalSearchQuery.trim()) return true;
+        const q = this.modalSearchQuery.toLowerCase().trim();
+        return (user.name && user.name.toLowerCase().includes(q)) ||
+          (user.id && user.id.toLowerCase().includes(q));
+      },
+
+      cohortHasVisibleUsers(cohort) {
+        return cohort.users.some(u => this.matchesModalSearch(u));
+      },
+
+      orgHasVisibleUsers(org) {
+        return org.cohorts.some(c => this.cohortHasVisibleUsers(c));
+      },
+
+      getAllVisibleUserIds() {
+        const ids = [];
+        this.organizations.forEach(org => {
+          org.cohorts.forEach(cohort => {
+            cohort.users.forEach(u => {
+              if (this.matchesModalSearch(u)) ids.push(u.id);
+            });
+          });
+        });
+        return ids;
+      },
+
+      getVisibleUsersInCohort(cohort) {
+        return cohort.users.filter(u => this.matchesModalSearch(u));
+      },
+
+      getVisibleUsersInOrg(org) {
+        return org.cohorts.flatMap(c => this.getVisibleUsersInCohort(c));
+      },
+
+      allVisibleInCohortSelected(cohort) {
+        const visible = this.getVisibleUsersInCohort(cohort);
+        return visible.length > 0 && visible.every(u => this.selectedUsers.includes(u.id));
+      },
+
+      allVisibleInOrgSelected(org) {
+        const visible = this.getVisibleUsersInOrg(org);
+        return visible.length > 0 && visible.every(u => this.selectedUsers.includes(u.id));
+      },
+
+      toggleSelectAllVisible() {
+        const visibleIds = this.getAllVisibleUserIds();
+        const selectedVisibleCount = visibleIds.filter(id => this.selectedUsers.includes(id)).length;
+        
+        // If any visible users are selected, deselect all visible
+        if (selectedVisibleCount > 0) {
+          this.selectedUsers = this.selectedUsers.filter(id => !visibleIds.includes(id));
+        } else {
+          // Select visible users up to capacity
+          visibleIds.forEach(id => {
+            if (!this.selectedUsers.includes(id) && this.canSelectMore()) {
+              this.selectedUsers = [...this.selectedUsers, id];
+            }
+          });
+        }
+      },
+
       issueCertificates(session) {
         // Handle certificate issuance
         if (confirm('Issue certificates to all learners in ' + session.cohort_name + '?')) {
@@ -1322,6 +1810,17 @@
         const day = date.getDate();
         const year = date.getFullYear();
         return `${month} ${day}, ${year}`;
+      },
+
+      getAvatarNumber(userId) {
+        // Generate consistent avatar number (1-70) from user ID
+        let hash = 0;
+        const str = String(userId || '');
+        for (let i = 0; i < str.length; i++) {
+          hash = ((hash << 5) - hash) + str.charCodeAt(i);
+          hash = hash & hash;
+        }
+        return (Math.abs(hash) % 70) + 1;
       }
     };
   }
