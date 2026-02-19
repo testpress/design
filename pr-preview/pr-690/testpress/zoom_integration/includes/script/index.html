@@ -1,23 +1,18 @@
 <script>
-function zoomIntegrationHandler() {
-  return {
-    sharingEnabled: false,
-    preventReserving: false,
-    isFetching: false,
-    deleteAfterImport: false,
-    noImport: false,
-    hasRunningClassesWithOldLicense: true,
-    disconnectConfirmationText: '',
-    init() {
-      if (!this.$nextTick) return;
-
-      this.$nextTick(() => {
-        if (window.HSClipboard) {
-          window.HSClipboard.autoInit();
-        }
-      });
-    },
-    zoomUsers: [
+  function zoomIntegrationHandler() {
+    return {
+      currentStep: 'sync', 
+      sharingEnabled: false,
+      preventReserving: false,
+      isFetching: false,
+      isSyncing: false,
+      deleteAfterImport: false,
+      noImport: false,
+      selectedUsers: [],
+      searchQuery: '',
+      hasRunningClassesWithOldLicense: true,
+      disconnectConfirmationText: '',
+      zoomUsers: [
       {
         id: 1,
         name: 'James Collins',
@@ -64,47 +59,91 @@ function zoomIntegrationHandler() {
         licenseId: 'LIC-7TQ2-44VP'
       }
     ],
-    async fetchUsers() {
-      if (this.isFetching) return;
+  
+      init() {
+        this.resetHSComponents()
+      },
+  
+      get allSelected() {
+        return this.selectedUsers.length === this.zoomUsers.length;
+        if (this.zoomUsers.length === 0) return false;
+        return this.zoomUsers.every(user => this.selectedUsers.some(id => id == user.id));
+      },
 
-      this.isFetching = true;
-
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 800));
-
-        // Only add the fetched user once, avoid duplicating the same row
-        const alreadyExists = this.zoomUsers.some(
-          (user) => user.email === 'rupesh@testpress.in'
+      get filteredZoomUsers() {
+        if (!this.searchQuery) return this.zoomUsers;
+        const query = this.searchQuery.toLowerCase();
+        return this.zoomUsers.filter(user => 
+          user.name.toLowerCase().includes(query) || 
+          user.email.toLowerCase().includes(query)
         );
-
-        if (!alreadyExists) {
-          const nextId = this.zoomUsers.length + 1;
-          this.zoomUsers.push({
-            id: nextId,
-            name: 'Rupesh',
-            email: 'rupesh@testpress.in',
-            avatarUrl:
-              'https://images.unsplash.com/photo-1656338997878-279d71d48f6e?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80',
-            assigned: false,
-            assignedStaff: '',
-            licenseId: 'LIC-6F2C-3B90'
-          });
+      },
+  
+      toggleAll() {
+        if (this.allSelected) {
+          this.selectedUsers = [];
+        } else {
+          this.selectedUsers = this.zoomUsers.map(u => u.id);
         }
+      },
+  
+      async importUsers() {
+        if (this.selectedUsers.length === 0) return;
+      
+        this.isSyncing = true;
+        try {
+          await new Promise(r => setTimeout(r, 1000));
+          this.zoomUsers = this.zoomUsers.filter(user => 
+            this.selectedUsers.some(selectedId => selectedId == user.id)
+          );
+          this.selectedUsers = [];
+          this.searchQuery = '';
+          this.currentStep = 'manage';
+          this.resetHSComponents()
+        } finally {
+          this.isSyncing = false;
+        }
+      },
+  
+      async fetchUsers() {
+        if (this.isFetching) return;
+  
+        this.isFetching = true;
+  
+        try {
+          await new Promise((resolve) => setTimeout(resolve, 800));
+  
+          // Only add the fetched user once, avoid duplicating the same row
+          const alreadyExists = this.zoomUsers.some(
+            (user) => user.email === 'rupesh@testpress.in'
+          );
+  
+          if (!alreadyExists) {
+            const nextId = this.zoomUsers.length + 1;
+            this.zoomUsers.push({
+              id: nextId,
+              name: 'Rupesh',
+              email: 'rupesh@testpress.in',
+              avatarUrl:
+                'https://images.unsplash.com/photo-1656338997878-279d71d48f6e?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80',
+              assigned: false,
+              assignedStaff: '',
+              licenseId: 'LIC-6F2C-3B90'
+            });
+          }
+          this.resetHSComponents()
+        } finally {
+          this.isFetching = false;
+        }
+      },
 
+      resetHSComponents() {
         if (this.$nextTick) {
           this.$nextTick(() => {
-            if (window.HSSelect) {
-              window.HSSelect.autoInit();
-            }
-            if (window.HSClipboard) {
-              window.HSClipboard.autoInit();
-            }
+            window.HSStaticMethods.autoInit();
           });
         }
-      } finally {
-        this.isFetching = false;
       }
     }
   }
-}
 </script>
