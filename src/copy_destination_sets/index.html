@@ -8,9 +8,65 @@ title: Copy Destination Sets
 
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
 {% block content %}
-<div class="py-10 max-w-7xl mx-auto lg:px-8 px-4">
+<div class="py-10 max-w-7xl mx-auto lg:px-8 px-4"
+  x-data="copyDestinationSetsData([{% for destination_set in copy_destination_set %}'{{ destination_set.id }}'{% if not loop.last %}, {% endif %}{% endfor %}])">
   {% include "./includes/breadcrumbs.html" %}
 	{% include "./includes/header.html" %}
   {% include "./includes/table.html" %}
+  {% include "./includes/delete_modal.html" %}
 </div>
+{% endblock %}
+
+{% block script %}
+<script>
+  function copyDestinationSetsData(allDestinationSetIds = []) {
+    return {
+      showDeleteModal: false,
+      selectedDestinationSetIds: [],
+      deletedDestinationSetIds: [],
+      allDestinationSetIds,
+
+      getAvailableDestinationSetIds() {
+        return this.allDestinationSetIds.filter(id => !this.deletedDestinationSetIds.includes(id));
+      },
+
+      isAllSelected() {
+        const availableIds = this.getAvailableDestinationSetIds();
+        return availableIds.length > 0 && availableIds.every(id => this.selectedDestinationSetIds.includes(id));
+      },
+
+      toggleSelectAll(event) {
+        this.selectedDestinationSetIds = event.target.checked ? [...this.getAvailableDestinationSetIds()] : [];
+      },
+
+      openDeleteModalForSingle(id) {
+        this.selectedDestinationSetIds = [String(id)];
+        this.showDeleteModal = true;
+      },
+
+      deleteDestinationSets(force = false) {
+        const idsToRemove = [...this.selectedDestinationSetIds];
+
+        if (!idsToRemove.length) {
+          this.showDeleteModal = false;
+          return;
+        }
+
+        if (!force) {
+          this.showDeleteModal = true;
+          return;
+        }
+
+        idsToRemove.forEach(id => {
+          if (!this.deletedDestinationSetIds.includes(id)) {
+            this.deletedDestinationSetIds.push(id);
+          }
+        });
+
+        this.selectedDestinationSetIds = [];
+        this.showDeleteModal = false;
+      }
+    };
+  }
+</script>
 {% endblock %}
