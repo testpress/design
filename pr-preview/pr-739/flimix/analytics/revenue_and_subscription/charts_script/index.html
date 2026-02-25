@@ -447,41 +447,58 @@
       const data = getPlanData(range);
       const options = {
         chart: {
-          type: 'donut',
+          type: 'bar',
           height: 300,
+          toolbar: { show: false },
           fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
         },
-        series: data,
-        labels: ['Basic', 'Standard', 'Premium', 'Family'],
-        legend: {
-          position: 'bottom',
-          fontSize: '13px',
-          fontWeight: 500,
-          labels: { colors: '#44403c' }
-        },
-        colors: ['#2563eb', '#8b5cf6', '#10b981', '#f59e0b'],
+        series: [
+          {
+            name: 'Revenue',
+            data: data
+          }
+        ],
+        colors: ['#2563eb'],
         plotOptions: {
-          pie: {
-            donut: {
-              size: '65%',
-              labels: {
-                show: true,
-                total: {
-                  show: true,
-                  label: 'Total',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#44403c',
-                  formatter: function (w) {
-                    const sum = w.globals.seriesTotals.reduce((a, b) => a + b, 0);
-                    if (sum >= 100000) return '₹' + (sum / 100000).toFixed(1) + 'L';
-                    if (sum >= 1000) return '₹' + (sum / 1000).toFixed(0) + 'k';
-                    return '₹' + sum;
-                  }
-                }
-              }
+          bar: {
+            horizontal: false,
+            columnWidth: '45%',
+            borderRadius: 4,
+            distributed: false
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        xaxis: {
+          categories: ['Basic', 'Standard', 'Premium', 'Annual'],
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: {
+            style: {
+              colors: '#78716c',
+              fontSize: '12px'
             }
           }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#78716c',
+              fontSize: '12px'
+            },
+            formatter: function (v) {
+              if (v >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
+              if (v >= 1000) return '₹' + (v / 1000).toFixed(0) + 'k';
+              return '₹' + v;
+            }
+          }
+        },
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 2,
+          xaxis: { lines: { show: false } },
+          padding: { left: 14, right: 8 }
         },
         tooltip: {
           y: {
@@ -496,7 +513,10 @@
       const el = document.getElementById('analytics-revenue-by-plan-chart');
       if (!el) return;
       if (planChart) {
-        planChart.updateOptions({ series: data });
+        planChart.updateOptions({
+          series: [{ name: 'Revenue', data: data }],
+          xaxis: { categories: ['Basic', 'Standard', 'Premium', 'Annual'] }
+        });
       } else {
         planChart = new ApexCharts(el, options);
         planChart.render();
@@ -645,6 +665,22 @@
       if (el) el.textContent = formatChurnValue(total);
     }
 
+    function updateRevenueByPlanCard(range) {
+      var raw = range != null ? range : (dateRangeSelect ? dateRangeSelect.value : '30');
+      var values = getPlanData(raw);
+      var total = values.reduce(function (a, b) { return a + b; }, 0);
+      var plans = ['basic', 'standard', 'premium', 'annual'];
+
+      for (var i = 0; i < plans.length; i++) {
+        var key = plans[i];
+        var value = values[i] || 0;
+        var share = total > 0 ? Math.round((value / total) * 100) : 0;
+
+        var valueEl = document.getElementById('plan-' + key + '-value');
+        if (valueEl) valueEl.textContent = formatRevenueTrendValue(value) + ' (' + share + '%)';
+      }
+    }
+
     function updateCharts(range) {
       updateRevenueTrendCardTitle(range);
       updateRevenueTrendBadgeAndTooltip(range);
@@ -653,6 +689,7 @@
       updateChurnBadgeAndTooltip(range);
       updateChurnValues(range);
       renderChurnChart(range);
+      updateRevenueByPlanCard(range);
       renderPlanChart(range);
       renderLifecycleChart(range);
     }
