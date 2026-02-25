@@ -44,7 +44,6 @@
     Alpine.data('contents', () => ({
       contentPage: 'VIDEO',
       isOpen: false,
-      expanded: false,
       expanded: [],
       section: 'ATTEMPT',
       showExamModeModal: false,
@@ -58,6 +57,8 @@
       isFeedbackSubmitted: false,
       stickyOffset: 0,
       globalHeaderHeight: 0,
+      observer: null,
+      resizeHandler: null,
 
       exam: {
         ['x-html']() {
@@ -883,19 +884,27 @@
           else window.location = "/pr-preview/pr-772/content_detail_page/discussions"
         })
 
+        this.resizeHandler = () => this.setStickyOffset()
+        window.addEventListener('resize', this.resizeHandler)
+
         this.$nextTick(() => {
           this.setStickyOffset()
 
           // Recalculate if any stackable header changes size (e.g. icon hidden/shown)
-          const observer = new ResizeObserver(() => this.setStickyOffset())
+          this.observer = new ResizeObserver(() => this.setStickyOffset())
           document
             .querySelectorAll('.js-stackable-header')
-            .forEach((el) => observer.observe(el))
+            .forEach((el) => this.observer.observe(el))
         })
+      },
 
-        window.addEventListener('resize', () => {
-          this.setStickyOffset()
-        })
+      destroy() {
+        if (this.resizeHandler) {
+          window.removeEventListener('resize', this.resizeHandler)
+        }
+        if (this.observer) {
+          this.observer.disconnect()
+        }
       },
 
       setStickyOffset() {
@@ -1188,7 +1197,7 @@
 </div>
         </div>
         <nav
-          class="px-6 flex flex-1 flex-col mt-3 px-6 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"
+          class="flex flex-1 flex-col mt-3 px-6 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"
           @scroll.debounce.300ms="scrolledbottom = ($el.scrollTop + $el.clientHeight >= $el.scrollHeight)"
         >
           <ul role="list" class="flex flex-1 flex-col gap-y-7">
