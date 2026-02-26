@@ -1,0 +1,102 @@
+---
+tags: tpstreams
+title: Authentication tokens | TPStreams
+date: 2024-05-20
+---
+
+{% extends "src/tpstreams/settings/base.html" %} {% block settings %}
+
+<script id="auth-tokens-data" type="application/json">
+  {{ (auth_tokens | dump | safe) if auth_tokens else '[]' }}
+</script>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('tokenManagement', () => ({
+      tokens: JSON.parse(
+        document.getElementById('auth-tokens-data').textContent
+      ),
+      tokenToDelete: null,
+      newToken: '',
+      tokenName: '',
+      get hasTokens() {
+        return this.tokens && this.tokens.length > 0
+      },
+      createToken() {
+        const prefix = 'tp_live_' + Math.random().toString(36).substring(2, 6)
+        const suffix = Math.random().toString(36).substring(2, 10)
+        const fullToken = prefix + suffix
+
+        this.newToken = fullToken
+        this.tokens = [
+          {
+            id: Date.now(),
+            name: this.tokenName || 'Unnamed Token',
+            token: fullToken,
+            prefix: prefix + '....',
+            created_by: 'James Miller',
+            created_at: 'Just now',
+          },
+          ...this.tokens,
+        ]
+
+        this.tokenName = ''
+
+        if (window.HSOverlay) {
+          window.HSOverlay.close('#create-token-modal')
+          setTimeout(() => {
+            window.HSOverlay.open('#success_modal')
+          }, 400)
+        }
+      },
+      deleteToken() {
+        this.tokens = this.tokens.filter((t) => t.id !== this.tokenToDelete)
+        if (window.HSOverlay) {
+          window.HSOverlay.close('#confirm_delete_modal')
+        }
+      },
+    }))
+  })
+</script>
+
+<div class="space-y-4" x-data="tokenManagement">
+  <div
+    class="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-5 gap-y-3"
+  >
+    <div>
+      <h2 class="text-xl font-semibold text-gray-800">Authentication tokens</h2>
+      <p class="text-sm text-gray-600">
+        Authentication tokens help you authenticate with the TPStreams API
+        securely.
+      </p>
+    </div>
+    <button
+      type="button"
+      data-hs-overlay="#create-token-modal"
+      class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none"
+    >
+      <svg
+        class="shrink-0 size-4"
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M5 12h14" />
+        <path d="M12 5v14" />
+      </svg>
+      Create New Token
+    </button>
+  </div>
+
+  {% include "./includes/tokens_list.html" %} {% include
+  "./includes/create_token_modal.html" %} {% include
+  "./includes/confirm_delete_modal.html" %} {% include
+  "./includes/success_modal.html" %}
+</div>
+{% endblock %}
