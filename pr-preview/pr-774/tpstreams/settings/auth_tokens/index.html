@@ -303,7 +303,60 @@
 </div>
     
 
-<div class="space-y-4">
+<script id="auth-tokens-data" type="application/json">
+  [{"id":1,"name":"CI/CD Deployment Script","token":"tp_live_87f6k2m4n9p1q5r0s3t8u1v4w7x0y2z5","prefix":"tp_live_87f6....","created_by":"James Miller","created_at":"10 mins ago"},{"id":2,"name":"Production Auth Token","token":"tp_live_fb2a9m1n7p3q0r6s9t2u5v8w1x4y7z0","prefix":"tp_live_fb2a....","created_by":"Sarah Wilson","created_at":"Feb 20, 2026"}]
+</script>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('tokenManagement', () => ({
+      tokens: JSON.parse(
+        document.getElementById('auth-tokens-data').textContent
+      ),
+      tokenToDelete: null,
+      newToken: '',
+      tokenName: '',
+      get hasTokens() {
+        return this.tokens && this.tokens.length > 0
+      },
+      createToken() {
+        const prefix = 'tp_live_' + Math.random().toString(36).substring(2, 6)
+        const suffix = Math.random().toString(36).substring(2, 10)
+        const fullToken = prefix + suffix
+
+        this.newToken = fullToken
+        this.tokens = [
+          {
+            id: Date.now(),
+            name: this.tokenName || 'Unnamed Token',
+            token: fullToken,
+            prefix: prefix + '....',
+            created_by: 'James Miller',
+            created_at: 'Just now',
+          },
+          ...this.tokens,
+        ]
+
+        this.tokenName = ''
+
+        if (window.HSOverlay) {
+          window.HSOverlay.close('#create-token-modal')
+          setTimeout(() => {
+            window.HSOverlay.open('#success_modal')
+          }, 400)
+        }
+      },
+      deleteToken() {
+        this.tokens = this.tokens.filter((t) => t.id !== this.tokenToDelete)
+        if (window.HSOverlay) {
+          window.HSOverlay.close('#confirm_delete_modal')
+        }
+      },
+    }))
+  })
+</script>
+
+<div class="space-y-4" x-data="tokenManagement">
   <div
     class="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-5 gap-y-3"
   >
@@ -338,7 +391,7 @@
     </button>
   </div>
 
-  <div x-data="{ hasTokens: true }" class="mt-4">
+  <div class="mt-4">
   <!-- Tokens Table -->
   <template x-if="hasTokens">
     <div
@@ -381,118 +434,73 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200">
-            <!-- Mock Token 1 -->
-            <tr class="hover:bg-gray-50 transition duration-150">
-              <td
-                class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800"
-              >
-                CI/CD Deployment Script
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                <div class="flex items-center gap-x-3">
-                  <code
-                    class="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-200"
-                    >87f6....</code
-                  >
+            <template x-for="token in tokens" :key="token.id">
+              <tr class="hover:bg-gray-50 transition duration-150">
+                <td
+                  class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800"
+                  x-text="token.name"
+                ></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                  <div class="flex items-center gap-x-3">
+                    <code
+                      class="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-200"
+                      x-text="token.prefix"
+                    ></code>
+                    <button
+                      type="button"
+                      class="text-gray-400 hover:text-blue-600 transition"
+                      title="Copy token"
+                      @click="navigator.clipboard.writeText(token.token)"
+                    >
+                      <svg
+                        class="shrink-0 size-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <rect
+                          width="14"
+                          height="14"
+                          x="8"
+                          y="8"
+                          rx="2"
+                          ry="2"
+                        />
+                        <path
+                          d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+                <td
+                  class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"
+                  x-text="token.created_by"
+                ></td>
+                <td
+                  class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"
+                  x-text="token.created_at"
+                ></td>
+                <td
+                  class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium"
+                >
                   <button
                     type="button"
-                    class="text-gray-400 hover:text-blue-600 transition"
-                    title="Copy token"
+                    data-hs-overlay="#confirm_delete_modal"
+                    class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-red-600 hover:text-red-800 disabled:opacity-50 disabled:pointer-events-none transition"
+                    @click="tokenToDelete = token.id"
                   >
-                    <svg
-                      class="shrink-0 size-4"
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                      <path
-                        d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
-                      />
-                    </svg>
+                    Delete
                   </button>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                James Miller
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                10 mins ago
-              </td>
-              <td
-                class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium"
-              >
-                <button
-                  type="button"
-                  data-hs-overlay="#confirm_delete_modal"
-                  class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-red-600 hover:text-red-800 disabled:opacity-50 disabled:pointer-events-none transition"
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
-            <!-- Mock Token 2 -->
-            <tr class="hover:bg-gray-50 transition duration-150">
-              <td
-                class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800"
-              >
-                Production Auth Token
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                <div class="flex items-center gap-x-3">
-                  <code
-                    class="text-xs font-mono bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-200"
-                    >fb2a....</code
-                  >
-                  <button
-                    type="button"
-                    class="text-gray-400 hover:text-blue-600 transition"
-                    title="Copy token"
-                  >
-                    <svg
-                      class="shrink-0 size-4"
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="24"
-                      height="24"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    >
-                      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                      <path
-                        d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                Sarah Wilson
-              </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                Feb 20, 2026
-              </td>
-              <td
-                class="px-6 py-4 whitespace-nowrap text-end text-sm font-medium"
-              >
-                <button
-                  type="button"
-                  data-hs-overlay="#confirm_delete_modal"
-                  class="inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent text-red-600 hover:text-red-800 disabled:opacity-50 disabled:pointer-events-none transition"
-                >
-                  Delete
-                </button>
-              </td>
-            </tr>
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
@@ -522,11 +530,12 @@
         </svg>
       </div>
       <h3 class="text-lg font-semibold text-gray-800">
-        No authentication tokens found
+        No authentication tokens
       </h3>
-      <p class="mt-2 text-gray-500 max-w-xs mx-auto">
-        You haven't created any authentication tokens yet. Create one to
-        authenticate with the TPStreams API securely.
+      <p class="mt-2 text-gray-500 max-w-sm mx-auto">
+        Authentication tokens allow you to securely access the TPStreams API
+        without using your password. You can create multiple tokens for
+        different applications or scripts.
       </p>
       <button
         type="button"
@@ -548,15 +557,12 @@
           <path d="M5 12h14" />
           <path d="M12 5v14" />
         </svg>
-        Create Authentication Token
+        Generate New Token
       </button>
     </div>
   </template>
 </div>
-
-</div>
-
-<div
+ <div
   id="create-token-modal"
   class="hs-overlay hidden size-full fixed top-0 start-0 z-[200] overflow-x-hidden overflow-y-auto pointer-events-none"
   role="dialog"
@@ -602,7 +608,7 @@
           </svg>
         </button>
       </div>
-      <form>
+      <form @submit.prevent="createToken()">
         <div class="p-5 overflow-y-auto space-y-6">
           <!-- Token Name -->
           <div>
@@ -613,6 +619,7 @@
               type="text"
               id="token-name"
               name="name"
+              x-model="tokenName"
               maxlength="100"
               class="py-3 px-4 block w-full border-gray-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:pointer-events-none bg-gray-50/50"
               placeholder="e.g. CI/CD Deployment Script"
@@ -656,9 +663,8 @@
             Cancel
           </button>
           <button
-            type="button"
+            type="submit"
             class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-bold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-none transition disabled:opacity-50 disabled:pointer-events-none shadow-sm shadow-blue-200"
-            data-hs-overlay="#success_modal"
           >
             Create Token
           </button>
@@ -758,8 +764,9 @@
 
         <button
           type="button"
-          data-hs-overlay="#confirm_delete_modal"
+          id="confirm-delete-button"
           class="py-2 px-3 inline-flex justify-center items-center bg-red-600 border border-red-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-red-700 focus:ring-1 focus:ring-red-300 transition"
+          @click="deleteToken()"
         >
           Delete
         </button>
@@ -840,13 +847,13 @@
           <div class="flex items-center justify-between gap-x-4">
             <code
               class="text-sm font-mono font-medium text-gray-800 break-all leading-relaxed"
-            >
-              tp_live_a7f3k9l2m5n8p1q4r0s6t9u2v5w8x1y4z7
-            </code>
+              x-text="newToken"
+            ></code>
             <button
               type="button"
               class="shrink-0 p-2 text-gray-400 hover:text-blue-600 focus:outline-none transition-colors bg-white border border-gray-200 rounded-lg shadow-sm"
               title="Copy to clipboard"
+              @click="navigator.clipboard.writeText(newToken)"
             >
               <svg
                 class="shrink-0 size-4"
@@ -883,7 +890,9 @@
     </div>
   </div>
 </div>
- 
+
+</div>
+
 
   </div>
 </div>
