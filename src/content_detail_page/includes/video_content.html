@@ -220,6 +220,135 @@ video.ready(function () {
   var transcriptContainer = document.getElementById("video-transcript-body");
   if (!transcriptRoot || !transcriptContainer) return;
 
+  var playerEl = video.el && video.el();
+  var fullscreenTranscriptRoot = null;
+  var fullscreenTranscriptBody = null;
+  var bigPlayButton = video.getChild && video.getChild("bigPlayButton");
+
+  var innerWrapper = null;
+
+  if (playerEl) {
+    // Wrap existing Video.js content so we can lay out video + fullscreen transcript
+    // side by side without covering the video.
+    innerWrapper = playerEl.querySelector(".vjs-shell-inner");
+    if (!innerWrapper) {
+      innerWrapper = document.createElement("div");
+      innerWrapper.className = "vjs-shell-inner";
+      innerWrapper.style.flex = "1 1 auto";
+      innerWrapper.style.minWidth = "0";
+
+      // Move all existing children into the inner wrapper
+      while (playerEl.firstChild) {
+        innerWrapper.appendChild(playerEl.firstChild);
+      }
+      playerEl.appendChild(innerWrapper);
+
+      // Ensure the big play button is centered relative to the full player,
+      // not just the left pane, by keeping it as a direct child of playerEl.
+      var movedBigPlay = innerWrapper.querySelector(".vjs-big-play-button");
+      if (movedBigPlay) {
+        playerEl.appendChild(movedBigPlay);
+      }
+    }
+
+    // Make the player a flex container so the video sits on the left
+    // and the transcript column sits on the right in fullscreen.
+    playerEl.style.display = "flex";
+    playerEl.style.alignItems = "stretch";
+
+    fullscreenTranscriptRoot = document.createElement("div");
+    fullscreenTranscriptRoot.id = "vjs-fullscreen-transcript";
+    fullscreenTranscriptRoot.style.flex = "0 0 32%";
+    fullscreenTranscriptRoot.style.maxWidth = "420px";
+    fullscreenTranscriptRoot.style.height = "100%";
+    // Match the light transcript panel styling in normal mode
+    fullscreenTranscriptRoot.style.backgroundColor = "#ffffff";
+    fullscreenTranscriptRoot.style.color = "#111827";
+    fullscreenTranscriptRoot.style.display = "none"; // only in fullscreen + when transcript is enabled
+    fullscreenTranscriptRoot.style.flexDirection = "column";
+    fullscreenTranscriptRoot.style.fontSize = "0.875rem";
+    fullscreenTranscriptRoot.style.lineHeight = "1.5";
+    fullscreenTranscriptRoot.style.borderLeft = "1px solid rgba(209,213,219,1)";
+    fullscreenTranscriptRoot.style.boxShadow = "0 0 0 1px rgba(209,213,219,1)";
+    fullscreenTranscriptRoot.style.borderRadius = "0.5rem";
+    fullscreenTranscriptRoot.style.zIndex = "2";
+
+    var fsHeader = document.createElement("div");
+    fsHeader.style.display = "flex";
+    fsHeader.style.alignItems = "center";
+    fsHeader.style.justifyContent = "space-between";
+    fsHeader.style.padding = "8px 12px";
+    fsHeader.style.borderBottom = "1px solid rgba(209,213,219,1)";
+
+    var fsTitle = document.createElement("div");
+    fsTitle.textContent = "Transcript";
+    fsTitle.style.fontSize = "0.875rem";
+    fsTitle.style.fontWeight = "600";
+    fsTitle.style.letterSpacing = "0.08em";
+    fsTitle.style.textTransform = "uppercase";
+
+    var fsClose = document.createElement("button");
+    fsClose.type = "button";
+    fsClose.setAttribute("aria-label", "Close transcript");
+    fsClose.style.display = "flex";
+    fsClose.style.alignItems = "center";
+    fsClose.style.justifyContent = "center";
+    fsClose.style.padding = "2px";
+    fsClose.style.color = "rgba(148,163,184,1)";
+    fsClose.style.cursor = "pointer";
+    fsClose.addEventListener("click", function () {
+      window.dispatchEvent(new CustomEvent("toggle-transcript"));
+    });
+    fsClose.innerHTML =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
+
+    fsHeader.appendChild(fsTitle);
+    fsHeader.appendChild(fsClose);
+
+    fullscreenTranscriptBody = document.createElement("div");
+    fullscreenTranscriptBody.style.flex = "1";
+    fullscreenTranscriptBody.style.overflowY = "auto";
+    fullscreenTranscriptBody.style.padding = "8px 12px";
+
+    fullscreenTranscriptRoot.appendChild(fsHeader);
+    fullscreenTranscriptRoot.appendChild(fullscreenTranscriptBody);
+    playerEl.appendChild(fullscreenTranscriptRoot);
+  }
+
+  // Mirror whether transcript is conceptually "on" so fullscreen overlay
+  // only appears when the user wants transcript visible.
+  var transcriptEnabled = true;
+
+  function updateFullscreenTranscriptVisibility() {
+    if (!fullscreenTranscriptRoot) return;
+    var isFs =
+      typeof video.isFullscreen === "function" && video.isFullscreen();
+    var shouldShow = isFs && transcriptEnabled;
+    fullscreenTranscriptRoot.style.display = shouldShow ? "flex" : "none";
+
+    // In fullscreen with the side transcript visible, hide the big play button
+    // so it doesn't look misaligned across the split layout. Restore it
+    // otherwise so normal behavior is unchanged.
+    if (bigPlayButton && bigPlayButton.el && bigPlayButton.el()) {
+      bigPlayButton.el().style.display = shouldShow ? "none" : "";
+    }
+
+    // Only make the inner wrapper positioned in fullscreen, so the
+    // play button and layout in normal mode remain untouched.
+    if (innerWrapper) {
+      innerWrapper.style.position = isFs ? "relative" : "";
+    }
+  }
+
+  window.addEventListener("toggle-transcript", function () {
+    transcriptEnabled = !transcriptEnabled;
+    updateFullscreenTranscriptVisibility();
+  });
+
+  video.on("fullscreenchange", function () {
+    updateFullscreenTranscriptVisibility();
+  });
+
   function formatTime(seconds) {
     seconds = Math.max(0, Math.floor(seconds || 0));
     var h = Math.floor(seconds / 3600);
@@ -263,6 +392,48 @@ video.ready(function () {
 
   var cueElements = [];
 
+  function onCueClick(e) {
+    var t = parseFloat(e.currentTarget.dataset.startTime);
+    if (!isNaN(t)) {
+      video.currentTime(t);
+      video.play();
+    }
+  }
+
+  function createCueElement(container, cue) {
+    if (!container) return null;
+
+    var el = document.createElement("div");
+    el.className =
+      "transcript-cue cursor-pointer py-1 px-0 mb-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/30";
+    // Use CSS grid so all timestamps form a clean column and
+    // multi-line text wraps under the text column, not under the time.
+    el.style.display = "grid";
+    el.style.gridTemplateColumns = "max-content 1fr";
+    el.style.columnGap = "0.5rem";
+    // Align timestamp and the first line of text on their text baselines
+    // so they look visually centered relative to each other.
+    el.style.alignItems = "baseline";
+    el.dataset.startTime = cue.startTime;
+
+    var timeSpan = document.createElement("span");
+    timeSpan.className =
+      "text-right text-xs text-gray-500 dark:text-neutral-400";
+    timeSpan.textContent = formatTime(cue.startTime);
+
+    var textSpan = document.createElement("span");
+    // Render cue text as HTML so any inline markup from WebVTT is preserved
+    textSpan.className = "flex-1";
+    textSpan.innerHTML = cue.text;
+
+    el.addEventListener("click", onCueClick);
+
+    el.appendChild(timeSpan);
+    el.appendChild(textSpan);
+    container.appendChild(el);
+    return el;
+  }
+
   function buildTranscript() {
     var cues = captionTrack.cues;
 
@@ -273,55 +444,29 @@ video.ready(function () {
     }
 
     transcriptContainer.innerHTML = "";
+    if (fullscreenTranscriptBody) {
+      fullscreenTranscriptBody.innerHTML = "";
+    }
     cueElements = [];
 
     for (var j = 0; j < cues.length; j++) {
       var cue = cues[j];
-      var el = document.createElement("div");
+      var sideEl = createCueElement(transcriptContainer, cue);
+      var fsEl = createCueElement(fullscreenTranscriptBody, cue);
 
-      el.className =
-        "transcript-cue cursor-pointer py-1 px-0 mb-1 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/30";
-      // Use CSS grid so all timestamps form a clean column and
-      // multi-line text wraps under the text column, not under the time.
-      el.style.display = "grid";
-      el.style.gridTemplateColumns = "max-content 1fr";
-      el.style.columnGap = "0.5rem";
-      // Align timestamp and the first line of text on their text baselines
-      // so they look visually centered relative to each other.
-      el.style.alignItems = "baseline";
-      el.dataset.startTime = cue.startTime;
+      var elementsForCue = [];
+      if (sideEl) elementsForCue.push(sideEl);
+      if (fsEl) elementsForCue.push(fsEl);
 
-      var timeSpan = document.createElement("span");
-      timeSpan.className =
-        "text-right text-xs text-gray-500 dark:text-neutral-400";
-      timeSpan.textContent = formatTime(cue.startTime);
-
-      var textSpan = document.createElement("span");
-      // Render cue text as HTML so any inline markup from WebVTT is preserved
-      textSpan.className = "flex-1";
-      textSpan.innerHTML = cue.text;
-
-      el.addEventListener("click", function (e) {
-        var t = parseFloat(e.currentTarget.dataset.startTime);
-        if (!isNaN(t)) {
-          video.currentTime(t);
-          video.play();
-        }
-      });
-
-      el.appendChild(timeSpan);
-      el.appendChild(textSpan);
-      transcriptContainer.appendChild(el);
-      cueElements.push({ cue: cue, el: el });
+      cueElements.push({ cue: cue, els: elementsForCue });
     }
   }
 
   function clearActiveCueHighlight() {
     cueElements.forEach(function (entry) {
-      entry.el.classList.remove(
-        "bg-emerald-100",
-        "dark:bg-emerald-900/50"
-      );
+      entry.els.forEach(function (el) {
+        el.classList.remove("bg-emerald-100", "dark:bg-emerald-900/50");
+      });
     });
   }
 
@@ -339,11 +484,14 @@ video.ready(function () {
       var cue = cueElements[k].cue;
       if (current >= cue.startTime && current < cue.endTime) {
         clearActiveCueHighlight();
-        var el = cueElements[k].el;
-        el.classList.add("bg-emerald-100", "dark:bg-emerald-900/50");
-        // Keep active cue in view
-        if (typeof el.scrollIntoView === "function") {
-          el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        var entries = cueElements[k].els;
+        for (var idx = 0; idx < entries.length; idx++) {
+          var el = entries[idx];
+          el.classList.add("bg-emerald-100", "dark:bg-emerald-900/50");
+          // Keep active cue in view in whichever transcript is visible
+          if (typeof el.scrollIntoView === "function") {
+            el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
         }
         break;
       }
