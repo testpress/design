@@ -135,7 +135,7 @@
           id="video-transcript"
           class="flex h-full flex-col text-sm leading-relaxed text-gray-900 dark:text-neutral-200 border border-gray-200 dark:border-neutral-700 rounded-md bg-white dark:bg-neutral-900"
         >
-          <div class="py-2.5 px-4 flex justify-between items-center border-b border-overlay-divider">
+          <div class="py-2.5 px-4 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700">
             <h3 id="hs-pro-transcript-label" class="font-medium text-foreground text-sm">
               Transcript
             </h3>
@@ -1059,6 +1059,9 @@ video.ready(function () {
   var playerEl = video.el && video.el();
   var fullscreenTranscriptRoot = null;
   var fullscreenTranscriptBody = null;
+  var fullscreenFsHeader = null;
+  var fullscreenFsTitle = null;
+  var fullscreenFsClose = null;
   var bigPlayButton = video.getChild && video.getChild("bigPlayButton");
 
   var innerWrapper = null;
@@ -1149,6 +1152,40 @@ video.ready(function () {
     fullscreenTranscriptRoot.appendChild(fsHeader);
     fullscreenTranscriptRoot.appendChild(fullscreenTranscriptBody);
     playerEl.appendChild(fullscreenTranscriptRoot);
+
+    fullscreenFsHeader = fsHeader;
+    fullscreenFsTitle = fsTitle;
+    fullscreenFsClose = fsClose;
+  }
+
+  function isDarkMode() {
+    return document.documentElement.classList.contains("dark");
+  }
+
+  function applyFullscreenTranscriptStyles() {
+    if (!fullscreenTranscriptRoot) return;
+    var dark = isDarkMode();
+    var borderColor = dark ? "rgba(64,64,64,1)" : "rgba(209,213,219,1)";
+    var bgColor = dark ? "#171717" : "#ffffff";
+    var textColor = dark ? "#e5e5e5" : "#111827";
+    var mutedColor = dark ? "rgba(163,163,163,1)" : "rgba(148,163,184,1)";
+
+    fullscreenTranscriptRoot.style.backgroundColor = bgColor;
+    fullscreenTranscriptRoot.style.color = textColor;
+    fullscreenTranscriptRoot.style.borderLeft = "1px solid " + borderColor;
+    fullscreenTranscriptRoot.style.boxShadow = "0 0 0 1px " + borderColor;
+    if (fullscreenFsHeader) {
+      fullscreenFsHeader.style.borderBottom = "1px solid " + borderColor;
+    }
+    if (fullscreenFsTitle) {
+      fullscreenFsTitle.style.color = textColor;
+    }
+    if (fullscreenFsClose) {
+      fullscreenFsClose.style.color = mutedColor;
+    }
+    if (fullscreenTranscriptBody) {
+      fullscreenTranscriptBody.style.color = textColor;
+    }
   }
 
   // Mirror whether transcript is conceptually "on" so fullscreen overlay
@@ -1161,6 +1198,10 @@ video.ready(function () {
       typeof video.isFullscreen === "function" && video.isFullscreen();
     var shouldShow = isFs && transcriptEnabled;
     fullscreenTranscriptRoot.style.display = shouldShow ? "flex" : "none";
+
+    if (shouldShow) {
+      applyFullscreenTranscriptStyles();
+    }
 
     // In fullscreen with the side transcript visible, hide the big play button
     // so it doesn't look misaligned across the split layout. Restore it
@@ -1184,6 +1225,21 @@ video.ready(function () {
   video.on("fullscreenchange", function () {
     updateFullscreenTranscriptVisibility();
   });
+
+  window.addEventListener("resize", function () {
+    if (fullscreenTranscriptRoot && fullscreenTranscriptRoot.style.display === "flex") {
+      applyFullscreenTranscriptStyles();
+    }
+  });
+
+  if (typeof MutationObserver !== "undefined" && document.documentElement) {
+    var darkObserver = new MutationObserver(function () {
+      if (fullscreenTranscriptRoot && fullscreenTranscriptRoot.style.display === "flex") {
+        applyFullscreenTranscriptStyles();
+      }
+    });
+    darkObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  }
 
   function formatTime(seconds) {
     seconds = Math.max(0, Math.floor(seconds || 0));
