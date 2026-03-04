@@ -1,0 +1,305 @@
+<script>
+  function payoutRunDetail() {
+    return {
+      run: {},
+      statusLabel: '',
+      statusKind: '',
+      approvalNotes: '',
+      approvalOtp: '',
+      resendOtpCooldown: 0,
+      rejectionNotes: '',
+      instituteSearch: '',
+      institutePayouts: [],
+      instituteSortDirection: 'asc',
+      instituteStatusFilter: 'all',
+
+      init() {
+        const params = new URLSearchParams(window.location.search);
+        const status = (params.get('status') || '').toLowerCase();
+        const runId = params.get('run_id') || '';
+
+        const map = {
+          evaluating:        { label: 'Evaluating',         kind: 'warning' },
+          awaiting_approval: { label: 'Awaiting approval',  kind: 'warning' },
+          approved:          { label: 'Approved',           kind: 'success' },
+          processing_payment:{ label: 'Processing payment', kind: 'success' },
+          completed:         { label: 'Completed',          kind: 'success' },
+          rejected:          { label: 'Rejected',           kind: 'danger' },
+          failed:            { label: 'Failed',             kind: 'danger' },
+        };
+
+        const config = map[status];
+        if (config) {
+          this.statusLabel = config.label;
+          this.statusKind = config.kind;
+        } else {
+          this.statusLabel = '';
+          this.statusKind = '';
+        }
+
+        if (status === 'evaluating') {
+          this.run = {
+            run_id: runId || 'PR-15012026-006',
+            cluster_name: 'Cluster 1',
+            added_by_display: 'Added by Accounts Executive on Apr 10, 2026',
+            cutoff_time_display: 'Apr 10, 2026 · 05:30 PM',
+          };
+        } else if (status === 'awaiting_approval' || status === 'approved') {
+          this.run = {
+            run_id: runId || 'PR-15012026-007',
+            cluster_name: 'Cluster 1',
+            added_by_display: 'Added on Apr 10, 2026',
+            cutoff_time_display: 'Apr 12, 2026 · 05:30 PM',
+            total_payout_display: '₹ 12,45,000',
+            total_institutes_display: '24',
+            paid_count_display: 'N/A',
+            failed_count_display: 'N/A',
+          };
+
+          this.institutePayouts = [
+            { name: 'Bala Institute of Technology', total_amount: '₹ 1,20,000', ledger_url: '#' },
+            { name: 'Pragathi College of Science', total_amount: '₹ 95,500', ledger_url: '#' },
+            { name: 'Sri Ramakrishna Junior College', total_amount: '₹ 78,250', ledger_url: '#' },
+          ];
+          this.instituteSearch = '';
+          this.instituteStatusFilter = 'all';
+        } else if (status === 'processing_payment') {
+          this.run = {
+            run_id: runId || 'PR-15012026-008',
+            cluster_name: 'Cluster 1',
+            added_by_display: 'Added on Apr 10, 2026',
+            cutoff_time_display: 'Apr 13, 2026 · 05:30 PM',
+            total_payout_display: '₹ 12,45,000',
+            total_institutes_display: '10',
+            paid_count_display: '6',
+            failed_count_display: '2',
+          };
+
+          this.institutePayouts = [
+            {
+              name: 'Bala Institute of Technology',
+              total_amount: '₹ 1,20,000',
+              status: 'paid',
+              failure_reason: '',
+              ledger_url: '#',
+            },
+            {
+              name: 'Pragathi College of Science',
+              total_amount: '₹ 95,500',
+              status: 'processing',
+              failure_reason: '',
+              ledger_url: '#',
+            },
+            {
+              name: 'Sri Ramakrishna Junior College',
+              total_amount: '₹ 78,250',
+              status: 'failed',
+              failure_reason: 'Payment failed due to incorrect bank details.\nPlease update the bank information for this institute and retry.',
+              ledger_url: '#',
+            },
+          ];
+
+          this.instituteSearch = '';
+          this.instituteStatusFilter = 'all';
+        } else if (status === 'completed') {
+          this.run = {
+            run_id: runId || 'PR-15012026-009',
+            cluster_name: 'Cluster 1',
+            added_by_display: 'Added on Apr 10, 2026',
+            cutoff_time_display: 'Apr 14, 2026 · 05:30 PM',
+            total_payout_display: '₹ 12,45,000',
+            total_institutes_display: '3',
+            paid_count_display: '2',
+            failed_count_display: '1',
+          };
+
+          this.institutePayouts = [
+            {
+              name: 'Bala Institute of Technology',
+              total_amount: '₹ 1,20,000',
+              status: 'paid',
+              failure_reason: '',
+              ledger_url: '#',
+            },
+            {
+              name: 'Pragathi College of Science',
+              total_amount: '₹ 95,500',
+              status: 'paid',
+              failure_reason: '',
+              ledger_url: '#',
+            },
+            {
+              name: 'Sri Ramakrishna Junior College',
+              total_amount: '₹ 78,250',
+              status: 'failed',
+              failure_reason: 'Payment failed due to incorrect bank details.\nPlease update the bank information for this institute and retry.',
+              ledger_url: '#',
+            },
+          ];
+
+          this.instituteSearch = '';
+          this.instituteStatusFilter = 'all';
+        } else if (status === 'rejected') {
+          this.run = {
+            run_id: runId || 'PR-15012026-010',
+            cluster_name: 'Cluster 1',
+            added_by_display: 'Added on Apr 10, 2026',
+            cutoff_time_display: 'Apr 12, 2026 · 05:30 PM',
+            total_payout_display: '₹ 12,45,000',
+            total_institutes_display: '10',
+            paid_count_display: 'N/A',
+            failed_count_display: 'N/A',
+            status_reason: 'Rejected because the payout configuration did not meet the latest payout policy. Update the configuration and try again.',
+          };
+
+          this.institutePayouts = [
+            {
+              name: 'Bala Institute of Technology',
+              total_amount: '₹ 1,20,000',
+              status: 'failed',
+              failure_reason: 'Payout rejected for this institute. Please verify institute eligibility and configuration.',
+              ledger_url: '#',
+            },
+            {
+              name: 'Pragathi College of Science',
+              total_amount: '₹ 95,500',
+              status: 'failed',
+              failure_reason: 'Payout rejected for this institute. Please verify institute eligibility and configuration.',
+              ledger_url: '#',
+            },
+          ];
+
+          this.instituteSearch = '';
+          this.instituteStatusFilter = 'all';
+        } else if (status === 'failed') {
+          this.run = {
+            run_id: runId || 'PR-15012026-011',
+            cluster_name: 'Cluster 1',
+            added_by_display: 'Added on Apr 10, 2026',
+            cutoff_time_display: 'Apr 13, 2026 · 05:30 PM',
+            total_payout_display: '₹ 12,45,000',
+            total_institutes_display: '10',
+            paid_count_display: 'N/A',
+            failed_count_display: 'N/A',
+            status_reason: 'Failed due to incorrect HDFC client ID. Fix the configuration and start a new payout run.',
+          };
+
+          this.institutePayouts = [
+            {
+              name: 'Bala Institute of Technology',
+              total_amount: '₹ 1,20,000',
+              status: 'failed',
+              failure_reason: 'Payment failed due to incorrect bank details.\nPlease update the bank information for this institute and retry.',
+              ledger_url: '#',
+            },
+            {
+              name: 'Pragathi College of Science',
+              total_amount: '₹ 95,500',
+              status: 'failed',
+              failure_reason: 'Payment failed due to daily bank transaction limits. Try again later or contact the bank.',
+              ledger_url: '#',
+            },
+          ];
+
+          this.instituteSearch = '';
+          this.instituteStatusFilter = 'all';
+        }
+      },
+
+      openApproveModal() {
+        if (this.statusLabel === 'Awaiting approval') {
+          window.HSOverlay?.open('#payout-approve-confirmation-modal');
+        }
+      },
+
+      openRejectModal() {
+        if (this.statusLabel === 'Awaiting approval') {
+          this.rejectionNotes = '';
+          window.HSOverlay?.open('#payout-reject-confirmation-modal');
+        }
+      },
+
+      openProcessPaymentModal() {
+        if (this.statusLabel === 'Approved') {
+          window.HSOverlay?.open('#payout-process-payment-modal');
+        }
+      },
+
+      confirmApprove() {
+        // In production: validate approvalOtp against backend, then close.
+        this.approvalNotes = '';
+        this.approvalOtp = '';
+        window.HSOverlay?.close('#payout-approve-confirmation-modal');
+      },
+
+      resendApprovalOtp() {
+        if (this.resendOtpCooldown > 0) return;
+        // In production: call API to resend OTP email for this payout run.
+        this.resendOtpCooldown = 60;
+        const interval = setInterval(() => {
+          this.resendOtpCooldown--;
+          if (this.resendOtpCooldown <= 0) clearInterval(interval);
+        }, 1000);
+      },
+
+      confirmReject() {
+        if (!this.rejectionNotes || !this.rejectionNotes.trim()) return;
+
+        this.rejectionNotes = '';
+        window.HSOverlay?.close('#payout-reject-confirmation-modal');
+      },
+
+      confirmProcessPayment() {
+        window.HSOverlay?.close('#payout-process-payment-modal');
+      },
+
+      clearDecisionForm() {
+        this.approvalNotes = '';
+        this.approvalOtp = '';
+        this.rejectionNotes = '';
+      },
+
+      filteredInstitutePayouts() {
+        let list = this.institutePayouts;
+
+        if (this.instituteSearch) {
+          const query = this.instituteSearch.toLowerCase();
+          list = list.filter((item) =>
+            item.name.toLowerCase().includes(query)
+          );
+        }
+
+         if (this.instituteStatusFilter && this.instituteStatusFilter !== 'all') {
+           list = list.filter((item) => item.status === this.instituteStatusFilter);
+         }
+
+        const dir = this.instituteSortDirection || 'asc';
+
+        return [...list].sort((a, b) => {
+          const parseAmount = (value) => {
+            if (!value) return 0;
+            const numeric = value.toString().replace(/[^\d.-]/g, '');
+            return parseFloat(numeric || '0');
+          };
+
+          const aVal = parseAmount(a.total_amount);
+          const bVal = parseAmount(b.total_amount);
+
+          return dir === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+      },
+
+      setInstituteSort(direction) {
+        this.instituteSortDirection = direction === 'desc' ? 'desc' : 'asc';
+      },
+
+      formatInstituteStatus(status) {
+        if (status === 'paid') return 'Paid';
+        if (status === 'failed') return 'Failed';
+        if (status === 'processing') return 'Processing';
+        return '';
+      },
+    };
+  }
+</script>
+
