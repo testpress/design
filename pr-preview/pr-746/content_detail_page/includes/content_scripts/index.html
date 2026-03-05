@@ -1,24 +1,28 @@
 <script>
-  document.addEventListener("alpine:init", () => {
-    Alpine.data("contents", () => ({
-      contentPage: "VIDEO",
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('contents', () => ({
+      contentPage: 'VIDEO',
       isOpen: false,
-      expanded: false, 
       expanded: [],
-      section:"ATTEMPT",
-      showExamModeModal:false,
-      showResultModal:false,
-      showPreTestModal:false,
+      section: 'ATTEMPT',
+      showExamModeModal: false,
+      showResultModal: false,
+      showPreTestModal: false,
       tab: 'running',
       activeTab: '',
       isCustomizeOpen: false,
       contentType: 'topics',
       isFeedbackModalOpen: false,
       isFeedbackSubmitted: false,
-      
+      stickyOffset: 0,
+      globalHeaderHeight: 0,
+      observer: null,
+      resizeHandler: null,
+
       exam: {
-        ["x-html"](){
-          if(this.section === "ATTEMPT") return `<div x-show="activeTab === 'previous'" x-cloak>
+        ['x-html']() {
+          if (this.section === 'ATTEMPT')
+            return `<div x-show="activeTab === 'previous'" x-cloak>
   <div class="px-4 lg:px-0">
     <div class="mt-8 flow-root">
       <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8 dark:bg-neutral-800">
@@ -749,7 +753,7 @@
   </div>
   <!-- End Download PDF Options Modal -->
 
-</div>`;
+</div>`
           else return `<div x-show="activeTab === 'leaderboard'" x-cloak>
   <div class="px-4 lg:px-0">
     <div class="mt-8 flow-root">
@@ -822,20 +826,59 @@
     </div>
   </div>
 
-</div>`;
+</div>`
+        },
+      },
+
+      init() {
+        this.$watch('activeTab', (value) => {
+          if (value == 'running')
+            window.location = "/pr-preview/pr-746/content_detail_page/running"
+          else if (value == 'upcoming')
+            window.location = "/pr-preview/pr-746/content_detail_page/upcoming"
+          else if (value == 'history')
+            window.location = "/pr-preview/pr-746/content_detail_page/history"
+          else if (value == 'leaderboard')
+            window.location = "/pr-preview/pr-746/content_detail_page/leaderboard"
+          else window.location = "/pr-preview/pr-746/content_detail_page/discussions"
+        })
+
+        this.resizeHandler = () => this.setStickyOffset()
+        window.addEventListener('resize', this.resizeHandler)
+
+        this.$nextTick(() => {
+          this.setStickyOffset()
+
+          // Recalculate if any stackable header changes size (e.g. icon hidden/shown)
+          this.observer = new ResizeObserver(() => this.setStickyOffset())
+          document
+            .querySelectorAll('.js-stackable-header')
+            .forEach((el) => this.observer.observe(el))
+        })
+      },
+
+      destroy() {
+        if (this.resizeHandler) {
+          window.removeEventListener('resize', this.resizeHandler)
+        }
+        if (this.observer) {
+          this.observer.disconnect()
         }
       },
-      
-      init(){
-        this.$watch('activeTab', (value) => {
-          if(value == 'running') window.location="/pr-preview/pr-746/content_detail_page/running" 
-          else if (value== 'upcoming') window.location="/pr-preview/pr-746/content_detail_page/upcoming"
-          else if (value== 'history') window.location="/pr-preview/pr-746/content_detail_page/history"
-          else if (value== 'leaderboard') window.location="/pr-preview/pr-746/content_detail_page/leaderboard"
-          else window.location="/pr-preview/pr-746/content_detail_page/discussions"
-        });
-      }
-      
-    }));
-  });
+
+      setStickyOffset() {
+        const globalHeader =
+          document.getElementById('global-header') ||
+          document.querySelector('header') ||
+          document.querySelector('.page-header')
+        const mobileBar = document.getElementById('mobile-sticky-bar')
+
+        const gHeight = (globalHeader && globalHeader.offsetHeight) || 0
+        const mHeight = (mobileBar && mobileBar.offsetHeight) || 0
+
+        this.globalHeaderHeight = gHeight
+        this.stickyOffset = gHeight + mHeight
+      },
+    }))
+  })
 </script>
