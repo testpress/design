@@ -1,0 +1,711 @@
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+  (function () {
+    const dateRangeSelect = document.getElementById('revenue-analytics-date-range');
+    let trendChart = null;
+    let churnChart = null;
+    let planChart = null;
+    let lifecycleChart = null;
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function getRangeBucket(val) {
+      const v = parseInt(val, 10) || 30;
+      if (v <= 14) return '7';
+      if (v <= 60) return '30';
+      if (v <= 180) return '90';
+      return '365';
+    }
+
+    var SCENARIOS = {
+      7:   { badge: 'Good',      badgeClass: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400', dotClass: 'bg-green-700 after:bg-green-700 dark:bg-green-400 dark:after:bg-green-400', tooltipText: 'New users are subscribing and buying content. Maintain strategy and monitor consistency.', subTrend: 'up', tvodTrend: 'up' },
+      30:  { badge: 'Attention', badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', dotClass: 'bg-amber-600 after:bg-amber-600 dark:bg-amber-400 dark:after:bg-amber-400', tooltipText: 'Subscription demand is weakening while purchases are stagnant. Focus on subscription value and retention.', subTrend: 'down', tvodTrend: 'flat' },
+      60:  { badge: 'Attention', badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', dotClass: 'bg-amber-600 after:bg-amber-600 dark:bg-amber-400 dark:after:bg-amber-400', tooltipText: 'Growth has stopped (plateau). Check new content releases, marketing activity, and pricing tests.', subTrend: 'flat', tvodTrend: 'flat' },
+      90:  { badge: 'Attention', badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', dotClass: 'bg-amber-600 after:bg-amber-600 dark:bg-amber-400 dark:after:bg-amber-400', tooltipText: 'Users are paying, but avoiding subscriptions (price or commitment concern). Review SVOD pricing and entry plans.', subTrend: 'down', tvodTrend: 'up' },
+      180: { badge: 'Critical',  badgeClass: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400', dotClass: 'bg-red-700 after:bg-red-700 dark:bg-red-400 dark:after:bg-red-400', tooltipText: 'Both monetization models are declining. Review content quality, pricing, UX issues, and competitor activity immediately.', subTrend: 'down', tvodTrend: 'down' },
+      365: { badge: 'Good',      badgeClass: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400', dotClass: 'bg-green-700 after:bg-green-700 dark:bg-green-400 dark:after:bg-green-400', tooltipText: 'Users are choosing subscriptions over one-time purchases (good for long-term value). Continue pushing SVOD value.', subTrend: 'up', tvodTrend: 'down' }
+    };
+
+    var CHURN_SCENARIOS = {
+      7:   { badge: 'Attention',badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', dotClass: 'bg-amber-600 after:bg-amber-600 dark:bg-amber-400 dark:after:bg-amber-400', tooltipText: 'Cancellations are steady. Losses are controlled but not improving. Look for retention improvements: onboarding, content reminders, engagement nudges.', pattern: 'flat' },
+      30:  { badge: 'Good',     badgeClass: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400', dotClass: 'bg-green-700 after:bg-green-700 dark:bg-green-400 dark:after:bg-green-400', tooltipText: 'Fewer users are cancelling. Retention is improving. Continue current content, pricing, and engagement strategy.', pattern: 'down' },
+      60:  { badge: 'Attention',badgeClass: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', dotClass: 'bg-amber-600 after:bg-amber-600 dark:bg-amber-400 dark:after:bg-amber-400', tooltipText: 'More users are cancelling than before. Early warning sign. Review recent content gaps, pricing perception, or value communication.', pattern: 'up' },
+      90:  { badge: 'Critical', badgeClass: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',   dotClass: 'bg-red-700 after:bg-red-700 dark:bg-red-400 dark:after:bg-red-400', tooltipText: 'Sudden increase in cancellations. User dissatisfaction likely increased. Focus on retention: content freshness, perceived value, plan benefits.', pattern: 'upSharp' },
+      180: { badge: 'Critical', badgeClass: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',   dotClass: 'bg-red-700 after:bg-red-700 dark:bg-red-400 dark:after:bg-red-400', tooltipText: 'High cancellations have become consistent. Ongoing leakage. Revisit subscription value, plan structure, and long-term retention strategy.', pattern: 'highFlat' },
+      365: { badge: 'Neutral',  badgeClass: 'bg-stone-100 text-stone-700 dark:bg-neutral-700/60 dark:text-neutral-200', dotClass: 'bg-stone-500 after:bg-stone-500 dark:bg-neutral-300 dark:after:bg-neutral-300', tooltipText: 'No cancellations yet because subscriptions are still new. Monitor as the subscriber base matures. No action needed yet.', pattern: 'zero' }
+    };
+
+    function getScenarioForRange(range) {
+      var raw = parseInt(range != null && range !== '' ? range : (dateRangeSelect ? dateRangeSelect.value : '30'), 10);
+      if (isNaN(raw) || raw <= 14) return SCENARIOS[7];
+      if (raw <= 60) return raw <= 30 ? SCENARIOS[30] : SCENARIOS[60];
+      if (raw <= 180) return raw <= 90 ? SCENARIOS[90] : SCENARIOS[180];
+      return SCENARIOS[365];
+    }
+
+    function getChurnScenarioForRange(range) {
+      var raw = parseInt(range != null && range !== '' ? range : (dateRangeSelect ? dateRangeSelect.value : '30'), 10);
+      if (isNaN(raw) || raw <= 14) return CHURN_SCENARIOS[7];
+      if (raw <= 60) return raw <= 30 ? CHURN_SCENARIOS[30] : CHURN_SCENARIOS[60];
+      if (raw <= 180) return raw <= 90 ? CHURN_SCENARIOS[90] : CHURN_SCENARIOS[180];
+      return CHURN_SCENARIOS[365];
+    }
+
+    function trendSeries(n, direction, base) {
+      var arr = [];
+      var step = base * 0.07;
+      for (var i = 0; i < n; i++) {
+        if (direction === 'up') arr.push(Math.round(base + i * step));
+        else if (direction === 'down') arr.push(Math.round(base + (n - 1 - i) * step));
+        else arr.push(Math.round(base + (i % 3 - 1) * (base * 0.008)));
+      }
+      return arr;
+    }
+
+    function churnSeries(n, pattern, base) {
+      var arr = [];
+      var step = Math.max(1, Math.round(base * 0.12));
+      for (var i = 0; i < n; i++) {
+        if (pattern === 'down') {
+          arr.push(Math.max(0, base + (n - 1 - i) * step));
+        } else if (pattern === 'up') {
+          arr.push(Math.max(0, base + i * step));
+        } else if (pattern === 'upSharp') {
+          var sharpStep = step * 1.6;
+          arr.push(Math.max(0, base + i * sharpStep));
+        } else if (pattern === 'highFlat') {
+          var jitter = (i % 3 - 1) * Math.round(base * 0.08);
+          arr.push(Math.max(0, base + step * (n / 2) + jitter));
+        } else if (pattern === 'zero') {
+          arr.push(0);
+        } else {
+          // flat
+          var smallJitter = (i % 3 - 1) * Math.round(base * 0.04);
+          arr.push(Math.max(0, base + smallJitter));
+        }
+      }
+      return arr;
+    }
+
+    function getWeekLabels(days) {
+      var n = Math.ceil(days / 7);
+      var labels = [];
+      var today = new Date();
+      today.setHours(0, 0, 0, 0);
+      for (var i = n - 1; i >= 0; i--) {
+        var weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() - (i * 7));
+        var weekStart = new Date(weekEnd);
+        weekStart.setDate(weekStart.getDate() - 6);
+        if (weekStart.getMonth() === weekEnd.getMonth()) {
+          labels.push(MONTHS[weekStart.getMonth()] + ' ' + weekStart.getDate() + '–' + weekEnd.getDate());
+        } else {
+          labels.push(MONTHS[weekStart.getMonth()] + ' ' + weekStart.getDate() + ' – ' + MONTHS[weekEnd.getMonth()] + ' ' + weekEnd.getDate());
+        }
+      }
+      return labels;
+    }
+
+    function getMonthLabels(count) {
+      var labels = [];
+      var d = new Date();
+      for (var i = count - 1; i >= 0; i--) {
+        var m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        labels.push(MONTHS[m.getMonth()]);
+      }
+      return labels;
+    }
+
+    function getTrendData(range) {
+      const raw = range || (dateRangeSelect ? dateRangeSelect.value : '30');
+      const rangeKey = getRangeBucket(raw);
+      const days = parseInt(raw, 10) || 30;
+      if (rangeKey === '7') {
+        var scenario = getScenarioForRange(raw);
+        var sub = trendSeries(7, scenario.subTrend, 45000);
+        var tvod = trendSeries(7, scenario.tvodTrend, 14000);
+        return {
+          categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          subscription: sub,
+          tvod: tvod
+        };
+      }
+      if (rangeKey === '90') {
+        var monthCount = days <= 90 ? 3 : 6;
+        var categories = getMonthLabels(monthCount);
+        var scenario = getScenarioForRange(raw);
+        var sub = trendSeries(monthCount, scenario.subTrend, 910000);
+        var tvod = trendSeries(monthCount, scenario.tvodTrend, 268000);
+        return { categories: categories, subscription: sub, tvod: tvod };
+      }
+      if (rangeKey === '365') {
+        var scenario = getScenarioForRange(raw);
+        var sub = trendSeries(12, scenario.subTrend, 1050000);
+        var tvod = trendSeries(12, scenario.tvodTrend, 360000);
+        return {
+          categories: getMonthLabels(12),
+          subscription: sub,
+          tvod: tvod
+        };
+      }
+      var nWeeks = Math.ceil(days / 7);
+      var scenario = getScenarioForRange(raw);
+      var subscription = trendSeries(nWeeks, scenario.subTrend, 290000);
+      var tvod = trendSeries(nWeeks, scenario.tvodTrend, 85000);
+      return {
+        categories: getWeekLabels(days),
+        subscription: subscription,
+        tvod: tvod
+      };
+    }
+
+    function getChurnData(range) {
+      const raw = range || (dateRangeSelect ? dateRangeSelect.value : '30');
+      const rangeKey = getRangeBucket(raw);
+      const days = parseInt(raw, 10) || 30;
+      var scenario = getChurnScenarioForRange(raw);
+
+      if (rangeKey === '7') {
+        return {
+          categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          series: churnSeries(7, scenario.pattern, 80)
+        };
+      }
+
+      if (rangeKey === '90') {
+        var monthCount = days <= 90 ? 3 : 6;
+        return {
+          categories: getMonthLabels(monthCount),
+          series: churnSeries(monthCount, scenario.pattern, 950)
+        };
+      }
+
+      if (rangeKey === '365') {
+        return {
+          categories: getMonthLabels(12),
+          series: churnSeries(12, scenario.pattern, 900)
+        };
+      }
+
+      var nWeeks = Math.ceil(days / 7);
+      return {
+        categories: getWeekLabels(days),
+        series: churnSeries(nWeeks, scenario.pattern, 120)
+      };
+    }
+
+    function getPlanData(range) {
+      const raw = range || (dateRangeSelect ? dateRangeSelect.value : '30');
+      const rangeKey = getRangeBucket(raw);
+      if (rangeKey === '7') {
+        return [180000, 220000, 320000, 130000];
+      }
+      if (rangeKey === '90') {
+        return [1850000, 2280000, 3320000, 1350000];
+      }
+      if (rangeKey === '365') {
+        return [7200000, 8900000, 12800000, 5200000];
+      }
+      return [620000, 820000, 1200000, 510000];
+    }
+
+    function getLifecycleData(range) {
+      const raw = range || (dateRangeSelect ? dateRangeSelect.value : '30');
+      const rangeKey = getRangeBucket(raw);
+      if (rangeKey === '7') {
+        return {
+          categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          new: [52, 48, 61, 55, 58, 72, 74],
+          renewal: [320, 310, 335, 340, 318, 290, 285],
+          cancelled: [12, 18, 15, 14, 16, 22, 19],
+          upgrade: [8, 12, 10, 14, 11, 15, 13],
+          downgrade: [5, 7, 6, 8, 6, 9, 7]
+        };
+      }
+      if (rangeKey === '90') {
+        var days = parseInt(raw, 10) || 90;
+        var monthCount = days <= 90 ? 3 : 6;
+        var categories = getMonthLabels(monthCount);
+        if (days <= 90) {
+          return {
+            categories: categories,
+            new: [565, 585, 610],
+            renewal: [6370, 6510, 6640],
+            cancelled: [265, 280, 288],
+            upgrade: [145, 163, 170],
+            downgrade: [103, 113, 122]
+          };
+        }
+        return {
+          categories: categories,
+          new: [565, 585, 610, 598, 615, 622],
+          renewal: [6370, 6510, 6640, 6580, 6720, 6780],
+          cancelled: [265, 280, 288, 275, 290, 295],
+          upgrade: [145, 163, 170, 158, 168, 172],
+          downgrade: [103, 113, 122, 108, 118, 125]
+        };
+      }
+      if (rangeKey === '365') {
+        return {
+          categories: getMonthLabels(12),
+          new: [620, 580, 720, 650, 680, 710, 690, 730, 700, 750, 720, 780],
+          renewal: [3200, 3180, 3350, 3280, 3320, 3400, 3380, 3450, 3420, 3500, 3480, 3550],
+          cancelled: [280, 265, 310, 290, 305, 320, 315, 330, 325, 340, 335, 350],
+          upgrade: [165, 158, 182, 170, 178, 188, 185, 195, 190, 200, 198, 208],
+          downgrade: [125, 118, 138, 130, 135, 142, 140, 148, 145, 152, 150, 158]
+        };
+      }
+      var nWeeks = Math.ceil(days / 7);
+      var newBase = [98, 112, 105, 135];
+      var renewalBase = [2080, 2120, 2050, 2100];
+      var cancelledBase = [72, 78, 75, 87];
+      var upgradeBase = [32, 38, 35, 45];
+      var downgradeBase = [22, 26, 24, 30];
+      var newArr = [], renewalArr = [], cancelledArr = [], upgradeArr = [], downgradeArr = [];
+      for (var i = 0; i < nWeeks; i++) {
+        newArr.push(newBase[i % 4] + i * 2);
+        renewalArr.push(renewalBase[i % 4] + i * 5);
+        cancelledArr.push(cancelledBase[i % 4] + i);
+        upgradeArr.push(upgradeBase[i % 4] + i);
+        downgradeArr.push(downgradeBase[i % 4] + i);
+      }
+      return {
+        categories: getWeekLabels(days),
+        new: newArr,
+        renewal: renewalArr,
+        cancelled: cancelledArr,
+        upgrade: upgradeArr,
+        downgrade: downgradeArr
+      };
+    }
+
+    function renderTrendChart(range) {
+      const data = getTrendData(range);
+      const options = {
+        chart: {
+          type: 'area',
+          height: 300,
+          toolbar: { show: false },
+          zoom: { enabled: false },
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        },
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 2,
+          xaxis: { lines: { show: false } },
+          padding: { left: 14, right: 8 }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        series: [
+          { name: 'Subscription', data: data.subscription },
+          { name: 'Pay per view', data: data.tvod }
+        ],
+        xaxis: {
+          categories: data.categories,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { style: { colors: '#78716c', fontSize: '12px' } }
+        },
+        yaxis: {
+          labels: {
+            offsetX: -4,
+            style: { colors: '#78716c', fontSize: '12px' },
+            formatter: function (v) {
+              if (v >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
+              if (v >= 1000) return '₹' + (v / 1000).toFixed(0) + 'k';
+              return '₹' + v;
+            }
+          }
+        },
+        legend: {
+          show: false
+        },
+        colors: ['#10b981', '#2563eb'],
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        markers: {
+          size: 0
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shadeIntensity: 0.8,
+            opacityFrom: 0.2,
+            opacityTo: 0,
+            stops: [0, 90, 100]
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: function (v) {
+              if (v >= 100000) return '₹' + (v / 100000).toFixed(2) + 'L';
+              if (v >= 1000) return '₹' + (v / 1000).toFixed(1) + 'k';
+              return '₹' + v;
+            }
+          }
+        }
+      };
+      const el = document.getElementById('analytics-revenue-trend-chart');
+      if (!el) return;
+      if (trendChart) {
+        trendChart.updateOptions({
+          series: options.series,
+          xaxis: { categories: data.categories }
+        });
+      } else {
+        trendChart = new ApexCharts(el, options);
+        trendChart.render();
+      }
+    }
+
+    function renderChurnChart(range) {
+      const data = getChurnData(range);
+      const options = {
+        chart: {
+          type: 'area',
+          height: 300,
+          toolbar: { show: false },
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        },
+        series: [{
+          name: 'Cancelled subscribers',
+          data: data.series
+        }],
+        xaxis: {
+          categories: data.categories,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: {
+            style: {
+              colors: '#78716c',
+              fontSize: '12px'
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#78716c',
+              fontSize: '12px'
+            },
+            formatter: function (value) {
+              if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
+              return Math.round(value);
+            }
+          }
+        },
+        dataLabels: { enabled: false },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            shadeIntensity: 0.8,
+            opacityFrom: 0.2,
+            opacityTo: 0,
+            stops: [0, 90, 100]
+          }
+        },
+        colors: ['#ef4444'],
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 2,
+          padding: { left: 14, right: 8 }
+        },
+        tooltip: {
+          x: { show: true },
+          y: {
+            formatter: function (value) {
+              if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
+              return Math.round(value);
+            }
+          }
+        },
+        legend: { show: false }
+      };
+
+      const el = document.getElementById('analytics-churn-chart');
+      if (!el) return;
+
+      if (churnChart) {
+        churnChart.updateOptions({
+          series: [{ name: 'Cancelled subscribers', data: data.series }],
+          xaxis: { categories: data.categories }
+        });
+      } else {
+        churnChart = new ApexCharts(el, options);
+        churnChart.render();
+      }
+    }
+
+    function renderPlanChart(range) {
+      const data = getPlanData(range);
+      const options = {
+        chart: {
+          type: 'bar',
+          height: 300,
+          toolbar: { show: false },
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        },
+        series: [
+          {
+            name: 'Revenue',
+            data: data
+          }
+        ],
+        colors: ['#2563eb'],
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: '45%',
+            borderRadius: 4,
+            distributed: false
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        xaxis: {
+          categories: ['Basic', 'Standard', 'Premium', 'Annual'],
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: {
+            style: {
+              colors: '#78716c',
+              fontSize: '12px'
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#78716c',
+              fontSize: '12px'
+            },
+            formatter: function (v) {
+              if (v >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
+              if (v >= 1000) return '₹' + (v / 1000).toFixed(0) + 'k';
+              return '₹' + v;
+            }
+          }
+        },
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 2,
+          xaxis: { lines: { show: false } },
+          padding: { left: 14, right: 8 }
+        },
+        tooltip: {
+          y: {
+            formatter: function (v) {
+              if (v >= 100000) return '₹' + (v / 100000).toFixed(2) + 'L';
+              if (v >= 1000) return '₹' + (v / 1000).toFixed(1) + 'k';
+              return '₹' + v;
+            }
+          }
+        }
+      };
+      const el = document.getElementById('analytics-revenue-by-plan-chart');
+      if (!el) return;
+      if (planChart) {
+        planChart.updateOptions({
+          series: [{ name: 'Revenue', data: data }],
+          xaxis: { categories: ['Basic', 'Standard', 'Premium', 'Annual'] }
+        });
+      } else {
+        planChart = new ApexCharts(el, options);
+        planChart.render();
+      }
+    }
+
+    function renderLifecycleChart(range) {
+      const data = getLifecycleData(range);
+      const options = {
+        chart: {
+          type: 'bar',
+          height: 300,
+          toolbar: { show: false },
+          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        },
+        series: [
+          { name: 'New', data: data.new },
+          { name: 'Renewal', data: data.renewal },
+          { name: 'Cancelled', data: data.cancelled },
+          { name: 'Upgrade', data: data.upgrade },
+          { name: 'Downgrade', data: data.downgrade }
+        ],
+        xaxis: {
+          categories: data.categories,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: { style: { colors: '#78716c', fontSize: '12px' } }
+        },
+        yaxis: {
+          labels: {
+            style: { colors: '#78716c', fontSize: '12px' }
+          }
+        },
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            borderRadius: 4,
+            columnWidth: '75%',
+            dataLabels: { position: 'top' }
+          }
+        },
+        colors: ['#10b981', '#2563eb', '#ef4444', '#8b5cf6', '#f59e0b'],
+        grid: {
+          borderColor: '#e7e5e4',
+          strokeDashArray: 2,
+          xaxis: { lines: { show: false } }
+        },
+        legend: {
+          position: 'bottom',
+          horizontalAlign: 'center',
+          fontSize: '13px',
+          fontWeight: 500,
+          labels: { colors: '#44403c' }
+        },
+        dataLabels: {
+          enabled: false
+        }
+      };
+      const el = document.getElementById('analytics-subscription-lifecycle-chart');
+      if (!el) return;
+      if (lifecycleChart) {
+        lifecycleChart.updateOptions({
+          series: [
+            { name: 'New', data: data.new },
+            { name: 'Renewal', data: data.renewal },
+            { name: 'Cancelled', data: data.cancelled },
+            { name: 'Upgrade', data: data.upgrade },
+            { name: 'Downgrade', data: data.downgrade }
+          ],
+          xaxis: { categories: data.categories }
+        });
+      } else {
+        lifecycleChart = new ApexCharts(el, options);
+        lifecycleChart.render();
+      }
+    }
+
+    function updateRevenueTrendCardTitle(range) {
+      var raw = range || (dateRangeSelect ? dateRangeSelect.value : '30');
+      var bucket = getRangeBucket(raw);
+      var titles = { '7': 'Are we growing day by day?', '30': 'Are we growing week by week?', '90': 'Are we growing month by month?', '365': 'Are we growing month by month?' };
+      var el = document.getElementById('revenue-trend-card-title');
+      if (el) el.textContent = titles[bucket] || titles['30'];
+    }
+
+    function formatRevenueTrendValue(val) {
+      if (val >= 100000) return '₹' + (val / 100000).toFixed(1) + 'L';
+      if (val >= 1000) return '₹' + (val / 1000).toFixed(1) + 'k';
+      return '₹' + val;
+    }
+
+    function updateRevenueTrendBadgeAndTooltip(range) {
+      var raw = range != null ? range : (dateRangeSelect ? dateRangeSelect.value : '30');
+      var scenario = getScenarioForRange(raw);
+      var badgeEl = document.getElementById('revenue-trend-status-badge');
+      var labelEl = badgeEl ? badgeEl.querySelector('.revenue-trend-status-label') : null;
+      var dotEl = badgeEl ? badgeEl.querySelector('.revenue-trend-status-dot') : null;
+      if (badgeEl) {
+        badgeEl.className = 'hs-tooltip-toggle py-1 px-2.5 inline-flex items-center gap-x-2 text-start whitespace-nowrap font-medium text-[13px] rounded-full cursor-pointer ' + scenario.badgeClass;
+      }
+      if (labelEl) labelEl.textContent = scenario.badge;
+      if (dotEl) dotEl.className = 'revenue-trend-status-dot relative w-2.5 h-px after:absolute after:top-1/2 after:-start-1 after:size-1.5 after:rounded-full after:-translate-y-1/2 ' + scenario.dotClass;
+      var tooltipEl = document.querySelector('.revenue-tooltip-text');
+      if (tooltipEl) tooltipEl.textContent = scenario.tooltipText;
+    }
+
+    function updateRevenueTrendValues(range) {
+      var raw = range != null ? range : (dateRangeSelect ? dateRangeSelect.value : '30');
+      var data = getTrendData(raw);
+      var lastIdx = data.subscription.length - 1;
+      var subVal = data.subscription[lastIdx];
+      var tvodVal = data.tvod[lastIdx];
+      var subEl = document.getElementById('revenue-trend-svod-value');
+      var tvodEl = document.getElementById('revenue-trend-tvod-value');
+      if (subEl) subEl.textContent = formatRevenueTrendValue(subVal);
+      if (tvodEl) tvodEl.textContent = formatRevenueTrendValue(tvodVal);
+    }
+
+    function formatChurnValue(val) {
+      if (val >= 1000) return (val / 1000).toFixed(1) + 'k';
+      return String(Math.round(val));
+    }
+
+    function updateChurnBadgeAndTooltip(range) {
+      var raw = range != null ? range : (dateRangeSelect ? dateRangeSelect.value : '30');
+      var scenario = getChurnScenarioForRange(raw);
+      var badgeEl = document.getElementById('churn-status-badge');
+      var labelEl = badgeEl ? badgeEl.querySelector('.churn-status-label') : null;
+      var dotEl = badgeEl ? badgeEl.querySelector('.churn-status-dot') : null;
+      if (badgeEl) {
+        badgeEl.className = 'hs-tooltip-toggle py-1 px-2.5 inline-flex items-center gap-x-2 text-start whitespace-nowrap font-medium text-[13px] rounded-full cursor-pointer ' + scenario.badgeClass;
+      }
+      if (labelEl) labelEl.textContent = scenario.badge;
+      if (dotEl) {
+        dotEl.className = 'churn-status-dot relative w-2.5 h-px after:absolute after:top-1/2 after:-start-1 after:size-1.5 after:rounded-full after:-translate-y-1/2 ' + scenario.dotClass;
+      }
+      var tooltipEl = document.querySelector('.churn-tooltip-text');
+      if (tooltipEl) tooltipEl.textContent = scenario.tooltipText;
+    }
+
+    function updateChurnValues(range) {
+      var raw = range != null ? range : (dateRangeSelect ? dateRangeSelect.value : '30');
+      var data = getChurnData(raw);
+      var total = data.series.reduce(function (a, b) { return a + b; }, 0);
+      var el = document.getElementById('churn-cancelled-value');
+      if (el) el.textContent = formatChurnValue(total);
+    }
+
+    function updateRevenueByPlanCard(range) {
+      var raw = range != null ? range : (dateRangeSelect ? dateRangeSelect.value : '30');
+      var values = getPlanData(raw);
+      var total = values.reduce(function (a, b) { return a + b; }, 0);
+      var plans = ['basic', 'standard', 'premium', 'annual'];
+
+      for (var i = 0; i < plans.length; i++) {
+        var key = plans[i];
+        var value = values[i] || 0;
+        var share = total > 0 ? Math.round((value / total) * 100) : 0;
+
+        var valueEl = document.getElementById('plan-' + key + '-value');
+        if (valueEl) valueEl.textContent = formatRevenueTrendValue(value) + ' (' + share + '%)';
+      }
+    }
+
+    function updateCharts(range) {
+      updateRevenueTrendCardTitle(range);
+      updateRevenueTrendBadgeAndTooltip(range);
+      updateRevenueTrendValues(range);
+      renderTrendChart(range);
+      updateChurnBadgeAndTooltip(range);
+      updateChurnValues(range);
+      renderChurnChart(range);
+      updateRevenueByPlanCard(range);
+      renderPlanChart(range);
+      renderLifecycleChart(range);
+    }
+
+    if (dateRangeSelect) {
+      dateRangeSelect.addEventListener('change', function () {
+        updateCharts(this.value);
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () { updateCharts(); }, 100);
+      });
+    } else {
+      setTimeout(function () { updateCharts(); }, 100);
+    }
+  })();
+</script>
