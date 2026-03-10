@@ -1,11 +1,26 @@
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script>
   (function () {
     const dateRangeInput = document.getElementById('user-analytics-date-range');
     let activeChart = null;
     let watchTimeChart = null;
+    let deviceDistributionChart = null;
+    let bingeVsCasualChart = null;
+    let viewingByHourChart = null;
+    let viewerLocationsChart = null;
 
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function initOrUpdateChart(chartInstance, elId, options) {
+      const el = document.getElementById(elId);
+      if (!el) return null;
+      if (!chartInstance) {
+        chartInstance = echarts.init(el);
+        window.addEventListener('resize', () => chartInstance.resize());
+      }
+      chartInstance.setOption(options);
+      return chartInstance;
+    }
 
     function getRangeBucket(val) {
       const v = parseInt(val, 10) || 30;
@@ -64,21 +79,15 @@
 
     function getActivityScenario(range) {
       const raw = parseInt(range != null && range !== '' ? range : (dateRangeInput ? dateRangeInput.value : '30'), 10);
-
-      // Last 7 days → flat pattern, needs Attention
       if (isNaN(raw) || raw <= 14) {
         return { pattern: 'flat_flat', status: 'Attention' };
       }
-
-      // Last 30 days (and up to ~2 months) → healthy up trend
       if (raw <= 60) {
         return { pattern: 'up_up', status: 'Good' };
       }
-
       if (raw <= 180) {
         return { pattern: 'down_flat', status: 'Attention' };
       }
-
       return { pattern: 'down_down', status: 'Critical' };
     }
 
@@ -124,7 +133,6 @@
       }
 
       const n = categories.length;
-
       return {
         categories,
         active: trendSeries(n, activeDir, activeBase),
@@ -134,38 +142,26 @@
 
     function renderActiveChart(range) {
       const data = getActivityData(range);
-      const el = document.getElementById('user-analytics-active-viewers-chart');
-      if (!el) return;
-
       const options = {
-        chart: {
-          type: 'area',
-          height: 260,
-          toolbar: { show: false },
-          zoom: { enabled: false },
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        grid: { top: 10, right: 35, bottom: 20, left: 40, borderColor: '#e7e5e4', show: false, borderWidth: 0 },
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: data.categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
         },
-        grid: {
-          borderColor: '#e7e5e4',
-          strokeDashArray: 2,
-          xaxis: { lines: { show: false } },
-          padding: { left: 14, right: 8 }
-        },
-        dataLabels: { enabled: false },
-        series: [
-          { name: 'Active viewers', data: data.active }
-        ],
-        xaxis: {
-          categories: data.categories,
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          labels: { style: { colors: '#78716c', fontSize: '12px' } }
-        },
-        yaxis: {
+        yAxis: {
+          type: 'value',
           min: 0,
-          tickAmount: 4,
-          labels: {
-            style: { colors: '#78716c', fontSize: '12px' },
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
             formatter: function (v) {
               if (v >= 100000) return (v / 100000).toFixed(1) + 'L';
               if (v >= 1000) return (v / 1000).toFixed(0) + 'k';
@@ -173,66 +169,48 @@
             }
           }
         },
-        legend: { show: false },
-        colors: ['#0ea5e9'],
-        stroke: { curve: 'smooth', width: 2 },
-        markers: { size: 0 },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shadeIntensity: 0.8,
-            opacityFrom: 0.18,
-            opacityTo: 0,
-            stops: [0, 90, 100]
+        series: [{
+          name: 'Active viewers',
+          type: 'line',
+          data: data.active,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2, color: '#0ea5e9' },
+          itemStyle: { color: '#0ea5e9' },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(14, 165, 233, 0.06)' },
+              { offset: 1, color: 'rgba(14, 165, 233, 0)' }
+            ])
           }
-        }
+        }]
       };
-
-      if (activeChart) {
-        activeChart.updateOptions({
-          series: options.series,
-          xaxis: { categories: data.categories }
-        });
-      } else {
-        activeChart = new ApexCharts(el, options);
-        activeChart.render();
-      }
+      
+      activeChart = initOrUpdateChart(activeChart, 'user-analytics-active-viewers-chart', options);
     }
 
     function renderWatchTimeChart(range) {
       const data = getActivityData(range);
-      const el = document.getElementById('user-analytics-watch-time-chart');
-      if (!el) return;
-
       const options = {
-        chart: {
-          type: 'area',
-          height: 260,
-          toolbar: { show: false },
-          zoom: { enabled: false },
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        grid: { top: 10, right: 35, bottom: 20, left: 40, borderColor: '#e7e5e4', show: false, borderWidth: 0 },
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: data.categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
         },
-        grid: {
-          borderColor: '#e7e5e4',
-          strokeDashArray: 2,
-          xaxis: { lines: { show: false } },
-          padding: { left: 14, right: 8 }
-        },
-        dataLabels: { enabled: false },
-        series: [
-          { name: 'Watch time (hours)', data: data.watch }
-        ],
-        xaxis: {
-          categories: data.categories,
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          labels: { style: { colors: '#78716c', fontSize: '12px' } }
-        },
-        yaxis: {
+        yAxis: {
+          type: 'value',
           min: 0,
-          tickAmount: 4,
-          labels: {
-            style: { colors: '#78716c', fontSize: '12px' },
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
             formatter: function (v) {
               if (v >= 100000) return (v / 1000).toFixed(0) + 'k';
               if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
@@ -240,30 +218,24 @@
             }
           }
         },
-        legend: { show: false },
-        colors: ['#22c55e'],
-        stroke: { curve: 'smooth', width: 2 },
-        markers: { size: 0 },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shadeIntensity: 0.8,
-            opacityFrom: 0.18,
-            opacityTo: 0,
-            stops: [0, 90, 100]
+        series: [{
+          name: 'Watch time (hours)',
+          type: 'line',
+          data: data.watch,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2, color: '#22c55e' },
+          itemStyle: { color: '#22c55e' },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(34, 197, 94, 0.06)' },
+              { offset: 1, color: 'rgba(34, 197, 94, 0)' }
+            ])
           }
-        }
+        }]
       };
-
-      if (watchTimeChart) {
-        watchTimeChart.updateOptions({
-          series: options.series,
-          xaxis: { categories: data.categories }
-        });
-      } else {
-        watchTimeChart = new ApexCharts(el, options);
-        watchTimeChart.render();
-      }
+      
+      watchTimeChart = initOrUpdateChart(watchTimeChart, 'user-analytics-watch-time-chart', options);
     }
 
     function updateStatusBadgeAndTooltip(range) {
@@ -315,6 +287,160 @@
       updateStatusBadgeAndTooltip(range);
     }
 
+    function renderBingeVsCasualChart() {
+      const options = {
+        tooltip: { trigger: 'item', formatter: '{b}<br/>{c}% of sessions', fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' },
+        color: ['#F59E0B', '#3B82F6', '#8B5CF6'],
+        series: [
+          {
+            type: 'pie',
+            radius: ['60%', '95%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false },
+            data: [
+              { value: 40, name: 'Casual viewing (<30 min)' },
+              { value: 35, name: 'Normal engagement (30–90 min)' },
+              { value: 25, name: 'Binge watching (90+ min)' }
+            ]
+          }
+        ]
+      };
+      bingeVsCasualChart = initOrUpdateChart(bingeVsCasualChart, 'user-analytics-binge-vs-casual-chart', options);
+    }
+
+    function renderViewingByHourChart() {
+      const hours = [];
+      for (let h = 0; h < 24; h++) {
+        hours.push(h.toString().padStart(2, '0'));
+      }
+      const data = [
+        60, 40, 30, 25, 30, 60, 90, 140, 190, 220, 260, 300,
+        340, 380, 420, 460, 520, 560, 600, 640, 700, 620, 480, 220
+      ];
+      
+      const options = {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { top: 10, right: 10, bottom: 20, left: 40 },
+        xAxis: {
+          type: 'category',
+          data: hours,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 10, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif', interval: 0, rotate: -45 }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            formatter: function (v) {
+              if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+              return Math.round(v);
+            }
+          }
+        },
+        series: [{
+          name: 'Viewers',
+          type: 'bar',
+          data: data,
+          barWidth: '55%',
+          itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] }
+        }]
+      };
+      
+      viewingByHourChart = initOrUpdateChart(viewingByHourChart, 'user-analytics-viewing-by-hour-chart', options);
+    }
+
+    function renderDeviceDistributionChart() {
+      const categories = ['Android', 'Web', 'iOS', 'TV'];
+      const data = [5200, 3100, 2400, 1200];
+      const colors = ['#3B82F6', '#8B5CF6', '#06B6D4', '#6366F1'];
+      
+      const options = {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { top: 10, right: 10, bottom: 20, left: 40 },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            formatter: function (v) {
+              if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+              return Math.round(v);
+            }
+          }
+        },
+        series: [{
+          name: 'Viewers',
+          type: 'bar',
+          data: data.map((val, idx) => ({ value: val, itemStyle: { color: colors[idx] } })),
+          barWidth: '55%',
+          itemStyle: { borderRadius: [4, 4, 0, 0] }
+        }]
+      };
+      
+      deviceDistributionChart = initOrUpdateChart(deviceDistributionChart, 'user-analytics-device-distribution-chart', options);
+    }
+
+    function renderViewerLocationsChart() {
+      const categories = ['Australia', 'Canada', 'United Kingdom', 'India', 'United States'];
+      const data = [11.1, 12.4, 15.8, 25.2, 35.5];
+      
+      const options = {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: function(params) { return params[0].name + ': ' + params[0].value + '%'; } },
+        grid: { top: 10, right: 40, bottom: 20, left: 100 },
+        xAxis: {
+          type: 'value',
+          max: 40,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif', formatter: '{value}%' }
+        },
+        yAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        series: [{
+          name: 'Viewers',
+          type: 'bar',
+          data: data,
+          barWidth: '65%',
+          itemStyle: { color: '#3B82F6', borderRadius: [0, 4, 4, 0] },
+          label: {
+            show: true,
+            position: 'insideRight',
+            formatter: '{c}%',
+            color: '#fff',
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            fontSize: 12
+          }
+        }]
+      };
+      
+      viewerLocationsChart = initOrUpdateChart(viewerLocationsChart, 'user-analytics-viewer-locations-chart', options);
+    }
+
     if (dateRangeInput) {
       dateRangeInput.addEventListener('change', function () {
         updateCharts(this.value);
@@ -323,11 +449,10 @@
 
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', function () {
-        setTimeout(function () { updateCharts(); }, 100);
+        setTimeout(function () { updateCharts(); renderDeviceDistributionChart(); renderBingeVsCasualChart(); renderViewingByHourChart(); renderViewerLocationsChart(); }, 100);
       });
     } else {
-      setTimeout(function () { updateCharts(); }, 100);
+      setTimeout(function () { updateCharts(); renderDeviceDistributionChart(); renderBingeVsCasualChart(); renderViewingByHourChart(); renderViewerLocationsChart(); }, 100);
     }
   })();
 </script>
-
