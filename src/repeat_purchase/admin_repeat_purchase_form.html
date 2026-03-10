@@ -1,0 +1,307 @@
+{% set is_repeat_purchase = "repeat_purchase" in page.url %}
+{% set is_edit = "edit" in page.url %}
+
+  <div class="space-y-6 sm:px-6 lg:px-0 lg:col-span-9">
+    <div class="flex flex-1 flex-col">
+      <div class="flex-1 pb-8">
+        <h1 class="text-xl font-semibold text-gray-900">
+          {% if is_repeat_purchase and is_edit %}
+            Update Repeat Purchase Offer
+          {% else %}
+            Create Repeat Purchase Offer
+          {% endif %}
+        </h1>
+
+        <div class="sm:block mt-6">
+
+          <div class="mx-auto max-w-6xl">
+            <div class="mt-2 flex flex-col">
+
+              <div class="min-w-full align-middle shadow sm:rounded-lg">
+
+                <form class="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl md:col-span-2"
+                      x-data="formValidator()"
+                      @submit="validateForm">
+
+                  <div class="px-4 py-6 sm:p-8">
+
+                    <div class="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+
+                      <!-- Coupon Code -->
+                      <div class="sm:col-span-3">
+                        <label class="block text-sm font-medium leading-6 text-gray-900">
+                            Offer Name
+                        </label>
+
+                        <div class="mt-2">
+                          <input
+                            type="text"
+                            name="name"
+                            value="{{ offer.name | default('') }}"
+                            class="block w-56 uppercase h-8 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300"
+                          >
+                        </div>
+                      </div>
+
+                      <!-- Discount Type -->
+                      <div class="sm:col-span-4">
+                        <label class="block text-sm font-medium leading-6 text-gray-900">
+                          Discount Type
+                        </label>
+
+                        <div class="mt-2">
+                          <select
+                            name="discount_type"
+                            class="block w-auto h-8 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300">
+
+                            <option {% if offer and offer.discount_type == 'Percentage' %}selected{% endif %}>Percentage</option>
+                            <option {% if offer and offer.discount_type == 'Fixed' %}selected{% endif %}>Fixed</option>
+
+                          </select>
+                        </div>
+                      </div>
+
+                      <!-- Discount Value -->
+                      <div class="sm:col-span-3">
+
+                        <label class="block text-sm font-medium leading-6 text-gray-900">
+                          Discount Value
+                        </label>
+
+                        <div class="mt-2">
+
+                          <input
+                            type="number"
+                            name="discount_value"
+                            value="{{ offer.discount_value | default('') }}"
+                            class="block w-40 h-8 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300"
+                          >
+
+                        </div>
+
+                      </div>
+
+                      <!-- Start Date -->
+                      <div class="sm:col-span-2 sm:col-start-1">
+
+                        <label class="block text-sm font-medium leading-6 text-gray-900">
+                          Start Date
+                        </label>
+
+                        <div class="mt-2">
+                          <input
+                            type="date"
+                            name="start_date"
+                            value="{{ offer.start_date | default('') }}"
+                            class="block w-full h-8 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300"
+                          >
+                        </div>
+                      </div>
+
+                      <!-- End Date -->
+                      <div class="sm:col-span-2">
+
+                        <label class="block text-sm font-medium leading-6 text-gray-900">
+                          End Date
+                        </label>
+
+                        <div class="mt-2">
+
+                          <input
+                            type="date"
+                            name="end_date"
+                            value="{{ offer.end_date | default('') }}"
+                            class="block w-full h-8 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300"
+                          >
+                        </div>
+                      </div>
+                      {% set dropdown = {
+                        label: "Applicable Products",
+                        help_text: "The new products the offer will be applied to.",
+                        field: "included_products",
+                        initial_data: offer.included_products | dump if offer else "[]",
+                        api_url: "/api/v2.5/admin/products/",
+                        display_expression: "item.title",
+                        chip_bg: "bg-green-100",
+                        chip_text: "text-green-700",
+                        chip_icon: "text-green-400 hover:text-green-500 hover:bg-green-200",
+                        placeholder: "Search Products"
+                      } %}
+                      {% include "./admin_offers_multi_select_dropdown.html" %}
+
+                      {% set dropdown = {
+                        label: "Purchased Products",
+                        help_text: "User must own the selected products to qualify for the offer. Can be left empty.",
+                        field: "existing_purchased_products",
+                        initial_data: offer.existing_purchased_products | dump if offer else "[]",
+                        api_url: "/api/repeat_purchase.json",
+                        display_expression: "item.title",
+                        chip_bg: "bg-green-100",
+                        chip_text: "text-green-700",
+                        chip_icon: "text-green-400 hover:text-green-500 hover:bg-green-200",
+                        placeholder: "Search Products"
+                      } %}
+                      {% include "./admin_offers_multi_select_dropdown.html" %}
+
+                      {% set dropdown = {
+                        label: "Eligible Batches",
+                        field: "eligible_batches",
+                        help_text: "The user must belong to selected batches to qualify for the offer. Can be left empty.",
+                        initial_data: offer.eligible_batches | dump if offer else "[]",
+                        api_url: "/api/v2.5/admin/batches/",
+                        display_expression: "item.name",
+                        chip_bg: "bg-green-100",
+                        chip_text: "text-green-700",
+                        chip_icon: "text-green-400 hover:text-green-500 hover:bg-green-200",
+                        placeholder: "Search Batches"
+                      } %}
+                      {% include "./admin_offers_multi_select_dropdown.html" %}
+
+                      {% set dropdown = {
+                        label: "Whitelisted Users",
+                        field: "eligible_users",
+                        help_text: "Only selected users will be eligible for the offer. Can be left empty.",
+                        initial_data: offer.eligible_users | dump if offer else "[]",
+                        api_url: "/api/v2.5/admin/users/",
+                        display_expression: "item.username || item.email",
+                        chip_bg: "bg-green-100",
+                        chip_text: "text-green-700",
+                        chip_icon: "text-green-400 hover:text-green-500 hover:bg-green-200",
+                        placeholder: "Search Users"
+                      } %}
+                      {% include "./admin_offers_multi_select_dropdown.html" %}
+
+                    </div>
+
+                  </div>
+
+                  <!-- Footer Buttons -->
+                  <div x-show="showError" style="display: none;" class="px-4 pt-4 sm:px-8 text-sm font-medium text-red-600">
+                    At least one of Purchased Products, Eligible Batches, or Whitelisted Users must be selected.
+                  </div>
+                  <div class="mt-6 flex items-center justify-end gap-x-6 border-t border-gray-900/10 px-4 py-4 sm:px-8">
+                    <button type="button"
+                            class="text-sm font-semibold leading-6 text-gray-900">
+                      Cancel
+                    </button>
+
+                    <button
+                      type="submit"
+                      class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700">
+
+                      {% if is_edit %}
+                        Update
+                      {% else %}
+                        Create
+                      {% endif %}
+
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% include "./alpine_select2.html" %}
+
+<script>
+
+function formValidator() {
+  return {
+    showError: false,
+    validateForm(e) {
+      this.showError = false;
+      const purchased = document.querySelector('input[name="existing_purchased_products"]')?.value;
+      const batches = document.querySelector('input[name="eligible_batches"]')?.value;
+      const users = document.querySelector('input[name="eligible_users"]')?.value;
+
+      const isEmpty = (val) => !val || val === '[]' || val.trim() === '';
+      
+      if (isEmpty(purchased) && isEmpty(batches) && isEmpty(users)) {
+        e.preventDefault();
+        this.showError = true;
+      }
+    }
+  }
+}
+
+function ProductData(searchUrl, initialData = []) {
+
+  return {
+
+    showSearchProductDropdown: false,
+    atTop: false,
+    atEnd: false,
+
+    ...select2(searchUrl, true),
+
+    fetchItems(params = {}) {
+      if (searchUrl.includes('products')) {
+        this.items = [
+          { id: 1, title: 'Sample Product 1' },
+          { id: 2, title: 'Sample Product 2' },
+          { id: 3, title: 'Sample Product 3' }
+        ];
+      } else if (searchUrl.includes('batches')) {
+        this.items = [
+          { id: 1, title: 'Sample Batch A', name: 'Sample Batch A' },
+          { id: 2, title: 'Sample Batch B', name: 'Sample Batch B' },
+          { id: 3, title: 'Sample Batch C', name: 'Sample Batch C' }
+        ];
+      } else if (searchUrl.includes('users')) {
+        this.items = [
+          { id: 1, title: 'user1@example.com', username: 'user1' },
+          { id: 2, title: 'user2@example.com', username: 'user2' },
+          { id: 3, title: 'user3@example.com', username: 'user3' }
+        ];
+      } else if (searchUrl.includes('repeat_purchase')) {
+        this.items = [
+          { id: 1, title: 'Sample Product 1' },
+          { id: 2, title: 'Sample Product 2' },
+          { id: 3, title: 'Sample Product 3' }
+        ];
+      }
+    },
+
+    selectedItems: [...initialData],
+    currentPage: 1,
+    storefetchedItems: [],
+    inputSearch: false,
+
+    getSelectedItemsIds() {
+      return this.selectedItems.map(item => item.id);
+    },
+
+    InitializeStoredItems(){
+      if(this.storefetchedItems.length === 0){
+        this.storefetchedItems = [...this.items];
+      }
+    },
+
+    displayItems() {
+      if (this.inputSearch) {
+        return this.items;
+      } else {
+        return this.storefetchedItems;
+      }
+    },
+
+    fetchNextPage(){
+
+      if(this.nextPage && !this.showLoading){
+
+        this.currentPage++
+        this.fetchItems({"page": this.currentPage})
+        this.storefetchedItems = this.storefetchedItems.concat(this.items)
+
+      }
+    }
+  };
+}
+
+</script>
