@@ -1,4 +1,4 @@
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script>
   (function () {
     const dateRangeSelect = document.getElementById('revenue-analytics-date-range');
@@ -7,6 +7,17 @@
     let planChart = null;
     let lifecycleChart = null;
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function initOrUpdateChart(chartInstance, elId, options) {
+      const el = document.getElementById(elId);
+      if (!el) return null;
+      if (!chartInstance) {
+        chartInstance = echarts.init(el);
+        window.addEventListener('resize', () => chartInstance.resize());
+      }
+      chartInstance.setOption(options);
+      return chartInstance;
+    }
 
     function getRangeBucket(val) {
       const v = parseInt(val, 10) || 30;
@@ -281,36 +292,34 @@
     function renderTrendChart(range) {
       const data = getTrendData(range);
       const options = {
-        chart: {
-          type: 'area',
-          height: 300,
-          toolbar: { show: false },
-          zoom: { enabled: false },
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        tooltip: {
+          trigger: 'axis',
+          formatter: function (params) {
+            let tooltipHtml = '<b>' + params[0].axisValue + '</b><br/>';
+            params.forEach(param => {
+              let val = param.value;
+              let formatted = val >= 100000 ? '₹' + (val / 100000).toFixed(2) + 'L' : val >= 1000 ? '₹' + (val / 1000).toFixed(1) + 'k' : '₹' + val;
+              tooltipHtml += param.marker + param.seriesName + ': <b>' + formatted + '</b><br/>';
+            });
+            return tooltipHtml;
+          }
         },
-        grid: {
-          borderColor: '#e7e5e4',
-          strokeDashArray: 2,
-          xaxis: { lines: { show: false } },
-          padding: { left: 14, right: 8 }
+        grid: { top: 10, right: 35, bottom: 20, left: 50, borderColor: '#e7e5e4', show: false },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: data.categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
         },
-        dataLabels: {
-          enabled: false
-        },
-        series: [
-          { name: 'Subscription', data: data.subscription },
-          { name: 'Pay per view', data: data.tvod }
-        ],
-        xaxis: {
-          categories: data.categories,
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          labels: { style: { colors: '#78716c', fontSize: '12px' } }
-        },
-        yaxis: {
-          labels: {
-            offsetX: -4,
-            style: { colors: '#78716c', fontSize: '12px' },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
             formatter: function (v) {
               if (v >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
               if (v >= 1000) return '₹' + (v / 1000).toFixed(0) + 'k';
@@ -318,175 +327,122 @@
             }
           }
         },
-        legend: {
-          show: false
-        },
-        colors: ['#10b981', '#2563eb'],
-        stroke: {
-          curve: 'smooth',
-          width: 2
-        },
-        markers: {
-          size: 0
-        },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shadeIntensity: 0.8,
-            opacityFrom: 0.2,
-            opacityTo: 0,
-            stops: [0, 90, 100]
-          }
-        },
-        tooltip: {
-          y: {
-            formatter: function (v) {
-              if (v >= 100000) return '₹' + (v / 100000).toFixed(2) + 'L';
-              if (v >= 1000) return '₹' + (v / 1000).toFixed(1) + 'k';
-              return '₹' + v;
+        series: [
+          {
+            name: 'Subscription',
+            type: 'line',
+            data: data.subscription,
+            smooth: true,
+            symbol: 'none',
+            lineStyle: { width: 2, color: '#10b981' },
+            itemStyle: { color: '#10b981' },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(16, 185, 129, 0.06)' },
+                { offset: 1, color: 'rgba(16, 185, 129, 0)' }
+              ])
+            }
+          },
+          {
+            name: 'Pay per view',
+            type: 'line',
+            data: data.tvod,
+            smooth: true,
+            symbol: 'none',
+            lineStyle: { width: 2, color: '#2563eb' },
+            itemStyle: { color: '#2563eb' },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(37, 99, 235, 0.06)' },
+                { offset: 1, color: 'rgba(37, 99, 235, 0)' }
+              ])
             }
           }
-        }
+        ]
       };
-      const el = document.getElementById('analytics-revenue-trend-chart');
-      if (!el) return;
-      if (trendChart) {
-        trendChart.updateOptions({
-          series: options.series,
-          xaxis: { categories: data.categories }
-        });
-      } else {
-        trendChart = new ApexCharts(el, options);
-        trendChart.render();
-      }
+      trendChart = initOrUpdateChart(trendChart, 'analytics-revenue-trend-chart', options);
     }
 
     function renderChurnChart(range) {
       const data = getChurnData(range);
       const options = {
-        chart: {
-          type: 'area',
-          height: 300,
-          toolbar: { show: false },
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
+        tooltip: {
+          trigger: 'axis',
+          formatter: function (params) {
+            let val = params[0].value;
+            let formatted = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : Math.round(val);
+            return '<b>' + params[0].axisValue + '</b><br/>' + params[0].marker + params[0].seriesName + ': <b>' + formatted + '</b>';
+          }
+        },
+        grid: { top: 10, right: 35, bottom: 20, left: 40, borderColor: '#e7e5e4', show: false },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: data.categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            formatter: function (value) {
+              if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
+              return Math.round(value);
+            }
+          }
         },
         series: [{
           name: 'Cancelled subscribers',
-          data: data.series
-        }],
-        xaxis: {
-          categories: data.categories,
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          labels: {
-            style: {
-              colors: '#78716c',
-              fontSize: '12px'
-            }
+          type: 'line',
+          data: data.series,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2, color: '#ef4444' },
+          itemStyle: { color: '#ef4444' },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(239, 68, 68, 0.06)' },
+              { offset: 1, color: 'rgba(239, 68, 68, 0)' }
+            ])
           }
-        },
-        yaxis: {
-          labels: {
-            style: {
-              colors: '#78716c',
-              fontSize: '12px'
-            },
-            formatter: function (value) {
-              if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
-              return Math.round(value);
-            }
-          }
-        },
-        dataLabels: { enabled: false },
-        stroke: {
-          curve: 'smooth',
-          width: 2
-        },
-        fill: {
-          type: 'gradient',
-          gradient: {
-            shadeIntensity: 0.8,
-            opacityFrom: 0.2,
-            opacityTo: 0,
-            stops: [0, 90, 100]
-          }
-        },
-        colors: ['#ef4444'],
-        grid: {
-          borderColor: '#e7e5e4',
-          strokeDashArray: 2,
-          padding: { left: 14, right: 8 }
-        },
-        tooltip: {
-          x: { show: true },
-          y: {
-            formatter: function (value) {
-              if (value >= 1000) return (value / 1000).toFixed(1) + 'k';
-              return Math.round(value);
-            }
-          }
-        },
-        legend: { show: false }
+        }]
       };
-
-      const el = document.getElementById('analytics-churn-chart');
-      if (!el) return;
-
-      if (churnChart) {
-        churnChart.updateOptions({
-          series: [{ name: 'Cancelled subscribers', data: data.series }],
-          xaxis: { categories: data.categories }
-        });
-      } else {
-        churnChart = new ApexCharts(el, options);
-        churnChart.render();
-      }
+      churnChart = initOrUpdateChart(churnChart, 'analytics-churn-chart', options);
     }
 
     function renderPlanChart(range) {
       const data = getPlanData(range);
+      const categories = ['Basic', 'Standard', 'Premium', 'Annual'];
       const options = {
-        chart: {
-          type: 'bar',
-          height: 300,
-          toolbar: { show: false },
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
-        },
-        series: [
-          {
-            name: 'Revenue',
-            data: data
-          }
-        ],
-        colors: ['#2563eb'],
-        plotOptions: {
-          bar: {
-            horizontal: false,
-            columnWidth: '45%',
-            borderRadius: 4,
-            distributed: false
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' },
+          formatter: function (params) {
+            let val = params[0].value;
+            let formatted = val >= 100000 ? '₹' + (val / 100000).toFixed(2) + 'L' : val >= 1000 ? '₹' + (val / 1000).toFixed(1) + 'k' : '₹' + val;
+            return '<b>' + params[0].axisValue + '</b><br/>' + params[0].marker + params[0].seriesName + ': <b>' + formatted + '</b>';
           }
         },
-        dataLabels: {
-          enabled: false
+        grid: { top: 10, right: 10, bottom: 20, left: 50, borderColor: '#e7e5e4', show: false },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
         },
-        xaxis: {
-          categories: ['Basic', 'Standard', 'Premium', 'Annual'],
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          labels: {
-            style: {
-              colors: '#78716c',
-              fontSize: '12px'
-            }
-          }
-        },
-        yaxis: {
-          labels: {
-            style: {
-              colors: '#78716c',
-              fontSize: '12px'
-            },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
             formatter: function (v) {
               if (v >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
               if (v >= 1000) return '₹' + (v / 1000).toFixed(0) + 'k';
@@ -494,104 +450,55 @@
             }
           }
         },
-        grid: {
-          borderColor: '#e7e5e4',
-          strokeDashArray: 2,
-          xaxis: { lines: { show: false } },
-          padding: { left: 14, right: 8 }
-        },
-        tooltip: {
-          y: {
-            formatter: function (v) {
-              if (v >= 100000) return '₹' + (v / 100000).toFixed(2) + 'L';
-              if (v >= 1000) return '₹' + (v / 1000).toFixed(1) + 'k';
-              return '₹' + v;
-            }
-          }
-        }
+        series: [{
+          name: 'Revenue',
+          type: 'bar',
+          data: data,
+          barWidth: '45%',
+          itemStyle: { color: '#2563eb', borderRadius: [4, 4, 0, 0] }
+        }]
       };
-      const el = document.getElementById('analytics-revenue-by-plan-chart');
-      if (!el) return;
-      if (planChart) {
-        planChart.updateOptions({
-          series: [{ name: 'Revenue', data: data }],
-          xaxis: { categories: ['Basic', 'Standard', 'Premium', 'Annual'] }
-        });
-      } else {
-        planChart = new ApexCharts(el, options);
-        planChart.render();
-      }
+      planChart = initOrUpdateChart(planChart, 'analytics-revenue-by-plan-chart', options);
     }
 
     function renderLifecycleChart(range) {
       const data = getLifecycleData(range);
       const options = {
-        chart: {
-          type: 'bar',
-          height: 300,
-          toolbar: { show: false },
-          fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif'
-        },
-        series: [
-          { name: 'New', data: data.new },
-          { name: 'Renewal', data: data.renewal },
-          { name: 'Cancelled', data: data.cancelled },
-          { name: 'Upgrade', data: data.upgrade },
-          { name: 'Downgrade', data: data.downgrade }
-        ],
-        xaxis: {
-          categories: data.categories,
-          axisBorder: { show: false },
-          axisTicks: { show: false },
-          labels: { style: { colors: '#78716c', fontSize: '12px' } }
-        },
-        yaxis: {
-          labels: {
-            style: { colors: '#78716c', fontSize: '12px' }
-          }
-        },
-        plotOptions: {
-          bar: {
-            horizontal: false,
-            borderRadius: 4,
-            columnWidth: '75%',
-            dataLabels: { position: 'top' }
-          }
-        },
-        colors: ['#10b981', '#2563eb', '#ef4444', '#8b5cf6', '#f59e0b'],
-        grid: {
-          borderColor: '#e7e5e4',
-          strokeDashArray: 2,
-          xaxis: { lines: { show: false } }
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: { type: 'shadow' }
         },
         legend: {
-          position: 'bottom',
-          horizontalAlign: 'center',
-          fontSize: '13px',
-          fontWeight: 500,
-          labels: { colors: '#44403c' }
+          data: ['New', 'Renewal', 'Cancelled', 'Upgrade', 'Downgrade'],
+          bottom: 0,
+          icon: 'circle',
+          itemWidth: 10,
+          itemHeight: 10,
+          textStyle: { color: '#44403c', fontSize: 13, fontWeight: 500, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
         },
-        dataLabels: {
-          enabled: false
-        }
+        grid: { top: 10, right: 10, bottom: 40, left: 40, borderColor: '#e7e5e4', show: false },
+        xAxis: {
+          type: 'category',
+          data: data.categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        series: [
+          { name: 'New', type: 'bar', data: data.new, barGap: '0%', barWidth: '15%', itemStyle: { color: '#10b981', borderRadius: [4, 4, 0, 0] } },
+          { name: 'Renewal', type: 'bar', data: data.renewal, barWidth: '15%', itemStyle: { color: '#2563eb', borderRadius: [4, 4, 0, 0] } },
+          { name: 'Cancelled', type: 'bar', data: data.cancelled, barWidth: '15%', itemStyle: { color: '#ef4444', borderRadius: [4, 4, 0, 0] } },
+          { name: 'Upgrade', type: 'bar', data: data.upgrade, barWidth: '15%', itemStyle: { color: '#8b5cf6', borderRadius: [4, 4, 0, 0] } },
+          { name: 'Downgrade', type: 'bar', data: data.downgrade, barWidth: '15%', itemStyle: { color: '#f59e0b', borderRadius: [4, 4, 0, 0] } }
+        ]
       };
-      const el = document.getElementById('analytics-subscription-lifecycle-chart');
-      if (!el) return;
-      if (lifecycleChart) {
-        lifecycleChart.updateOptions({
-          series: [
-            { name: 'New', data: data.new },
-            { name: 'Renewal', data: data.renewal },
-            { name: 'Cancelled', data: data.cancelled },
-            { name: 'Upgrade', data: data.upgrade },
-            { name: 'Downgrade', data: data.downgrade }
-          ],
-          xaxis: { categories: data.categories }
-        });
-      } else {
-        lifecycleChart = new ApexCharts(el, options);
-        lifecycleChart.render();
-      }
+      
+      lifecycleChart = initOrUpdateChart(lifecycleChart, 'analytics-subscription-lifecycle-chart', options);
     }
 
     function updateRevenueTrendCardTitle(range) {
