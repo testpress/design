@@ -14,7 +14,7 @@
         chartInstance = echarts.init(el);
         window.addEventListener('resize', () => chartInstance.resize());
       }
-      chartInstance.setOption(options);
+      chartInstance.setOption(options, true);
       return chartInstance;
     }
 
@@ -39,11 +39,7 @@
         if (weekStart.getMonth() === weekEnd.getMonth()) {
           labels.push(MONTHS[weekStart.getMonth()] + ' ' + weekStart.getDate() + '–' + weekEnd.getDate());
         } else {
-          labels.push(
-            MONTHS[weekStart.getMonth()] + ' ' + weekStart.getDate() +
-            ' – ' +
-            MONTHS[weekEnd.getMonth()] + ' ' + weekEnd.getDate()
-          );
+          labels.push(MONTHS[weekStart.getMonth()] + ' ' + weekStart.getDate() + ' – ' + MONTHS[weekEnd.getMonth()] + ' ' + weekEnd.getDate());
         }
       }
       return labels;
@@ -76,7 +72,7 @@
     function getScenario(range) {
       const raw = parseInt(range != null && range !== '' ? range : (dateRangeInput ? dateRangeInput.value : '30'), 10);
       if (isNaN(raw) || raw <= 14) return { pattern: 'flat_flat', status: 'Attention' };
-      if (raw <= 60) return { pattern: 'up_up', status: 'Good' };
+      if (raw <= 60)  return { pattern: 'up_up',    status: 'Good' };
       if (raw <= 180) return { pattern: 'down_flat', status: 'Attention' };
       return { pattern: 'down_down', status: 'Critical' };
     }
@@ -87,135 +83,95 @@
       const days = parseInt(raw, 10) || 30;
       const scenario = getScenario(raw);
 
-      let categories;
-      let viewersBase;
-      let watchBase;
-
+      let categories, viewersBase, watchBase;
       if (bucket === '7') {
         categories = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        viewersBase = 3000;
-        watchBase = 2000;
+        viewersBase = 3000; watchBase = 2000;
       } else if (bucket === '30') {
         categories = getWeekLabels(days);
-        viewersBase = 3200;
-        watchBase = 2100;
+        viewersBase = 3200; watchBase = 2100;
       } else if (bucket === '90') {
-        const monthCount = days <= 90 ? 3 : 6;
-        categories = getMonthLabels(monthCount);
-        viewersBase = 3500;
-        watchBase = 2300;
+        categories = getMonthLabels(days <= 90 ? 3 : 6);
+        viewersBase = 3500; watchBase = 2300;
       } else {
         categories = getMonthLabels(12);
-        viewersBase = 3400;
-        watchBase = 2200;
+        viewersBase = 3400; watchBase = 2200;
       }
 
       let viewersDir = 'flat', watchDir = 'flat';
-      if (scenario.pattern === 'up_up') { viewersDir = 'up'; watchDir = 'up'; }
-      else if (scenario.pattern === 'down_down') { viewersDir = 'down'; watchDir = 'down'; }
-      else if (scenario.pattern === 'down_flat') { viewersDir = 'down'; watchDir = 'flat'; }
+      if (scenario.pattern === 'up_up')    { viewersDir = 'up';   watchDir = 'up'; }
+      if (scenario.pattern === 'down_down'){ viewersDir = 'down'; watchDir = 'down'; }
+      if (scenario.pattern === 'down_flat'){ viewersDir = 'down'; watchDir = 'flat'; }
 
       const n = categories.length;
       return {
         categories,
         viewers: trendSeries(n, viewersDir, viewersBase),
-        watch: trendSeries(n, watchDir, watchBase)
+        watch:   trendSeries(n, watchDir,   watchBase)
       };
     }
 
-    function axisLabelStyle() {
-      return { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' };
-    }
+    const axisLabel = { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' };
+    const numFormatter = v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v);
 
     function renderContentViewersChart(range) {
       const data = getData(range);
-      const options = {
-        grid: { top: 10, right: 35, bottom: 20, left: 40, borderColor: '#e7e5e4', show: false, borderWidth: 0 },
-        tooltip: { trigger: 'axis' },
-        xAxis: {
-          type: 'category', boundaryGap: false, data: data.categories,
-          axisLine: { show: false }, axisTick: { show: false }, axisLabel: axisLabelStyle()
-        },
-        yAxis: {
-          type: 'value', min: 0, splitNumber: 4,
-          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
-          axisLabel: {
-            ...axisLabelStyle(),
-            formatter: v => v >= 1000 ? (v / 1000).toFixed(1) + 'k' : Math.round(v)
-          }
-        },
+      contentViewersChart = initOrUpdateChart(contentViewersChart, 'movie-content-viewers-chart', {
+        grid: { top: 10, right: 20, bottom: 20, left: 40 },
+        tooltip: { trigger: 'axis', formatter: params => params[0].axisValue + '<br/>' + params[0].seriesName + ': ' + params[0].data.toLocaleString() },
+        xAxis: { type: 'category', boundaryGap: false, data: data.categories, axisLine: { show: false }, axisTick: { show: false }, axisLabel },
+        yAxis: { type: 'value', min: 0, splitNumber: 4, splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } }, axisLabel: { ...axisLabel, formatter: numFormatter } },
         series: [{
           name: 'Content viewers', type: 'line', data: data.viewers,
           smooth: true, symbol: 'none',
           lineStyle: { width: 2, color: '#0ea5e9' },
           itemStyle: { color: '#0ea5e9' },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(14, 165, 233, 0.06)' },
-              { offset: 1, color: 'rgba(14, 165, 233, 0)' }
-            ])
-          }
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(14,165,233,0.08)' }, { offset: 1, color: 'rgba(14,165,233,0)' }]) }
         }]
-      };
-      contentViewersChart = initOrUpdateChart(contentViewersChart, 'movie-content-viewers-chart', options);
+      });
     }
 
     function renderWatchTimeChart(range) {
       const data = getData(range);
-      const options = {
-        grid: { top: 10, right: 35, bottom: 20, left: 50, borderColor: '#e7e5e4', show: false, borderWidth: 0 },
-        tooltip: { trigger: 'axis' },
-        xAxis: {
-          type: 'category', boundaryGap: false, data: data.categories,
-          axisLine: { show: false }, axisTick: { show: false }, axisLabel: axisLabelStyle()
-        },
-        yAxis: {
-          type: 'value', min: 0, splitNumber: 4,
-          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
-          axisLabel: {
-            ...axisLabelStyle(),
-            formatter: v => v >= 1000 ? (v / 1000).toFixed(1) + 'k hrs' : Math.round(v) + ' hrs'
-          }
-        },
+      watchTimeChart = initOrUpdateChart(watchTimeChart, 'movie-watch-time-chart', {
+        grid: { top: 10, right: 20, bottom: 20, left: 40 },
+        tooltip: { trigger: 'axis', formatter: params => params[0].axisValue + '<br/>' + params[0].seriesName + ': ' + params[0].data.toLocaleString() + ' hrs' },
+        xAxis: { type: 'category', boundaryGap: false, data: data.categories, axisLine: { show: false }, axisTick: { show: false }, axisLabel },
+        yAxis: { type: 'value', min: 0, splitNumber: 4, splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } }, axisLabel: { ...axisLabel, formatter: numFormatter } },
         series: [{
           name: 'Watch time (hours)', type: 'line', data: data.watch,
           smooth: true, symbol: 'none',
           lineStyle: { width: 2, color: '#22c55e' },
           itemStyle: { color: '#22c55e' },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: 'rgba(34, 197, 94, 0.06)' },
-              { offset: 1, color: 'rgba(34, 197, 94, 0)' }
-            ])
-          }
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(34,197,94,0.08)' }, { offset: 1, color: 'rgba(34,197,94,0)' }]) }
         }]
-      };
-      watchTimeChart = initOrUpdateChart(watchTimeChart, 'movie-watch-time-chart', options);
+      });
     }
+
+    const TOOLTIP_BY_PATTERN = {
+      'up_up':    'More people are discovering and watching the content longer. Promote on homepage to maintain momentum.',
+      'flat_flat':'Engagement is stable with no growth. Refresh promotions or add to recommendation lists.',
+      'down_flat':'Fewer new viewers discovering it but existing viewers engage well. Re-promote to attract new audiences.',
+      'down_down':'Both discovery and engagement are falling. Re-promote, improve recommendations, or analyse viewer drop-off.'
+    };
+    const STATUS_CONFIG = {
+      'Good':      { bg: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400',   dot: 'relative w-2.5 h-px bg-green-700 after:absolute after:top-1/2 after:-start-1 after:size-1.5 after:bg-green-700 after:rounded-full after:-translate-y-1/2 dark:bg-green-400 dark:after:bg-green-400' },
+      'Attention': { bg: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',   dot: 'relative w-2.5 h-px bg-amber-600 after:absolute after:top-1/2 after:-start-1 after:size-1.5 after:bg-amber-600 after:rounded-full after:-translate-y-1/2 dark:bg-amber-400 dark:after:bg-amber-400' },
+      'Critical':  { bg: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',           dot: 'relative w-2.5 h-px bg-red-700 after:absolute after:top-1/2 after:-start-1 after:size-1.5 after:bg-red-700 after:rounded-full after:-translate-y-1/2 dark:bg-red-400 dark:after:bg-red-400' }
+    };
 
     function updateStatusBadge(range) {
       const scenario = getScenario(range);
-      const badgeEl = document.querySelector('#movie-content-viewers-chart')?.closest('.bg-white, .dark\\:bg-neutral-800')
-                      ?.querySelector?.('.hs-tooltip-toggle');
-      if (!badgeEl) return;
-      const labelEl = badgeEl.querySelector('span:last-child');
-      const TOOLTIP_BY_PATTERN = {
-        'up_up':    'More people are discovering and watching the content longer. Promote on homepage to maintain momentum.',
-        'flat_flat':'Engagement is stable with no growth. Refresh promotions or add to recommendation lists.',
-        'down_flat':'Fewer new viewers but existing ones still engage. Re-promote the content to attract new audiences.',
-        'down_down':'Both discovery and engagement are falling. Re-promote, improve recommendations, or analyse viewer drop-off.'
-      };
-      const CONFIG = {
-        'Good'    : { bg: 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400',  dot: 'bg-green-700 after:bg-green-700 dark:bg-green-400 dark:after:bg-green-400' },
-        'Attention': { bg: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', dot: 'bg-amber-600 after:bg-amber-600 dark:bg-amber-400 dark:after:bg-amber-400' },
-        'Critical' : { bg: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400',         dot: 'bg-red-700 after:bg-red-700 dark:bg-red-400 dark:after:bg-red-400' }
-      };
-      const cfg = CONFIG[scenario.status] || CONFIG['Attention'];
-      badgeEl.className = 'hs-tooltip-toggle py-1 px-2.5 inline-flex items-center gap-x-2 text-start whitespace-nowrap font-medium text-[13px] rounded-full cursor-pointer ' + cfg.bg;
-      const dotEl = badgeEl.querySelector('span:first-child');
-      if (dotEl) dotEl.className = 'relative w-2.5 h-px after:absolute after:top-1/2 after:-start-1 after:size-1.5 after:rounded-full after:-translate-y-1/2 ' + cfg.dot;
+      const cfg = STATUS_CONFIG[scenario.status] || STATUS_CONFIG['Attention'];
+
+      const badgeEl = document.getElementById('movie-content-viewers-status-badge');
+      const dotEl   = document.getElementById('movie-content-viewers-status-dot');
+      const labelEl = document.getElementById('movie-content-viewers-status-label');
+      const tooltipEl = badgeEl ? badgeEl.closest('.hs-tooltip')?.querySelector('.hs-tooltip-content p') : null;
+
+      if (badgeEl) badgeEl.className = 'hs-tooltip-toggle py-1 px-2.5 inline-flex items-center gap-x-2 text-start whitespace-nowrap font-medium text-[13px] rounded-full cursor-pointer ' + cfg.bg;
+      if (dotEl)   dotEl.className = cfg.dot;
       if (labelEl) labelEl.textContent = scenario.status;
-      const tooltipEl = badgeEl.closest('.hs-tooltip')?.querySelector('.hs-tooltip-content p');
       if (tooltipEl) tooltipEl.textContent = TOOLTIP_BY_PATTERN[scenario.pattern] || TOOLTIP_BY_PATTERN['flat_flat'];
     }
 
@@ -225,10 +181,12 @@
       updateStatusBadge(range);
     }
 
+    // Listen to hidden input change (fired by Alpine setRange())
     if (dateRangeInput) {
       dateRangeInput.addEventListener('change', function () { updateAll(this.value); });
     }
 
+    // Initial render
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => setTimeout(() => updateAll(), 100));
     } else {
