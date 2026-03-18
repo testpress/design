@@ -1,0 +1,73 @@
+<script>
+  function rcParsePercent(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return Math.min(Math.max(val, 0), 100);
+    const s = String(val).replace('%', '').trim();
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : Math.min(Math.max(n, 0), 100);
+  }
+
+  function rcSectionPercent(section) {
+    const groups = section.groups || [];
+    if (groups.length === 0) return 0;
+    const total = groups.reduce((sum, g) => {
+      if (g.average_percentage) return sum + rcParsePercent(g.average_percentage);
+      const score = parseFloat(g.average_score) || 0;
+      const max = parseFloat((g.items && g.items[0]) ? g.items[0].max : 0) || 100;
+      return sum + Math.min((score / max) * 100, 100);
+    }, 0);
+    return total / groups.length;
+  }
+
+  function rcScoreColor(pct) {
+    if (pct >= 70) return 'green';
+    if (pct >= 40) return 'amber';
+    return 'red';
+  }
+
+  const RC_COLORS = {
+    green: { text: 'text-green-600 dark:text-green-500', bg: 'bg-green-600 dark:bg-green-500' },
+    amber: { text: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-500 dark:bg-amber-400' },
+    red:   { text: 'text-red-500 dark:text-red-400',     bg: 'bg-red-500 dark:bg-red-400'     },
+  };
+
+  function rcTextClass(pct) {
+    return RC_COLORS[rcScoreColor(pct)].text;
+  }
+
+  function rcBgClass(pct) {
+    return RC_COLORS[rcScoreColor(pct)].bg;
+  }
+
+  function rcOverallPercent(report) {
+    const sections = report.sections || [];
+    if (sections.length === 0) return 0;
+    const total = sections.reduce((s, sec) => s + rcSectionPercent(sec), 0);
+    return total / sections.length;
+  }
+
+  function rcTrend(pct) {
+    if (pct >= 80) return { label: 'Excellent', color: 'text-green-600 dark:text-green-500' };
+    if (pct >= 70) return { label: 'On track',  color: 'text-green-600 dark:text-green-500' };
+    if (pct >= 50) return { label: 'Average',   color: 'text-amber-500 dark:text-amber-400' };
+    return           { label: 'Needs work',  color: 'text-red-500 dark:text-red-400'     };
+  }
+
+  function rcSegments(pct) {
+    const TOTAL = 5;
+    const filled = Math.round((pct / 100) * TOTAL);
+    return Array.from({ length: TOTAL }, (_, i) => ({ filled: i < filled }));
+  }
+
+  function rcRadialSvg(pct) {
+    const color = rcScoreColor(pct);
+    const COLOR_HEX = { green: '#16a34a', amber: '#f59e0b', red: '#ef4444' };
+    const MUTED = '#d1d5db';
+    const filledCount = Math.round((pct / 100) * 12);
+    const rects = Array.from({ length: 12 }, (_, i) => {
+      const fill = i < filledCount ? COLOR_HEX[color] : MUTED;
+      return `<rect x="-3" y="-28" width="6" height="12" rx="3" fill="${fill}" transform="rotate(${i * 30})"/>`;
+    }).join('');
+    return `<svg width="40" height="40" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><g transform="translate(32,32)">${rects}</g></svg>`;
+  }
+</script>
