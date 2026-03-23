@@ -41,6 +41,11 @@ module.exports = config => {
     config.addFilter("filter", filter);
     config.addPassthroughCopy({ "src/api": "api" });
     config.addPassthroughCopy("css/simba.css");
+    config.addPassthroughCopy("css/odinhire.css");
+    config.addPassthroughCopy({
+        "src/odinhire/node_modules/preline/dist/preline.js":
+            "src/odinhire/node_modules/preline/dist/preline.js",
+    });
     config.addPassthroughCopy({
         "src/simba/node_modules/preline/dist/preline.js":
             "src/simba/node_modules/preline/dist/preline.js",
