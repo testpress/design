@@ -1,23 +1,103 @@
-<div class="divide-y divide-gray-100 dark:divide-neutral-700 border-b border-gray-100 dark:border-neutral-700">
-    {% for report_card in student_report_card %}
-        <div class="py-3 px-4 sm:px-6 transition-colors hover:bg-gray-50 dark:hover:bg-neutral-700">
-        <a :href="`${previewPath}/testpress/report_cards/detail/`" class="flex gap-x-3 items-center focus:outline-none">
+<script>
+  if (typeof groupData === 'undefined') {
+    function groupData(initialItems) {
+      return {
+        search: '',
+        sortBy: 'recent',
+        items: initialItems,
+        get filteredItems() {
+          let filtered = this.items.filter(i => 
+            i.title.toLowerCase().includes(this.search.toLowerCase())
+          );
+          
+          if (this.sortBy === 'most-score') {
+            return filtered.slice().sort((a,b) => b.score - a.score);
+          } else if (this.sortBy === 'least-score') {
+            return filtered.slice().sort((a,b) => a.score - b.score);
+          } else if (this.sortBy === 'recent') {
+            return filtered.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+          } else if (this.sortBy === 'oldest') {
+            return filtered.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+          }
+          return filtered;
+        }
+      }
+    }
+  }
+</script>
 
-            <div class="min-w-0 flex-1">
-                <h2 class="text-[13px] sm:text-[15px] font-medium text-gray-800 dark:text-neutral-200 truncate line-clamp-1">
-                    {{ report_card.title }}
-                </h2>
-                <p class="text-xs text-gray-500 dark:text-neutral-400 truncate line-clamp-1 mt-0.5">{{ report_card.course_name }}</p>
-            </div>
-            <div class="flex shrink-0 items-center gap-x-3">
-                <div class="flex flex-col items-end">
-                    <p class="text-sm sm:text-base text-gray-900 dark:text-white font-medium leading-tight">
-                        {{ report_card.total_score }}
-                    </p>
-                    <p class="text-[10px] text-gray-500 dark:text-neutral-400">{{ report_card.score_range }}</p>
+<div x-data="groupData({{ student_report_card | dump | safe }}.map(r => ({ ...r, score: r.total_score, date: r.metrics.last_updated })))">
+    <!-- Search & Sort Bar -->
+    <div class="px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-neutral-800 bg-gray-50/10 dark:bg-neutral-800/10">
+        <div class="grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5 items-center">
+        <div>
+            <!-- Search Input -->
+            <div class="relative">
+                <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-3.5">
+                    <svg class="shrink-0 size-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+                </div>
+                <input type="text" x-model="search" class="py-1.5 sm:py-2 ps-10 pe-8 block w-full min-w-75 bg-gray-100 border-transparent rounded-lg sm:text-sm placeholder:text-gray-500 focus:bg-white focus:border-emerald-500 focus:ring-emerald-600 checked:border-emerald-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-700 dark:border-transparent dark:text-neutral-400 dark:placeholder:text-neutral-400 dark:focus:bg-neutral-800 dark:focus:ring-neutral-600" placeholder="Search exam">
+                <div x-show="search.length > 0" class="absolute inset-y-0 end-0 flex items-center z-20 pe-1" x-cloak>
+                    <button @click="search = ''" type="button" class="inline-flex shrink-0 justify-center items-center size-6 rounded-full text-gray-400 hover:text-gray-500 dark:text-neutral-500 dark:hover:text-neutral-400 focus:outline-none" aria-label="Close">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                    </button>
                 </div>
             </div>
-        </a>
         </div>
-    {% endfor %}
+
+        <div class="flex md:justify-end items-center gap-x-2">
+            <!-- Sort Dropdown -->
+            <div class="hs-dropdown [--auto-close:true] relative inline-flex">
+            <button id="hs-pro-dptied" type="button" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 shadow-2xs hover:bg-gray-50 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-none" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <svg class="shrink-0 mt-0.5 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+                <span x-text="sortBy === 'recent' ? 'Recent Attempt' : sortBy === 'oldest' ? 'Old Attempt' : sortBy === 'most-score' ? 'Most Score' : 'Least Score'"></span>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+
+            <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-48 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-xl mt-2" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-dptied">
+                <div class="p-1">
+                <button type="button" @click="sortBy = 'recent'" class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-none" :class="sortBy === 'recent' ? 'bg-gray-100 dark:bg-neutral-800' : ''">
+                    Recent Attempt
+                </button>
+                <button type="button" @click="sortBy = 'oldest'" class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-none" :class="sortBy === 'oldest' ? 'bg-gray-100 dark:bg-neutral-800' : ''">
+                    Old Attempt
+                </button>
+                <button type="button" @click="sortBy = 'most-score'" class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-none" :class="sortBy === 'most-score' ? 'bg-gray-100 dark:bg-neutral-800' : ''">
+                    Most Score
+                </button>
+                <button type="button" @click="sortBy = 'least-score'" class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-none" :class="sortBy === 'least-score' ? 'bg-gray-100 dark:bg-neutral-800' : ''">
+                    Least Score
+                </button>
+                </div>
+            </div>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <!-- List of Exam Cards -->
+    <div class="divide-y divide-gray-100 dark:divide-neutral-700 border-b border-gray-100 dark:border-neutral-700">
+        <template x-for="report_card in filteredItems" :key="report_card.id">
+            <div class="py-3 px-4 sm:px-6 transition-colors hover:bg-gray-50 dark:hover:bg-neutral-700">
+                <a :href="`${previewPath}/testpress/report_cards/detail/`" class="flex gap-x-3 items-center focus:outline-none">
+                    <div class="min-w-0 flex-1">
+                        <h2 class="text-[13px] sm:text-[15px] font-medium text-gray-800 dark:text-neutral-200 truncate line-clamp-1" x-text="report_card.title">
+                        </h2>
+                        <p class="text-xs text-gray-500 dark:text-neutral-400 truncate line-clamp-1 mt-0.5" x-text="report_card.course_name"></p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-x-3">
+                        <div class="flex flex-col items-end">
+                            <p class="text-sm sm:text-base text-gray-900 dark:text-white font-medium leading-tight" x-text="report_card.total_score">
+                            </p>
+                            <p class="text-[10px] text-gray-500 dark:text-neutral-400" x-text="report_card.score_range"></p>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </template>
+
+        <div x-show="filteredItems.length === 0" class="px-5 py-12 text-center text-sm text-gray-500" x-cloak>
+            No exam report cards found.
+        </div>
+    </div>
 </div>
