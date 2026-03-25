@@ -39,8 +39,27 @@ module.exports = config => {
     config.addPassthroughCopy("fonts");
     config.addFilter("groupBy", groupBy);
     config.addFilter("filter", filter);
+    config.addFilter("dueIn", (dateString) => {
+        if (!dateString) return "";
+        const today = new Date();
+        const deadline = new Date(dateString);
+        const diffTime = deadline - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return "Expired";
+        if (diffDays === 0) return "Due today";
+        if (diffDays === 1) return "Due tomorrow";
+        if (diffDays <= 14) return `Due in ${diffDays} days`;
+        
+        return `Due on ${new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+    });
     config.addPassthroughCopy({ "src/api": "api" });
     config.addPassthroughCopy("css/simba.css");
+    config.addPassthroughCopy("css/odinhire.css");
+    config.addPassthroughCopy({
+        "src/odinhire/node_modules/preline/dist/preline.js":
+            "src/odinhire/node_modules/preline/dist/preline.js",
+    });
     config.addPassthroughCopy({
         "src/simba/node_modules/preline/dist/preline.js":
             "src/simba/node_modules/preline/dist/preline.js",
