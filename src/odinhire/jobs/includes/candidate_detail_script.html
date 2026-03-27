@@ -1,56 +1,50 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    var initChart = function() {
-      if (typeof echarts === 'undefined') {
-        console.error('ECharts is not defined');
-        return;
-      }
-      var chartDom = document.getElementById('overall-score-chart');
-      if (!chartDom) return;
+  // Move initialization functions to global scope so Alpine can call them
+  var initECharts = function() {
+    // 1. Overall Score Chart
+    var chartDom = document.getElementById('overall-score-chart');
+    if (chartDom) {
+      // Clear existing instance if it exists to avoid duplication
+      var existingChart = echarts.getInstanceByDom(chartDom);
+      if (existingChart) echarts.dispose(chartDom);
+      
       var myChart = echarts.init(chartDom);
       var score = {{ candidate.overall_score | default(0) }};
-      var color = score >= 80 ? '#10B981' : score >= 60 ? '#F59E0B' : '#EF4444'; // Emerald, Amber, Red
+      var color = score >= 80 ? '#10B981' : score >= 60 ? '#F59E0B' : '#EF4444'; 
       
-      var option = {
+      myChart.setOption({
         tooltip: { show: false },
-        series: [
-          {
-            type: 'pie',
-            radius: ['70%', '90%'],
-            avoidLabelOverlap: false,
-            silent: true,
-            label: {
-              show: true,
-              position: 'center',
-              formatter: score + '%',
-              fontSize: 28,
-              fontWeight: 'bold',
-              color: '#374151'
-            },
-            labelLine: {
-              show: false
-            },
-            data: [
-              { value: score, itemStyle: { color: color, borderRadius: 4 } },
-              { value: 100 - score, itemStyle: { color: '#E5E7EB', borderRadius: 4 } }
-            ]
-          }
-        ]
-      };
-
-      myChart.setOption(option);
-      
-      window.addEventListener('resize', function() {
-        myChart.resize();
+        series: [{
+          type: 'pie',
+          radius: ['70%', '90%'],
+          avoidLabelOverlap: false,
+          silent: true,
+          label: {
+            show: true,
+            position: 'center',
+            formatter: score + '%',
+            fontSize: 28,
+            fontWeight: 'bold',
+            color: '#374151'
+          },
+          data: [
+            { value: score, itemStyle: { color: color, borderRadius: 4 } },
+            { value: 100 - score, itemStyle: { color: '#E5E7EB', borderRadius: 4 } }
+          ]
+        }]
       });
-    };
-    
-    var initBreakdownChart = function() {
-      var breakdownDom = document.getElementById('candidate-score-breakdown-chart');
-      if (!breakdownDom) return;
-      var myBreakdownChart = echarts.init(breakdownDom);
       
+      window.addEventListener('resize', function() { myChart.resize(); });
+    }
+    
+    // 2. Breakdown Chart
+    var breakdownDom = document.getElementById('candidate-score-breakdown-chart');
+    if (breakdownDom) {
+      var existingBreakdown = echarts.getInstanceByDom(breakdownDom);
+      if (existingBreakdown) echarts.dispose(breakdownDom);
+      
+      var myBreakdownChart = echarts.init(breakdownDom);
       var categories = ['Problem Solving', 'Behavioral', 'Communication', 'Skill'];
       var scores = [
         {{ candidate.score_breakdown.problem_solving | default(0) }},
@@ -59,24 +53,21 @@
         {{ candidate.score_breakdown.skill | default(0) }}
       ];
       
-      var options = {
-        tooltip: { 
-          trigger: 'axis', 
-          axisPointer: { type: 'shadow' }
-        },
+      myBreakdownChart.setOption({
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
         grid: { top: 10, right: 30, bottom: 20, left: 110 },
         xAxis: {
           type: 'value',
           max: 100,
           splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
-          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif', formatter: '{value}%' }
+          axisLabel: { color: '#78716c', fontSize: 12, formatter: '{value}%' }
         },
         yAxis: {
           type: 'category',
           data: categories,
           axisLine: { show: false },
           axisTick: { show: false },
-          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+          axisLabel: { color: '#78716c', fontSize: 12 }
         },
         series: [{
           name: 'Score',
@@ -84,25 +75,22 @@
           data: scores,
           barWidth: '65%',
           itemStyle: { color: '#3B82F6', borderRadius: [0, 4, 4, 0] },
-          label: {
-            show: true,
-            position: 'insideRight',
-            formatter: '{c}%',
-            color: '#fff',
-            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
-            fontSize: 12
-          }
+          label: { show: true, position: 'insideRight', formatter: '{c}%', color: '#fff', fontSize: 12 }
         }]
-      };
-      
-      myBreakdownChart.setOption(options);
-      
-      window.addEventListener('resize', function() {
-        myBreakdownChart.resize();
       });
-    };
-    
-    initChart();
-    initBreakdownChart();
+      
+      window.addEventListener('resize', function() { myBreakdownChart.resize(); });
+    }
+  };
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', initECharts);
+  
+  // Custom event listener for Alpine tab switches
+  document.addEventListener('tab-switched', function(e) {
+    if (e.detail.tab === 'overview') {
+      // Small delay to ensure DOM is rendered by Alpine before init
+      setTimeout(initECharts, 50);
+    }
   });
 </script>
