@@ -5,14 +5,11 @@
     // 1. Overall Score Chart
     var chartDom = document.getElementById('overall-score-chart');
     if (chartDom) {
-      // Clear existing instance if it exists to avoid duplication
       var existingChart = echarts.getInstanceByDom(chartDom);
       if (existingChart) echarts.dispose(chartDom);
       
       var myChart = echarts.init(chartDom);
       var score = {{ candidate.overall_score | default(0) }};
-      var color = '#3B82F6';
-      
       myChart.setOption({
         tooltip: { show: false },
         series: [{
@@ -29,12 +26,11 @@
             color: '#374151'
           },
           data: [
-            { value: score, itemStyle: { color: color, borderRadius: 4 } },
+            { value: score, itemStyle: { color: '#3B82F6', borderRadius: 4 } },
             { value: 100 - score, itemStyle: { color: '#E5E7EB', borderRadius: 4 } }
           ]
         }]
       });
-      
       window.addEventListener('resize', function() { myChart.resize(); });
     }
     
@@ -53,13 +49,9 @@
         {{ candidate.score_breakdown.skill | default(0) }}
       ];
       
-      // Map colors to each score item
       var barData = scores.map((score, index) => {
-        var colors = ['#06B6D4', '#6366F1', '#A855F7', '#3B82F6']; // Cyan, Indigo, Purple, Blue
-        return {
-           value: score,
-           itemStyle: { color: colors[index], borderRadius: [0, 4, 4, 0] }
-        };
+        var colors = ['#0EA5E9', '#6366F1', '#A855F7', '#3B82F6']; // Sky, Indigo, Purple, Blue
+        return { value: score, itemStyle: { color: colors[index], borderRadius: [0, 4, 4, 0] } };
       });
 
       myBreakdownChart.setOption({
@@ -74,31 +66,90 @@
         yAxis: {
           type: 'category',
           data: categories,
-          axisLine: { show: false },
-          axisTick: { show: false },
+          axisLine: { show: false }, axisTick: { show: false },
           axisLabel: { color: '#78716c', fontSize: 12 }
         },
         series: [{
-          name: 'Score',
-          type: 'bar',
-          data: barData,
-          barWidth: '65%',
+          name: 'Score', type: 'bar', data: barData, barWidth: '65%',
           label: { show: true, position: 'insideRight', formatter: '{c}%', color: '#fff', fontSize: 12 }
         }]
       });
-      
       window.addEventListener('resize', function() { myBreakdownChart.resize(); });
     }
+
+    // 3. Behaviour Radar Chart Shared Logic
+    var radarOption = {
+      color: ['#6366F1'],
+      tooltip: {
+        show: true,
+        trigger: 'item',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#E5E7EB',
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: { color: '#374151', fontSize: 12 },
+        formatter: function(params) {
+          var tooltipHtml = '<div class="space-y-1">';
+          const dimensions = ['Motivation', 'Cognitive Ability', 'Adaptability', 'Collaboration', 'Time Management', 'Attention to Detail'];
+          dimensions.forEach((name, i) => {
+            tooltipHtml += `<div class="flex justify-between gap-4">
+              <span class="text-gray-500 font-medium">${name}</span>
+              <span class="font-bold text-gray-900">${params.value[i]}%</span>
+            </div>`;
+          });
+          tooltipHtml += '</div>';
+          return tooltipHtml;
+        }
+      },
+      radar: {
+        indicator: [
+          { name: 'Motivation', max: 100 }, { name: 'Cognitive Ability', max: 100 },
+          { name: 'Adaptability', max: 100 }, { name: 'Collaboration', max: 100 },
+          { name: 'Time Management', max: 100 }, { name: 'Attention to Detail', max: 100 }
+        ],
+        shape: 'polygon',
+        splitNumber: 5,
+        axisName: {
+          color: '#6B7280', // Matched to text-gray-500
+          fontSize: 12,
+          fontWeight: 400
+        },
+        splitLine: { lineStyle: { color: ['rgba(229, 231, 235, 0.6)'] } },
+        splitArea: { show: false },
+        axisLine: { lineStyle: { color: 'rgba(55, 65, 81, 0.2)' } }
+      },
+      series: [{
+        name: 'Behavioural Assessment',
+        type: 'radar',
+        data: [{
+          value: [84, 91, 86, 78, 80, 88],
+          name: 'Candidate Score',
+          areaStyle: { color: 'rgba(99, 102, 241, 0.2)' },
+          lineStyle: { width: 1.5, color: '#6366F1' },
+          symbol: 'circle', symbolSize: 3, itemStyle: { color: '#6366F1' }
+        }]
+      }]
+    };
+
+    ['behaviourRadarChart', 'tabBehaviourRadarChart'].forEach(function(id) {
+      var dom = document.getElementById(id);
+      if (dom) {
+        var existing = echarts.getInstanceByDom(dom);
+        if (existing) echarts.dispose(dom);
+        var chart = echarts.init(dom);
+        chart.setOption(radarOption);
+        window.addEventListener('resize', function() { chart.resize(); });
+      }
+    });
   };
 
   // Initial load
-  document.addEventListener('DOMContentLoaded', initECharts);
+  document.addEventListener('DOMContentLoaded', function() {
+    initECharts();
+  });
   
   // Custom event listener for Alpine tab switches
   document.addEventListener('tab-switched', function(e) {
-    if (e.detail.tab === 'overview') {
-      // Small delay to ensure DOM is rendered by Alpine before init
-      setTimeout(initECharts, 50);
-    }
+    setTimeout(initECharts, 50);
   });
 </script>
