@@ -55,21 +55,35 @@ module.exports = config => {
     });
     config.addFilter("formatDate", (dateString) => {
         if (!dateString) return "";
-        return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch (e) {
+            return dateString;
+        }
     });
+
     config.addFilter("dateOnly", (dateString) => {
         if (!dateString) return "";
-        return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        } catch (e) {
+            return dateString;
+        }
     });
+
     config.addFilter("dateTime", (dateString) => {
         if (!dateString) return "";
-        return new Date(dateString).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true 
-        });
+        try {
+            return new Date(dateString).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true 
+            });
+        } catch (e) {
+            return dateString;
+        }
     });
     config.addFilter("filterByJobId", function(items, jobId) {
         if (!Array.isArray(items)) return [];
