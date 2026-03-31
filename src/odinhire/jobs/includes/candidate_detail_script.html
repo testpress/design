@@ -2,12 +2,23 @@
 <script>
   // Move initialization functions to global scope so Alpine can call them
   var initECharts = function() {
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    // Theme-specific configuration
+    const theme = {
+      labelColor: isDark ? '#F5F5F5' : '#374151', // neutral-100 : gray-700
+      subLabelColor: isDark ? '#A3A3A3' : '#78716c', // neutral-400 : gray-600
+      trackColor: isDark ? '#404040' : '#E5E7EB', // neutral-700 : gray-200
+      splitLineColor: isDark ? '#404040' : '#E5E7EB', // neutral-700 : gray-200
+      axisLineColor: isDark ? '#404040' : '#E5E7EB', // neutral-700 : gray-200
+      tooltipBg: isDark ? '#171717' : '#FFFFFF', // neutral-900 : white
+      tooltipBorder: isDark ? '#262626' : '#E5E7EB', // neutral-800 : gray-200
+    };
+
     // 1. Overall Score Chart
     var chartDom = document.getElementById('overall-score-chart');
     if (chartDom) {
-      var existingChart = echarts.getInstanceByDom(chartDom);
-      if (existingChart) echarts.dispose(chartDom);
-      
+      echarts.dispose(chartDom);
       var myChart = echarts.init(chartDom);
       var score = {{ candidate.overall_score | default(0) }};
       myChart.setOption({
@@ -23,11 +34,11 @@
             formatter: score + '%',
             fontSize: 28,
             fontWeight: 'bold',
-            color: '#374151'
+            color: theme.labelColor
           },
           data: [
             { value: score, itemStyle: { color: '#3B82F6', borderRadius: 4 } },
-            { value: 100 - score, itemStyle: { color: '#E5E7EB', borderRadius: 4 } }
+            { value: 100 - score, itemStyle: { color: theme.trackColor, borderRadius: 4 } }
           ]
         }]
       });
@@ -37,9 +48,7 @@
     // 2. Breakdown Chart
     var breakdownDom = document.getElementById('candidate-score-breakdown-chart');
     if (breakdownDom) {
-      var existingBreakdown = echarts.getInstanceByDom(breakdownDom);
-      if (existingBreakdown) echarts.dispose(breakdownDom);
-      
+      echarts.dispose(breakdownDom);
       var myBreakdownChart = echarts.init(breakdownDom);
       var categories = ['Reasoning', 'Behaviour', 'Communication', 'Technical'];
       var scores = [
@@ -50,24 +59,30 @@
       ];
       
       var barData = scores.map((score, index) => {
-        var colors = ['#0EA5E9', '#6366F1', '#A855F7', '#3B82F6']; // Sky, Indigo, Purple, Blue
+        var colors = ['#0EA5E9', '#6366F1', '#A855F7', '#3B82F6'];
         return { value: score, itemStyle: { color: colors[index], borderRadius: [0, 4, 4, 0] } };
       });
 
       myBreakdownChart.setOption({
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        tooltip: { 
+          trigger: 'axis', 
+          axisPointer: { type: 'shadow' },
+          backgroundColor: theme.tooltipBg,
+          borderColor: theme.tooltipBorder,
+          textStyle: { color: theme.subLabelColor }
+        },
         grid: { top: 10, right: 30, bottom: 20, left: 110 },
         xAxis: {
           type: 'value',
           max: 100,
-          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
-          axisLabel: { color: '#78716c', fontSize: 12, formatter: '{value}%' }
+          splitLine: { lineStyle: { type: 'dashed', color: theme.splitLineColor } },
+          axisLabel: { color: theme.subLabelColor, fontSize: 12, formatter: '{value}%' }
         },
         yAxis: {
           type: 'category',
           data: categories,
           axisLine: { show: false }, axisTick: { show: false },
-          axisLabel: { color: '#78716c', fontSize: 12 }
+          axisLabel: { color: theme.subLabelColor, fontSize: 12 }
         },
         series: [{
           name: 'Score', type: 'bar', data: barData, barWidth: '65%',
@@ -77,24 +92,24 @@
       window.addEventListener('resize', function() { myBreakdownChart.resize(); });
     }
 
-    // 3. Behaviour Radar Chart Shared Logic
+    // 3. Behaviour Radar Chart
     var radarOption = {
       color: ['#6366F1'],
       tooltip: {
         show: true,
         trigger: 'item',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#E5E7EB',
+        backgroundColor: theme.tooltipBg,
+        borderColor: theme.tooltipBorder,
         borderWidth: 1,
         padding: [8, 12],
-        textStyle: { color: '#374151', fontSize: 12 },
+        textStyle: { color: theme.subLabelColor, fontSize: 12 },
         formatter: function(params) {
-          var tooltipHtml = '<div class="space-y-1">';
+          var tooltipHtml = `<div class="space-y-1">`;
           const dimensions = ['Motivation', 'Cognitive Ability', 'Adaptability', 'Collaboration', 'Time Management', 'Attention to Detail'];
           dimensions.forEach((name, i) => {
             tooltipHtml += `<div class="flex justify-between gap-4">
-              <span class="text-gray-500 font-medium">${name}</span>
-              <span class="font-bold text-gray-900">${params.value[i]}%</span>
+              <span class="font-medium" style="color: ${theme.subLabelColor}">${name}</span>
+              <span class="font-bold" style="color: ${theme.labelColor}">${params.value[i]}%</span>
             </div>`;
           });
           tooltipHtml += '</div>';
@@ -109,14 +124,10 @@
         ],
         shape: 'polygon',
         splitNumber: 5,
-        axisName: {
-          color: '#6B7280', // Matched to text-gray-500
-          fontSize: 12,
-          fontWeight: 400
-        },
-        splitLine: { lineStyle: { color: ['rgba(229, 231, 235, 0.6)'] } },
+        axisName: { color: theme.subLabelColor, fontSize: 12, fontWeight: 400 },
+        splitLine: { lineStyle: { color: [theme.splitLineColor] } },
         splitArea: { show: false },
-        axisLine: { lineStyle: { color: 'rgba(55, 65, 81, 0.2)' } }
+        axisLine: { lineStyle: { color: theme.axisLineColor, opacity: 0.3 } }
       },
       series: [{
         name: 'Behavioural Assessment',
@@ -134,8 +145,7 @@
     ['behaviourRadarChart', 'tabBehaviourRadarChart'].forEach(function(id) {
       var dom = document.getElementById(id);
       if (dom) {
-        var existing = echarts.getInstanceByDom(dom);
-        if (existing) echarts.dispose(dom);
+        echarts.dispose(dom);
         var chart = echarts.init(dom);
         chart.setOption(radarOption);
         window.addEventListener('resize', function() { chart.resize(); });
@@ -148,6 +158,21 @@
     initECharts();
   });
   
+  // Modern robust theme detection using MutationObserver
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        initECharts();
+      }
+    });
+  });
+  observer.observe(document.documentElement, { attributes: true });
+
+  // Custom event listener for Preline theme changes
+  window.addEventListener('on-hs-appearance-change', function() {
+    setTimeout(initECharts, 50);
+  });
+
   // Custom event listener for Alpine tab switches
   document.addEventListener('tab-switched', function(e) {
     setTimeout(initECharts, 50);
