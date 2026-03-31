@@ -1,0 +1,180 @@
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script>
+  // Move initialization functions to global scope so Alpine can call them
+  var initECharts = function() {
+    const isDark = document.documentElement.classList.contains('dark');
+    
+    // Theme-specific configuration
+    const theme = {
+      labelColor: isDark ? '#F5F5F5' : '#374151', // neutral-100 : gray-700
+      subLabelColor: isDark ? '#A3A3A3' : '#78716c', // neutral-400 : gray-600
+      trackColor: isDark ? '#404040' : '#E5E7EB', // neutral-700 : gray-200
+      splitLineColor: isDark ? '#404040' : '#E5E7EB', // neutral-700 : gray-200
+      axisLineColor: isDark ? '#404040' : '#E5E7EB', // neutral-700 : gray-200
+      tooltipBg: isDark ? '#171717' : '#FFFFFF', // neutral-900 : white
+      tooltipBorder: isDark ? '#262626' : '#E5E7EB', // neutral-800 : gray-200
+    };
+
+    // 1. Overall Score Chart
+    var chartDom = document.getElementById('overall-score-chart');
+    if (chartDom) {
+      echarts.dispose(chartDom);
+      var myChart = echarts.init(chartDom);
+      var score = {{ candidate.overall_score | default(0) }};
+      myChart.setOption({
+        tooltip: { show: false },
+        series: [{
+          type: 'pie',
+          radius: ['70%', '90%'],
+          avoidLabelOverlap: false,
+          silent: true,
+          label: {
+            show: true,
+            position: 'center',
+            formatter: score + '%',
+            fontSize: 28,
+            fontWeight: 'bold',
+            color: theme.labelColor
+          },
+          data: [
+            { value: score, itemStyle: { color: '#3B82F6', borderRadius: 4 } },
+            { value: 100 - score, itemStyle: { color: theme.trackColor, borderRadius: 4 } }
+          ]
+        }]
+      });
+      window.addEventListener('resize', function() { myChart.resize(); });
+    }
+    
+    // 2. Breakdown Chart
+    var breakdownDom = document.getElementById('candidate-score-breakdown-chart');
+    if (breakdownDom) {
+      echarts.dispose(breakdownDom);
+      var myBreakdownChart = echarts.init(breakdownDom);
+      var categories = ['Reasoning', 'Behaviour', 'Communication', 'Technical'];
+      var scores = [
+        {{ candidate.score_breakdown.reasoning | default(0) }},
+        {{ candidate.score_breakdown.behavioral | default(0) }},
+        {{ candidate.score_breakdown.communication | default(0) }},
+        {{ candidate.score_breakdown.skill | default(0) }}
+      ];
+      
+      var barData = scores.map((score, index) => {
+        var colors = ['#0EA5E9', '#6366F1', '#A855F7', '#3B82F6'];
+        return { value: score, itemStyle: { color: colors[index], borderRadius: [0, 4, 4, 0] } };
+      });
+
+      myBreakdownChart.setOption({
+        tooltip: { 
+          trigger: 'axis', 
+          axisPointer: { type: 'shadow' },
+          backgroundColor: theme.tooltipBg,
+          borderColor: theme.tooltipBorder,
+          textStyle: { color: theme.subLabelColor }
+        },
+        grid: { top: 10, right: 30, bottom: 20, left: 110 },
+        xAxis: {
+          type: 'value',
+          max: 100,
+          splitLine: { lineStyle: { type: 'dashed', color: theme.splitLineColor } },
+          axisLabel: { color: theme.subLabelColor, fontSize: 12, formatter: '{value}%' }
+        },
+        yAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { show: false }, axisTick: { show: false },
+          axisLabel: { color: theme.subLabelColor, fontSize: 12 }
+        },
+        series: [{
+          name: 'Score', type: 'bar', data: barData, barWidth: '65%',
+          label: { show: true, position: 'insideRight', formatter: '{c}%', color: '#fff', fontSize: 12 }
+        }]
+      });
+      window.addEventListener('resize', function() { myBreakdownChart.resize(); });
+    }
+
+    // 3. Behaviour Radar Chart
+    var radarOption = {
+      color: ['#6366F1'],
+      tooltip: {
+        show: true,
+        trigger: 'item',
+        backgroundColor: theme.tooltipBg,
+        borderColor: theme.tooltipBorder,
+        borderWidth: 1,
+        padding: [8, 12],
+        textStyle: { color: theme.subLabelColor, fontSize: 12 },
+        formatter: function(params) {
+          var tooltipHtml = `<div class="space-y-1">`;
+          const dimensions = ['Motivation', 'Cognitive Ability', 'Adaptability', 'Collaboration', 'Time Management', 'Attention to Detail'];
+          dimensions.forEach((name, i) => {
+            tooltipHtml += `<div class="flex justify-between gap-4">
+              <span class="font-medium" style="color: ${theme.subLabelColor}">${name}</span>
+              <span class="font-bold" style="color: ${theme.labelColor}">${params.value[i]}%</span>
+            </div>`;
+          });
+          tooltipHtml += '</div>';
+          return tooltipHtml;
+        }
+      },
+      radar: {
+        indicator: [
+          { name: 'Motivation', max: 100 }, { name: 'Cognitive Ability', max: 100 },
+          { name: 'Adaptability', max: 100 }, { name: 'Collaboration', max: 100 },
+          { name: 'Time Management', max: 100 }, { name: 'Attention to Detail', max: 100 }
+        ],
+        shape: 'polygon',
+        splitNumber: 5,
+        axisName: { color: theme.subLabelColor, fontSize: 12, fontWeight: 400 },
+        splitLine: { lineStyle: { color: [theme.splitLineColor] } },
+        splitArea: { show: false },
+        axisLine: { lineStyle: { color: theme.axisLineColor, opacity: 0.3 } }
+      },
+      series: [{
+        name: 'Behavioural Assessment',
+        type: 'radar',
+        data: [{
+          value: [84, 91, 86, 78, 80, 88],
+          name: 'Candidate Score',
+          areaStyle: { color: 'rgba(99, 102, 241, 0.2)' },
+          lineStyle: { width: 1.5, color: '#6366F1' },
+          symbol: 'circle', symbolSize: 3, itemStyle: { color: '#6366F1' }
+        }]
+      }]
+    };
+
+    ['behaviourRadarChart', 'tabBehaviourRadarChart'].forEach(function(id) {
+      var dom = document.getElementById(id);
+      if (dom) {
+        echarts.dispose(dom);
+        var chart = echarts.init(dom);
+        chart.setOption(radarOption);
+        window.addEventListener('resize', function() { chart.resize(); });
+      }
+    });
+  };
+
+  // Initial load
+  document.addEventListener('DOMContentLoaded', function() {
+    initECharts();
+  });
+  
+  // Modern robust theme detection using MutationObserver
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+        initECharts();
+      }
+    });
+  });
+  observer.observe(document.documentElement, { attributes: true });
+
+  // Custom event listener for Preline theme changes
+  window.addEventListener('on-hs-appearance-change', function() {
+    setTimeout(initECharts, 50);
+  });
+
+  // Custom event listener for Alpine tab switches
+  document.addEventListener('tab-switched', function(e) {
+    setTimeout(initECharts, 50);
+  });
+</script>
