@@ -57,6 +57,16 @@ module.exports = config => {
         if (!dateString) return "";
         return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
+    config.addFilter("dateTime", (dateString) => {
+        if (!dateString) return "";
+        return new Date(dateString).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true 
+        });
+    });
     config.addFilter("filterByJobId", function(items, jobId) {
         if (!Array.isArray(items)) return [];
         return items.filter(item => item.job_id === jobId);
