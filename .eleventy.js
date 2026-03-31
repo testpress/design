@@ -57,6 +57,10 @@ module.exports = config => {
         if (!dateString) return "";
         return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
+    config.addFilter("dateOnly", (dateString) => {
+        if (!dateString) return "";
+        return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    });
     config.addFilter("dateTime", (dateString) => {
         if (!dateString) return "";
         return new Date(dateString).toLocaleDateString('en-US', { 
