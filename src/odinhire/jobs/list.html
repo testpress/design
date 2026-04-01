@@ -326,13 +326,19 @@ tags: odinhire
                 <li
                   class="inline-flex items-center relative text-sm text-muted-foreground-1 pe-2 last:pe-0 last:after:hidden after:absolute after:top-1/2 after:end-0 after:inline-block after:size-[3px] after:bg-surface-3 after:rounded-full after:-translate-y-1/2">
                   <p class="text-sm text-muted-foreground-1">
-                    Posted {{ job.posted_at }}
+                    {{ job.posted_at }}
+                  </p>
+                </li>
+                <li
+                  class="inline-flex items-center relative text-sm text-muted-foreground-1 pe-2 last:pe-0 last:after:hidden after:absolute after:top-1/2 after:end-0 after:inline-block after:size-[3px] after:bg-surface-3 after:rounded-full after:-translate-y-1/2">
+                  <p class="text-sm text-muted-foreground-1">
+                    {{ job.total_rounds }} Rounds
                   </p>
                 </li>
               </ul>
             </div>
             <!-- Col 1 -->
-            <div class="flex flex-col gap-y-3 md:col-span-2">
+            <div class="flex flex-col  gap-y-3 md:col-span-2">
               <ul class="flex flex-wrap items-center text-sm text-muted-foreground-1 list-none m-0 p-0 font-medium">
                 <li class="flex items-center gap-x-1">
                   <span class="text-foreground">{{ job.candidate_counts.applied }}</span>
@@ -341,20 +347,85 @@ tags: odinhire
                 <li class="mx-2 opacity-40">|</li>
                 <li class="flex items-center gap-x-1">
                   <span class="text-foreground">{{ job.candidate_counts.interviewing }}</span>
-                  <span>Interviewing</span>
+                  <span>In Evaluation</span>
                 </li>
                 <li class="mx-2 opacity-40">|</li>
                 <li class="flex items-center gap-x-1">
-                  <span class="text-foreground">{{ job.candidate_counts.shortlisted }}</span>
-                  <span>Shortlisted</span>
+                  {% if job.openings >= 1 %}
+                    <span class="text-foreground">{{ job.candidate_counts.hired }}/{{ job.openings }}</span>
+                  {% else %}
+                    <span class="text-foreground">{{ job.candidate_counts.hired }}</span>
+                  {% endif %}
+                  <span>Hired</span>
                 </li>
               </ul>
-              <!-- Progress -->
-              <div class="flex items-center gap-x-3 whitespace-nowrap max-w-xs">
-                <div class="flex w-full h-1.5 bg-surface-1 rounded-full overflow-hidden" role="progressbar" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
-                  <div class="flex flex-col justify-center rounded-full overflow-hidden bg-primary text-xs text-primary-foreground text-center whitespace-nowrap transition duration-500" style="width: {{ job.stage_summary.completion_percent }}%"></div>
+            <div 
+              x-data="{ 
+                applied: {{ job.candidate_counts.applied | dump }},
+                newCount: {{ job.candidate_counts.new | dump }},
+                hired: {{ job.candidate_counts.hired | dump }},
+                openings: {{ job.openings | dump }},
+                showTooltip: false,
+
+                get processed() {
+                  return this.applied - this.newCount
+                },
+
+                get progress() {
+                  // hiring complete override (requires opening > 0)
+                  if (this.isHiringComplete) return 100
+                  
+                  // fallback to pipeline progress
+                  if (this.applied === 0) return 0
+                  return Math.round((this.processed / this.applied) * 100)
+                },
+
+                get isHiringComplete() {
+                  return this.openings > 0 && this.hired >= this.openings
+                }
+              }"
+              class="relative flex items-center gap-x-3 max-w-xs mt-2"
+              @mouseenter="showTooltip = true"
+              @mouseleave="showTooltip = false"
+            >
+              <div class="w-full h-1.5 bg-surface-1 rounded-full overflow-hidden cursor-help">
+                
+                <div 
+                  class="h-full bg-primary transition-all duration-500"
+                  :style="'width: ' + progress + '%'"
+                ></div>
+
+              </div>
+
+              <!-- Pipeline Tooltip -->
+              <div x-show="showTooltip" 
+                   x-transition:enter="transition ease-out duration-100"
+                   x-transition:enter-start="opacity-0 translate-y-1"
+                   x-transition:enter-end="opacity-100 translate-y-0"
+                   x-transition:leave="transition ease-in duration-75"
+                   x-transition:leave-start="opacity-100 translate-y-0"
+                   x-transition:leave-end="opacity-0 translate-y-1"
+                   class="absolute bottom-full left-0 mb-2 z-50 py-2 px-3 bg-tooltip border border-tooltip-line text-tooltip-foreground rounded-lg shadow-xl pointer-events-none" 
+                   x-cloak>
+                <div class="flex flex-col gap-y-1">
+                  <span class="text-[11px] font-bold whitespace-nowrap">
+                    <template x-if="isHiringComplete">
+                      <span>Hiring complete</span>
+                    </template>
+                    <template x-if="!isHiringComplete">
+                      <span>Pipeline progress: <span x-text="progress"></span>%</span>
+                    </template>
+                  </span>
+                  <template x-if="!isHiringComplete">
+                    <div class="flex items-center gap-x-1.5 text-[10px] opacity-70 whitespace-nowrap">
+                      <span x-text="processed"></span> processed
+                      <span class="opacity-30">•</span>
+                      <span x-text="newCount"></span> pending
+                    </div>
+                  </template>
                 </div>
               </div>
+            </div>
               <!-- End Progress -->
             </div>
 
