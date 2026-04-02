@@ -47,17 +47,20 @@
         class="flex items-center justify-between gap-x-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700/50 transition-all duration-200 py-5 px-4 relative"
         :class="{ 
           '!opacity-40 !bg-gray-50 dark:!bg-neutral-700 select-none': dragging === index,
-          '!border-t-primary !border-t-2 z-20': dropTarget === index && dragging !== index && dragging > index,
-          '!border-b-primary !border-b-2 z-20': dropTarget === index && dragging !== index && dragging < index,
           'z-50': activeDropdown === index,
-          'z-10': activeDropdown !== index && (dropTarget !== index || dragging === index)
+          'z-10': activeDropdown !== index
         }"
         draggable="true"
-        @dragstart="if (!$event.target.closest('.drag-handle')) { $event.preventDefault(); return; } dragstart(index, $event)"
-        @dragover.prevent="dragover(index)"
-        @dragleave="dragleave()"
-        @drop="drop(index)"
-        @dragend="dragend()"
+        @dragstart="dragging = index; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', index);"
+        @dragover.prevent="if (dragging !== null && dragging !== index) { 
+          const items = [...rounds];
+          const draggedItem = items.splice(dragging, 1)[0];
+          items.splice(index, 0, draggedItem);
+          rounds = items;
+          dragging = index;
+        }"
+        @drop="dragging = null"
+        @dragend="dragging = null"
         @click="window.location.href = '#round-detail';"
       >
         <div class="flex min-w-0 flex-auto items-center">
@@ -123,30 +126,20 @@
       activeDropdown: null,
 
       dragstart(index, e) {
-        this.dragging = index;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', index); // Essential for some browsers to trigger drag
       },
 
       dragover(index) {
-        this.dropTarget = index;
       },
 
       dragleave() {
       },
 
       drop(index) {
-        if (this.dragging === null) return;
-        const items = [...this.rounds];
-        const draggedItem = items.splice(this.dragging, 1)[0];
-        items.splice(index, 0, draggedItem);
-        this.rounds = items;
-        this.dragend();
+        this.dragging = null;
       },
 
       dragend() {
         this.dragging = null;
-        this.dropTarget = null;
       }
     }
   }
