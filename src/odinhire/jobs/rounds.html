@@ -44,30 +44,35 @@
   <ul class="flex flex-col divide-y divide-gray-200 dark:divide-neutral-700">
     <template x-for="(round, index) in rounds" :key="round.id">
       <li 
-        class="flex items-center justify-between gap-x-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700/50 transition-all duration-200 py-5 px-4 relative"
+        class="flex items-center justify-between gap-x-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700/80 transition-all duration-500 ease-in-out py-5 px-4 relative active:scale-[1.01]"
         :class="{ 
-          '!opacity-40 !bg-gray-50 dark:!bg-neutral-700 select-none': dragging === index,
+          '!opacity-40 !bg-gray-100 dark:!bg-neutral-700 select-none scale-95': dragging === index,
           'z-50': activeDropdown === index,
           'z-10': activeDropdown !== index
         }"
         draggable="true"
-        @dragstart="dragging = index; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', index);"
-        @dragover.prevent="if (dragging !== null && dragging !== index) { 
+        @mousedown="handleGrabbed = !!$event.target.closest('.drag-handle-container')"
+        @dragstart="console.log('Drag Start Requested...', index, 'From Handle:', handleGrabbed); if (!handleGrabbed) { console.log('Rejecting: Not a handle'); $event.preventDefault(); return; } dragging = index; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', index); console.log('Drag Initialized for:', index);"
+        @dragenter.prevent="$event.dataTransfer.dropEffect = 'move';"
+        @dragover.prevent="$event.dataTransfer.dropEffect = 'move'; if (dragging !== null && dragging !== index) { 
           const items = [...rounds];
           const draggedItem = items.splice(dragging, 1)[0];
           items.splice(index, 0, draggedItem);
           rounds = items;
           dragging = index;
         }"
-        @drop="dragging = null"
-        @dragend="dragging = null"
-        @click="window.location.href = '#round-detail';"
+        @drop="console.log('Drop event on:', index); dragging = null; handleGrabbed = false;"
+        @dragend="console.log('Drag end event'); dragging = null; handleGrabbed = false;"
+        @click="console.log('Card Clicked'); window.location.href = '#round-detail';"
       >
-        <div class="flex min-w-0 flex-auto items-center">
-          <!-- Drag Handle -->
-          <svg class="drag-handle shrink-0 size-4 text-gray-400 dark:text-neutral-500 cursor-grab active:cursor-grabbing mr-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/><circle cx="15" cy="5" r="1"/>
-          </svg>
+        <div class="flex min-w-0 flex-auto items-center" :class="{ 'pointer-events-none': dragging !== null }">
+          <!-- Drag Handle Wrapper -->
+          <div class="drag-handle-container shrink-0 p-2 -ml-2 cursor-grab active:cursor-grabbing hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md transition-colors mr-2"
+               :class="{ 'pointer-events-none': dragging !== null }">
+            <svg class="size-4 text-gray-400 dark:text-neutral-500 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/><circle cx="15" cy="5" r="1"/>
+            </svg>
+          </div>
 
           <div class="min-w-0 flex-auto">
             <div class="flex items-start gap-x-3">
@@ -124,6 +129,7 @@
       dragging: null,
       dropTarget: null,
       activeDropdown: null,
+      handleGrabbed: false,
 
       dragstart(index, e) {
       },
