@@ -1,6 +1,13 @@
 const groupBy = require("./js/groupBy");
 const filter = require("./js/filter");
 module.exports = config => {
+    // Ignore the build output and node_modules from the file watcher
+    // to prevent unnecessary re-builds when output files change
+    config.watchIgnores.add("public/**");
+    config.watchIgnores.add("node_modules/**");
+    config.watchIgnores.add("src/simba/node_modules/**");
+    config.watchIgnores.add("src/odinhire/node_modules/**");
+
     config.addPassthroughCopy("img");
     config.addPassthroughCopy("CNAME");
 
