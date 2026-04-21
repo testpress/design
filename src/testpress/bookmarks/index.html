@@ -50,7 +50,13 @@ new_student_page: true
                         d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z">
                       </path>
                     </svg>
-                    <span class="max-w-[100px] sm:max-w-[150px] truncate" x-text="getFolderLabel()">All Folders</span>
+                    <span class="max-w-[100px] sm:max-w-[150px] truncate">
+                      <span x-show="selectedFolderId === 'all'">All Bookmarks</span>
+                      <span x-show="selectedFolderId === 'uncategorized'" x-cloak>Uncategorized</span>
+                      {% for folder in bookmark_folders %}
+                      <span x-show="selectedFolderId == {{ folder.id }}" x-cloak>{{ folder.name }}</span>
+                      {% endfor %}
+                    </span>
                   </button>
                 </div>
               </div>
@@ -71,7 +77,12 @@ new_student_page: true
                       <path d="M16 5h6" />
                       <path d="M19 8V2" />
                     </svg>
-                    <span class="truncate max-w-[100px] sm:max-w-none" x-text="getSelectedLabel()">All contents</span>
+                    <span class="truncate max-w-[100px] sm:max-w-none">
+                      <span x-show="selectedType === null">All contents</span>
+                      {% for cat in bookmark_categories %}
+                      <span x-show="selectedType === '{{ cat.id }}'" x-cloak>{{ cat.name }}</span>
+                      {% endfor %}
+                    </span>
                     <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                       viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                       stroke-linejoin="round">
@@ -88,13 +99,13 @@ new_student_page: true
                         :class="selectedType === null && 'bg-gray-50 dark:bg-neutral-800'">
                         All contents
                       </button>
-                      <template x-for="cat in categories" :key="cat.id">
-                        <button @click="setType(cat.id)" type="button"
+                      {% for cat in bookmark_categories %}
+                        <button @click="setType('{{ cat.id }}')" type="button"
                           class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-                          :class="selectedType === cat.id && 'bg-gray-50 dark:bg-neutral-800'">
-                          <span x-text="cat.name"></span>
+                          :class="selectedType === '{{ cat.id }}' && 'bg-gray-50 dark:bg-neutral-800'">
+                          <span>{{ cat.name }}</span>
                         </button>
-                      </template>
+                      {% endfor %}
                     </div>
                   </div>
                 </div>
@@ -143,14 +154,16 @@ new_student_page: true
         </div>
 
         <!-- Content Area -->
-        <div class="flex-1 bg-gray-100 dark:bg-neutral-900 min-h-[calc(100vh-4rem)]">
-          <ul role="list" class="space-y-2 py-4 sm:space-y-4 sm:px-6 lg:px-8">
-            <template x-for="bookmark in bookmarks" :key="bookmark.id">
-              <li class="relative bg-white px-4 py-6 shadow-sm sm:rounded-lg sm:px-6 hover:z-30 transition-all duration-200">
+        <div class="flex-1 bg-gray-100 dark:bg-neutral-900">
+          <ul role="list" class="py-4 sm:px-6 lg:px-8">
+            {% for bookmark in bookmarks %}
+              <li 
+                x-show="(selectedType === null || selectedType === '{{ bookmark.typeId }}') && (selectedFolderId === 'all' || selectedFolderId == '{{ bookmark.folderId }}')"
+                class="mb-2 sm:mb-4 last:mb-0 relative bg-white px-4 py-6 shadow-sm sm:rounded-lg sm:px-6 hover:z-30 transition-all duration-200">
                 <div class="absolute top-4 right-4 z-20" @click.stop>
                   <!-- Actions Dropdown -->
                   <div class="hs-dropdown [--placement:bottom-right] relative inline-flex">
-                    <button id="hs-pro-pdmd1" type="button" 
+                    <button id="hs-pro-pdmd{{ bookmark.id }}" type="button" 
                       class="size-8 inline-flex justify-center items-center gap-x-2 text-sm rounded-lg bg-white border border-gray-200 text-gray-500 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
                       <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="12" cy="12" r="1"></circle>
@@ -159,7 +172,7 @@ new_student_page: true
                       </svg>
                     </button>
 
-                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-48 z-[60] transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-900 dark:border-neutral-800" role="menu" aria-orientation="vertical">
+                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-48 z-[60] transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-900 dark:border-neutral-800" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-pdmd{{ bookmark.id }}">
                       <div class="p-1 space-y-0.5">
                         <!-- Move to Folder Sub-menu -->
                         <div class="hs-dropdown [--strategy:static] md:[--strategy:absolute] [--adaptive:none] md:[--trigger:hover] [--placement:left-top] relative">
@@ -169,7 +182,7 @@ new_student_page: true
                             <svg class="ms-auto size-3 text-gray-400 rotate-90 md:rotate-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                           </button>
 
-                          <div class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] md:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 md:w-56 hidden z-[70] top-0 end-full md:me-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 shadow-xl rounded-xl" role="menu" @click.stop> <!-- Keep stop propagation here for the sub-menu search div specifically if needed, but actually search needs to be clickable -->
+                          <div class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] md:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 md:w-56 hidden z-[70] top-0 end-full md:me-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 shadow-xl rounded-xl" role="menu" @click.stop>
                             <div class="p-2 border-b border-gray-200 dark:border-neutral-800">
                               <div class="relative">
                                 <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
@@ -179,16 +192,19 @@ new_student_page: true
                               </div>
                             </div>
                             <div class="max-h-48 overflow-y-auto p-1 space-y-0.5 custom-scrollbar">
-                              <template x-for="folder in getFilteredFolders()" :key="folder.id">
-                                <button @click="moveToFolder(bookmark.id, folder.id)" class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
-                                  <span x-text="folder.name"></span>
+                              {% for folder in bookmark_folders %}
+                                <button 
+                                  x-show="!folderSearch || '{{ folder.name }}'.toLowerCase().includes(folderSearch.toLowerCase())"
+                                  @click="moveToFolder({{ bookmark.id }}, {{ folder.id }})" 
+                                  class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
+                                  <span>{{ folder.name }}</span>
                                 </button>
-                              </template>
+                              {% endfor %}
                             </div>
                           </div>
                         </div>
 
-                        <button @click="removeBookmark(bookmark.id)" class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
+                        <button @click="removeBookmark({{ bookmark.id }})" class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
                           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 size-4"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                           Remove
                         </button>
@@ -198,37 +214,36 @@ new_student_page: true
                 </div>
 
                 <div class="flex min-w-0 gap-x-4">
-                  <!-- Thumbnail Container (Always 16:9) -->
+                  <!-- Thumbnail/Icon Container (Always 16:9 outer bounds) -->
                   <div class="relative w-32 h-18 flex flex-shrink-0 mt-0.5 justify-center items-center rounded overflow-hidden">
-                    <template x-if="bookmark.type === 'Video'">
+                    {% if bookmark.thumbnail %}
                       <div class="w-full h-full relative">
-                        <img :src="bookmark.thumbnail" alt="Video" class="w-full h-full object-cover">
-                        <span class="absolute bottom-0 right-0 bg-black bg-opacity-50 text-white text-xs px-2 py-0.5 rounded" x-text="bookmark.type"></span>
+                        <img src="{{ bookmark.thumbnail }}" alt="Video" class="w-full h-full object-cover">
+                        <span class="absolute bottom-0 right-0 bg-black bg-opacity-50 text-white text-xs px-2 py-0.5 rounded">{{ bookmark.type }}</span>
                       </div>
-                    </template>
-                    <template x-if="bookmark.type !== 'Video'">
+                    {% else %}
                       <div class="w-full h-full flex items-center justify-center">
-                        <img :src="bookmark.thumbnail" class="h-12 w-12 object-contain" alt="File">
+                        <img src="{{ bookmark.icon }}" alt="Attachment" class="w-16 h-16 object-cover rounded">
                       </div>
-                    </template>
+                    {% endif %}
                   </div>
 
-                  <div class="min-w-0 flex-auto pe-10"> <!-- Added padding-right to avoid overlap with absolute dropdown -->
+                  <div class="min-w-0 flex-auto pe-10">
                     <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-neutral-200 line-clamp-2">
-                      <a :href="bookmark.url" target="_blank" rel="noopener noreferrer">
+                       <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
                         <span class="absolute inset-x-0 -top-px bottom-0"></span>
-                        <span x-text="bookmark.title"></span>
+                        <span>{{ bookmark.title }}</span>
                       </a>
                     </p>
                     <p class="mt-1 flex flex-col sm:flex-row sm:space-x-1 text-xs leading-5 text-gray-500 dark:text-neutral-400">
-                      <span class="relative" x-text="bookmark.type === 'Question' ? bookmark.examName : bookmark.date"></span>
+                      <span class="relative">{% if bookmark.type == 'Question' %}{{ bookmark.examName }}{% else %}{{ bookmark.date }}{% endif %}</span>
                       <span class="relative hidden sm:block">·</span>
-                      <a class="relative" x-text="`${bookmark.course} > ${bookmark.chapter}`"></a>
+                      <a class="relative">{{ bookmark.course }} > {{ bookmark.chapter }}</a>
                     </p>
                   </div>
                 </div>
               </li>
-            </template>
+            {% endfor %}
           </ul>
         </div>
       </main>
