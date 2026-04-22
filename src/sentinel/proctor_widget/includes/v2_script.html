@@ -1,0 +1,244 @@
+<script>
+function v2ProctoringWidget() {
+  return {
+    stage: 'hidden', // hidden, consent, preparing, permissions, validating, identity, ready
+    
+
+    streams: {
+      camera: null,
+      screen: null
+    },
+
+    // Preparing step state
+    statusIdx: 0,
+    statusSequence: [
+      'Loading session settings',
+      'Checking browser compatibility',
+      'Checking available devices',
+      'Preparing secure setup'
+    ],
+    preparingFailed: false,
+    
+    // Permissions state
+    permissions: [
+      { name: 'camera', label: 'Camera', state: 'idle' },
+      { name: 'microphone', label: 'Microphone', state: 'idle' },
+      { name: 'screen', label: 'Screen sharing', state: 'idle' }
+    ],
+    
+    // Identity state
+    identitySubState: 'capturing', // capturing, capture-failed, verifying, verified, rejected, failed
+    attemptsRemaining: 2,
+    
+    // Ready state
+    countdown: 5,
+    
+    init() {
+      console.log('Sentinel V2 Widget Initialized');
+      // Cleanup streams on page unload just in case
+      window.addEventListener('beforeunload', () => this.stopAllStreams());
+    },
+
+    get statusText() {
+      return this.statusSequence[this.statusIdx];
+    },
+
+    get currentStep() {
+      const mapping = {
+        'preparing': 0,
+        'permissions': 1,
+        'validating': 1,
+        'identity': 2,
+        'ready': 3
+      };
+
+      return mapping[this.stage] ?? 0;
+    },
+
+
+    goToStep(step) {
+      console.log('Navigating to:', step);
+      this.stage = step;
+      
+      if (step === 'preparing' && !this.preparingFailed) {
+        this.runSimulatedChecks();
+      }
+      
+      if (step === 'identity') {
+        this.setupCameraPreview();
+        // Auto-verify after 3 seconds
+        setTimeout(() => {
+          if (this.stage === 'identity' && this.identitySubState === 'capturing') {
+            this.simulateIdentityVerification();
+          }
+        }, 3000);
+      }
+
+      
+      if (step === 'ready') {
+        this.startCountdown();
+      }
+
+      if (step === 'hidden') {
+        this.stopAllStreams();
+      }
+    },
+
+    runSimulatedChecks() {
+      this.statusIdx = 0;
+      this.preparingFailed = false;
+      
+      const interval = setInterval(() => {
+        if (this.statusIdx < this.statusSequence.length - 1) {
+          this.statusIdx++;
+        } else {
+          clearInterval(interval);
+          setTimeout(() => this.goToStep('permissions'), 800);
+        }
+      }, 1000);
+    },
+
+    async requestPermission(name) {
+      const perm = this.permissions.find(p => p.name === name);
+      if (!perm) return;
+      
+      perm.state = 'requesting';
+      
+      try {
+        if (name === 'camera') {
+          this.streams.camera = await navigator.mediaDevices.getUserMedia({ video: true });
+          console.log('Camera access granted');
+        } else if (name === 'microphone') {
+          // We piggyback on the same stream if they allow combined, or request separately
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+          console.log('Microphone access granted');
+        } else if (name === 'screen') {
+          this.streams.screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
+          console.log('Screen sharing access granted');
+        }
+        
+        perm.state = 'granted';
+        
+
+      } catch (err) {
+        console.error(`Permission denied for ${name}:`, err);
+        perm.state = 'denied'; 
+      }
+    },
+
+    validatePermissions() {
+      if (this.stage === 'identity') return;
+      this.stage = 'validating';
+      console.log('Validating permissions...');
+      
+      setTimeout(() => {
+        if (this.stage === 'validating') {
+          this.goToStep('identity');
+        }
+      }, 2000);
+    },
+
+    setupCameraPreview() {
+      // Connect stream to video element in identity step
+      this.$nextTick(() => {
+        const video = document.getElementById('v2-webcam-preview');
+        if (video && this.streams.camera) {
+          video.srcObject = this.streams.camera;
+        }
+      });
+    },
+
+    stopAllStreams() {
+      Object.values(this.streams).forEach(stream => {
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+      });
+      this.streams.camera = null;
+      this.streams.screen = null;
+      console.log('All media streams stopped');
+    },
+
+    simulateIdentityVerification() {
+      this.identitySubState = 'verifying';
+      console.log('Identity: Verifying preview...');
+      
+      setTimeout(() => {
+        this.identitySubState = 'verified';
+        console.log('Identity: Verified!');
+        setTimeout(() => this.goToStep('ready'), 1500);
+      }, 3000);
+    },
+
+    startCountdown() {
+      this.countdown = 5;
+      const timer = setInterval(() => {
+        if (this.countdown > 0) {
+          this.countdown--;
+        } else {
+          clearInterval(timer);
+          this.goToStep('hidden');
+          console.log('Workflow Completed');
+        }
+      }, 1000);
+    },
+
+    //  Simulation Helpers 
+
+    resetState() {
+      this.stopAllStreams();
+      this.stage = 'hidden';
+      this.statusIdx = 0;
+      this.preparingFailed = false;
+      this.identitySubState = 'capturing';
+      this.attemptsRemaining = 2;
+      this.permissions.forEach(p => p.state = 'idle');
+    },
+
+    startSession() {
+      this.resetState();
+      this.stage = 'consent';
+    },
+
+    simulatePrepFailed() {
+      this.resetState();
+      this.stage = 'preparing';
+      this.statusIdx = 0;
+      setTimeout(() => {
+        this.statusIdx = 1; // Checking browser compatibility
+        setTimeout(() => {
+          this.preparingFailed = true;
+        }, 1000);
+      }, 1000);
+    },
+
+    simulateIdentityRejected() {
+      this.resetState();
+      this.stage = 'identity';
+      this.identitySubState = 'verifying';
+      setTimeout(() => {
+        this.identitySubState = 'rejected';
+        this.attemptsRemaining = 1;
+      }, 2000);
+    },
+
+
+
+    simulateIdentityFailed() {
+      this.resetState();
+      this.stage = 'identity';
+      this.identitySubState = 'verifying';
+      setTimeout(() => {
+        this.identitySubState = 'failed';
+        this.attemptsRemaining = 0;
+      }, 2000);
+    },
+
+    simulateCaptureFailed() {
+      this.resetState();
+      this.stage = 'identity';
+      this.identitySubState = 'capture-failed';
+    }
+  }
+}
+</script>
