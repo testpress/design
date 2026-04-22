@@ -12,13 +12,14 @@
   <div style="flex: 0 0 auto; margin-bottom: 20px;">
     <div class="flex flex-col gap-2.5">
       <template x-for="(perm, index) in permissions" :key="perm.name">
-         <div class="flex items-start gap-3 p-3 rounded-[12px] border-[1.5px] transition-all duration-300"
+         <div class="flex items-center gap-3 p-3 rounded-[12px] border-[1.5px]"
+              style="transition: 0.25s;"
               :style="{
-                borderColor: perm.state === 'granted' ? 'var(--v2-success-500)' : perm.state === 'requesting' ? 'var(--v2-primary-500)' : 'var(--color-gray-200)',
-                backgroundColor: perm.state === 'granted' ? 'var(--v2-success-50)' : (perm.state === 'requesting' ? 'var(--color-bg-icon)' : 'var(--color-bg-item)'),
-                opacity: (permissions.findIndex(p => p.state !== 'granted') === index || perm.state === 'granted') ? '1' : '0.5',
-                filter: (permissions.findIndex(p => p.state !== 'granted') === index || perm.state === 'granted') ? 'none' : 'grayscale(0.5)'
-              }">
+                 borderColor: perm.state === 'granted' ? 'var(--v2-success-500)' : (perm.state === 'denied' ? 'var(--color-warning-600)' : (perm.state === 'requesting' ? 'var(--v2-primary-500)' : 'var(--color-gray-200)')),
+                 backgroundColor: perm.state === 'granted' ? 'var(--v2-success-50)' : (perm.state === 'denied' ? 'var(--color-warning-50)' : (perm.state === 'requesting' ? 'var(--color-bg-icon)' : 'var(--color-bg-item)')),
+                 opacity: (permissions.findIndex(p => p.state !== 'granted') === index || perm.state === 'granted' || perm.state === 'denied') ? '1' : '0.5',
+                 filter: (permissions.findIndex(p => p.state !== 'granted') === index || perm.state === 'granted' || perm.state === 'denied') ? 'none' : 'grayscale(0.5)'
+               }">
 
           <div class="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center text-blue-600 border-[1.5px] border-blue-600/10"
                style="background-color: var(--color-bg-icon);">
@@ -42,6 +43,9 @@
           <div class="flex-1 min-w-0">
             <p class="text-sm font-semibold text-gray-800 dark:text-white" x-text="perm.label"></p>
             <p class="text-[12px] text-gray-800 dark:text-neutral-400 truncate" x-text="perm.name === 'camera' ? 'Required to monitor you during the session' : (perm.name === 'microphone' ? 'Required for audio monitoring during the session' : 'Required to record your screen during the session')"></p>
+            <template x-if="perm.state === 'denied'">
+              <p class="text-[11px] font-medium text-orange-600 dark:text-orange-400 mt-0.5">Please provide browser permission to continue</p>
+            </template>
           </div>
 
           <div class="shrink-0 self-center">
@@ -55,6 +59,13 @@
                <div class="w-6 h-6 rounded-full flex items-center justify-center text-white v2-animate-pop-in" style="background: var(--color-success-600);">
                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6L5 9L10 3"/></svg>
                </div>
+            </template>
+            <template x-if="perm.state === 'denied'">
+               <button @click="requestPermission(perm.name)" 
+                       class="px-3.5 py-1.5 rounded-lg text-[13px] font-semibold text-white transition-colors"
+                       style="background-color: var(--color-warning-600);">
+                 Try again
+               </button>
             </template>
             <template x-if="(perm.state === 'idle' || perm.state === 'retry') && permissions.slice(0, index).every(p => p.state === 'granted')">
                <button @click="requestPermission(perm.name)" class="px-4 py-1.5 rounded-lg bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">Allow</button>
@@ -70,7 +81,7 @@
     <div class="flex justify-end gap-2.5">
       <button @click="stage = 'hidden'" class="px-5 py-2.5 rounded-lg border-[1.5px] border-[var(--color-gray-200)] dark:border-neutral-700 dark:bg-neutral-800 text-sm font-medium text-gray-600 dark:text-neutral-300 hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors">Cancel</button>
       <button :disabled="!permissions.every(p => p.state === 'granted')" 
-              @click="goToStep('identity')" 
+              @click="validatePermissions()" 
               class="px-6 py-2.5 rounded-lg bg-blue-600 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all">
         Continue
       </button>

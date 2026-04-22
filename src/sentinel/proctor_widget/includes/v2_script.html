@@ -1,7 +1,7 @@
 <script>
 function v2ProctoringWidget() {
   return {
-    stage: 'hidden', // hidden, consent, preparing, permissions, identity, ready
+    stage: 'hidden', // hidden, consent, preparing, permissions, validating, identity, ready
     
 
     streams: {
@@ -27,7 +27,7 @@ function v2ProctoringWidget() {
     ],
     
     // Identity state
-    identitySubState: 'capturing', // capturing, verifying, verified, rejected, failed
+    identitySubState: 'capturing', // capturing, capture-failed, verifying, verified, rejected, failed
     attemptsRemaining: 2,
     
     // Ready state
@@ -47,6 +47,7 @@ function v2ProctoringWidget() {
       const mapping = {
         'preparing': 0,
         'permissions': 1,
+        'validating': 1,
         'identity': 2,
         'ready': 3
       };
@@ -118,14 +119,23 @@ function v2ProctoringWidget() {
         
         perm.state = 'granted';
         
-        // Auto-advance if all granted
-        if (this.permissions.every(p => p.state === 'granted')) {
-          setTimeout(() => this.goToStep('identity'), 1000);
-        }
+
       } catch (err) {
         console.error(`Permission denied for ${name}:`, err);
-        perm.state = 'idle'; // Reset so they can try again
+        perm.state = 'denied'; 
       }
+    },
+
+    validatePermissions() {
+      if (this.stage === 'identity') return;
+      this.stage = 'validating';
+      console.log('Validating permissions...');
+      
+      setTimeout(() => {
+        if (this.stage === 'validating') {
+          this.goToStep('identity');
+        }
+      }, 2000);
     },
 
     setupCameraPreview() {
@@ -222,6 +232,12 @@ function v2ProctoringWidget() {
         this.identitySubState = 'failed';
         this.attemptsRemaining = 0;
       }, 2000);
+    },
+
+    simulateCaptureFailed() {
+      this.resetState();
+      this.stage = 'identity';
+      this.identitySubState = 'capture-failed';
     }
   }
 }
