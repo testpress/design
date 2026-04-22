@@ -1,0 +1,358 @@
+---
+tags: testpress
+student_view : My Bookmarks
+date: 2026-04-21
+new_student_page: true
+---
+
+{% extends "src/testpress/layout/student_layout.html" %}
+{% block body_class %}bg-white dark:bg-neutral-900 min-h-[calc(100vh-3.75rem)]{% endblock body_class %}
+{% block main_class %}h-[calc(100vh-3.75rem)] overflow-hidden p-0 sm:p-0 space-y-0{% endblock main_class %}
+{% block main_content %}
+<!--
+  This example requires updating your template:
+
+  ```
+  <html class="h-full bg-white">
+  <body class="h-full overflow-hidden">
+  ```
+-->
+<style>
+  [x-cloak] {
+    display: none !important;
+  }
+</style>
+<div x-data="useBookmarkFilter()" x-effect="selectedType; selectedFolderId; checkMatches()" x-init="console.log('Alpine Initialized', mobileFoldersOpen)" class="flex h-full">
+  {% include "./add_folder_modal.html" %}
+
+  <div class="flex min-w-0 flex-1 flex-col h-full min-h-0">
+    <div class="relative z-20 flex flex-1 h-full min-h-0">
+      {% include "./aside.html" %}
+      <main class="relative z-0 flex-1 flex flex-col lg:order-last overflow-y-auto custom-scrollbar h-full min-h-0">
+        <!-- Sticky Header -->
+        <div
+          class="sticky top-0 z-40 bg-white shadow-sm dark:bg-neutral-900 border-b border-gray-200 dark:border-neutral-800 shrink-0">
+          <div class="px-4 pt-6 pb-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col gap-y-4 sm:flex-row sm:items-center sm:justify-between sm:gap-y-0">
+              <div class="flex items-center justify-between sm:justify-start sm:gap-x-4">
+                <h1 class="text-2xl font-bold text-gray-900 dark:text-neutral-200">My Bookmarks</h1>
+
+                <!-- Mobile Folder Drawer Trigger -->
+                <div class="lg:hidden">
+                  <button
+                    @click="mobileFoldersOpen = true; console.log('Mobile Folder Button Clicked', mobileFoldersOpen)"
+                    type="button"
+                    class="py-1.5 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                      stroke-linejoin="round">
+                      <path
+                        d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z">
+                      </path>
+                    </svg>
+                    <span class="max-w-[100px] sm:max-w-[150px] truncate">
+                      <span x-show="selectedFolderId === 'all'">All Bookmarks</span>
+                      <span x-show="selectedFolderId === 'uncategorized'" x-cloak>Uncategorized</span>
+                      {% for folder in bookmark_folders %}
+                      <span x-show="selectedFolderId == {{ folder.id }}" x-cloak>{{ folder.name }}</span>
+                      {% endfor %}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Filters & Sorting -->
+              <div class="flex items-center gap-x-2 sm:gap-x-3">
+                <!-- Category Filter Dropdown -->
+                <div class="hs-dropdown [--auto-close:true] relative inline-flex">
+                  <button id="category-dropdown-btn" type="button"
+                    class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"
+                    aria-haspopup="menu" aria-expanded="false" aria-label="Category options">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                      class="shrink-0 size-3.5">
+                      <path d="M12 5H2" />
+                      <path d="M6 12h12" />
+                      <path d="M9 19h6" />
+                      <path d="M16 5h6" />
+                      <path d="M19 8V2" />
+                    </svg>
+                    <span class="truncate max-w-[100px] sm:max-w-none">
+                      <span x-show="selectedType === null">All contents</span>
+                      {% for cat in bookmark_categories %}
+                      <span x-show="selectedType === '{{ cat.id }}'" x-cloak>{{ cat.name }}</span>
+                      {% endfor %}
+                    </span>
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                      stroke-linejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  <div
+                    class="hs-dropdown-menu hs-dropdown-open:opacity-100 min-w-48 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white border border-gray-200 rounded-xl shadow-xl dark:bg-neutral-900 dark:border-neutral-700"
+                    role="menu" aria-orientation="vertical" aria-labelledby="category-dropdown-btn">
+                    <div class="p-1">
+                      <button @click="setType(null)" type="button"
+                        class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        :class="selectedType === null && 'bg-gray-50 dark:bg-neutral-800'">
+                        All contents
+                      </button>
+                      {% for cat in bookmark_categories %}
+                        <button @click="setType('{{ cat.id }}')" type="button"
+                          class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                          :class="selectedType === '{{ cat.id }}' && 'bg-gray-50 dark:bg-neutral-800'">
+                          <span>{{ cat.name }}</span>
+                        </button>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Sort Dropdown -->
+                <div class="hs-dropdown [--auto-close:true] relative inline-flex">
+                  <button id="sort-dropdown-btn" type="button"
+                    class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"
+                    aria-haspopup="menu" aria-expanded="false" aria-label="Sort options">
+                    <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                      stroke-linejoin="round">
+                      <path d="m3 16 4 4 4-4" />
+                      <path d="M7 20V4" />
+                      <path d="m21 8-4-4-4 4" />
+                      <path d="M17 4v16" />
+                    </svg>
+                    <span x-text="getSortLabel()">Recent</span>
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                      viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                      stroke-linejoin="round">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+
+                  <div
+                    class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white border border-gray-200 rounded-xl shadow-xl dark:bg-neutral-900 dark:border-neutral-700"
+                    role="menu" aria-orientation="vertical" aria-labelledby="sort-dropdown-btn">
+                    <div class="p-1">
+                      <button @click="setSort('recent')" type="button"
+                        class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        :class="sortOrder === 'recent' && 'bg-gray-50 dark:bg-neutral-800'">
+                        Recent First
+                      </button>
+                      <button @click="setSort('oldest')" type="button"
+                        class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
+                        :class="sortOrder === 'oldest' && 'bg-gray-50 dark:bg-neutral-800'">
+                        Oldest First
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="flex-1 bg-gray-100 dark:bg-neutral-900">
+          <div class="py-4 sm:px-6 lg:px-8">
+            <ul role="list" class="">
+              {% for bookmark in bookmarks %}
+                <li 
+                  x-show="(selectedType === null || selectedType === '{{ bookmark.typeId }}') && (selectedFolderId === 'all' || selectedFolderId == '{{ bookmark.folderId }}')"
+                  class="bookmark-item mb-2 sm:mb-4 last:mb-0 relative bg-white px-4 py-6 shadow-sm sm:rounded-lg sm:px-6 hover:z-30 transition-all duration-200">
+                <div class="absolute top-4 right-4 z-20" @click.stop>
+                  <!-- Actions Dropdown -->
+                  <div class="hs-dropdown [--placement:bottom-right] relative inline-flex">
+                    <button id="hs-pro-pdmd{{ bookmark.id }}" type="button" 
+                      class="size-8 inline-flex justify-center items-center gap-x-2 text-sm rounded-lg bg-white border border-gray-200 text-gray-500 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                      <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="19" cy="12" r="1"></circle>
+                        <circle cx="5" cy="12" r="1"></circle>
+                      </svg>
+                    </button>
+
+                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-48 z-[60] transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-900 dark:border-neutral-800" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-pdmd{{ bookmark.id }}">
+                      <div class="p-1 space-y-0.5">
+                        <!-- Move to Folder Sub-menu -->
+                        <div class="hs-dropdown [--strategy:static] md:[--strategy:absolute] [--adaptive:none] md:[--trigger:hover] [--placement:left-top] relative">
+                          <button type="button" class="hs-dropdown-toggle group w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder size-4"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                            Move to Folder
+                            <svg class="ms-auto size-3 text-gray-400 rotate-90 md:rotate-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                          </button>
+
+                          <div class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] md:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 md:w-56 hidden z-[70] top-0 end-full md:me-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 shadow-xl rounded-xl" role="menu" @click.stop>
+                            <div class="p-2 border-b border-gray-200 dark:border-neutral-800">
+                              <div class="relative">
+                                <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                                  <svg class="shrink-0 size-3.5 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                                </div>
+                                <input x-model="folderSearch" type="text" class="py-1.5 ps-9 block w-full border-gray-200 rounded-lg text-xs focus:border-blue-500 focus:ring-blue-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500" placeholder="Search folder...">
+                              </div>
+                            </div>
+                            <div class="max-h-48 overflow-y-auto p-1 space-y-0.5 custom-scrollbar">
+                              {% for folder in bookmark_folders %}
+                                <button 
+                                  x-show="!folderSearch || '{{ folder.name }}'.toLowerCase().includes(folderSearch.toLowerCase())"
+                                  @click="moveToFolder({{ bookmark.id }}, {{ folder.id }})" 
+                                  class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
+                                  <span>{{ folder.name }}</span>
+                                </button>
+                              {% endfor %}
+                            </div>
+                          </div>
+                        </div>
+
+                        <button @click="removeBookmark({{ bookmark.id }})" class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trash-2 size-4"><path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="flex min-w-0 gap-x-4">
+                  <!-- Thumbnail/Icon Container (Always 16:9 outer bounds) -->
+                  <div class="relative w-32 h-18 flex flex-shrink-0 mt-0.5 justify-center items-center rounded overflow-hidden">
+                    {% if bookmark.thumbnail %}
+                      <div class="w-full h-full relative">
+                        <img src="{{ bookmark.thumbnail }}" alt="Video" class="w-full h-full object-cover">
+                        <span class="absolute bottom-0 right-0 bg-black bg-opacity-50 text-white text-xs px-2 py-0.5 rounded">{{ bookmark.type }}</span>
+                      </div>
+                    {% else %}
+                      <div class="w-full h-full flex items-center justify-center">
+                        <img src="{{ bookmark.icon }}" alt="Attachment" class="w-16 h-16 object-cover rounded">
+                      </div>
+                    {% endif %}
+                  </div>
+
+                  <div class="min-w-0 flex-auto pe-10">
+                    <p class="text-sm font-semibold leading-5 text-gray-900 dark:text-neutral-200 line-clamp-2">
+                       <a href="{{ bookmark.url }}" target="_blank" rel="noopener noreferrer">
+                        <span class="absolute inset-x-0 -top-px bottom-0"></span>
+                        <span>{{ bookmark.title }}</span>
+                      </a>
+                    </p>
+                    <p class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-5 text-gray-500 dark:text-neutral-400">
+                      <span class="whitespace-nowrap">{% if bookmark.type == 'Question' %}{{ bookmark.examName }}{% else %}{{ bookmark.date }}{% endif %}</span>
+                      <span class="hidden sm:inline text-gray-300 dark:text-neutral-700 mx-0.5">•</span>
+                      <span class="text-gray-600 dark:text-neutral-300">{{ bookmark.course }}</span>
+                      <svg class="shrink-0 size-3 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                      <span>{{ bookmark.chapter }}</span>
+                    </p>
+                  </div>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+
+          <!-- Empty State Card -->
+          <div x-show="!hasMatches" x-cloak class="bg-white dark:bg-neutral-800 shadow-sm sm:rounded-lg p-8 sm:p-12 min-h-[400px] flex flex-col justify-center items-center text-center">
+            <svg class="w-48 mx-auto mb-6 text-gray-200 dark:text-neutral-700" width="178" height="90" viewBox="0 0 178 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="27" y="50.5" width="124" height="39" rx="7.5" fill="currentColor" class="fill-white dark:fill-neutral-900"/>
+              <rect x="27" y="50.5" width="124" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-50 dark:stroke-neutral-700/10"/>
+              <rect x="34.5" y="58" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-50 dark:fill-neutral-700/30"/>
+              <rect x="66.5" y="61" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-50 dark:fill-neutral-700/30"/>
+              <rect x="66.5" y="73" width="77" height="6" rx="3" fill="currentColor" class="fill-gray-50 dark:fill-neutral-700/30"/>
+              <rect x="19.5" y="28.5" width="139" height="39" rx="7.5" fill="currentColor" class="fill-white dark:fill-neutral-900"/>
+              <rect x="19.5" y="28.5" width="139" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-100 dark:stroke-neutral-700/30"/>
+              <rect x="27" y="36" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-100 dark:fill-neutral-700/70"/>
+              <rect x="59" y="39" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-100 dark:fill-neutral-700/70"/>
+              <rect x="59" y="51" width="92" height="6" rx="3" fill="currentColor" class="fill-gray-100 dark:fill-neutral-700/70"/>
+              <g filter="url(#filter19_card)">
+              <rect x="12" y="6" width="154" height="40" rx="8" fill="currentColor" class="fill-white dark:fill-neutral-900" shape-rendering="crispEdges"/>
+              <rect x="12.5" y="6.5" width="153" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-100 dark:stroke-neutral-700/60" shape-rendering="crispEdges"/>
+              <rect x="20" y="14" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-200 dark:fill-neutral-800 "/>
+              <rect x="52" y="17" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-800"/>
+              <rect x="52" y="29" width="106" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-800"/>
+              </g>
+              <defs>
+              <filter id="filter19_card" x="0" y="0" width="178" height="64" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+              <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+              <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+              <feOffset dy="6"/>
+              <feGaussianBlur stdDeviation="6"/>
+              <feComposite in2="hardAlpha" operator="out"/>
+              <feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.03 0"/>
+              <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_card"/>
+              <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_card" result="shape"/>
+              </filter>
+              </defs>
+            </svg>
+
+            <div class="max-w-sm mx-auto">
+              <p class="mt-2 font-medium text-gray-800 dark:text-neutral-200">
+                No bookmarks found
+              </p>
+              <p class="mb-5 text-sm text-gray-500 dark:text-neutral-400">
+                Try adjusting your filters or search to find what you're looking for.
+              </p>
+              <button @click="resetFilters()" type="button" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none transition-all duration-200 shadow-sm hover:shadow-md">
+                Clear all filters
+              </button>
+            </div>
+          </div>
+          <!-- End Empty State -->
+        </div>
+      </main>
+
+    </div>
+    <!-- Mobile Folder Drawer (Pure Alpine) -->
+    <div x-show="mobileFoldersOpen" x-cloak
+      x-effect="if (mobileFoldersOpen) document.body.style.overflow = 'hidden'; else document.body.style.overflow = '';"
+      class="fixed inset-0 z-[100] lg:hidden" role="dialog" aria-modal="true">
+      <!-- Backdrop -->
+      <div x-show="mobileFoldersOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="mobileFoldersOpen = false"
+        class="fixed inset-0 bg-gray-900/50 transition-opacity"></div>
+
+      <!-- Drawer Content -->
+      <div x-show="mobileFoldersOpen" x-transition:enter="transform transition ease-in-out duration-300"
+        x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+        x-transition:leave="transform transition ease-in-out duration-300" x-transition:leave-start="translate-x-0"
+        x-transition:leave-end="-translate-x-full"
+        class="fixed inset-y-0 start-0 flex max-w-xs w-full bg-white shadow-xl dark:bg-neutral-900">
+        <div class="flex flex-col h-full w-full bg-white dark:bg-neutral-900 overflow-hidden">
+          <!-- Header -->
+          <div
+            class="shrink-0 py-3 px-4 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700">
+            <div class="flex items-center gap-x-3">
+              <h3 class="font-medium text-gray-800 dark:text-neutral-200">Folders</h3>
+              <button @click="showAddFolderModal = true; console.log('Add Folder Modal Toggle:', showAddFolderModal)"
+                type="button"
+                class="py-1 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+                Add folders
+              </button>
+            </div>
+            <button @click="mobileFoldersOpen = false" type="button"
+              class="p-1 inline-flex justify-center items-center rounded-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+          <!-- Body -->
+          <div class="flex-1 min-h-0 flex flex-col">
+            {% include "./folder_list.html" %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% endblock main_content %}
+
+    {% block script %}
+    {% include "./bookmark_filter_component.html" %}
+    {% endblock script %}
