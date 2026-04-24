@@ -1,0 +1,165 @@
+<script>
+  (function () {
+    'use strict';
+
+    // ============================================================================
+    // CONSTANTS
+    // ============================================================================
+    const DATE_PICKER_SELECTORS = {
+      INPUT: '#hs-datepicker-with-navigation-controls',
+      TODAY_BUTTON: '#hs-datepicker-with-navigation-controls-today',
+      PREV_BUTTON: '#hs-datepicker-with-navigation-controls-prev',
+      NEXT_BUTTON: '#hs-datepicker-with-navigation-controls-next'
+    };
+
+    // ============================================================================
+    // DATE PICKER FUNCTIONS
+    // ============================================================================
+    function initializeDatePicker() {
+      const datepickerInstance = HSDatepicker.getInstance(DATE_PICKER_SELECTORS.INPUT, true);
+
+      if (!datepickerInstance || !datepickerInstance.element || !datepickerInstance.element.vanillaCalendar) {
+        return;
+      }
+
+      const element = datepickerInstance.element;
+      const vanillaCalendar = element.vanillaCalendar;
+      const todayButton = document.querySelector(DATE_PICKER_SELECTORS.TODAY_BUTTON);
+      const prevButton = document.querySelector(DATE_PICKER_SELECTORS.PREV_BUTTON);
+      const nextButton = document.querySelector(DATE_PICKER_SELECTORS.NEXT_BUTTON);
+
+      if (!todayButton || !prevButton || !nextButton) {
+        return;
+      }
+
+      function getCurrentDate() {
+        if (vanillaCalendar.context && vanillaCalendar.context.selectedDates) {
+          const contextDates = vanillaCalendar.context.selectedDates;
+
+          if (contextDates && contextDates.length > 0) {
+            const dateString = contextDates[0];
+
+            if (dateString === 'today') {
+              return new Date();
+            }
+
+            const date = new Date(dateString);
+
+            if (!isNaN(date.getTime())) {
+              return date;
+            }
+          }
+        }
+
+        const currentState = element.getCurrentState();
+
+        if (currentState.selectedDates && currentState.selectedDates.length > 0) {
+          const dateString = currentState.selectedDates[0];
+
+          if (dateString === 'today') {
+            return new Date();
+          }
+
+          const date = new Date(dateString);
+
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        const selectedDates = vanillaCalendar.selectedDates;
+
+        if (selectedDates && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+
+          if (dateString === 'today') {
+            return new Date();
+          }
+
+          const date = new Date(dateString);
+
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        return new Date();
+      }
+
+      function formatDateToISO(date) {
+        if (!date || isNaN(date.getTime())) {
+          return new Date().toISOString().split('T')[0];
+        }
+
+        return date.toISOString().split('T')[0];
+      }
+
+      function updateDate(selectedDates) {
+        if (selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
+
+          vanillaCalendar.set({
+            selectedDates: selectedDates,
+            selectedMonth: date.getMonth(),
+            selectedYear: date.getFullYear()
+          });
+        } else {
+          vanillaCalendar.set({ selectedDates: selectedDates });
+        }
+
+        const inputElement = document.querySelector(DATE_PICKER_SELECTORS.INPUT);
+
+        if (inputElement && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
+          const formattedValue = element.formatDate(date);
+          inputElement.value = formattedValue;
+        }
+
+        if (!inputElement) {
+          return;
+        }
+
+        const changeEvent = new CustomEvent('change', {
+          detail: {
+            selectedDates: selectedDates,
+            selectedTime: vanillaCalendar.context.selectedTime,
+            rest: vanillaCalendar.context
+          }
+        });
+
+        inputElement.dispatchEvent(changeEvent);
+      }
+
+      todayButton.addEventListener('click', () => {
+        const today = new Date();
+        const todayStr = formatDateToISO(today);
+        updateDate([todayStr]);
+      });
+
+      prevButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() - 1);
+        const prevDate = formatDateToISO(currentDate);
+        updateDate([prevDate]);
+      });
+
+      nextButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() + 1);
+        const nextDate = formatDateToISO(currentDate);
+        updateDate([nextDate]);
+      });
+    }
+
+    // ============================================================================
+    // MAIN ENTRY POINT
+    // ============================================================================
+    window.addEventListener('load', () => {
+      requestAnimationFrame(() => {
+        initializeDatePicker();
+      });
+    });
+  })();
+</script>
