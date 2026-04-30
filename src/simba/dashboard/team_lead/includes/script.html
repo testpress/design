@@ -16,6 +16,10 @@
     // DATE PICKER FUNCTIONS
     // ============================================================================
     function initializeDatePicker() {
+      if (typeof window.HSDatepicker === 'undefined' || !window.HSDatepicker) {
+        return;
+      }
+
       const datepickerInstance = HSDatepicker.getInstance(DATE_PICKER_SELECTORS.INPUT, true);
 
       if (!datepickerInstance || !datepickerInstance.element || !datepickerInstance.element.vanillaCalendar) {
@@ -153,12 +157,193 @@
       });
     }
 
+    function initializeTodaysTasks() {
+      const card = document.getElementById('todays-tasks-card');
+      const list = document.getElementById('todays-tasks-list');
+      const count = document.getElementById('todays-tasks-count');
+      const emptyState = document.getElementById('todays-tasks-empty');
+      const undoStack = document.getElementById('todays-tasks-undo-stack');
+      const undoTemplate = document.getElementById('todays-tasks-undo-template');
+      const pendingRemovals = new Map();
+      let undoSequence = 0;
+
+      if (!card || !list || !count) {
+        return;
+      }
+
+      function updateTaskCount() {
+        const remainingTasks = list.querySelectorAll('[data-task-row]').length;
+        count.textContent = String(remainingTasks);
+
+        if (emptyState) {
+          if (remainingTasks === 0) {
+            emptyState.classList.remove('hidden');
+            list.classList.add('hidden');
+          } else {
+            emptyState.classList.add('hidden');
+            list.classList.remove('hidden');
+          }
+        }
+      }
+
+      function removeTaskWithTransition(taskRow) {
+        taskRow.style.overflow = 'hidden';
+        taskRow.style.maxHeight = `${taskRow.offsetHeight}px`;
+        taskRow.style.transition = 'max-height 280ms ease, opacity 280ms ease, margin 280ms ease, padding 280ms ease';
+
+        requestAnimationFrame(() => {
+          taskRow.style.maxHeight = '0px';
+          taskRow.style.opacity = '0';
+          taskRow.style.marginTop = '0';
+          taskRow.style.marginBottom = '0';
+          taskRow.style.paddingTop = '0';
+          taskRow.style.paddingBottom = '0';
+          taskRow.style.borderWidth = '0';
+        });
+
+        window.setTimeout(() => {
+          taskRow.remove();
+          updateTaskCount();
+        }, 300);
+      }
+
+      function removeUndoToast(removal) {
+        if (removal && removal.toastElement) {
+          removal.toastElement.remove();
+        }
+      }
+
+      function finalizePendingRemoval(undoId) {
+        const removal = pendingRemovals.get(undoId);
+
+        if (!removal) {
+          return;
+        }
+
+        pendingRemovals.delete(undoId);
+        removeUndoToast(removal);
+        removeTaskWithTransition(removal.taskRow);
+      }
+
+      function restoreTask(undoId) {
+        const removal = pendingRemovals.get(undoId);
+
+        if (!removal) {
+          return;
+        }
+
+        window.clearTimeout(removal.timeoutId);
+        pendingRemovals.delete(undoId);
+        removeUndoToast(removal);
+
+        const taskRow = removal.taskRow;
+
+        const checkbox = taskRow.querySelector('.task-checkbox');
+        const taskTitle = taskRow.querySelector('.task-title');
+
+        if (checkbox instanceof HTMLInputElement) {
+          checkbox.checked = false;
+          checkbox.disabled = false;
+        }
+
+        if (taskTitle) {
+          taskTitle.classList.remove('line-through', 'text-stone-400', 'dark:text-neutral-500');
+        }
+
+        taskRow.classList.remove('opacity-70');
+      }
+
+      if (undoStack) {
+        undoStack.addEventListener('click', (event) => {
+          const button = event.target instanceof Element
+            ? event.target.closest('.todays-tasks-undo-button')
+            : null;
+
+          if (!(button instanceof HTMLButtonElement)) {
+            return;
+          }
+
+          const undoId = button.dataset.undoId;
+
+          if (!undoId) {
+            return;
+          }
+
+          restoreTask(undoId);
+        });
+      }
+
+      list.addEventListener('change', (event) => {
+        const target = event.target;
+
+        if (!(target instanceof HTMLInputElement) || !target.classList.contains('task-checkbox') || !target.checked) {
+          return;
+        }
+
+        const taskRow = target.closest('[data-task-row]');
+
+        if (!taskRow) {
+          return;
+        }
+
+        const taskTitle = taskRow.querySelector('.task-title');
+
+        if (taskTitle) {
+          taskTitle.classList.add('line-through', 'text-stone-400', 'dark:text-neutral-500');
+        }
+
+        taskRow.classList.add('opacity-70');
+        target.disabled = true;
+
+        const undoId = `todo-undo-${++undoSequence}`;
+        const timeoutId = window.setTimeout(() => {
+          finalizePendingRemoval(undoId);
+        }, 3000);
+
+        const taskMessage = taskTitle ? taskTitle.textContent?.replace(/\s+/g, ' ').trim() : 'Task completed';
+        let toastElement = null;
+
+        if (undoTemplate && undoStack) {
+          const templateToast = undoTemplate.firstElementChild;
+
+          if (templateToast) {
+            toastElement = templateToast.cloneNode(true);
+            const toastText = toastElement.querySelector('.todays-tasks-undo-text');
+            const toastButton = toastElement.querySelector('.todays-tasks-undo-button');
+            const toastClose = toastElement.querySelector('.todays-tasks-toast-close');
+            const toastId = `todays-tasks-toast-${undoId}`;
+
+            toastElement.id = toastId;
+
+            if (toastText) {
+              toastText.innerHTML = `Marked as completed <span class="font-semibold text-gray-900 dark:text-white">${taskMessage}</span>`;
+            }
+
+            if (toastButton) {
+              toastButton.dataset.undoId = undoId;
+            }
+
+            if (toastClose instanceof HTMLButtonElement) {
+              toastClose.dataset.hsRemoveElement = `#${toastId}`;
+            }
+
+            undoStack.prepend(toastElement);
+          }
+        }
+
+        pendingRemovals.set(undoId, { timeoutId, taskRow, toastElement });
+      });
+
+      updateTaskCount();
+    }
+
     // ============================================================================
     // MAIN ENTRY POINT
     // ============================================================================
     window.addEventListener('load', () => {
       requestAnimationFrame(() => {
         initializeDatePicker();
+        initializeTodaysTasks();
       });
     });
   })();
