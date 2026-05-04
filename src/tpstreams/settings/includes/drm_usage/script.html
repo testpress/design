@@ -1,0 +1,230 @@
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<script>
+  const drmUsageReport = {{ drm_usage | dump | safe }};
+
+  function drmUsageComponent() {
+    return {
+      selectedMonth: null,
+      reportMonth: null,
+      monthOptions: [],
+      currentMonth: null,
+      viewMode: 'graph',
+      usageByDate: {},
+      chart: null,
+
+      init() {
+        this.usageByDate = this.getUsageByDate(drmUsageReport.records || []);
+        this.monthOptions = this.getMonthOptions(drmUsageReport.records || []);
+
+        if (!this.monthOptions.length) return;
+
+        this.currentMonth = this.monthOptions[0].value;
+
+        const params = new URLSearchParams(window.location.search);
+        const monthParam = params.get('month');
+        this.selectedMonth = this.monthOptions.some(month => month.value === monthParam)
+          ? monthParam
+          : this.currentMonth;
+        this.reportMonth = this.selectedMonth;
+
+        this.$watch('selectedMonth', value => {
+          if (!value) return;
+          const url = new URL(window.location);
+          url.searchParams.set('month', value);
+          window.history.replaceState({}, '', url.pathname + url.search);
+          this.setReportMonth();
+        });
+
+        this.setReportMonth();
+      },
+
+      get selectedMonthLabel() {
+        const month = this.monthOptions.find(option => option.value === this.selectedMonth);
+        return month ? month.label : '';
+      },
+
+      getUsageByDate(records) {
+        return records.reduce((usageByDate, record) => {
+          usageByDate[record.date] = record.drm_summary_usage || {};
+          return usageByDate;
+        }, {});
+      },
+
+      getMonthOptions(records) {
+        const months = records.reduce((monthsByValue, record) => {
+          const monthValue = record.date.slice(0, 7);
+          const [year, month] = monthValue.split('-').map(Number);
+          monthsByValue[monthValue] = {
+            label: new Date(year, month - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' }),
+            value: monthValue
+          };
+          return monthsByValue;
+        }, {});
+
+        return Object.values(months).sort((first, second) => second.value.localeCompare(first.value));
+      },
+
+      get daysInSelectedMonth() {
+        if (!this.reportMonth) return [];
+        const [year, month] = this.reportMonth.split('-').map(Number);
+        const daysInMonth = new Date(year, month, 0).getDate();
+        const monthLabel = new Date(year, month - 1, 1).toLocaleString('default', { month: 'short' });
+        const days = [];
+
+        for (let day = 1; day <= daysInMonth; day++) {
+          const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+          days.push({
+            date,
+            label: `${day} ${monthLabel}`,
+            chartLabel: String(day),
+            count: this.usageByDate[date]?.total_requests || 0
+          });
+        }
+
+        return days;
+      },
+
+      get totalLicenseRequests() {
+        return this.daysInSelectedMonth.reduce((total, day) => total + day.count, 0);
+      },
+
+      get averagePerDay() {
+        if (!this.daysInSelectedMonth.length) return 0;
+        return Math.round((this.totalLicenseRequests / this.daysInSelectedMonth.length) * 10) / 10;
+      },
+
+      get highestDay() {
+        if (!this.daysInSelectedMonth.length) return { label: '-', count: 0 };
+        const bestDay = this.daysInSelectedMonth.reduce((best, day) => day.count > best.count ? day : best, this.daysInSelectedMonth[0]);
+        return bestDay.count > 0 ? bestDay : { label: '-', count: 0 };
+      },
+
+      get highestDayDisplay() {
+        if (this.highestDay.count === 0) return 'No usage';
+        return `${this.highestDay.label} · ${this.formatNumber(this.highestDay.count)}`;
+      },
+
+      goToPreviousMonth() {
+        const [year, month] = this.selectedMonth.split('-').map(Number);
+        const previousDate = new Date(year, month - 2, 1);
+        const previous = `${previousDate.getFullYear()}-${String(previousDate.getMonth() + 1).padStart(2, '0')}`;
+        if (this.monthOptions.some(option => option.value === previous)) {
+          this.selectedMonth = previous;
+        }
+      },
+
+      goToNextMonth() {
+        if (this.selectedMonth === this.currentMonth) return;
+        const [year, month] = this.selectedMonth.split('-').map(Number);
+        const nextDate = new Date(year, month, 1);
+        const next = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+        if (this.monthOptions.some(option => option.value === next)) {
+          this.selectedMonth = next;
+        }
+      },
+
+      setViewMode(mode) {
+        this.viewMode = mode === 'table' ? 'table' : 'graph';
+        if (this.viewMode === 'graph') {
+          this.$nextTick(() => this.renderChart());
+        }
+      },
+
+      setReportMonth() {
+        this.reportMonth = this.selectedMonth;
+        this.$nextTick(() => {
+          if (this.totalLicenseRequests === 0) {
+            this.destroyChart();
+            return;
+          }
+          this.renderChart();
+        });
+      },
+
+      renderChart() {
+        const chartElement = document.querySelector('#drm-usage-chart');
+        if (!chartElement || typeof ApexCharts === 'undefined') return;
+        if (this.totalLicenseRequests === 0) {
+          this.destroyChart();
+          return;
+        }
+
+        const options = {
+          chart: {
+            height: 350,
+            type: 'line',
+            toolbar: { show: false },
+            zoom: { enabled: false },
+            animations: { enabled: true, dynamicAnimation: { speed: 250 } }
+          },
+          series: [{
+            name: 'License Requests',
+            data: this.daysInSelectedMonth.map(day => day.count)
+          }],
+          colors: ['#2563eb'],
+          dataLabels: { enabled: false },
+          stroke: { curve: 'smooth', width: 2 },
+          markers: { size: 4, strokeWidth: 0, hover: { size: 6 } },
+          grid: {
+            show: true,
+            borderColor: '#f0f0f0',
+            strokeDashArray: 4,
+            xaxis: { lines: { show: true } },
+            yaxis: { lines: { show: true } }
+          },
+          xaxis: {
+            categories: this.daysInSelectedMonth.map(day => day.chartLabel),
+            tickAmount: this.daysInSelectedMonth.length - 1,
+            axisBorder: { color: '#d1d5db' },
+            axisTicks: { show: false },
+            labels: {
+              rotate: 0,
+              hideOverlappingLabels: true,
+              trim: false,
+              style: { colors: '#6b7280', fontSize: '12px' }
+            },
+            crosshairs: {
+              show: true,
+              stroke: { color: '#d1d5db', width: 1, dashArray: 4 }
+            },
+            tooltip: { enabled: false }
+          },
+          yaxis: {
+            min: 0,
+            tickAmount: 4,
+            labels: { style: { colors: '#6b7280', fontSize: '12px' } }
+          },
+          tooltip: {
+            shared: false,
+            intersect: false,
+            y: { formatter: value => `${value} license requests` }
+          }
+        };
+
+        if (this.chart) {
+          this.chart.updateOptions(options);
+          return;
+        }
+
+        this.chart = new ApexCharts(chartElement, options);
+        this.chart.render();
+      },
+
+      destroyChart() {
+        const chartElement = document.querySelector('#drm-usage-chart');
+        if (this.chart) {
+          this.chart.destroy();
+          this.chart = null;
+        }
+        if (chartElement) {
+          chartElement.innerHTML = '';
+        }
+      },
+
+      formatNumber(value) {
+        return new Intl.NumberFormat().format(value);
+      }
+    };
+  }
+</script>
