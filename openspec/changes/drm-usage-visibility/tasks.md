@@ -9,7 +9,7 @@
 ## 2. Build the monthly usage experience
 
 - [x] 2.1 Add month selection so users can inspect a reporting period.
-  - Implement current-month default, `?month=YYYY-MM` URL sync, previous/next controls, and a last-12-months dropdown. Done when the selected month updates the daily values and URL.
+  - Implement current-month default, `?month=YYYY-MM` URL sync, previous/next controls, and a month dropdown. Done when the selected month updates the daily values and URL.
 
 - [x] 2.2 Show summary cards so users can quickly understand the selected month.
   - Add cards for total license requests, average per day, and highest usage day. Done when the cards update from the selected month’s daily counts.

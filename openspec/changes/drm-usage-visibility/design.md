@@ -58,12 +58,12 @@ The mock should support:
 - Reading `?month=YYYY-MM` from the URL.
 - Updating the URL when the selected month changes.
 - Previous/next month controls.
-- Month dropdown for the last 12 months.
+- Month dropdown.
 - Graph/table toggle.
 - Daily rows for every day in the selected month, including zero-count days.
 - Empty state when the selected month total is zero.
 
-For the design repo, deterministic mock data is acceptable.
+For the design repo, deterministic mock data is acceptable and does not need to cover an exact 12-month range.
 
 **Rationale:** The page can be implemented and reviewed in the design repo now, then connected to real values later.
 
