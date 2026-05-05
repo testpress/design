@@ -1,10 +1,10 @@
-## 1. Create the DRM usage settings surface
+## 1. Create the DRM usage sidebar area
 
-- [x] 1.1 Add DRM Usage to TPStreams settings navigation so users can discover the page.
-  - Update desktop and mobile/tablet settings navigation with a `DRM Usage` item. Done when the navigation points to `/tpstreams/settings/drm_usage/` and highlights correctly on that page.
+- [x] 1.1 Add a primary sidebar Usage item.
+  - Add desktop and mobile sidebar navigation for `Usage`. Done when the sidebar points to the DRM Usage page and highlights for usage pages.
 
-- [x] 1.2 Create the DRM usage settings page so the UI has a dedicated reviewable route.
-  - Add `src/tpstreams/settings/drm_usage.html` extending the TPStreams settings base. Done when the page renders inside the existing settings layout.
+- [x] 1.2 Create the DRM Usage page under the new Usage area.
+  - Add `src/tpstreams/usage/drm_usage.html` using the TPStreams sidebar layout. Done when users can review DRM usage from the Usage sidebar item.
 
 ## 2. Build the monthly usage experience
 

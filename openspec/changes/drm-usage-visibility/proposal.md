@@ -2,11 +2,12 @@
 
 ## Why
 
-Organizations using TPStreams DRM need a simple way to view DRM consumption from settings. This page will help users understand how many DRM license requests their organization has made during a selected month.
+Organizations using TPStreams DRM need a simple way to view DRM consumption. DRM usage is usage/analytics data, so it should be available from a primary Usage area.
 
 ## What Changes
 
-- Add a DRM Usage page under TPStreams settings.
+- Add a new primary sidebar `Usage` area for usage/analytics pages.
+- Add DRM Usage under the new Usage area.
 - Show selected-month DRM license request usage.
 - Display total usage, daily usage, and an empty state when there is no usage.
 - Keep the page summarized and customer-facing.
@@ -15,17 +16,13 @@ Organizations using TPStreams DRM need a simple way to view DRM consumption from
 
 ### New Capabilities
 
-- `tpstreams-drm-usage-page`: Customer-facing TPStreams settings page for summarized DRM usage.
-
-### Modified Capabilities
-
-- `tpstreams-settings-navigation`: Add DRM Usage as a settings navigation item.
+- `tpstreams-drm-usage-page`: Customer-facing TPStreams sidebar Usage page for summarized DRM usage.
 
 ## Impact
 
 - **Scope:** Design repo UI only.
-- **UI:** New TPStreams settings page for DRM usage.
-- **Navigation:** Desktop and mobile/tablet TPStreams settings navigation include DRM Usage.
+- **UI:** New TPStreams Usage page for DRM usage.
+- **Navigation:** Sidebar gains a `Usage` item that opens DRM Usage.
 
 ## Non-goals
 
