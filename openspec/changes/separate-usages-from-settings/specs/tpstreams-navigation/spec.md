@@ -29,7 +29,7 @@ The TPStreams usages section SHALL provide its own local tab navigation separate
 
 #### Scenario: Render usages local navigation
 - **WHEN** the usages section is rendered
-- **THEN** it SHALL include a local tab labeled `Bandwidth Usage`
+- **THEN** it SHALL include a local tab labeled `Resource Usage`
 - **AND** that local tab SHALL link within the usages section rather than through settings
 
 ### Requirement: Sidebar active state reflects section ownership

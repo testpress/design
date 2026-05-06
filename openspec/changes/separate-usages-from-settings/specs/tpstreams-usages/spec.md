@@ -13,7 +13,7 @@ The TPStreams usages section SHALL provide its own tab navigation so future usag
 
 #### Scenario: Render the initial usages tab
 - **WHEN** the usages section is rendered
-- **THEN** it SHALL show `Bandwidth Usage` as the initial tab
+- **THEN** it SHALL show `Resource Usage` as the initial tab
 - **AND** the current usages content SHALL be rendered within that tab
 
 #### Scenario: Add future usages views inside the section
@@ -35,7 +35,7 @@ Moving the usages page into its own section MUST preserve the existing page inte
 #### Scenario: Render moved usages page
 - **WHEN** the usages page is loaded from `/tpstreams/usages/`
 - **THEN** the page SHALL continue to render the existing usage summary metrics, usage table, month filter, and export dropdown
-- **AND** the page SHALL present that content under the `Bandwidth Usage` tab
+- **AND** the page SHALL present that content under the `Resource Usage` tab
 - **AND** the relocation SHALL NOT require users to navigate through settings first
 
 #### Scenario: Preserve moved partial interactions

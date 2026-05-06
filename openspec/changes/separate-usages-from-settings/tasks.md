@@ -5,7 +5,7 @@
 
 ## 2. Make the usages section extendable
 
-- [x] 2.1 Add a usages-specific base and tab navigation so the current screen becomes the `Bandwidth Usage` tab and future usage views can be added without another layout refactor.
+- [x] 2.1 Add a usages-specific base and tab navigation so the current screen becomes the `Resource Usage` tab and future usage views can be added without another layout refactor.
 
 ## 3. Remove usages from settings-specific navigation
 

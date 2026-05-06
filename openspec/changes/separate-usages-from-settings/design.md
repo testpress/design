@@ -21,7 +21,7 @@ The usages page should follow that same pattern.
 
 - Align filesystem structure with the visible TPStreams navigation.
 - Make usages a standalone section under `src/tpstreams/`.
-- Make the usages section extendable with its own tab pattern, starting with `Bandwidth Usage`.
+- Make the usages section extendable with its own tab pattern, starting with `Resource Usage`.
 - Keep the relocation low-risk by preserving existing page markup and helper behavior.
 - Ensure sidebar active states reflect the new information architecture cleanly.
 
@@ -48,10 +48,10 @@ The usages page should follow that same pattern.
 
 **Rationale:** These partials are not shared by settings pages, so colocating them with the usages page makes ownership clearer and reduces accidental coupling.
 
-### 3. Add usages-local tabs with `Bandwidth Usage` as the first tab
+### 3. Add usages-local tabs with `Resource Usage` as the first tab
 
 - Add `src/tpstreams/usages/includes/desktop_tabs.html` and `src/tpstreams/usages/includes/tablet_tabs.html`.
-- Use `Bandwidth Usage` as the label for the current page.
+- Use `Resource Usage` as the label for the current page.
 - Keep the tab structure local to the usages section so additional usage views can be added later without another layout move.
 
 **Rationale:** The section should be extendable now, not only after more usage views exist. A local tab structure gives the section a stable shape for future additions such as storage or live-stream-focused reporting.
@@ -78,7 +78,7 @@ The usages page should follow that same pattern.
 
 - **[Risk] A plain page move could still leave usages hard to extend**  
   Without local tabs, adding the next usage view would likely trigger another structural refactor.  
-  → **Mitigation:** Introduce a usages-local tab pattern now and make the current page the `Bandwidth Usage` tab.
+  → **Mitigation:** Introduce a usages-local tab pattern now and make the current page the `Resource Usage` tab.
 
 - **[Risk] Subtle behavior regressions in moved partials**  
   Rewriting the includes during the move could accidentally change dropdown behavior.  
@@ -91,7 +91,7 @@ The usages page should follow that same pattern.
 ## Migration Plan
 
 1. Create the new `src/tpstreams/usages/` page and includes directory.
-2. Add a usages base and usages-local tabs with `Bandwidth Usage` as the first tab.
+2. Add a usages base and usages-local tabs with `Resource Usage` as the first tab.
 3. Move usages-only helper partials into the new section without changing behavior.
 4. Remove usages from settings tabs.
 5. Update desktop and mobile sidebar links and active-state logic to point to `/tpstreams/usages/`.
