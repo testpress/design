@@ -42,11 +42,13 @@
           </template>
           
           <template x-if="batch.tags.length > 2">
-            <div class="hs-tooltip inline-block [--placement:bottom]">
-              <span class="hs-tooltip-toggle cursor-pointer font-medium text-stone-500 hover:text-stone-800 text-[11px] py-1 px-0.5 transition-colors">
+            <div class="hs-dropdown relative inline-block [--strategy:fixed] [--placement:bottom]">
+              <button id="hs-dropdown-more-{{ batch.id }}" type="button" 
+                      class="hs-dropdown-toggle cursor-pointer font-medium text-stone-500 hover:text-stone-800 text-[11px] py-1 px-0.5 transition-colors focus:outline-none">
                 +<span x-text="batch.tags.length - 2"></span> more
-              </span>
-              <div class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible hidden opacity-0 transition-opacity absolute invisible z-20 w-48 bg-white border border-stone-200 text-start rounded-xl shadow-lg p-3" role="tooltip">
+              </button>
+              
+              <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden z-[100] transition-[opacity,margin] duration-100 w-48 bg-white border border-stone-200 text-start rounded-xl shadow-lg p-3 max-h-60 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300" aria-labelledby="hs-dropdown-more-{{ batch.id }}">
                 <div class="flex flex-col gap-y-1">
                   <template x-for="tag in batch.tags.slice(2)" :key="tag">
                     <span class="text-xs font-medium text-stone-600 bg-stone-50 px-2 py-1.5 rounded border border-stone-100 whitespace-nowrap" x-text="tag"></span>
@@ -62,19 +64,22 @@
           </template>
         </div>
 
-        <!-- Tags Trigger & Popover -->
-        <div class="relative inline-block" 
+        <!-- Tags Trigger & Popover (Preline Dropdown) -->
+        <div class="hs-dropdown relative inline-flex [--strategy:fixed] [--placement:bottom-right]" 
              x-data="{ 
-               showTagsPopover: false, 
                tagSearch: '', 
+               isInputFocused: false,
                allTags: ['Priority', '2024', 'UPSC', 'History', 'Economy', 'Art', 'Literature', 'Exam', 'Mock', 'Practice'],
                get filteredTags() {
-                 if (this.tagSearch.trim() === '') return [];
-                 return this.allTags.filter(t => t.toLowerCase().startsWith(this.tagSearch.toLowerCase().trim()) && !batch.tags.includes(t));
+                 const search = this.tagSearch.trim().toLowerCase();
+                 return this.allTags.filter(t => 
+                   t.toLowerCase().startsWith(search) && 
+                   !batch.tags.map(bt => bt.toLowerCase()).includes(t.toLowerCase())
+                 );
                },
                addTag(tag) {
                  const trimmed = tag.trim();
-                 if (trimmed && !batch.tags.includes(trimmed)) {
+                 if (trimmed && !batch.tags.map(bt => bt.toLowerCase()).includes(trimmed.toLowerCase())) {
                    batch.tags.push(trimmed);
                    updateBatchTags(batch.id, batch.tags);
                  }
@@ -85,41 +90,28 @@
                  updateBatchTags(batch.id, batch.tags);
                }
              }">
-          <div class="hs-tooltip inline-block [--placement:bottom]">
-            <button type="button" 
-                    @click="showTagsPopover = !showTagsPopover"
-                    class="hs-tooltip-toggle inline-flex items-center gap-x-1 py-0.5 px-1.5 rounded-full border border-stone-200 bg-white text-stone-500 text-[11px] font-medium shadow-sm hover:bg-stone-50 focus:outline-none transition-colors">
-              <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-            </button>
-            <div class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible hidden opacity-0 transition-opacity absolute invisible z-50 py-1 px-2 bg-stone-800 text-white text-[11px] rounded shadow-sm" role="tooltip">
-              Edit tags
-            </div>
-          </div>
+          
+          <button id="hs-dropdown-tags-{{ batch.id }}" type="button" 
+                  class="hs-dropdown-toggle inline-flex items-center gap-x-1 py-0.5 px-1.5 rounded-full border border-stone-200 bg-white text-stone-500 text-[11px] font-medium shadow-sm hover:bg-stone-50 focus:outline-none transition-colors">
+            <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+          </button>
 
-          <!-- Popover -->
-          <div x-show="showTagsPopover" 
-               x-transition:enter="transition ease-out duration-100"
-               x-transition:enter-start="opacity-0 scale-95"
-               x-transition:enter-end="opacity-100 scale-100"
-               x-transition:leave="transition ease-in duration-75"
-               x-transition:leave-start="opacity-100 scale-100"
-               x-transition:leave-end="opacity-0 scale-95"
-               @click.away="showTagsPopover = false"
-               class="absolute right-0 top-full mt-2 w-96 bg-white rounded-xl shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] z-50 p-5 border border-stone-200">
-            
+          <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden z-[100] transition-[opacity,margin] duration-100 w-96 bg-white rounded-xl shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] p-5 border border-stone-200" aria-labelledby="hs-dropdown-tags-{{ batch.id }}">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-base font-bold text-stone-800">Tags</h3>
-              <button @click="showTagsPopover = false" class="text-stone-400 hover:text-stone-600 focus:outline-none transition-colors">
+              <button type="button" class="hs-dropdown-toggle text-stone-400 hover:text-stone-600 focus:outline-none transition-colors">
                 <svg class="size-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
               </button>
             </div>
 
             <!-- Tag Search/Input -->
-            <div class="relative mb-4">
+            <div class="relative mb-4" @click.stop>
               <div class="w-full min-h-[44px] px-3 py-2 border border-stone-200 rounded-lg bg-white flex flex-wrap gap-1.5 items-center cursor-text focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-all">
                 <input 
                   type="text" 
                   x-model="tagSearch" 
+                  @focus="isInputFocused = true"
+                  @blur="setTimeout(() => isInputFocused = false, 200)"
                   @keydown.enter.prevent="addTag(tagSearch)"
                   placeholder="Type to search or add tag..." 
                   class="flex-1 min-w-[120px] border-none focus:ring-0 p-0 text-sm placeholder:text-stone-400 bg-transparent"
@@ -127,37 +119,36 @@
               </div>
 
               <!-- Suggestions Dropdown -->
-              <div x-show="tagSearch.trim().length > 0" 
-                   class="absolute z-[60] w-full mt-1 bg-white border border-stone-200 rounded-lg shadow-xl py-1">
+              <div x-show="isInputFocused || tagSearch.trim().length > 0" 
+                   @click.stop
+                   class="absolute z-[110] w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300">
+
                 <div class="flex flex-col">
                   <template x-for="tag in filteredTags" :key="tag">
                     <button 
                       @click="addTag(tag)"
-                      class="w-full text-start px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 focus:outline-none transition-colors"
+                      class="py-2 px-4 w-full text-start text-sm text-gray-800 cursor-pointer hover:bg-gray-100 rounded-lg focus:outline-none focus:bg-gray-100 transition-colors"
                     >
                       <span x-text="tag"></span>
                     </button>
                   </template>
-                  
+
                   <template x-if="tagSearch.trim().length > 0 && !allTags.map(t => t.toLowerCase()).includes(tagSearch.toLowerCase().trim()) && !batch.tags.map(t => t.toLowerCase()).includes(tagSearch.toLowerCase().trim())">
                     <button 
                       @click="addTag(tagSearch)"
-                      class="w-full text-start px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 focus:outline-none transition-colors border-t border-stone-100"
+                      class="py-2 px-4 w-full text-start text-sm text-gray-800 cursor-pointer hover:bg-gray-100 rounded-lg focus:outline-none focus:bg-gray-100 border-t border-gray-100 transition-colors"
                     >
                       Add "<span x-text="tagSearch"></span>"
                     </button>
                   </template>
 
-
                   <template x-if="tagSearch.trim().length > 0 && filteredTags.length === 0 && (allTags.map(t => t.toLowerCase()).includes(tagSearch.toLowerCase().trim()) || batch.tags.map(t => t.toLowerCase()).includes(tagSearch.toLowerCase().trim()))">
-                    <div class="px-4 py-2 text-sm text-stone-400 italic">
+                    <div class="py-2 px-4 text-sm text-gray-400 italic">
                       Tag already exists or added
                     </div>
                   </template>
                 </div>
               </div>
-
-
             </div>
 
             <!-- Existing Tags -->
@@ -175,8 +166,6 @@
                 <span class="text-xs text-stone-400 italic">No tags added</span>
               </template>
             </div>
-
-
           </div>
         </div>
       </div>
