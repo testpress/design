@@ -6,8 +6,7 @@ Organizations using TPStreams DRM need a simple way to view DRM consumption. DRM
 
 ## What Changes
 
-- Add a new primary sidebar `Usage` area for usage/analytics pages.
-- Add DRM Usage under the new Usage area.
+- Add a DRM Usage tab in the existing `Usages` area alongside Resource Usage.
 - Show selected-month DRM license request usage.
 - Display total usage, daily usage, and an empty state when there is no usage.
 - Keep the page summarized and customer-facing.
@@ -22,7 +21,7 @@ Organizations using TPStreams DRM need a simple way to view DRM consumption. DRM
 
 - **Scope:** Design repo UI only.
 - **UI:** New TPStreams Usage page for DRM usage.
-- **Navigation:** Sidebar gains a `Usage` item that opens DRM Usage.
+- **Navigation:** DRM Usage is accessible as a tab within the `Usages` section.
 
 ## Non-goals
 

@@ -1,12 +1,12 @@
 ## ADDED Requirements
 
-### Requirement: DRM usage is visible from a primary sidebar Usage area
-The system SHALL provide tenant-facing DRM license request usage visibility from a primary sidebar Usage area.
+### Requirement: DRM usage is visible from the primary sidebar Usages area
+The system SHALL provide tenant-facing DRM license request usage visibility from a tab within the primary sidebar Usages area.
 
-#### Scenario: User reviews DRM usage from sidebar Usage
-- **WHEN** a user opens the TPStreams sidebar Usage item
+#### Scenario: User reviews DRM usage from Usages tabs
+- **WHEN** a user navigates to the DRM Usage tab in the Usages area
 - **THEN** the system SHALL display the DRM Usage page
-- **AND** the sidebar SHALL highlight Usage for usage pages
+- **AND** the sidebar SHALL highlight Usages for any usage page
 
 ### Requirement: Monthly DRM usage summary
 The system SHALL summarize DRM license request usage for a selected month.

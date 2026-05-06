@@ -1,10 +1,10 @@
-## 1. Create the DRM usage sidebar area
+## 1. Create the DRM usage tab area
 
-- [x] 1.1 Add a primary sidebar Usage item.
-  - Add desktop and mobile sidebar navigation for `Usage`. Done when the sidebar points to the DRM Usage page and highlights for usage pages.
+- [x] 1.1 Integrate with existing Usages area.
+  - Ensure the desktop and mobile sidebar navigation for `Usages` highlights correctly for both resource and DRM usage pages.
 
-- [x] 1.2 Create the DRM Usage page under the new Usage area.
-  - Add `src/tpstreams/usage/drm_usage.html` using the TPStreams sidebar layout. Done when users can review DRM usage from the Usage sidebar item.
+- [x] 1.2 Create the DRM Usage tab and page.
+  - Add `src/tpstreams/usages/drm_usage.html` using the shared Usages base layout with tabs. Done when users can navigate to the DRM Usage tab.
 
 ## 2. Build the monthly usage experience
 

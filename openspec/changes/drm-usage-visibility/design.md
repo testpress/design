@@ -1,13 +1,12 @@
 ## Context
 
-This change adds tenant-facing DRM Usage visibility in a new primary sidebar Usage area. The page summarizes DRM license request usage for the selected month.
+This change adds tenant-facing DRM Usage visibility as a new tab in the existing primary sidebar Usages area. The page summarizes DRM license request usage for the selected month.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Add a primary sidebar `Usage` item.
-- Add a TPStreams DRM Usage page in that new Usage area.
+- Add a DRM Usage tab within the existing `Usages` page.
 - Make the UI clearly about DRM license request usage.
 - Show selected-month summary cards and daily counts.
 - Include a graph view and table view.
@@ -23,7 +22,7 @@ This change adds tenant-facing DRM Usage visibility in a new primary sidebar Usa
 
 ### 1. Page location and navigation
 
-For the MVP, add a new primary sidebar `Usage` item and place DRM Usage there at `src/tpstreams/usage/drm_usage.html`.
+Add a new `DRM Usage` tab in the existing `Usages` section and place DRM Usage there at `src/tpstreams/usages/drm_usage.html`.
 
 **Rationale:** DRM Usage is analytics/consumption data. It belongs in a Usage area, not with configuration pages.
 
@@ -33,8 +32,8 @@ The DRM Usage page should extend the TPStreams sidebar layout and use a compact 
 
 Recommended content:
 
-- Sidebar item: `Usage`
-- Page heading: `Usage`
+- Sidebar item: `Usages`
+- Page heading: `Usages`
 - Section heading: `DRM Usage`
 - Helper copy: `Daily DRM license request usage overview`
 - Summary cards:
