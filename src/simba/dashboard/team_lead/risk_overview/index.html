@@ -1,0 +1,233 @@
+---
+role: "Team Lead"
+view: "Risk Overview"
+permalink: /simba/team-lead/risk_overview/
+tags: simba
+tailwindv4: true
+---
+
+{% extends "../../base_dashboard.html" %}
+
+{% block title %}Risk Overview | Team Lead{% endblock title %}
+
+{% block content %}
+<div class="max-w-[85rem] px-4 sm:px-6 lg:px-8 mx-auto">
+  {% include 'src/simba/partials/breadcrumb.html' %}
+  <div class="py-2 sm:pb-0 sm:pt-5 space-y-5">
+    {% include './includes/header.html' %}
+    {% include './includes/tabs_nav.html' %}
+    {% include './includes/filter_pills.html' %}
+
+    <div id="tabs-risk-mentors-content" role="tabpanel" aria-labelledby="tabs-risk-mentors">
+      {% include './includes/mentors_tab_content.html' %}
+    </div>
+
+    <div id="tabs-risk-batches-content" class="hidden" role="tabpanel" aria-labelledby="tabs-risk-batches">
+      {% include './includes/batches_tab_content.html' %}
+    </div>
+
+    <div id="tabs-risk-students-content" class="hidden" role="tabpanel" aria-labelledby="tabs-risk-students">
+      {% include './includes/students_tab_content.html' %}
+    </div>
+
+  </div>
+</div>
+{% include '../includes/add_follow_up_modal.html' %}
+{% endblock content %}
+
+{% block extra_scripts %}
+<script src="{{ '/src/simba/node_modules/preline/dist/preline.js' | url }}"></script>
+<script>
+  (function () {
+    const statusRank = { "At Risk": 0, "Needs Attention": 1, "Healthy": 2, "Critical": 0 };
+
+    const rows = Array.from(document.querySelectorAll("[data-risk-row]"));
+    const mentorRows = rows.filter((row) => row.dataset.tab === "mentors");
+    const batchRows = rows.filter((row) => row.dataset.tab === "batches");
+    const studentRows = rows.filter((row) => row.dataset.tab === "students");
+
+    function sortRowsByPriority(list) {
+      return [...list].sort((a, b) => {
+        const aStatus = statusRank[a.dataset.status] ?? 99;
+        const bStatus = statusRank[b.dataset.status] ?? 99;
+        if (aStatus !== bStatus) return aStatus - bStatus;
+        const aFollowup = Number(a.dataset.followupCoverage ?? 999);
+        const bFollowup = Number(b.dataset.followupCoverage ?? 999);
+        return aFollowup - bFollowup;
+      });
+    }
+
+    function reorderInDom(sortedRows) {
+      if (!sortedRows.length) return;
+      const tbody = sortedRows[0].closest("tbody");
+      sortedRows.forEach((row) => tbody.appendChild(row));
+    }
+
+    reorderInDom(sortRowsByPriority(mentorRows));
+    reorderInDom(sortRowsByPriority(batchRows));
+    reorderInDom(sortRowsByPriority(studentRows));
+
+    const needingActionCount = mentorRows.filter((row) => {
+      const status = row.dataset.status;
+      return status === "At Risk" || status === "Critical" || status === "Needs Attention";
+    }).length;
+    const countEl = document.getElementById("risk-overview-needing-action-count");
+    if (countEl) countEl.textContent = String(needingActionCount);
+
+    const mentorFilter = document.getElementById("risk-filter-mentor");
+    const batchFilter = document.getElementById("risk-filter-batch");
+    const atRiskBtn = document.getElementById("risk-filter-at-risk-only");
+
+    const mentorSet = new Set();
+    const batchSet = new Set();
+    const batchToMentor = new Map();
+
+    mentorRows.forEach((row) => {
+      const mentorName = row.cells[0]?.innerText?.trim() || "";
+      if (mentorName) mentorSet.add(mentorName);
+    });
+
+    batchRows.forEach((row) => {
+      const batchText = row.cells[0]?.innerText?.trim() || "";
+      if (batchText) {
+        batchSet.add(batchText);
+        const parts = batchText.split(" - Mentor ");
+        if (parts.length === 2) batchToMentor.set(parts[0].trim(), parts[1].trim());
+      }
+    });
+
+    const mentorPillValueEl = document.getElementById("risk-pill-mentor-value");
+    const batchPillValueEl = document.getElementById("risk-pill-batch-value");
+    const reasonPillValueEl = document.getElementById("risk-pill-reason-value");
+    const defaultMentor = Array.from(mentorSet).sort()[0] || mentorPillValueEl?.textContent?.trim() || "";
+    const defaultBatch = Array.from(batchSet).sort()[0] || batchPillValueEl?.textContent?.trim() || "";
+
+    function getActiveTabId() {
+      const tab = document.querySelector("button[role='tab'][aria-selected='true']");
+      return tab?.id || "tabs-risk-mentors";
+    }
+
+    function isAtRiskStatus(status) {
+      return status === "At Risk" || status === "Critical";
+    }
+
+    function applyFilters() {
+      const atRiskOnly = atRiskBtn?.dataset.active === "true";
+      const selectedMentor = defaultMentor;
+      const selectedBatch = defaultBatch;
+      const selectedReason = document.querySelector('[data-reason-chip-active="true"]')?.dataset.reason || reasonPillValueEl?.textContent?.trim() || "";
+      const activeTabId = getActiveTabId();
+
+      rows.forEach((row) => {
+        const tab = row.dataset.tab;
+        const status = row.dataset.status || "";
+        const firstCellText = row.cells[0]?.innerText?.trim() || "";
+        const rowReason = row.querySelector('[data-reason-chip]')?.dataset.reason || "";
+        const isVisibleTab =
+          (activeTabId === "tabs-risk-mentors" && tab === "mentors") ||
+          (activeTabId === "tabs-risk-batches" && tab === "batches") ||
+          (activeTabId === "tabs-risk-students" && tab === "students");
+
+        if (!isVisibleTab) {
+          row.style.display = "";
+          return;
+        }
+
+        let show = true;
+        if (atRiskOnly && !isAtRiskStatus(status)) show = false;
+
+        if (tab === "students") {
+          const parts = firstCellText.split(" - Batch ");
+          const studentBatch = parts.length === 2 ? parts[1].trim() : "";
+          const studentMentor = batchToMentor.get(studentBatch) || "";
+          if (selectedMentor && studentMentor.toLowerCase() !== selectedMentor.toLowerCase()) show = false;
+          if (selectedBatch && studentBatch.toLowerCase() !== selectedBatch.toLowerCase()) show = false;
+        }
+        if (selectedReason && rowReason !== selectedReason) show = false;
+        row.style.display = show ? "" : "none";
+      });
+
+      const statusPill = document.getElementById("risk-pill-status");
+      const mentorPill = document.getElementById("risk-pill-mentor");
+      const batchPill = document.getElementById("risk-pill-batch");
+      const reasonPill = document.getElementById("risk-pill-reason");
+      const mentorPillValue = mentorPillValueEl;
+      const batchPillValue = batchPillValueEl;
+      const reasonPillValue = reasonPillValueEl;
+
+      if (statusPill) statusPill.classList.toggle("hidden", !atRiskOnly);
+      if (mentorPill && mentorPillValue) {
+        mentorPillValue.textContent = selectedMentor;
+        mentorPill.classList.toggle("hidden", !selectedMentor);
+      }
+      if (batchPill && batchPillValue) {
+        batchPillValue.textContent = selectedBatch;
+        batchPill.classList.toggle("hidden", !selectedBatch);
+      }
+      if (reasonPill && reasonPillValue) {
+        reasonPillValue.textContent = selectedReason;
+        reasonPill.classList.toggle("hidden", !selectedReason);
+      }
+    }
+
+    document.querySelectorAll('[data-reason-chip]').forEach((chip) => {
+      chip.addEventListener('click', function (event) {
+        event.preventDefault();
+        const alreadyActive = this.dataset.reasonChipActive === 'true';
+        document.querySelectorAll('[data-reason-chip]').forEach((el) => {
+          el.dataset.reasonChipActive = 'false';
+          el.classList.remove('font-semibold', 'text-green-700', 'dark:text-green-500');
+        });
+        if (!alreadyActive) {
+          this.dataset.reasonChipActive = 'true';
+          this.classList.add('font-semibold', 'text-green-700', 'dark:text-green-500');
+        }
+        applyFilters();
+      });
+    });
+
+    // Default reason pill to first reason in active tab
+    const defaultTabRow = document.querySelector('#tabs-risk-mentors-content [data-risk-row]');
+    const defaultReasonChip = defaultTabRow?.querySelector('[data-reason-chip]');
+    if (defaultReasonChip) {
+      defaultReasonChip.dataset.reasonChipActive = 'true';
+      defaultReasonChip.classList.add('font-semibold', 'text-green-700', 'dark:text-green-500');
+    }
+
+    atRiskBtn?.addEventListener("click", function () {
+      const next = this.dataset.active !== "true";
+      this.dataset.active = next ? "true" : "false";
+      this.classList.toggle("bg-stone-900", next);
+      this.classList.toggle("text-white", next);
+      this.classList.toggle("dark:bg-white", next);
+      this.classList.toggle("dark:text-neutral-900", next);
+      applyFilters();
+    });
+    document.getElementById("risk-pill-status-clear")?.addEventListener("click", function () {
+      if (!atRiskBtn) return;
+      atRiskBtn.dataset.active = "false";
+      atRiskBtn.classList.remove("bg-stone-900", "text-white", "dark:bg-white", "dark:text-neutral-900");
+      applyFilters();
+    });
+    document.getElementById("risk-pill-mentor-clear")?.addEventListener("click", function () {
+      if (mentorFilter) mentorFilter.value = "";
+      applyFilters();
+    });
+    document.getElementById("risk-pill-batch-clear")?.addEventListener("click", function () {
+      if (batchFilter) batchFilter.value = "";
+      applyFilters();
+    });
+    document.getElementById("risk-pill-reason-clear")?.addEventListener("click", function () {
+      document.querySelectorAll('[data-reason-chip]').forEach((el) => {
+        el.dataset.reasonChipActive = "false";
+        el.classList.remove("font-semibold", "text-green-700", "dark:text-green-500");
+      });
+      applyFilters();
+    });
+    document.querySelectorAll("button[role='tab']").forEach((tab) => {
+      tab.addEventListener("click", () => setTimeout(applyFilters, 0));
+    });
+    applyFilters();
+  })();
+</script>
+{% endblock extra_scripts %}
