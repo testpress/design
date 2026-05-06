@@ -33,6 +33,7 @@ function v2ProctoringWidget() {
     attemptsRemaining: 2,
     
     // Ready state
+    engineStatus: 'starting', // starting, started
     countdown: 5,
     
     init() {
@@ -61,6 +62,14 @@ function v2ProctoringWidget() {
       console.log('Navigating to:', step);
       this.stage = step;
       
+      if (step === 'fetching_policy') {
+        setTimeout(() => {
+          if (this.stage === 'fetching_policy') {
+            this.goToStep('preparing');
+          }
+        }, 1500);
+      }
+
       if (step === 'preparing' && !this.preparingFailed) {
         this.runSimulatedChecks();
       }
@@ -76,7 +85,7 @@ function v2ProctoringWidget() {
       }
 
       if (step === 'ready') {
-        this.startCountdown();
+        this.initializeEngine();
       }
 
       if (step === 'hidden') {
@@ -170,9 +179,26 @@ function v2ProctoringWidget() {
       }, 3000);
     },
 
+    initializeEngine() {
+      this.engineStatus = 'starting';
+      console.log('Proctoring Engine: Initializing...');
+      
+      // Simulate engine startup delay
+      setTimeout(() => {
+        this.engineStatus = 'started';
+        console.log('Proctoring Engine: Started!');
+        this.startCountdown();
+      }, 3000);
+    },
+
     startCountdown() {
       this.countdown = 5;
       const timer = setInterval(() => {
+        if (this.stage !== 'ready') {
+          clearInterval(timer);
+          return;
+        }
+
         if (this.countdown > 0) {
           this.countdown--;
         } else {
@@ -192,6 +218,7 @@ function v2ProctoringWidget() {
       this.preparingFailed = false;
       this.identitySubState = 'capturing';
       this.attemptsRemaining = 2;
+      this.engineStatus = 'starting';
       this.permissions.forEach(p => p.state = 'idle');
     },
 
