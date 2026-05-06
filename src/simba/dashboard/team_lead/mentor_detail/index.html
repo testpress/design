@@ -1,0 +1,190 @@
+---
+role: "Team Lead"
+view: "Mentor Detail"
+permalink: simba/team-lead/mentor_detail/
+tags: simba
+tailwindv4: true
+---
+
+{% extends "../../base_dashboard.html" %}
+
+{% set mentor = mentor_detail.mentor %}
+{% set mentor_assigned_students = mentor_detail.mentor_assigned_students %}
+{% set mentor_batches = mentor_detail.mentor_batches %}
+{% set mentor_activity_logs = mentor_detail.mentor_activity_logs %}
+{% set mentor_follow_ups = mentor_detail.mentor_follow_ups %}
+{% set follow_up_timeline = mentor_detail.follow_up_timeline %}
+
+{% block title %}Mentor Detail — {{ mentor.name }} | Team Lead{% endblock title %}
+
+{% block content %}
+<div class="max-w-[85rem] px-4 sm:px-6 lg:px-8 mx-auto">
+  <div class="py-2 sm:pb-0 sm:pt-5 space-y-5">
+    {% include './includes/breadcrumb.html' %}
+    {% include './includes/header.html' %}
+    {% include './includes/stats.html' %}
+
+    <div class="space-y-5">
+      {% include './includes/tabs_nav.html' %}
+
+      <!-- Tab Content -->
+      <div id="tabs-mentor-overview-content" class="" role="tabpanel" aria-labelledby="tabs-mentor-overview">
+        {% include './includes/overview_tab_content.html' %}
+      </div>
+      <!-- End Tab Content -->
+
+      <!-- Tab Content -->
+      <div id="tabs-mentor-batches-content" class="hidden" role="tabpanel" aria-labelledby="tabs-mentor-batches">
+        {% include './includes/assigned_batches_tab_content.html' %}
+      </div>
+      <!-- Tab Content -->
+      <div id="tabs-mentor-students-content" class="hidden" role="tabpanel" aria-labelledby="tabs-mentor-students">
+        {% include './includes/assigned_students_tab_content.html' %}
+      </div>
+      <!-- End Tab Content -->
+      <!-- Tab Content -->
+      <div id="tabs-mentor-followups-content" class="hidden" role="tabpanel" aria-labelledby="tabs-mentor-followups">
+        {% include './includes/follow_ups_tab_content.html' %}
+      </div>
+      <!-- End Tab Content -->
+      <!-- Tab Content -->
+      <div id="tabs-mentor-reviews-content" class="hidden" role="tabpanel" aria-labelledby="tabs-mentor-reviews">
+        {% include './includes/review_tab_content.html' %}
+      </div>
+      <!-- End Tab Content -->
+    </div>
+  </div>
+</div>
+{% include '../includes/add_follow_up_modal.html' %}
+{% endblock content %}
+
+{% block extra_scripts %}
+<script src="{{ '/src/simba/node_modules/preline/dist/preline.js' | url }}"></script>
+<script id="mentor-switcher-data" type="application/json">
+  {{ (mentor_academic_performance | dump | safe) if mentor_academic_performance else '[]' }}
+</script>
+<script id="mentor-switcher-default-data" type="application/json">
+  {{ (mentor | dump | safe) if mentor else '{}' }}
+</script>
+<script>
+  (function () {
+    var defaultMentor = {};
+    try {
+      defaultMentor = JSON.parse(document.getElementById('mentor-switcher-default-data').textContent || '{}');
+    } catch (error) {
+      defaultMentor = {};
+    }
+
+    var rawData = [];
+    try {
+      rawData = JSON.parse(document.getElementById('mentor-switcher-data').textContent || '[]');
+    } catch (error) {
+      rawData = [];
+    }
+
+    var mentorMap = {};
+    function slugify(name) {
+      return String(name || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+    }
+
+    function toMentorContext(item) {
+      return {
+        name: item.name || defaultMentor.name,
+        image_url: item.image_url || defaultMentor.image_url,
+        course: defaultMentor.course,
+        joined_on: defaultMentor.joined_on,
+        average_score: item.average_score != null ? item.average_score : defaultMentor.average_score,
+        attendance: item.attendance != null ? item.attendance : defaultMentor.attendance,
+        follow_up_impact_last_90_days: defaultMentor.follow_up_impact_last_90_days,
+        review_rating_last_90_days: defaultMentor.review_rating_last_90_days
+      };
+    }
+
+    mentorMap[slugify(defaultMentor.name)] = defaultMentor;
+    rawData.forEach(function (item) {
+      mentorMap[slugify(item.name)] = toMentorContext(item);
+    });
+
+    function updateMentorView(selectedMentor) {
+      var nameNode = document.getElementById('mentor-detail-name');
+      var courseNode = document.getElementById('mentor-detail-course');
+      var joinedNode = document.getElementById('mentor-detail-joined');
+      var avatarNode = document.getElementById('mentor-detail-avatar');
+      var passRateNode = document.getElementById('mentor-stat-pass-rate');
+      var attendanceNode = document.getElementById('mentor-stat-attendance');
+
+      if (nameNode) nameNode.textContent = selectedMentor.name;
+      if (courseNode) courseNode.textContent = selectedMentor.course;
+      if (joinedNode) joinedNode.textContent = selectedMentor.joined_on;
+      if (avatarNode) {
+        avatarNode.src = selectedMentor.image_url;
+        avatarNode.alt = selectedMentor.name + "'s Avatar";
+      }
+      if (passRateNode) passRateNode.textContent = selectedMentor.average_score + '%';
+      if (attendanceNode) attendanceNode.textContent = selectedMentor.attendance + '%';
+    }
+
+    function syncActiveMentorOption(activeSlug) {
+      var optionNodes = document.querySelectorAll('[data-mentor-option]');
+      optionNodes.forEach(function (optionNode) {
+        var optionSlug = slugify(optionNode.getAttribute('data-mentor-name'));
+        var checkNode = optionNode.querySelector('[data-mentor-check]');
+        var isActive = optionSlug === activeSlug;
+
+        optionNode.classList.toggle('bg-stone-100', isActive);
+        optionNode.classList.toggle('dark:bg-neutral-800', isActive);
+        optionNode.classList.toggle('font-medium', isActive);
+
+        if (checkNode) {
+          checkNode.classList.toggle('hidden', !isActive);
+        }
+      });
+    }
+
+    function applyMentorFromHash() {
+      var hashValue = String(window.location.hash || '');
+      var activeSlug = hashValue.indexOf('#mentor=') === 0 ? hashValue.replace('#mentor=', '') : slugify(defaultMentor.name);
+      var selectedMentor = mentorMap[activeSlug] || defaultMentor;
+
+      updateMentorView(selectedMentor);
+      syncActiveMentorOption(activeSlug);
+    }
+
+    document.querySelectorAll('[data-mentor-option]').forEach(function (optionNode) {
+      optionNode.addEventListener('click', function (event) {
+        var mentorName = optionNode.getAttribute('data-mentor-name');
+        var slug = slugify(mentorName);
+        event.preventDefault();
+        window.history.replaceState({}, '', '#mentor=' + slug);
+        applyMentorFromHash();
+      });
+    });
+
+    var mentorSearchInput = document.getElementById('mentor-switch-search');
+    var emptyState = document.getElementById('mentor-switch-empty');
+    if (mentorSearchInput) {
+      mentorSearchInput.addEventListener('input', function () {
+        var query = mentorSearchInput.value.trim().toLowerCase();
+        var visibleCount = 0;
+
+        document.querySelectorAll('[data-mentor-option]').forEach(function (optionNode) {
+          var mentorName = String(optionNode.getAttribute('data-mentor-name') || '').toLowerCase();
+          var isMatch = query === '' || mentorName.indexOf(query) !== -1;
+          optionNode.classList.toggle('hidden', !isMatch);
+          if (isMatch) visibleCount += 1;
+        });
+
+        if (emptyState) {
+          emptyState.classList.toggle('hidden', visibleCount !== 0);
+        }
+      });
+    }
+
+    applyMentorFromHash();
+  })();
+</script>
+{% endblock extra_scripts %}
