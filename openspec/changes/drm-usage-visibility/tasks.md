@@ -22,5 +22,5 @@
 
 ## 3. Verify the design
 
-- [ ] 3.1 Verify the design page in the local design environment.
+- [x] 3.1 Verify the design page in the local design environment.
   - Run the available design build or dev server and check desktop/mobile layout. Done when the page renders without template errors and the controls do not overlap.
