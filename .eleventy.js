@@ -7,6 +7,7 @@ module.exports = config => {
     config.watchIgnores.add("node_modules/**");
     config.watchIgnores.add("src/simba/node_modules/**");
     config.watchIgnores.add("src/odinhire/node_modules/**");
+    config.watchIgnores.add("src/limeread/node_modules/**");
 
     config.addPassthroughCopy("img");
     config.addPassthroughCopy("CNAME");
@@ -71,9 +72,14 @@ module.exports = config => {
     config.addPassthroughCopy({ "src/api": "api" });
     config.addPassthroughCopy("css/simba.css");
     config.addPassthroughCopy("css/odinhire.css");
+    config.addPassthroughCopy("css/limeread.css");
     config.addPassthroughCopy({
         "src/odinhire/node_modules/preline/dist/preline.js":
             "src/odinhire/node_modules/preline/dist/preline.js",
+    });
+    config.addPassthroughCopy({
+        "src/limeread/node_modules/preline/dist/preline.js":
+            "src/limeread/node_modules/preline/dist/preline.js",
     });
     config.addPassthroughCopy({
         "src/simba/node_modules/preline/dist/preline.js":
