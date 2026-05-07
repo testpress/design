@@ -13,6 +13,7 @@
 
   <div class="p-5">
     {% for day in follow_up_timeline.slice(0, 2) %}
+    {% set day_loop_index = loop.index0 %}
     <!-- Date Step -->
     <div
       class="relative group pb-1 after:absolute after:top-0 first:after:top-4 after:bottom-0 after:start-4 after:w-px after:bg-stone-300 dark:after:bg-neutral-500 after:-translate-x-1/2">
@@ -62,12 +63,38 @@
                 {{ item.note_body }}
               </p>
               {% if item.todo_created %}
+              {# Resolve linked task by follow_up_id (todos first, then scheduled). #}
+              {% set linked_todos = (task_management_todos | filter('follow_up_id', item.follow_up_id)) %}
+              {% set linked_task = null %}
+              {% if linked_todos and (linked_todos | length) %}
+                {% set linked_task = linked_todos[0] %}
+              {% endif %}
+              {% if not linked_task and item.follow_up_id %}
+                {% for group in task_management_scheduled.groups %}
+                  {% if not linked_task %}
+                    {% set group_matches = (group.tasks | filter('follow_up_id', item.follow_up_id)) %}
+                    {% if group_matches and (group_matches | length) %}
+                      {% set linked_task = group_matches[0] %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+              {% set todo_modal_id = 'hs-pro-recent-followup-todo-detail-' ~ day_loop_index ~ '-' ~ loop.index0 %}
               <p class="mt-2 flex items-center gap-x-1.5 text-xs text-green-700 dark:text-green-400">
                 <span class="size-5 flex shrink-0 justify-center items-center">
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><path d="m9 11 3 3L22 4"></path></svg>
                 </span>
-                To-do created for this follow-up{% if item.todo_due %} · Due {{ item.todo_due }}{% endif %}
+                <button type="button"
+                  class="relative z-10 inline-flex items-center gap-x-1 decoration-2 hover:underline focus:outline-hidden focus:underline"
+                  data-hs-overlay="#{{ todo_modal_id }}"
+                  aria-haspopup="dialog"
+                  aria-expanded="false"
+                  aria-controls="{{ todo_modal_id }}">
+                  To-do created for this follow-up
+                  {% if item.todo_due %} · Due {{ item.todo_due }}{% endif %}
+                </button>
               </p>
+              {% include 'src/simba/follow-ups/includes/todo_detail_modal.html' %}
               {% endif %}
             </div>
           </div>
