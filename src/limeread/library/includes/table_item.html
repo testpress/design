@@ -109,34 +109,42 @@
             <!-- License Column -->
             <td class="size-px whitespace-nowrap px-4 py-3">
               {% if book.status == 'DRAFT' and (not book.license.type or book.license.type == 'UNLIMITED') %}
-                <span class="text-sm text-gray-400 dark:text-neutral-600">-</span>
+                <span class="text-sm text-muted-foreground-2">-</span>
               {% else %}
-                {% set is_problematic = book.license.utilization_percent >= 100 or book.activity.trend == 'EXPIRED_LICENSE' %}
-                <span class="inline-flex items-center gap-x-1.5 py-1 px-2 rounded-lg text-xs font-medium border 
-                  {% if is_problematic %}
-                    bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20
+                {# Operational Logic #}
+                {% set utilization = book.license.utilization_percent | default(0) %}
+                {% set is_exhausted = (utilization >= 100 or book.activity.trend == 'EXPIRED_LICENSE') and book.status != 'ARCHIVED' %}
+                {% set is_warning = utilization >= 85 and not is_exhausted and book.status != 'ARCHIVED' %}
+                
+                <div class="inline-flex items-center gap-x-1.5 py-1 px-2.5 rounded-full text-xs font-medium border transition-all
+                  {% if is_exhausted %}
+                    bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400
+                  {% elif is_warning %}
+                    bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400
                   {% else %}
-                    bg-gray-50 text-gray-700 border-gray-200 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-700
+                    bg-surface border-surface-line text-muted-foreground-1 dark:text-neutral-400
                   {% endif %}">
                   
                   {% if book.license.type == 'CONCURRENT' %}
                     <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    {{ book.license.concurrent_limit }} Concurrent
+                    <span>{{ book.license.concurrent_limit }} Concurrent</span>
                   {% elif book.license.type == 'BORROW_LIMIT' %}
                     <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></svg>
-                    {{ book.license.borrow_limit }} Borrows
+                    <span>{{ book.license.borrow_limit }} Borrows</span>
                   {% elif book.license.type == 'TIME_BASED' or book.license.type == 'HYBRID' %}
                     <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                    {% if is_problematic %}
-                      Expired
-                    {% else %}
-                      Expires in {{ book.license.expires_in or '5m' }}
-                    {% endif %}
+                    <span>
+                      {% if is_exhausted %}
+                        Expired
+                      {% else %}
+                        Expires in {{ book.license.expires_in or '5m' }}
+                      {% endif %}
+                    </span>
                   {% else %}
                     <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                    Unlimited
+                    <span>Unlimited</span>
                   {% endif %}
-                </span>
+                </div>
               {% endif %}
             </td>
 
