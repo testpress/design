@@ -18,6 +18,20 @@
               <div class="">
                 <div class="flex items-center gap-x-2">
                   <p class="font-medium text-foreground">{{ book.title }}</p>
+                  
+                  {% if book.status == 'ACTIVE' and book.activity.waitlist_count > 0 %}
+                  <div x-data="{ showFireTooltip: false }" class="relative inline-flex items-center">
+                    <span @mouseenter="showFireTooltip = true" @mouseleave="showFireTooltip = false" class="text-xs cursor-help">🔥</span>
+                    
+                    <!-- Tooltip -->
+                    <div x-show="showFireTooltip" x-cloak x-transition.opacity
+                      class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[10px] rounded shadow-lg whitespace-nowrap z-50">
+                      High Demand
+                      <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                    </div>
+                  </div>
+                  {% endif %}
+
                   {% if book.status != "ACTIVE" %}
                     <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium 
                       {% if book.status == 'DISABLED' %}
@@ -104,7 +118,29 @@
               {% endif %}
             </td>
 
-            <!-- License Column -->
+            <td class="size-px whitespace-nowrap px-4 py-1">
+              <span class="text-sm text-gray-800 dark:text-neutral-200">
+                {% if book.status == 'DRAFT' %}
+                  -
+                {% elif book.license.type == 'CONCURRENT' %}
+                  {{ book.license.concurrent_limit }} Max Readers
+                {% elif book.license.type == 'TIME_BASED' %}
+                  {% if book.license.valid_until %}
+                    Expires on {{ book.license.valid_until | formatDate }}
+                  {% else %}
+                    Expires in {{ book.license.expires_in }}
+                  {% endif %}
+                {% elif book.license.type == 'BORROW_LIMIT' %}
+                  {{ book.license.borrow_limit }} Borrow Limit
+                {% elif book.license.type == 'UNLIMITED' %}
+                  Unlimited
+                {% else %}
+                  -
+                {% endif %}
+              </span>
+            </td>
+
+            <!-- Activity Column -->
             <td class="size-px whitespace-nowrap px-4 py-3">
               {% if book.status == 'DRAFT' %}
                 <span class="text-sm text-gray-400 dark:text-neutral-600">-</span>
@@ -116,43 +152,59 @@
               {% else %}
                 {% set limit_val = 0 %}
                 {% set active_val = 0 %}
-                {% set type_label = "" %}
                 {% set color_class = "emerald" %}
                 
                 {% if book.license.type == 'CONCURRENT' %}
                   {% set limit_val = book.license.concurrent_limit | default(0) %}
                   {% set active_val = book.license.active_readers | default(0) %}
-                  {% set type_label = "Concurrent" %}
-                  {% set color_class = "red" if active_val >= limit_val else "orange" %}
+                  {% if active_val >= limit_val or book.activity.waitlist_count > 0 %}
+                    {% set color_class = "orange" %}
+                  {% else %}
+                    {% set color_class = "emerald" %}
+                  {% endif %}
                 {% elif book.license.type == 'BORROW_LIMIT' %}
                   {% set limit_val = book.license.borrow_limit | default(1) %}
                   {% set active_val = book.activity.total_borrows | default(0) %}
-                  {% set type_label = "Borrow Limit" %}
-                  {% set color_class = "emerald" %}
+                  {% if active_val >= limit_val %}
+                    {% set color_class = "orange" %}
+                  {% else %}
+                    {% set color_class = "emerald" %}
+                  {% endif %}
                 {% elif book.license.type == 'TIME_BASED' %}
-                  {% set type_label = "Time Based" %}
+                  {% set active_val = book.activity.active_borrows | default(0) %}
                   {% set color_class = "emerald" %}
                 {% endif %}
 
-                <div class="flex flex-col gap-y-1.5 min-w-[140px]">
-                  <!-- Type and Icon -->
-                  <div class="flex items-center gap-x-2.5">
-                    <span class="shrink-0">
-                      {% if book.license.type == 'CONCURRENT' %}
-                        <svg class="size-4 text-indigo-600 dark:text-indigo-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                      {% elif book.license.type == 'BORROW_LIMIT' %}
-                        <svg class="size-4 text-pink-500 dark:text-pink-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-6Z"/><path d="M9 12v.01"/><path d="M13 12v.01"/><path d="M17 12v.01"/><path d="M5 12v.01"/></svg>
-                      {% elif book.license.type == 'TIME_BASED' %}
-                        <svg class="size-4 text-purple-600 dark:text-purple-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                      {% endif %}
-                    </span>
-                    <span class="text-sm font-semibold 
-                      {% if color_class == 'red' %}text-red-600 dark:text-red-500{% else %}text-slate-800 dark:text-neutral-200{% endif %}">
-                      {{ type_label }}
-                    </span>
-                  </div>
+                <div class="flex flex-col gap-y-1.5 min-w-[210px]">
+                  <!-- Numbers Row (Top) -->
+                  <ul class="flex flex-wrap items-center text-[13px] text-muted-foreground-1 list-none m-0 p-0 font-medium whitespace-nowrap">
+                    <li class="flex items-center gap-x-1">
+                        <span class="text-foreground">
+                          {{ active_val }}
+                        </span>
+                        <span>Active</span>
+                    </li>
 
-                  <!-- Progress Bar -->
+                    {% if book.license.type == 'CONCURRENT' and book.activity.waitlist_count > 0 %}
+                      <li class="mx-2 opacity-40">|</li>
+                      <li class="flex items-center gap-x-1">
+                        <span class="text-orange-600 dark:text-orange-400">{{ book.activity.waitlist_count }}</span>
+                        <span class="text-orange-600 dark:text-orange-400">Waitlisted</span>
+                      </li>
+                    {% elif book.license.type == 'TIME_BASED' %}
+                      <li class="mx-2 opacity-40">|</li>
+                      <li class="flex items-center gap-x-1">
+                        {% if book.license.expires_in and book.license.expires_in[0] == '-' %}
+                          <span class="text-orange-600 dark:text-orange-400">Expired</span>
+                        {% else %}
+                          <span class="text-foreground">{{ book.license.expires_in }}</span>
+                          <span>Left</span>
+                        {% endif %}
+                      </li>
+                    {% endif %}
+                  </ul>
+
+                  <!-- Progress Bar Row (Bottom) -->
                   <div class="h-1.5 w-full bg-gray-100 dark:bg-neutral-700 rounded-full overflow-hidden">
                     {% set bar_width = 0 %}
                     {% if book.license.type == 'TIME_BASED' %}
@@ -161,29 +213,9 @@
                       {% set bar_width = (active_val / limit_val * 100) | round if limit_val > 0 else 0 %}
                     {% endif %}
                     <div class="h-full transition-all duration-500 rounded-full
-                      {% if color_class == 'red' %}bg-red-500
-                      {% elif color_class == 'orange' %}bg-orange-400
+                      {% if color_class == 'orange' %}bg-orange-400
                       {% else %}bg-emerald-500{% endif %}"
                       style="width: {{ bar_width if bar_width <= 100 else 100 }}%"></div>
-                  </div>
-
-                  <!-- Details Row -->
-                  <div class="flex items-center gap-x-2 text-xs font-medium">
-                    {% if book.license.type == 'TIME_BASED' %}
-                      <span class="text-slate-600 dark:text-neutral-400">{{ book.license.expires_in }} Left</span>
-                    {% else %}
-                      <span class="{% if color_class == 'red' %}text-red-600 dark:text-red-500{% else %}text-slate-600 dark:text-neutral-400{% endif %}">
-                        {{ active_val }} / {{ limit_val }}
-                      </span>
-                    {% endif %}
-
-                    {% if book.license.type == 'CONCURRENT' and book.activity.waitlist_count > 0 %}
-                      <span class="text-red-500">{{ book.activity.waitlist_count }} Waitlisted</span>
-                    {% elif book.license.type == 'CONCURRENT' %}
-                      <span class="text-gray-400 dark:text-neutral-500 font-normal">0 Waitlisted</span>
-                    {% else %}
-                      <span class="text-gray-400 dark:text-neutral-500 font-normal">Healthy</span>
-                    {% endif %}
                   </div>
                 </div>
               {% endif %}
