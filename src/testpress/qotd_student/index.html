@@ -1,0 +1,174 @@
+---
+tags: testpress
+student_view : Question of the Day
+date: 2000-10-01
+new_student_page: true
+---
+
+
+{% extends "src/testpress/layout/student_layout.html" %}
+{% set current_state = qotd_student_progress.states.in_progress %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock body_class %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ '/node_modules/apexcharts/dist/apexcharts.css' | url }}">
+<style type="text/css">
+  .apexcharts-tooltip.apexcharts-theme-light {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+</style>
+{% endblock extra_head %}
+
+{% block main_content %}
+<div x-data="qotdDashboard()" class="max-w-7xl mx-auto lg:px-8 space-y-8" x-cloak>
+  
+  <!-- Header -->
+  <div>
+    {% include "./header.html" %}
+  </div>
+
+  <!-- Main Content Card -->
+  {% include "./dashboard.html" %}
+
+  <!-- Start Exam Button -->
+  <div class="flex justify-center mt-6">
+    <button @click="startQuiz()" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
+      {{ current_state.button_label }}
+    </button>
+  </div>
+
+  <!-- Quiz Modal Overlay -->
+  {% include "./quiz.html" %}
+
+</div>
+{% endblock main_content %}
+{% block script %} 
+{% include "./apex_chart_script.html" %}
+<script>
+  function qotdDashboard() {
+    return {
+      isQuizOpen: false,
+      showSummary: false,
+      currentIndex: 0,
+      selectedIdx: null,
+      hasAnswered: false,
+      correctAnswers: 0,
+      userAnswers: [],
+      touchStartX: 0,
+      questions: [
+        {
+          text: "If a train travels at 60 km/h, how long does it take to cover 150 km?",
+          options: ["2.5 hours", "2 hours", "3 hours", "1.5 hours"],
+          correctIdx: 0,
+          subject: "Maths",
+          difficulty: "Medium",
+          explanation: "Time = Distance / Speed = 150 km / 60 km/h = 2.5 hours."
+        },
+        {
+          text: "A car accelerates uniformly from 0 to 72 km/h in 10 seconds. What is its acceleration?",
+          options: ["2 m/s²", "3 m/s²", "4 m/s²", "5 m/s²"],
+          correctIdx: 1,
+          subject: "Physics",
+          difficulty: "Medium",
+          explanation: "Convert speed to m/s: 72 km/h = 20 m/s. Acceleration = (20 m/s - 0 m/s) / 10 s = 2 m/s²."
+        },
+        {
+          text: "A circle has a radius of 5 cm. What is its circumference? (Take π ≈ 3.14)",
+          options: ["31.4 cm", "15.7 cm", "6.28 cm", "25 cm"],
+          correctIdx: 0,
+          subject: "Maths",
+          difficulty: "Medium",
+          explanation: "Circumference = 2πr = 2 × 3.14 × 5 = 31.4 cm."
+        },
+        {
+          text: "A body is dropped from rest from a height of 80m. How long does it take to reach the ground? (g = 10 m/s²)",
+          options: ["3 s", "4 s", "5 s", "2 s"],
+          correctIdx: 1,
+          subject: "Physics",
+          difficulty: "Medium",
+          explanation: "Using s = ut + ½at², where u=0, a=10, s=80. 80 = 0 + ½(10)t² => 80 = 5t² => t² = 16 => t = 4 s."
+        },
+        {
+          text: "If a car travels at 72 km/h, its velocity in m/s is:",
+          options: ["10 m/s", "15 m/s", "20 m/s", "25 m/s"],
+          correctIdx: 2,
+          subject: "Physics",
+          difficulty: "Medium",
+          explanation: "72 km/h × (1000 m/km) × (1 h/3600 s) = 20 m/s."
+        }
+      ],
+
+      startQuiz() {
+        this.isQuizOpen = true;
+        this.showSummary = false;
+        this.currentIndex = 0;
+        this.selectedIdx = null;
+        this.hasAnswered = false;
+        this.correctAnswers = 0;
+        this.userAnswers = [];
+        document.body.style.overflow = 'hidden';
+      },
+
+      selectOption(idx) {
+        if (this.hasAnswered) return;
+        this.selectedIdx = idx;
+        this.hasAnswered = true;
+        this.userAnswers[this.currentIndex] = idx;
+        if (idx === this.questions[this.currentIndex].correctIdx) {
+          this.correctAnswers++;
+        }
+      },
+
+      nextQuestion() {
+        if (this.currentIndex < this.questions.length - 1) {
+          this.currentIndex++;
+          this.selectedIdx = this.userAnswers[this.currentIndex] ?? null;
+          this.hasAnswered = this.selectedIdx !== null;
+          this.$refs.quizBody.scrollTop = 0;
+        } else {
+          this.endQuiz();
+        }
+      },
+
+      previousQuestion() {
+        if (this.currentIndex > 0) {
+          this.currentIndex--;
+          this.selectedIdx = this.userAnswers[this.currentIndex] ?? null;
+          this.hasAnswered = this.selectedIdx !== null;
+          this.$refs.quizBody.scrollTop = 0;
+        }
+      },
+
+      endQuiz() {
+        this.closeQuiz();
+      },
+
+      closeQuiz() {
+        this.isQuizOpen = false;
+        document.body.style.overflow = 'auto';
+      },
+
+      retakeQuiz() {
+        this.startQuiz();
+      },
+
+      handleTouchStart(e) {
+        this.touchStartX = e.changedTouches[0].screenX;
+      },
+
+      handleTouchEnd(e) {
+        const diff = this.touchStartX - e.changedTouches[0].screenX;
+        if (diff > 50 && this.hasAnswered) {
+          this.nextQuestion();
+        } else if (diff < -50) {
+          this.previousQuestion();
+        }
+      },
+
+    };
+  }
+</script>
+{% endblock script %}
+
