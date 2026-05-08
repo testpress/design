@@ -1,0 +1,202 @@
+---
+view: Question of the Day
+tags: testpress
+title: Manage QOTD Config
+permalink: testpress/qotd-config/manage/
+date: 2026-05-06
+---
+
+{% extends "layouts/admin_base.html" %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
+{% block content %}
+
+<div x-data="qotdManage()" class="py-10 max-w-7xl mx-auto lg:px-8 px-4 space-y-5">
+    <!-- Breadcrumb -->
+    {% include "./breadcrumb.html" %}
+
+    <!-- Configuration Section -->
+    <div class="mb-6">
+      {% include "./config_section.html" %}
+    </div>
+
+    <!-- Daily Questions Section -->
+    <div>
+      {% include "./daily_question_section.html" %}
+    </div>
+
+    <!-- Modals -->
+    {% include "./replace_question_modal.html" %}
+    {% include "./add_question_modal.html" %}
+</div>
+
+{% endblock %}
+
+{% block script %}
+<script>
+  function qotdManage() {
+    return {
+      configName: 'Foundation Batch Daily',
+      status: 'active',
+      isGlobal: false,
+      hasSubjects: true, // Based on initial selection
+      difficulty: 'medium',
+      
+      activeTab: 'today',
+      selectedQuestionForReplace: null,
+      selectedQuestionToAdd: null,
+      replacingIndex: null,
+      
+      today: {
+        stats: { attempted: 42, type: 'auto', label: 'Auto-generated' },
+        currentQuestionIndex: 0,
+        questions: [
+          {
+            id: 1,
+            subject: 'Physics',
+            difficulty: 'Medium',
+            text: 'A block of mass 5kg is pulled along a horizontal frictionless surface by a force of 20N. What is the acceleration?',
+            options: ['2 m/s²', '4 m/s²', '5 m/s²', '10 m/s²'],
+            correctIndex: 1,
+            explanation: 'Using Newton\'s second law: F = ma. So, a = F/m = 20N / 5kg = 4 m/s².'
+          },
+          {
+            id: 2,
+            subject: 'Chemistry',
+            difficulty: 'Hard',
+            text: 'Which of the following elements has the highest electronegativity?',
+            options: ['Oxygen', 'Fluorine', 'Nitrogen', 'Chlorine'],
+            correctIndex: 1,
+            explanation: 'Fluorine is the most electronegative element on the periodic table with a value of 3.98 on the Pauling scale.'
+          },
+          {
+            id: 3,
+            subject: 'Biology',
+            difficulty: 'Easy',
+            text: 'What is the powerhouse of the cell?',
+            options: ['Nucleus', 'Ribosome', 'Mitochondria', 'Golgi Apparatus'],
+            correctIndex: 2,
+            explanation: 'Mitochondria are known as the powerhouse of the cell because they generate most of the cell\'s supply of adenosine triphosphate (ATP).'
+          }
+        ]
+      },
+
+      tomorrow: {
+        stats: { attempted: 0, type: 'overridden', label: 'Overridden' },
+        currentQuestionIndex: 0,
+        questions: [
+          {
+            id: 4,
+            subject: 'Mathematics',
+            difficulty: 'Hard',
+            text: 'What is the derivative of sin(x) with respect to x?',
+            options: ['cos(x)', '-cos(x)', 'sin(x)', '-sin(x)'],
+            correctIndex: 0,
+            explanation: 'The derivative of sin(x) is cos(x). This is a fundamental result in calculus.'
+          },
+          {
+            id: 5,
+            subject: 'History',
+            difficulty: 'Medium',
+            text: 'Who was the first President of the United States?',
+            options: ['Thomas Jefferson', 'John Adams', 'George Washington', 'Benjamin Franklin'],
+            correctIndex: 2,
+            explanation: 'George Washington served as the first President of the United States from 1789 to 1797.'
+          },
+          {
+            id: 6,
+            subject: 'Geography',
+            difficulty: 'Easy',
+            text: 'Which is the largest ocean on Earth?',
+            options: ['Atlantic Ocean', 'Indian Ocean', 'Arctic Ocean', 'Pacific Ocean'],
+            correctIndex: 3,
+            explanation: 'The Pacific Ocean is the largest and deepest of Earth\'s five oceanic divisions.'
+          }
+        ]
+      },
+
+      get activeData() {
+        return this[this.activeTab];
+      },
+
+      openReplaceModal(index) {
+        this.replacingIndex = index;
+        
+        // Default to the selected question in the list (Question 102)
+        this.selectedQuestionForReplace = { 
+          id: 102, 
+          text: 'Who was the Viceroy of India during the Quit India Movement?' 
+        };
+        if (window.HSOverlay) window.HSOverlay.open(document.querySelector('#replace-question-modal'));
+      },
+
+      selectQuestion(question) {
+        this.selectedQuestionForReplace = question;
+      },
+
+      confirmReplace() {
+        if (this.selectedQuestionForReplace && this.replacingIndex !== null) {
+          // Update the question in the active list
+          this.activeData.questions[this.replacingIndex] = {
+            ...this.selectedQuestionForReplace,
+            id: this.selectedQuestionForReplace.id // Maintain the new ID
+          };
+          
+          if (window.HSOverlay) window.HSOverlay.close(document.querySelector('#replace-question-modal'));
+          
+          // Optional: Show a success toast
+          console.log('Question replaced successfully');
+        }
+      },
+
+      openAddModal() {
+        this.selectedQuestionToAdd = null;
+        if (window.HSOverlay) window.HSOverlay.open(document.querySelector('#add-question-modal'));
+      },
+
+      confirmAdd() {
+        if (this.selectedQuestionToAdd) {
+          // Add the question to the active list
+          this.activeData.questions.push({
+            ...this.selectedQuestionToAdd,
+            options: ['Option A', 'Option B', 'Option C', 'Option D'], // Placeholder options
+            correctIndex: 0
+          });
+          
+          if (window.HSOverlay) window.HSOverlay.close(document.querySelector('#add-question-modal'));
+          
+          console.log('Question added successfully');
+        }
+      },
+
+      nextQuestion() {
+        if (this.activeData.currentQuestionIndex < this.activeData.questions.length - 1) {
+          this.activeData.currentQuestionIndex++;
+        }
+      },
+
+      prevQuestion() {
+        if (this.activeData.currentQuestionIndex > 0) {
+          this.activeData.currentQuestionIndex--;
+        }
+      },
+
+      editQuestion() {
+        console.log('Editing question:', this.activeData.questions[this.activeData.currentQuestionIndex].id);
+      },
+
+      replaceQuestion() {
+        console.log('Replacing question:', this.activeData.questions[this.activeData.currentQuestionIndex].id);
+      },
+
+      deleteQuestion() {
+        console.log('Deleting question:', this.activeData.questions[this.activeData.currentQuestionIndex].id);
+      },
+      
+      saveChanges() {
+        // Handle save logic
+        console.log('Saving changes...');
+      }
+    };
+  }
+</script>
+{% endblock %}
