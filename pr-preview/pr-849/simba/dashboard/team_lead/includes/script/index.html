@@ -1,0 +1,350 @@
+<script>
+  (function () {
+    'use strict';
+
+    // ============================================================================
+    // CONSTANTS
+    // ============================================================================
+    const DATE_PICKER_SELECTORS = {
+      INPUT: '#hs-datepicker-with-navigation-controls',
+      TODAY_BUTTON: '#hs-datepicker-with-navigation-controls-today',
+      PREV_BUTTON: '#hs-datepicker-with-navigation-controls-prev',
+      NEXT_BUTTON: '#hs-datepicker-with-navigation-controls-next'
+    };
+
+    // ============================================================================
+    // DATE PICKER FUNCTIONS
+    // ============================================================================
+    function initializeDatePicker() {
+      if (typeof window.HSDatepicker === 'undefined' || !window.HSDatepicker) {
+        return;
+      }
+
+      const datepickerInstance = HSDatepicker.getInstance(DATE_PICKER_SELECTORS.INPUT, true);
+
+      if (!datepickerInstance || !datepickerInstance.element || !datepickerInstance.element.vanillaCalendar) {
+        return;
+      }
+
+      const element = datepickerInstance.element;
+      const vanillaCalendar = element.vanillaCalendar;
+      const todayButton = document.querySelector(DATE_PICKER_SELECTORS.TODAY_BUTTON);
+      const prevButton = document.querySelector(DATE_PICKER_SELECTORS.PREV_BUTTON);
+      const nextButton = document.querySelector(DATE_PICKER_SELECTORS.NEXT_BUTTON);
+
+      if (!todayButton || !prevButton || !nextButton) {
+        return;
+      }
+
+      function getCurrentDate() {
+        if (vanillaCalendar.context && vanillaCalendar.context.selectedDates) {
+          const contextDates = vanillaCalendar.context.selectedDates;
+
+          if (contextDates && contextDates.length > 0) {
+            const dateString = contextDates[0];
+
+            if (dateString === 'today') {
+              return new Date();
+            }
+
+            const date = new Date(dateString);
+
+            if (!isNaN(date.getTime())) {
+              return date;
+            }
+          }
+        }
+
+        const currentState = element.getCurrentState();
+
+        if (currentState.selectedDates && currentState.selectedDates.length > 0) {
+          const dateString = currentState.selectedDates[0];
+
+          if (dateString === 'today') {
+            return new Date();
+          }
+
+          const date = new Date(dateString);
+
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        const selectedDates = vanillaCalendar.selectedDates;
+
+        if (selectedDates && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+
+          if (dateString === 'today') {
+            return new Date();
+          }
+
+          const date = new Date(dateString);
+
+          if (!isNaN(date.getTime())) {
+            return date;
+          }
+        }
+
+        return new Date();
+      }
+
+      function formatDateToISO(date) {
+        if (!date || isNaN(date.getTime())) {
+          return new Date().toISOString().split('T')[0];
+        }
+
+        return date.toISOString().split('T')[0];
+      }
+
+      function updateDate(selectedDates) {
+        if (selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
+
+          vanillaCalendar.set({
+            selectedDates: selectedDates,
+            selectedMonth: date.getMonth(),
+            selectedYear: date.getFullYear()
+          });
+        } else {
+          vanillaCalendar.set({ selectedDates: selectedDates });
+        }
+
+        const inputElement = document.querySelector(DATE_PICKER_SELECTORS.INPUT);
+
+        if (inputElement && selectedDates.length > 0) {
+          const dateString = selectedDates[0];
+          const date = new Date(dateString);
+          const formattedValue = element.formatDate(date);
+          inputElement.value = formattedValue;
+        }
+
+        if (!inputElement) {
+          return;
+        }
+
+        const changeEvent = new CustomEvent('change', {
+          detail: {
+            selectedDates: selectedDates,
+            selectedTime: vanillaCalendar.context.selectedTime,
+            rest: vanillaCalendar.context
+          }
+        });
+
+        inputElement.dispatchEvent(changeEvent);
+      }
+
+      todayButton.addEventListener('click', () => {
+        const today = new Date();
+        const todayStr = formatDateToISO(today);
+        updateDate([todayStr]);
+      });
+
+      prevButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() - 1);
+        const prevDate = formatDateToISO(currentDate);
+        updateDate([prevDate]);
+      });
+
+      nextButton.addEventListener('click', () => {
+        const currentDate = getCurrentDate();
+        currentDate.setDate(currentDate.getDate() + 1);
+        const nextDate = formatDateToISO(currentDate);
+        updateDate([nextDate]);
+      });
+    }
+
+    function initializeTodaysTasks() {
+      const card = document.getElementById('todays-tasks-card');
+      const list = document.getElementById('todays-tasks-list');
+      const count = document.getElementById('todays-tasks-count');
+      const emptyState = document.getElementById('todays-tasks-empty');
+      const undoStack = document.getElementById('todays-tasks-undo-stack');
+      const undoTemplate = document.getElementById('todays-tasks-undo-template');
+      const pendingRemovals = new Map();
+      let undoSequence = 0;
+
+      if (!card || !list || !count) {
+        return;
+      }
+
+      function updateTaskCount() {
+        const remainingTasks = list.querySelectorAll('[data-task-row]').length;
+        count.textContent = String(remainingTasks);
+
+        if (emptyState) {
+          if (remainingTasks === 0) {
+            emptyState.classList.remove('hidden');
+            list.classList.add('hidden');
+          } else {
+            emptyState.classList.add('hidden');
+            list.classList.remove('hidden');
+          }
+        }
+      }
+
+      function removeTaskWithTransition(taskRow) {
+        taskRow.style.overflow = 'hidden';
+        taskRow.style.maxHeight = `${taskRow.offsetHeight}px`;
+        taskRow.style.transition = 'max-height 280ms ease, opacity 280ms ease, margin 280ms ease, padding 280ms ease';
+
+        requestAnimationFrame(() => {
+          taskRow.style.maxHeight = '0px';
+          taskRow.style.opacity = '0';
+          taskRow.style.marginTop = '0';
+          taskRow.style.marginBottom = '0';
+          taskRow.style.paddingTop = '0';
+          taskRow.style.paddingBottom = '0';
+          taskRow.style.borderWidth = '0';
+        });
+
+        window.setTimeout(() => {
+          taskRow.remove();
+          updateTaskCount();
+        }, 300);
+      }
+
+      function removeUndoToast(removal) {
+        if (removal && removal.toastElement) {
+          removal.toastElement.remove();
+        }
+      }
+
+      function finalizePendingRemoval(undoId) {
+        const removal = pendingRemovals.get(undoId);
+
+        if (!removal) {
+          return;
+        }
+
+        pendingRemovals.delete(undoId);
+        removeUndoToast(removal);
+        removeTaskWithTransition(removal.taskRow);
+      }
+
+      function restoreTask(undoId) {
+        const removal = pendingRemovals.get(undoId);
+
+        if (!removal) {
+          return;
+        }
+
+        window.clearTimeout(removal.timeoutId);
+        pendingRemovals.delete(undoId);
+        removeUndoToast(removal);
+
+        const taskRow = removal.taskRow;
+
+        const checkbox = taskRow.querySelector('.task-checkbox');
+        const taskTitle = taskRow.querySelector('.task-title');
+
+        if (checkbox instanceof HTMLInputElement) {
+          checkbox.checked = false;
+          checkbox.disabled = false;
+        }
+
+        if (taskTitle) {
+          taskTitle.classList.remove('line-through', 'text-stone-400', 'dark:text-neutral-500');
+        }
+
+        taskRow.classList.remove('opacity-70');
+      }
+
+      if (undoStack) {
+        undoStack.addEventListener('click', (event) => {
+          const button = event.target instanceof Element
+            ? event.target.closest('.todays-tasks-undo-button')
+            : null;
+
+          if (!(button instanceof HTMLButtonElement)) {
+            return;
+          }
+
+          const undoId = button.dataset.undoId;
+
+          if (!undoId) {
+            return;
+          }
+
+          restoreTask(undoId);
+        });
+      }
+
+      list.addEventListener('change', (event) => {
+        const target = event.target;
+
+        if (!(target instanceof HTMLInputElement) || !target.classList.contains('task-checkbox') || !target.checked) {
+          return;
+        }
+
+        const taskRow = target.closest('[data-task-row]');
+
+        if (!taskRow) {
+          return;
+        }
+
+        const taskTitle = taskRow.querySelector('.task-title');
+
+        if (taskTitle) {
+          taskTitle.classList.add('line-through', 'text-stone-400', 'dark:text-neutral-500');
+        }
+
+        taskRow.classList.add('opacity-70');
+        target.disabled = true;
+
+        const undoId = `todo-undo-${++undoSequence}`;
+        const timeoutId = window.setTimeout(() => {
+          finalizePendingRemoval(undoId);
+        }, 3000);
+
+        const taskMessage = taskTitle ? taskTitle.textContent?.replace(/\s+/g, ' ').trim() : 'Task completed';
+        let toastElement = null;
+
+        if (undoTemplate && undoStack) {
+          const templateToast = undoTemplate.firstElementChild;
+
+          if (templateToast) {
+            toastElement = templateToast.cloneNode(true);
+            const toastText = toastElement.querySelector('.todays-tasks-undo-text');
+            const toastButton = toastElement.querySelector('.todays-tasks-undo-button');
+            const toastClose = toastElement.querySelector('.todays-tasks-toast-close');
+            const toastId = `todays-tasks-toast-${undoId}`;
+
+            toastElement.id = toastId;
+
+            if (toastText) {
+              toastText.innerHTML = `Marked as completed <span class="font-semibold text-gray-900 dark:text-white">${taskMessage}</span>`;
+            }
+
+            if (toastButton) {
+              toastButton.dataset.undoId = undoId;
+            }
+
+            if (toastClose instanceof HTMLButtonElement) {
+              toastClose.dataset.hsRemoveElement = `#${toastId}`;
+            }
+
+            undoStack.prepend(toastElement);
+          }
+        }
+
+        pendingRemovals.set(undoId, { timeoutId, taskRow, toastElement });
+      });
+
+      updateTaskCount();
+    }
+
+    // ============================================================================
+    // MAIN ENTRY POINT
+    // ============================================================================
+    window.addEventListener('load', () => {
+      requestAnimationFrame(() => {
+        initializeDatePicker();
+        initializeTodaysTasks();
+      });
+    });
+  })();
+</script>
