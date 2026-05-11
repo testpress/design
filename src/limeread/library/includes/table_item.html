@@ -24,18 +24,7 @@
                     {{ book.title }}
                   </a>
                   
-                  {% if book.status == 'ACTIVE' and book.activity.waitlist_count > 0 %}
-                  <div x-data="{ showFireTooltip: false }" class="relative inline-flex items-center">
-                    <span @mouseenter="showFireTooltip = true" @mouseleave="showFireTooltip = false" class="text-xs cursor-help">🔥</span>
-                    
-                    <!-- Tooltip -->
-                    <div x-show="showFireTooltip" x-cloak x-transition.opacity
-                      class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-[10px] rounded shadow-lg whitespace-nowrap z-50">
-                      High Demand
-                      <div class="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
-                    </div>
-                  </div>
-                  {% endif %}
+
 
                   {% if book.status != "ACTIVE" %}
                     <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium 
@@ -48,6 +37,33 @@
                       {% endif %}">
                       {{ book.status | capitalize }}
                     </span>
+                  {% else %}
+                    <!-- Near Limit Logic -->
+                    {% set usage_pct = 0 %}
+                    {% if book.license.type == 'CONCURRENT' %}
+                      {% set usage_pct = (book.license.active_readers / book.license.concurrent_limit * 100) if book.license.concurrent_limit > 0 else 0 %}
+                    {% elif book.license.type == 'BORROW_LIMIT' %}
+                      {% set usage_pct = (book.license.used_borrows / book.license.borrow_limit * 100) if book.license.borrow_limit > 0 else 0 %}
+                    {% endif %}
+
+                    {% if usage_pct >= 80 and usage_pct < 100 %}
+                      <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-orange-100 text-orange-800 dark:bg-orange-500/10 dark:text-orange-500">
+                        Near Limit
+                      </span>
+                    {% endif %}
+
+                    <!-- Expiring Soon Logic -->
+                    {% if book.license.type == 'TIME_BASED' or book.license.type == 'MULTI_RULE' %}
+                      {% set exp_str = book.license.expires_in %}
+                      {% if exp_str and 'day' in exp_str and '-' not in exp_str %}
+                        {% set days = exp_str.split(' ')[0] | int %}
+                        {% if days <= 30 %}
+                          <span class="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-500/10 dark:text-yellow-500">
+                            Expiring Soon
+                          </span>
+                        {% endif %}
+                      {% endif %}
+                    {% endif %}
                   {% endif %}
                 </div>
                 <ul class="flex flex-wrap items-center whitespace-nowrap gap-1.5">
@@ -56,33 +72,136 @@
                                     {{ book.author }}
                                   </p>
                                 </li>
-                                <li class="inline-flex items-center relative text-sm text-muted-foreground-1 pe-2 last:pe-0 last:after:hidden after:absolute after:top-1/2 after:end-0 after:inline-block after:size-[3px] after:bg-surface-3 after:rounded-full after:-translate-y-1/2">
+                                <li class="inline-flex items-center relative text-sm text-muted-foreground-1">
                                   <p class="text-sm text-muted-foreground-1">
                                     {{ book.subject.name }}
                                   </p>
+                                </li>
+                                <!-- License Info Popover -->
+                                <li class="inline-flex items-center ml-0.5">
+                                  <div x-data="{ 
+                                    open: false,
+                                    coords: { top: 0, left: 0 },
+                                    togglePopover(e) {
+                                      this.open = !this.open;
+                                      if (this.open) {
+                                        const rect = e.target.closest('button').getBoundingClientRect();
+                                        this.coords.top = rect.top + (rect.height / 2);
+                                        this.coords.left = rect.right + 12;
+                                      }
+                                    }
+                                  }" class="inline-flex">
+                                    <button @click="togglePopover($event)" type="button" class="opacity-75 text-muted-foreground-1 hover:text-foreground transition-colors focus:outline-none">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 shrink-0"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                                    </button>
+
+                                    <!-- Fixed Positioned Popover (Card Style) -->
+                                    <div x-show="open" 
+                                         x-cloak 
+                                         @click.away="open = false"
+                                         @scroll.window="open = false"
+                                         x-transition:enter="transition ease-out duration-200"
+                                         x-transition:enter-start="opacity-0 translate-x-1"
+                                         x-transition:enter-end="opacity-100 translate-x-0"
+                                         x-transition:leave="transition ease-in duration-150"
+                                         x-transition:leave-start="opacity-100 translate-x-0"
+                                         x-transition:leave-end="opacity-0 translate-x-1"
+                                         :style="`position: fixed; top: ${coords.top}px; left: ${coords.left}px; transform: translateY(-50%);`"
+                                         class="z-[100] w-72 pointer-events-auto">
+                                      
+                                      <!-- Card Container -->
+                                      <div class="flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xl rounded-xl overflow-hidden">
+                                        <!-- Header -->
+                                        <div class="py-3 px-5 border-b border-gray-200 dark:border-neutral-700">
+                                          <h2 class="font-medium text-foreground">
+                                            License Overview
+                                          </h2>
+                                        </div>
+                                        <!-- End Header -->
+ 
+                                        <!-- Body -->
+                                        <div class="p-5">
+                                          <div class="mb-3">
+                                            <p class="font-semibold text-sm text-foreground">
+                                              License rules
+                                            </p>
+                                          </div>
+                                          
+                                          <div class="flex flex-wrap gap-2">
+                                            {% if book.license.type == 'CONCURRENT' %}
+                                              <span class="p-2 bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300 text-xs rounded-md inline-flex items-center gap-x-2">
+                                                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                                {{ book.license.concurrent_limit }} Readers
+                                              </span>
+                                            {% elif book.license.type == 'BORROW_LIMIT' %}
+                                              <span class="p-2 bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300 text-xs rounded-md inline-flex items-center gap-x-2">
+                                                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                                {{ book.license.borrow_limit }} Borrows
+                                              </span>
+                                            {% elif book.license.type == 'TIME_BASED' %}
+                                              <span class="p-2 bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300 text-xs rounded-md inline-flex items-center gap-x-2">
+                                                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                                {{ book.license.expires_in }} Left
+                                              </span>
+                                            {% elif book.license.type == 'MULTI_RULE' %}
+                                              {% for rule in book.license.rules %}
+                                                <span class="p-2 bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300 text-xs rounded-md inline-flex items-center gap-x-2">
+                                                  {% if rule.type == 'CONCURRENT' %}
+                                                    <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                                    {{ rule.limit }} Readers
+                                                  {% elif rule.type == 'TIME_BASED' %}
+                                                    <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                                    {{ rule.expires_in }} Left
+                                                  {% elif rule.type == 'BORROW_LIMIT' %}
+                                                    <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                                    {{ rule.limit }} Borrows
+                                                  {% endif %}
+                                                </span>
+                                              {% endfor %}
+                                            {% endif %}
+                                            
+                                            <!-- Example Duration Tag (Static for now if not in data) -->
+                                            <span class="p-2 bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300 text-xs rounded-md inline-flex items-center gap-x-2">
+                                              <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/></svg>
+                                              14 Day Borrow
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <!-- End Body -->
+                                      </div>
+                                        <!-- End Body -->
+                                      </div>
+                                      <!-- End Card Container -->
+                                      
+                                      <!-- Arrow (Fitted to card boundary) -->
+                                      <div class="absolute top-1/2 left-0 -translate-y-1/2 -ml-1.5 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-l border-gray-200 dark:border-neutral-700 rotate-45 z-[-1]"></div>
+                                    </div>
+                                  </div>
                                 </li>
                               </ul>
               </div>
             </div>
             </td>
             <td class="size-px whitespace-nowrap px-6 py-1">
-              {% if book.publisher.name and book.publisher.name != 'No Publisher' %}
-                <a class="text-sm text-gray-600 dark:text-neutral-300 hover:cursor-pointer hover:underline">
-                  {{ book.publisher.name }}
-                </a>
-              {% else %}
-                <span class="text-sm text-gray-400 dark:text-neutral-600">-</span>
-              {% endif %}
-            </td>
-            <td class="size-px whitespace-nowrap px-6 py-1">
               {% if book.access.visibility == "PUBLIC" %}
-                <span class="rounded-md px-2 py-1 text-xs bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
+                <span class="rounded-md px-2 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200">
                   All Members
                 </span>
               {% else %}
-                <div x-data="{ open: false }" @mouseleave="open = false" class="relative inline-block">
+                <div x-data="{ 
+                  open: false, 
+                  position: 'bottom',
+                  checkSpace() {
+                    this.open = true;
+                    this.$nextTick(() => {
+                      const rect = this.$refs.popover.getBoundingClientRect();
+                      const spaceBelow = window.innerHeight - rect.top;
+                      this.position = spaceBelow < 250 ? 'top' : 'bottom';
+                    });
+                  }
+                }" @mouseleave="open = false" class="relative inline-block">
                   <span
-                    @mouseenter="open = true"
+                    @mouseenter="checkSpace()"
                     class="rounded-md px-2 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200 cursor-help"
                   >
                     {{ book.access.groups_count }}
@@ -97,13 +216,15 @@
                   <div 
                     x-show="open" 
                     x-cloak 
+                    x-ref="popover"
                     x-transition:enter="transition ease-out duration-200"
                     x-transition:enter-start="opacity-0 translate-y-1"
                     x-transition:enter-end="opacity-100 translate-y-0"
                     x-transition:leave="transition ease-in duration-150"
                     x-transition:leave-start="opacity-100 translate-y-0"
                     x-transition:leave-end="opacity-0 translate-y-1"
-                    class="absolute z-10 top-full left-1/2 -translate-x-1/2 pt-3 w-48"
+                    :class="position === 'bottom' ? 'top-full pt-3' : 'bottom-full pb-3'"
+                    class="absolute z-10 left-1/2 -translate-x-1/2 w-48"
                   >
                     <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-lg p-3">
                       <ul class="space-y-1 list-disc ps-4">
@@ -116,128 +237,70 @@
                         {% endfor %}
                       </ul>
                     </div>
-                    <!-- Arrow (Flipped to top of the content box) -->
-                    <div class="absolute top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-l border-gray-200 dark:border-neutral-700 rotate-45"></div>
+                    <!-- Arrow -->
+                    <div :class="position === 'bottom' ? 'top-1.5 border-t border-l' : 'bottom-1.5 border-b border-r'" class="absolute left-1/2 -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rotate-45"></div>
                   </div>
                 </div>
               {% endif %}
             </td>
 
             <td class="size-px whitespace-nowrap px-6 py-1">
-              <span class="text-sm text-gray-800 dark:text-neutral-200">
-                {% if book.status == 'DRAFT' %}
-                  -
-                {% elif book.license.type == 'CONCURRENT' %}
-                  {{ book.license.concurrent_limit }} Max Readers
-                {% elif book.license.type == 'TIME_BASED' %}
-                  {% if book.license.valid_until %}
-                    Expires on {{ book.license.valid_until | formatDate }}
-                  {% else %}
-                    Expires in {{ book.license.expires_in }}
-                  {% endif %}
-                {% elif book.license.type == 'BORROW_LIMIT' %}
-                  {{ book.license.borrow_limit }} Borrow Limit
-                {% elif book.license.type == 'UNLIMITED' %}
-                  Unlimited
-                {% else %}
-                  -
-                {% endif %}
-              </span>
-            </td>
-
-            <!-- Activity Column -->
-            <td class="size-px whitespace-nowrap px-6 py-3">
-              {% if book.status == 'DRAFT' %}
-                <span class="text-sm text-gray-400 dark:text-neutral-600">-</span>
-              {% elif book.license.type == 'UNLIMITED' %}
-                <div class="flex items-center gap-x-2 text-gray-400 dark:text-neutral-600">
-                  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                  <span class="text-sm font-medium">Unlimited</span>
-                </div>
+              {% if book.publisher.name and book.publisher.name != 'No Publisher' %}
+                <a class="text-sm text-muted-foreground-2 hover:cursor-pointer hover:underline">
+                  {{ book.publisher.name }}
+                </a>
               {% else %}
-                {% set limit_val = 0 %}
-                {% set active_val = 0 %}
-                {% set color_class = "emerald" %}
-                
-                {% if book.license.type == 'CONCURRENT' %}
-                  {% set limit_val = book.license.concurrent_limit | default(0) %}
-                  {% set active_val = book.license.active_readers | default(0) %}
-                  {% if active_val >= limit_val or book.activity.waitlist_count > 0 %}
-                    {% set color_class = "orange" %}
-                  {% else %}
-                    {% set color_class = "emerald" %}
-                  {% endif %}
-                {% elif book.license.type == 'BORROW_LIMIT' %}
-                  {% set limit_val = book.license.borrow_limit | default(1) %}
-                  {% set active_val = book.activity.total_borrows | default(0) %}
-                  {% if active_val >= limit_val %}
-                    {% set color_class = "orange" %}
-                  {% else %}
-                    {% set color_class = "emerald" %}
-                  {% endif %}
-                {% elif book.license.type == 'TIME_BASED' %}
-                  {% set active_val = book.activity.active_borrows | default(0) %}
-                  {% set color_class = "emerald" %}
-                {% endif %}
-
-                <div class="flex flex-col gap-y-1.5 min-w-[150px]">
-                  <!-- Numbers Row (Top) -->
-                  <ul class="flex flex-wrap items-center text-[13px] text-muted-foreground-1 list-none m-0 p-0 font-medium whitespace-nowrap">
-                    <li>
-                      <a href="#" class="flex items-center gap-x-1 hover:underline cursor-pointer">
-                        <span class="text-foreground">
-                          {{ active_val }}
-                        </span>
-                        <span>Active</span>
-                      </a>
-                    </li>
-
-                    {% if book.license.type == 'CONCURRENT' and book.activity.waitlist_count > 0 %}
-                      <li class="mx-2 opacity-40">|</li>
-                      <li>
-                        <a href="#" class="flex items-center gap-x-1 text-orange-600 dark:text-orange-400 hover:underline cursor-pointer">
-                          <span>{{ book.activity.waitlist_count }}</span>
-                          <span>Waitlisted</span>
-                        </a>
-                      </li>
-                    {% elif book.license.type == 'TIME_BASED' %}
-                      <li class="mx-2 opacity-40">|</li>
-                      <li class="flex items-center gap-x-1">
-                        {% if book.license.expires_in and book.license.expires_in[0] == '-' %}
-                          <span class="text-orange-600 dark:text-orange-400">Expired</span>
-                        {% else %}
-                          <span class="text-foreground">{{ book.license.expires_in }}</span>
-                          <span>Left</span>
-                        {% endif %}
-                      </li>
-                    {% endif %}
-                  </ul>
-
-                  <!-- Progress Bar Row (Bottom) -->
-                  <div class="h-1.5 w-full bg-gray-100 dark:bg-neutral-700 rounded-full overflow-hidden">
-                    {% set bar_width = 0 %}
-                    {% if book.license.type == 'TIME_BASED' %}
-                      {% set bar_width = 40 %}
-                    {% else %}
-                      {% set bar_width = (active_val / limit_val * 100) | round if limit_val > 0 else 0 %}
-                    {% endif %}
-                    <div class="h-full transition-all duration-500 rounded-full
-                      {% if color_class == 'orange' %}bg-orange-400
-                      {% else %}bg-emerald-500{% endif %}"
-                      style="width: {{ bar_width if bar_width <= 100 else 100 }}%"></div>
-                  </div>
-                </div>
+                <span class="text-sm text-muted-foreground-1">-</span>
               {% endif %}
             </td>
 
-            <td class="size-px whitespace-nowrap px-6 py-3">
-              {% if book.status == 'DRAFT' %}
-                <span class="text-sm text-gray-400 dark:text-neutral-600">-</span>
-              {% else %}
-                <span class="text-sm text-gray-500 dark:text-neutral-500">
-                  {{ book.activity.total_borrows }}
+            <td class="size-px whitespace-nowrap px-6 py-1">
+              {% if book.status != 'ACTIVE' %}
+                <span class="text-sm text-muted-foreground-1 ps-2">
+                  -
                 </span>
+              {% else %}
+                {% set health = 'healthy' %}
+                {% if book.license.type == 'TIME_BASED' and book.license.expires_in and book.license.expires_in[0] == '-' %}
+                  {% set health = 'exhausted' %}
+                {% elif book.license.type == 'BORROW_LIMIT' and book.license.used_borrows >= book.license.borrow_limit %}
+                  {% set health = 'exhausted' %}
+                {% elif book.activity.waitlist_count > 0 %}
+                  {% set health = 'waitlisted' %}
+                {% elif book.license.type == 'CONCURRENT' and book.license.active_readers >= book.license.concurrent_limit %}
+                  {% set health = 'at_capacity' %}
+                {% endif %}
+
+                <div class="inline-block">
+                  {% if health == 'healthy' %}
+                    <span class="py-1.5 ps-1.5 pe-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium bg-emerald-100 text-emerald-800 rounded-full dark:bg-emerald-500/10 dark:text-emerald-500">
+                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                      Healthy
+                    </span>
+                  {% elif health == 'at_capacity' %}
+                    <span class="py-1.5 ps-1.5 pe-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium bg-orange-100 text-orange-800 rounded-full dark:bg-orange-500/10 dark:text-orange-500">
+                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      At Capacity
+                    </span>
+                  {% elif health == 'waitlisted' %}
+                    <span class="py-1.5 ps-1.5 pe-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium bg-red-100 text-red-800 rounded-full dark:bg-red-500/10 dark:text-red-500">
+                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                      Waitlisted
+                    </span>
+                  {% elif health == 'exhausted' %}
+                    <span class="py-1.5 ps-1.5 pe-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium bg-red-100 text-red-800 rounded-full dark:bg-red-500/10 dark:text-red-500">
+                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7.86 2h8.28L22 7.86v8.28L16.14 22H7.86L2 16.14V7.86L7.86 2z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Exhausted
+                    </span>
+                  {% endif %}
+                </div>
               {% endif %}
+            </td>
+
+            <td class="size-px whitespace-nowrap px-6 py-3">
+              <span class="text-sm text-muted-foreground-2">
+                {{ book.updated_at }}
+              </span>
             </td>
 
 
