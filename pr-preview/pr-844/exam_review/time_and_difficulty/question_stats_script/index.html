@@ -1,0 +1,95 @@
+
+<script>
+  function examAnalyticsComponent() {
+    return {
+      sections: [],
+      selectedSectionId: '',
+      selectedSection: null,
+      filteredQuestions: [],
+      filters: { status: 'all', difficulty: 'all' },
+      searchQuery: '',
+      sortKey: '',
+      sortAsc: true,
+      appliedFilterCount: 0,
+      isloading:true,
+
+      async init() {
+        this.isloading = true;
+        const previewPath = window.location.pathname.match(/(\/pr-preview\/pr-\d+)?/)[0] || '' 
+        const response = await fetch(`${previewPath}/api/exam/user_selected_answer.json`);
+        const data = await response.json();
+        this.sections = data;
+        this.selectedSectionId = data[0]?.section_id || '';
+        this.changeSection();
+        this.isloading = false;
+      },
+
+      changeSection() {
+        this.selectedSection = this.sections.find(s => s.section_id === this.selectedSectionId);
+        this.applyFilters();
+      },
+
+      applyFilters() {
+        let questions = this.selectedSection?.user_answers || [];
+
+        questions = this.filterQuestions(questions);
+        questions = this.sortQuestions(questions);
+
+        questions.forEach(q => q.showFull = false);
+
+        this.filteredQuestions = questions;
+
+        this.appliedFilterCount = 0;
+        if (this.filters.status !== 'all') this.appliedFilterCount++;
+        if (this.filters.difficulty !== 'all') this.appliedFilterCount++;
+      },
+
+      filterQuestions(questions) {
+        return questions.filter(q => {
+          const matchStatus = this.filters.status === 'all' || q.status === this.filters.status;
+          const matchDifficulty = this.filters.difficulty === 'all' || q.difficulty_level === this.filters.difficulty;
+          const matchSearch =
+            !this.searchQuery ||
+            q.question_text.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+            q.question_number.includes(this.searchQuery);
+
+          return matchStatus && matchDifficulty && matchSearch;
+        });
+      },
+
+      sortQuestions(questions) {
+        if (!this.sortKey) return questions;
+
+        return questions.slice().sort((a, b) => {
+          const aVal = a[this.sortKey];
+          const bVal = b[this.sortKey];
+
+          if (aVal == null && bVal == null) return 0;
+          if (aVal == null) return 1;
+          if (bVal == null) return -1;
+
+          return this.sortAsc ? aVal - bVal : bVal - aVal;
+        });
+      },
+
+      clearFilters() {
+        this.filters.status = 'all';
+        this.filters.difficulty = 'all';
+        this.searchQuery = '';
+        this.sortKey = '';
+        this.sortAsc = true;
+        this.applyFilters();
+      },
+
+      sortBy(key, asc = null) {
+        if (this.sortKey === key && asc === null) {
+          this.sortAsc = !this.sortAsc;
+        } else {
+          this.sortKey = key;
+          this.sortAsc = asc !== null ? asc : true;
+        }
+        this.applyFilters();
+      }
+    };
+  }
+</script>
