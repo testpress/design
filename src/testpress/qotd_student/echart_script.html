@@ -1,0 +1,84 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+
+<script>
+  function renderDonutChart(chartId, seriesData, seriesLabels) {
+    const chartDom = document.querySelector(chartId);
+    if (!chartDom) return;
+    
+    // Dispose old instance if exists
+    let myChart = echarts.getInstanceByDom(chartDom);
+    if (myChart) {
+      myChart.dispose();
+    }
+    
+    myChart = echarts.init(chartDom);
+    const isDarkMode = document.documentElement.classList.contains('dark');
+    
+    // Map stats to ECharts data format
+    const data = seriesLabels.map((name, index) => ({
+      value: seriesData[index],
+      name: name,
+      itemStyle: {
+        color: index === 0 ? '#22c55e' : (index === 1 ? '#ef4444' : '#f97316')
+      }
+    }));
+
+    const option = {
+      tooltip: {
+        trigger: 'item',
+        backgroundColor: isDarkMode ? '#171717' : '#ffffff',
+        borderColor: isDarkMode ? '#3f3f46' : '#e4e4e7',
+        textStyle: {
+          color: isDarkMode ? '#e5e5e5' : '#18181b'
+        }
+      },
+      series: [
+        {
+          name: 'Questions',
+          type: 'pie',
+          radius: ['55%', '85%'],
+          avoidLabelOverlap: false,
+          padAngle: 5,
+          itemStyle: {
+            borderRadius: 6
+          },
+          label: {
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: 20,
+              fontWeight: 'bold',
+              color: isDarkMode ? '#e5e5e5' : '#18181b',
+              formatter: '{d}%'
+            }
+          },
+          labelLine: {
+            show: false
+          },
+          data: data
+        }
+      ]
+    };
+
+    option && myChart.setOption(option);
+
+    // Responsive
+    window.addEventListener('resize', () => {
+      myChart.resize();
+    });
+  }
+
+  window.addEventListener('load', () => {
+    {% for state_key, state_val in qotd_student_progress.states %}
+    const stats_{{ state_key }} = [
+      {{ state_val.stats.correct | default(0) }},
+      {{ state_val.stats.incorrect | default(0) }},
+      {{ state_val.stats.unanswered | default(0) }}
+    ];
+    renderDonutChart('#hs-pie-chart-{{ state_val.status }}', stats_{{ state_key }}, ['Correct', 'Incorrect', 'Unanswered']);
+    {% endfor %}
+  });
+</script>

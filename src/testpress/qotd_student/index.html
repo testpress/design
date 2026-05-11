@@ -7,7 +7,8 @@ new_student_page: true
 
 
 {% extends "src/testpress/layout/student_layout.html" %}
-{% set current_state = qotd_student_progress.states.in_progress %}
+{% set state = query.state or "in_progress" %}
+{% set current_state = qotd_student_progress.states[state] %}
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock body_class %}
 
 {% block extra_head %}
@@ -22,22 +23,27 @@ new_student_page: true
 {% endblock extra_head %}
 
 {% block main_content %}
-<div x-data="qotdDashboard()" class="max-w-7xl mx-auto lg:px-8 space-y-8" x-cloak>
+<div x-data="qotdDashboard()" class="max-w-7xl mx-auto lg:px-8 space-y-8" x-cloak x-init="state = new URLSearchParams(window.location.search).get('state') || '{{ state }}'">
   
   <!-- Header -->
   <div>
     {% include "./header.html" %}
   </div>
 
-  <!-- Main Content Card -->
-  {% include "./dashboard.html" %}
+  <!-- Main Content Card (Rendered for each state) -->
+  {% for state_key, state_val in qotd_student_progress.states %}
+    <div x-show="state === '{{ state_key }}'">
+      {% set current_state = state_val %}
+      {% include "./dashboard.html" %}
 
-  <!-- Start Exam Button -->
-  <div class="flex justify-center mt-6">
-    <button @click="startQuiz()" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
-      {{ current_state.button_label }}
-    </button>
-  </div>
+      <!-- Start Exam Button -->
+      <div class="flex justify-center mt-6">
+        <button @click="isQuizOpen = true" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
+          {{ current_state.button_label }}
+        </button>
+      </div>
+    </div>
+  {% endfor %}
 
   <!-- Quiz Modal Overlay -->
   {% include "./quiz.html" %}
@@ -45,10 +51,11 @@ new_student_page: true
 </div>
 {% endblock main_content %}
 {% block script %} 
-{% include "./apex_chart_script.html" %}
+{% include "./echart_script.html" %}
 <script>
   function qotdDashboard() {
     return {
+      state: 'in_progress',
       isQuizOpen: false,
       showSummary: false,
       currentIndex: 0,
@@ -130,6 +137,17 @@ new_student_page: true
         } else {
           this.endQuiz();
         }
+      },
+
+      startQuiz() {
+        this.isQuizOpen = true;
+        this.currentIndex = 0;
+        this.showSummary = false;
+        this.selectedIdx = null;
+        this.hasAnswered = false;
+        this.correctAnswers = 0;
+        this.userAnswers = Array(this.questions.length).fill(null);
+        document.body.style.overflow = 'hidden';
       },
 
       previousQuestion() {
