@@ -116,25 +116,23 @@
     <div class="py-3 grid grid-cols-3 border-y border-gray-200 dark:border-neutral-700 divide-x divide-gray-200 dark:divide-neutral-700">
       <!-- Item -->
       <div class="px-4">
-                <p class="text-sm text-gray-500 dark:text-neutral-400">
+        <p class="text-sm text-gray-500 dark:text-neutral-400">
           Active
         </p>
         <p class="font-semibold text-sm text-gray-800 dark:text-neutral-200">
-          8/10
+          {{ book.active_readers or 0 }}{% if book.concurrent_limit %}/{{ book.concurrent_limit }}{% endif %}
         </p>
-
       </div>
       <!-- End Item -->
 
       <!-- Item -->
       <div class="px-4">
         <p class="text-sm text-gray-500 dark:text-neutral-400">
-          Total Barrows
+          Total Borrows
         </p>
         <p class="font-semibold text-sm text-gray-800 dark:text-neutral-200">
-          200
+          {{ book.total_borrows or 0 }}
         </p>
-
       </div>
       <!-- End Item -->
 
@@ -143,8 +141,8 @@
         <p class="text-sm text-gray-500 dark:text-neutral-400">
           Waitlist
         </p>
-        <p class="font-semibold text-sm text-orange-600 dark:text-neutral-200">
-          14
+        <p class="font-semibold text-sm {% if book.waitlist_count > 0 %}text-orange-600{% else %}text-gray-800 dark:text-neutral-200{% endif %}">
+          {{ book.waitlist_count or 0 }}
         </p>
       </div>
       <!-- End Item -->
@@ -172,8 +170,8 @@
     </div>
 
     <div class="grow text-end">
-      <p class="font-medium text-sm text-gray-900">
-        10 Readers
+      <p class="font-medium text-sm text-gray-900 dark:text-neutral-200">
+        {{ book.concurrent_limit or 'Unlimited' }}
       </p>
     </div>
   </div>
@@ -194,8 +192,8 @@
     </div>
 
     <div class="grow text-end">
-      <p class="font-medium text-sm text-gray-900">
-        100 Borrows
+      <p class="font-medium text-sm text-gray-900 dark:text-neutral-200">
+        {{ book.borrow_limit or 'Unlimited' }}
       </p>
     </div>
   </div>
@@ -216,8 +214,8 @@
     </div>
 
     <div class="grow text-end">
-      <p class="font-medium text-sm text-gray-900">
-        14 Days
+      <p class="font-medium text-sm text-gray-900 dark:text-neutral-200">
+        {{ book.borrow_duration or '14 Days' }}
       </p>
     </div>
   </div>
@@ -242,8 +240,8 @@
     </div>
 
     <div class="grow text-end">
-      <p class="font-medium text-sm text-orange-600">
-        10 Days
+      <p class="font-medium text-sm {% if book.expires_in and '-' in book.expires_in %}text-red-500{% elif book.expires_in and 'day' in book.expires_in %}text-orange-600{% else %}text-gray-900 dark:text-neutral-200{% endif %}">
+        {{ book.expires_in or '-' }}
       </p>
     </div>
   </div>
@@ -251,6 +249,7 @@
 </div>
     <!-- End Grid -->
 
+    {% if book.utilization_percentage != null %}
     <!-- Footer -->
     <div class="mt-auto py-3 px-4 flex items-center border-t border-gray-200 dark:border-neutral-700">
       <span class="flex justify-center items-center gap-x-1 text-sm sm:text-[13px] text-gray-500 dark:text-neutral-400">
@@ -259,18 +258,21 @@
       </span>
 
 
+      {% set usage = book.utilization_percentage %}
+      
       <!-- Progress -->
       <div class="ms-auto w-1/2 flex items-center gap-x-1 whitespace-nowrap">
-        <div class="flex w-full h-1 bg-gray-200 dark:bg-neutral-600 rounded-full overflow-hidden" role="progressbar" aria-valuenow="38" aria-valuemin="0" aria-valuemax="100">
-          <div class="flex flex-col justify-center rounded-full overflow-hidden bg-green-500 text-sm sm:text-[13px] text-white text-center whitespace-nowrap transition duration-500" style="width: 38%;"></div>
+        <div class="flex w-full h-1 bg-gray-200 dark:bg-neutral-600 rounded-full overflow-hidden" role="progressbar" aria-valuenow="{{ usage }}" aria-valuemin="0" aria-valuemax="100">
+          <div class="flex flex-col justify-center rounded-full overflow-hidden bg-primary text-sm sm:text-[13px] text-white text-center whitespace-nowrap transition duration-500" style="width: {{ usage }}%;"></div>
         </div>
         <div class="w-10 text-end -mt-0.5">
-          <span class="text-sm sm:text-[13px] text-gray-500 dark:text-neutral-400">38%</span>
+          <span class="text-sm sm:text-[13px] text-gray-500 dark:text-neutral-400">{{ usage }}%</span>
         </div>
       </div>
       <!-- End Progress -->
     </div>
     <!-- End Footer -->
+    {% endif %}
   </div>
                                         <!-- End Body -->
                                       </div>
@@ -364,13 +366,13 @@
                 </span>
               {% else %}
                 {% set health = 'healthy' %}
-                {% if book.license.type == 'TIME_BASED' and book.license.expires_in and book.license.expires_in[0] == '-' %}
+                {% if book.expires_in and book.expires_in[0] == '-' %}
                   {% set health = 'exhausted' %}
-                {% elif book.license.type == 'BORROW_LIMIT' and book.license.used_borrows >= book.license.borrow_limit %}
+                {% elif book.borrow_limit and book.used_borrows >= book.borrow_limit %}
                   {% set health = 'exhausted' %}
-                {% elif book.activity.waitlist_count > 0 %}
+                {% elif book.waitlist_count > 0 %}
                   {% set health = 'waitlisted' %}
-                {% elif book.license.type == 'CONCURRENT' and book.license.active_readers >= book.license.concurrent_limit %}
+                {% elif book.concurrent_limit and book.active_readers >= book.concurrent_limit %}
                   {% set health = 'at_capacity' %}
                 {% endif %}
 
