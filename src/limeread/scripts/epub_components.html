@@ -1,0 +1,114 @@
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('epubUpload', () => ({
+                status: 'idle', // idle, uploading, extracting, success, error
+                statusMessage: '',
+                fileName: '',
+                metadata: {
+                    title: '',
+                    author: '',
+                    isbn: '',
+                    publisher: '',
+                    cover: null
+                },
+
+                async handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    this.fileName = file.name;
+
+                    if (!file.name.toLowerCase().endsWith('.epub')) {
+                        this.status = 'error';
+                        this.statusMessage = 'Please select a valid .epub file';
+                        return;
+                    }
+
+                    this.status = 'uploading';
+                    this.statusMessage = 'Uploading...';
+
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    this.status = 'extracting';
+                    this.statusMessage = 'Extracting metadata...';
+
+                    try {
+                        // Check for ePub library (handling different potential global names)
+                        const epubLib = window.ePub || (window.epubjs ? window.epubjs.ePub : null);
+                        
+                        if (!epubLib) {
+                            console.error('EPUB.js not found in global scope');
+                            throw new Error('EPUB library failed to load. Please refresh the page.');
+                        }
+
+                        const book = epubLib(file);
+                        const metadata = await book.loaded.metadata;
+                        console.log('Full EPUB Metadata:', metadata);
+
+                        this.metadata.title = metadata.title || '';
+                        this.metadata.author = metadata.creator || '';
+                        this.metadata.publisher = metadata.publisher || '';
+                        
+                        if (metadata.identifier) {
+                            const ids = Array.isArray(metadata.identifier) ? metadata.identifier : [metadata.identifier];
+                            
+                            // 1. Try to find something explicitly marked as ISBN
+                            let isbnMatch = ids.find(id => {
+                                const val = (typeof id === 'string' ? id : id.value) || '';
+                                return val.toLowerCase().includes('isbn');
+                            });
+
+                            // 2. If no explicit ISBN, look for a 10-13 digit number that isn't a URL
+                            if (!isbnMatch) {
+                                isbnMatch = ids.find(id => {
+                                    const val = (typeof id === 'string' ? id : id.value) || '';
+                                    const isUrl = val.includes('http') || val.includes('urn:') || val.includes('url:');
+                                    const digits = val.replace(/[^0-9]/g, '');
+                                    return !isUrl && (digits.length === 10 || digits.length === 13);
+                                });
+                            }
+
+                            if (isbnMatch) {
+                                const raw = typeof isbnMatch === 'string' ? isbnMatch : isbnMatch.value;
+                                this.metadata.isbn = raw.replace(/ISBN\s*[:\-]?\s*/gi, '').trim();
+                            } else {
+                                this.metadata.isbn = ''; // Don't show URLs or UUIDs as ISBN
+                            }
+                        }
+
+                        try {
+                            const coverUrl = await book.coverUrl();
+                            if (coverUrl) {
+                                this.metadata.cover = coverUrl;
+                            }
+                        } catch (coverErr) {
+                            console.warn('Cover extraction failed:', coverErr);
+                        }
+
+                        this.status = 'success';
+                        this.statusMessage = 'Metadata extracted!';
+                        
+                    } catch (error) {
+                        console.error('EPUB Processing Error:', error);
+                        this.status = 'error';
+                        this.statusMessage = error.message || 'Failed to extract metadata';
+                    }
+                },
+
+                reset() {
+                    this.status = 'idle';
+                    this.statusMessage = '';
+                    this.fileName = '';
+                    this.metadata = {
+                        title: '',
+                        author: '',
+                        isbn: '',
+                        publisher: '',
+                        cover: null
+                    };
+                }
+            }));
+        });
+    </script>

@@ -1,3 +1,4 @@
+<div x-data="epubUpload" class="space-y-5">
             <div class="flex flex-col bg-card border border-card-line overflow-hidden rounded-xl shadow-2xs">
               <!-- Header -->
               <div class="py-3 px-5 flex justify-between items-center gap-x-5 border-b border-card-header">
@@ -31,7 +32,7 @@
               </span>
               <label for="hs-pro-epdupb" class="relative cursor-pointer bg-transparent font-semibold text-primary hover:text-primary-hover rounded-lg decoration-2 hover:underline focus-within:outline-hidden">
                 <span>browse</span>
-                <input id="hs-pro-epdupb" type="file" class="sr-only">
+                <input id="hs-pro-epdupb" type="file" class="sr-only" @change="handleFileSelect" accept=".epub">
               </label>
             </div>
 
@@ -40,6 +41,28 @@
             </p>
           </div>
         </div>
+
+        <!-- Progress Status -->
+        <template x-if="status !== 'idle'">
+          <div class="mt-4 p-4 bg-layer border border-layer-line rounded-xl flex items-center gap-x-3">
+            <div x-show="status === 'uploading' || status === 'extracting'" class="animate-spin inline-block size-4 border-[2px] border-current border-t-transparent text-primary rounded-full" role="status" aria-label="loading">
+              <span class="sr-only">Loading...</span>
+            </div>
+            <div x-show="status === 'success'" class="flex shrink-0 justify-center items-center size-5 bg-success/10 text-success rounded-full">
+              <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            </div>
+            <div x-show="status === 'error'" class="flex shrink-0 justify-center items-center size-5 bg-destructive/10 text-destructive rounded-full">
+                <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>
+            </div>
+            <div class="grow">
+              <p class="text-sm font-medium text-foreground" x-text="statusMessage"></p>
+              <p x-show="fileName" class="text-xs text-muted-foreground" x-text="fileName"></p>
+            </div>
+            <button x-show="status === 'success' || status === 'error'" @click="reset" type="button" class="text-xs font-medium text-primary hover:underline">
+              Clear
+            </button>
+          </div>
+        </template>
               </div>
               <!-- End Body -->
             </div>
@@ -62,8 +85,13 @@
 
                   <!-- Logo Upload Group -->
                   <div class="flex flex-wrap items-center gap-3 sm:gap-5">
-<div class="h-24 aspect-[2/3] shrink-0 flex items-center justify-center rounded-md bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700">
-                  <svg class="size-10 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>
+<div class="h-32 aspect-[2/3] shrink-0 flex items-center justify-center rounded-md bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 overflow-hidden">
+                    <template x-if="metadata.cover">
+                        <img :src="metadata.cover" class="size-full object-cover" alt="Cover Preview">
+                    </template>
+                    <template x-if="!metadata.cover">
+                        <svg class="size-10 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>
+                    </template>
                 </div>
 
                     <div class="grow">
@@ -95,7 +123,7 @@
                     <label for="hs-pro-epdsku" class="block mb-2 text-sm font-medium text-foreground">
                       Title <span class="text-red-500">*</span>
                     </label>
-                    <input id="hs-pro-epdsku" type="text" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+                    <input id="ebook-title" type="text" x-model="metadata.title" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
                   </div>
                   <!-- End Input -->
 
@@ -104,7 +132,7 @@
                     <label for="hs-pro-epdsku" class="block mb-2 text-sm font-medium text-foreground">
                       Author <span class="text-red-500">*</span>
                     </label>
-                    <input id="hs-pro-epdsku" type="text" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+                    <input id="ebook-author" type="text" x-model="metadata.author" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
                   </div>
                   <!-- End Input -->
                 </div>
@@ -114,7 +142,7 @@
                     <label for="hs-pro-epdsku" class="block mb-2 text-sm font-medium text-foreground">
                       ISBN 
                     </label>
-                    <input id="hs-pro-epdsku" type="text" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+                    <input id="ebook-isbn" type="text" x-model="metadata.isbn" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
                   </div>
                   <!-- End Input -->
 
@@ -123,10 +151,11 @@
                     <label for="hs-pro-epdsku" class="block mb-2 text-sm font-medium text-foreground">
                       Publisher <span class="text-red-500">*</span>
                     </label>
-                    <input id="hs-pro-epdsku" type="text" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+                    <input id="ebook-publisher" type="text" x-model="metadata.publisher" class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
                   </div>
                   <!-- End Input -->
                 </div>
     </div>
     <!-- End Body -->
+</div>
 </div>
