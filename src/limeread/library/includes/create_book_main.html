@@ -1,3 +1,5 @@
+
+
 <div x-data="epubUpload" class="space-y-5">
   <div class="flex flex-col bg-card border border-card-line overflow-hidden rounded-xl shadow-2xs">
     <!-- Header -->
@@ -12,7 +14,7 @@
     <div class="p-5">
       <!-- Upload Area -->
       <div x-show="status === 'idle'"
-        class="p-8 sm:p-12 flex justify-center bg-layer border border-dashed border-layer-line rounded-xl transition-all">
+        class="p-8 sm:p-12 flex justify-center bg-layer border border-dashed border-line-3 rounded-xl transition-all">
         <div class="text-center">
           <svg class="shrink-0 w-16 text-muted-foreground mx-auto" width="73" height="47" viewBox="0 0 73 47"
             fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -23,12 +25,12 @@
 
           <div class="mt-4 flex flex-wrap justify-center text-sm/6 text-muted-foreground-1">
             <span class="pe-1 font-medium text-foreground">
-              Drop your EPUB or PDF file here or
+              Drop your EPUB file here or
             </span>
             <label for="hs-pro-epdupb"
               class="relative cursor-pointer bg-transparent font-semibold text-primary hover:text-primary-hover rounded-lg decoration-2 hover:underline focus-within:outline-hidden">
               <span>browse</span>
-              <input id="hs-pro-epdupb" type="file" class="sr-only" @change="handleFileSelect" accept=".epub">
+              <input id="hs-pro-epdupb" type="file" class="sr-only" @change="handleFileSelect" accept=".epub,application/epub+zip,.pdf,application/pdf">
             </label>
           </div>
 
@@ -39,9 +41,9 @@
       </div>
 
       <!-- File Progress Card -->
-      <div x-show="status !== 'idle'" x-transition class="space-y-2">
+      <div x-show="status !== 'idle'" x-transition>
         <div class="p-3 bg-layer border border-layer-line rounded-xl">
-          <div class="flex gap-x-3" :class="status !== 'success' && 'mb-2'">
+          <div class="flex gap-x-3">
             <!-- File Icon -->
             <span
               class="shrink-0 size-10 flex justify-center items-center bg-layer border border-layer-line text-muted-foreground-1 rounded-lg">
@@ -61,8 +63,8 @@
                 <p class="text-sm font-medium text-foreground truncate max-w-[180px] sm:max-w-xs" x-text="fileName"></p>
 
                 <div class="flex items-center gap-x-2 ms-2">
-                  <!-- Cancel Button (Uploading) -->
-                  <template x-if="status !== 'success'">
+                  <!-- Cancel Button (Uploading/Extracting) -->
+                  <template x-if="status !== 'ready' && status !== 'error'">
                     <button @click="reset" type="button"
                       class="text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus:text-foreground"
                       title="cancel upload">
@@ -75,8 +77,8 @@
                       </svg>
                     </button>
                   </template>
-                  <!-- Replace File Link (Success) -->
-                  <template x-if="status === 'success'">
+                  <!-- Replace File Link (Success/Error) -->
+                  <template x-if="status === 'ready' || status === 'error'">
                     <label for="hs-pro-epdupb"
                       class="text-xs font-medium text-muted-foreground-1 hover:underline decoration-2 underline-offset-4 decoration-muted-foreground-1/30 transition-colors cursor-pointer focus-within:outline-hidden">
                       Replace file
@@ -89,14 +91,19 @@
           </div>
 
           <!-- Progress Bar (Hidden on Success) -->
-          <div x-show="status !== 'success'" class="flex items-center gap-x-3 whitespace-nowrap">
+          <div x-show="status !== 'ready' && status !== 'success'" class="mt-2 flex items-center gap-x-3 whitespace-nowrap">
             <div class="flex w-full h-2 bg-surface-1 rounded-full overflow-hidden" role="progressbar"
               :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
               <div
                 class="flex flex-col justify-center rounded-full overflow-hidden bg-primary text-xs text-primary-foreground text-center whitespace-nowrap transition-all duration-500"
-                :style="`width: ${progress}%`" :class="progress === 100 && 'bg-green-500'"></div>
+                :style="`width: ${progress}%`" 
+                :class="{ 
+                  'bg-green-500': status === 'ready', 
+                  'bg-red-500': status === 'error',
+                  'bg-primary': status !== 'ready' && status !== 'error'
+                }"></div>
             </div>
-            <div class="w-10 text-end">
+            <div class="w-10 text-end" x-show="status !== 'error'">
               <span class="text-sm text-foreground">
                 <span x-text="progress"></span>%
               </span>
@@ -106,7 +113,7 @@
       </div>
 
       <!-- Info Alert -->
-      <div x-show="status !== 'success'" x-transition class="mt-4 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-sm text-gray-600 dark:text-neutral-300 rounded-lg p-4" role="alert">
+      <div x-show="status !== 'ready' && status !== 'success' && status !== 'error'" x-transition class="mt-4 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-sm text-gray-600 dark:text-neutral-300 rounded-lg p-4" role="alert">
         <div class="flex">
           <div class="shrink-0">
             <svg class="shrink-0 size-4 mt-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
@@ -144,7 +151,7 @@
           <div
             class="h-32 aspect-[2/3] shrink-0 flex items-center justify-center rounded-md bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 overflow-hidden">
             <template x-if="metadata.cover">
-              <img :src="metadata.cover" class="size-full object-cover" alt="Cover Preview">
+              <img :src="metadata.cover" class="size-full" alt="Cover Preview">
             </template>
             <template x-if="!metadata.cover">
               <svg class="size-10 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24"
