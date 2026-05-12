@@ -1,0 +1,484 @@
+
+
+<div x-data="epubUpload" class="space-y-5">
+  <div class="flex flex-col bg-card border border-card-line overflow-hidden rounded-xl shadow-2xs">
+    <!-- Header -->
+    <div class="py-3 px-5 flex justify-between items-center gap-x-5 border-b border-card-header">
+      <h2 class="inline-block font-semibold text-foreground">
+        Ebook File
+      </h2>
+    </div>
+    <!-- End Header -->
+
+    <!-- Body -->
+    <div class="p-5">
+      <!-- Upload Area -->
+      <div x-show="status === 'idle'"
+        class="p-8 sm:p-12 flex justify-center bg-layer border border-dashed border-line-3 rounded-xl transition-all">
+        <div class="text-center">
+          <svg class="shrink-0 w-16 text-muted-foreground mx-auto" width="73" height="47" viewBox="0 0 73 47"
+            fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M54.519 40.4773V6.76876C54.519 3.92686 52.2121 1.62305 49.3664 1.62305H22.7076C19.8619 1.62305 17.555 3.92686 17.555 6.76876V40.4773M54.519 40.4773C54.519 43.3192 52.2121 45.6231 49.3664 45.6231H22.7076C19.8619 45.6231 17.555 43.3192 17.555 40.4773M54.519 40.4773L54.5189 34.6563L48.6564 28.3566L43.2612 34.6373C42.4421 35.5908 40.9662 35.5955 40.141 34.6472L30.3406 23.3844L17.555 36.9154V40.4773M6.20483 9.59424L17.707 7.6798V42.5188L12.6457 43.5828C9.25658 44.2954 5.94238 42.0892 5.29702 38.691L1.14643 16.8357C0.500082 13.4322 2.78322 10.1637 6.20483 9.59424ZM65.8691 9.59424L54.3669 7.6798V42.5188L59.4282 43.5828C62.8173 44.2954 66.1316 42.0892 66.7769 38.691L70.9274 16.8357C71.5738 13.4322 69.2907 10.1637 65.8691 9.59424ZM45.0584 15.3561C45.0584 17.7228 43.1372 19.6413 40.7673 19.6413C38.3974 19.6413 36.4762 17.7228 36.4762 15.3561C36.4762 12.9894 38.3974 11.0708 40.7673 11.0708C43.1372 11.0708 45.0584 12.9894 45.0584 15.3561Z"
+              stroke="currentColor" stroke-width="2"></path>
+          </svg>
+
+          <div class="mt-4 flex flex-wrap justify-center text-sm/6 text-muted-foreground-1">
+            <span class="pe-1 font-medium text-foreground">
+              Drop your EPUB file here or
+            </span>
+            <label for="hs-pro-epdupb"
+              class="relative cursor-pointer bg-transparent font-semibold text-primary hover:text-primary-hover rounded-lg decoration-2 hover:underline focus-within:outline-hidden">
+              <span>browse</span>
+              <input id="hs-pro-epdupb" type="file" class="sr-only" @change="handleFileSelect" accept=".epub,application/epub+zip,.pdf,application/pdf">
+            </label>
+          </div>
+
+          <p class="mt-1 text-xs text-muted-foreground">
+            Pick a file upto 100MB
+          </p>
+        </div>
+      </div>
+
+      <!-- File Progress Card -->
+      <div x-show="status !== 'idle'" x-transition>
+        <div class="p-3 bg-layer border border-layer-line rounded-xl">
+          <div class="flex gap-x-3">
+            <!-- File Icon -->
+            <span
+              class="shrink-0 size-10 flex justify-center items-center bg-layer border border-layer-line text-muted-foreground-1 rounded-lg">
+
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                class="lucide lucide-book-open-icon lucide-book-open">
+                <path d="M12 7v14" />
+                <path
+                  d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z" />
+              </svg>
+            </span>
+
+            <!-- Text & Actions -->
+            <div class="grow">
+              <div class="flex justify-between items-start">
+                <p class="text-sm font-medium text-foreground truncate max-w-[180px] sm:max-w-xs" x-text="fileName"></p>
+
+                <div class="flex items-center gap-x-2 ms-2">
+                  <!-- Cancel Button (Uploading/Extracting) -->
+                  <template x-if="status !== 'ready' && status !== 'error'">
+                    <button @click="reset" type="button"
+                      class="text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus:text-foreground"
+                      title="cancel upload">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                        class="shrink-0 size-4">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="m15 9-6 6" />
+                        <path d="m9 9 6 6" />
+                      </svg>
+                    </button>
+                  </template>
+                  <!-- Replace File Link (Success/Error) -->
+                  <template x-if="status === 'ready' || status === 'error'">
+                    <label for="hs-pro-epdupb"
+                      class="text-xs font-medium text-muted-foreground-1 hover:underline decoration-2 underline-offset-4 decoration-muted-foreground-1/30 transition-colors cursor-pointer focus-within:outline-hidden">
+                      Replace file
+                    </label>
+                  </template>
+                </div>
+              </div>
+              <p class="text-xs text-muted-foreground-1" x-text="fileSize"></p>
+            </div>
+          </div>
+
+          <!-- Progress Bar (Hidden on Success) -->
+          <div x-show="status !== 'ready' && status !== 'success'" class="mt-2 flex items-center gap-x-3 whitespace-nowrap">
+            <div class="flex w-full h-2 bg-surface-1 rounded-full overflow-hidden" role="progressbar"
+              :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
+              <div
+                class="flex flex-col justify-center rounded-full overflow-hidden bg-primary text-xs text-primary-foreground text-center whitespace-nowrap transition-all duration-500"
+                :style="`width: ${progress}%`" 
+                :class="{ 
+                  'bg-green-500': status === 'ready', 
+                  'bg-red-500': status === 'error',
+                  'bg-primary': status !== 'ready' && status !== 'error'
+                }"></div>
+            </div>
+            <div class="w-10 text-end" x-show="status !== 'error'">
+              <span class="text-sm text-foreground">
+                <span x-text="progress"></span>%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Info Alert -->
+      <div x-show="status !== 'ready' && status !== 'success' && status !== 'error'" x-transition class="mt-4 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-sm text-gray-600 dark:text-neutral-300 rounded-lg p-4" role="alert">
+        <div class="flex">
+          <div class="shrink-0">
+            <svg class="shrink-0 size-4 mt-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+          </div>
+          <div class="flex-1 md:flex md:justify-between ms-2">
+            <p class="text-sm">
+              Book metadata and cover image will be automatically extracted after upload. 
+              You can review and update the detected details before publishing.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Body -->
+  </div>
+
+  <div class="flex flex-col bg-card border border-card-line overflow-hidden rounded-xl shadow-2xs">
+    <!-- Header -->
+    <div class="py-3 px-5 flex justify-between items-center gap-x-5 border-b border-card-header">
+      <h2 class="inline-block font-semibold text-foreground">
+        Ebook Details
+      </h2>
+    </div>
+    <!-- End Header -->
+
+    <!-- Body -->
+    <div class="p-5 space-y-4">
+      <div>
+        <label class="block mb-2 text-sm font-medium text-foreground">
+          Cover Image
+        </label>
+
+        <!-- Logo Upload Group -->
+        <div class="flex flex-wrap items-center gap-3 sm:gap-5">
+          <div
+            class="h-42 aspect-[2/3] shrink-0 flex items-center justify-center rounded-md bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 overflow-hidden">
+            <template x-if="metadata.cover">
+              <img :src="metadata.cover" class="size-full" alt="Cover Preview">
+            </template>
+            <template x-if="!metadata.cover">
+              <svg class="size-10 text-gray-300 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24"
+                height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 7v14"></path>
+                <path
+                  d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z">
+                </path>
+              </svg>
+            </template>
+          </div>
+
+          <div class="grow">
+            <div class="flex items-center gap-x-2">
+              <button type="button"
+                class="py-2 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg bg-primary border border-primary-line text-primary-foreground hover:bg-primary-hover disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:border-primary-focus focus:ring-1 focus:ring-primary-focus">
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" x2="12" y1="3" y2="15"></line>
+                </svg>
+                Upload
+              </button>
+
+              <button type="button"
+                class="py-2 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg bg-layer border border-layer-line text-destructive shadow-2xs hover:bg-layer-hover disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-layer-focus">
+                Delete
+              </button>
+            </div>
+
+            <p class="mt-2 text-xs text-muted-foreground-1">
+              Your image should be portrait oriented, at least 600x900px, and JPG or PNG.
+            </p>
+          </div>
+        </div>
+        <!-- End Logo Upload Group -->
+      </div>
+      <!-- Row 1: Title & Author -->
+      <div class="grid sm:grid-cols-2 gap-3 sm:gap-5">
+        <div>
+          <label for="ebook-title" class="block mb-2 text-sm font-medium text-foreground">
+            Title <span class="text-red-500">*</span>
+          </label>
+          <input id="ebook-title" type="text" x-model="metadata.title" placeholder="e.g. Atomic Habits"
+            class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+        </div>
+        <div>
+          <label for="ebook-author" class="block mb-2 text-sm font-medium text-foreground">
+            Author <span class="text-red-500">*</span>
+          </label>
+          <input id="ebook-author" type="text" x-model="metadata.author" placeholder="e.g. James Clear"
+            class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+        </div>
+      </div>
+
+      <!-- Row 2: Publisher & Year -->
+      <div class="grid sm:grid-cols-2 gap-3 sm:gap-5">
+        <div x-data="{ 
+            open: false, 
+            search: '', 
+            position: 'bottom',
+            defaultOptions: ['Penguin Books', 'HarperCollins', 'Macmillan Publishers', 'Random House', 'Hachette', 'Simon & Schuster', 'Oxford University Press'],
+            toggle() {
+              this.open = !this.open;
+              if (this.open) {
+                this.$nextTick(() => {
+                  const trigger = this.$refs.publisherTrigger;
+                  const rect = trigger.getBoundingClientRect();
+                  const spaceBelow = window.innerHeight - rect.bottom;
+                  this.position = spaceBelow < 280 ? 'top' : 'bottom';
+                });
+              }
+            },
+            get filteredOptions() {
+              return this.defaultOptions.filter(o => o.toLowerCase().includes(this.search.toLowerCase()))
+            },
+            select(val) {
+              metadata.publisher = val;
+              this.open = false;
+              this.search = '';
+            }
+          }">
+          <label class="block mb-2 text-sm font-medium text-foreground">
+            Publisher <span class="text-red-500">*</span>
+          </label>
+          <div class="relative">
+            <div x-ref="publisherTrigger" @click="toggle()" 
+                 class="py-1.5 sm:py-2 px-3 flex items-center justify-between w-full bg-layer border border-layer-line rounded-lg sm:text-sm text-layer-foreground cursor-pointer hover:bg-layer-hover focus:outline-hidden transition-colors">
+              <span x-text="metadata.publisher || 'Select Publisher'" :class="!metadata.publisher && 'text-muted-foreground-1'"></span>
+              <svg class="shrink-0 size-4 text-muted-foreground-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+
+            <!-- Dropdown -->
+            <div x-show="open" @click.away="open = false" x-cloak x-transition
+                 :class="position === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1'"
+                 class="absolute z-50 w-full max-h-60 p-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden flex flex-col">
+              <div class="p-1">
+                <input type="text" x-model="search" placeholder="Search publishers..." class="block w-full text-xs sm:text-sm bg-layer border border-layer-line rounded-md text-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:ring-primary-focus py-1.5 px-2">
+              </div>
+              <div class="overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                <template x-if="detectedMetadata.publisher && !search">
+                  <div @click="select(detectedMetadata.publisher)" class="py-2 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md flex items-center justify-between">
+                    <div class="flex items-center gap-x-2 truncate">
+                      <span x-text="detectedMetadata.publisher" class="truncate font-medium"></span>
+                      <span class="py-0.5 px-1.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 shrink-0">Auto detected</span>
+                    </div>
+                    <template x-if="metadata.publisher === detectedMetadata.publisher">
+                      <svg class="shrink-0 size-3.5 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </template>
+                  </div>
+                </template>
+                <template x-for="option in filteredOptions" :key="option">
+                  <div @click="select(option)" class="py-2 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md flex items-center justify-between">
+                    <span x-text="option"></span>
+                    <template x-if="metadata.publisher === option">
+                      <svg class="shrink-0 size-3.5 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </template>
+                  </div>
+                </template>
+
+                <!-- 
+                DEVELOPER NOTE: Empty State Placeholder
+                Use this when the database has zero existing publishers.
+                <div class="py-10 px-3 text-center">
+                  <p class="text-sm text-gray-500 font-medium">No publishers available</p>
+                  <p class="text-xs text-muted-foreground-1 mt-1">Start typing to create a new publisher</p>
+                </div>
+                -->
+
+                <!-- No Results / Add New Publisher -->
+                <template x-if="filteredOptions.length === 0 && search">
+                  <div @click="select(search)" class="py-2.5 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md border-t border-gray-100 dark:border-neutral-800 mt-1">
+                    <div class="flex items-center gap-x-2">
+                      <svg class="shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                      <span>Add "<span x-text="search" class="font-medium"></span>" as new publisher</span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label for="ebook-pub-year" class="block mb-2 text-sm font-medium text-foreground">
+            Publication Year
+          </label>
+          <input id="ebook-pub-year" type="text" x-model="metadata.publication_year" placeholder="e.g. 2024"
+            class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+        </div>
+      </div>
+
+      <!-- Row 3: Language & Edition -->
+      <div class="grid sm:grid-cols-2 gap-3 sm:gap-5">
+        <div x-data="{ 
+            open: false, 
+            search: '', 
+            position: 'bottom',
+            options: window.getLanguageList(),
+            toggle() {
+              this.open = !this.open;
+              if (this.open) {
+                this.$nextTick(() => {
+                  const trigger = this.$refs.langTrigger;
+                  const rect = trigger.getBoundingClientRect();
+                  const spaceBelow = window.innerHeight - rect.bottom;
+                  this.position = spaceBelow < 280 ? 'top' : 'bottom';
+                });
+              }
+            },
+            get filteredOptions() {
+              return this.options.filter(o => o.name.toLowerCase().includes(this.search.toLowerCase()))
+            },
+            select(option) {
+              metadata.language = option.name;
+              this.open = false;
+              this.search = '';
+            }
+          }">
+          <label class="block mb-2 text-sm font-medium text-foreground">
+            Language
+          </label>
+          <div class="relative">
+            <div x-ref="langTrigger" @click="toggle()"
+              class="py-1.5 sm:py-2 px-3 flex items-center justify-between w-full bg-layer border border-layer-line rounded-lg sm:text-sm text-layer-foreground cursor-pointer hover:bg-layer-hover focus:outline-hidden transition-colors">
+              <span x-text="metadata.language || 'Select Language'" :class="!metadata.language && 'text-muted-foreground-1'"></span>
+              <svg class="shrink-0 size-4 text-muted-foreground-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+            </div>
+
+            <!-- Dropdown -->
+            <div x-show="open" @click.away="open = false" x-cloak x-transition
+              :class="position === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1'"
+              class="absolute z-50 w-full max-h-60 p-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden flex flex-col">
+              <div class="p-1">
+                <input type="text" x-model="search" placeholder="Search languages..." class="block w-full text-xs sm:text-sm bg-layer border border-layer-line rounded-md text-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:ring-primary-focus py-1.5 px-2">
+              </div>
+              <div class="overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                <template x-for="option in filteredOptions" :key="option.id">
+                  <div @click="select(option)" class="py-2 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md flex items-center justify-between">
+                    <span x-text="option.name"></span>
+                    <template x-if="metadata.language === option.name">
+                      <svg class="shrink-0 size-3.5 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </template>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label for="ebook-edition" class="block mb-2 text-sm font-medium text-foreground">
+            Edition
+          </label>
+          <input id="ebook-edition" type="text" x-model="metadata.edition" placeholder="e.g. 1st Edition"
+            class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+        </div>
+      </div>
+
+      <!-- Row 4: Subject & ISBN -->
+      <div class="grid sm:grid-cols-2 gap-3 sm:gap-5">
+        <div x-data="{ 
+            open: false, 
+            search: '', 
+            position: 'bottom',
+            options: ['Fiction', 'Non-Fiction', 'Science', 'Technology', 'History', 'Biography', 'Business', 'Education', 'Philosophy', 'Art', 'Travel', 'Health'],
+            toggle() {
+              this.open = !this.open;
+              if (this.open) {
+                this.$nextTick(() => {
+                  const trigger = this.$refs.subjectTrigger;
+                  const rect = trigger.getBoundingClientRect();
+                  const spaceBelow = window.innerHeight - rect.bottom;
+                  this.position = spaceBelow < 280 ? 'top' : 'bottom';
+                });
+              }
+            },
+            get filteredOptions() {
+              return this.options.filter(o => o.toLowerCase().includes(this.search.toLowerCase()))
+            },
+            select(val) {
+              metadata.subjects = [val];
+              this.open = false;
+              this.search = '';
+            }
+          }">
+          <label class="block mb-2 text-sm font-medium text-foreground">
+            Subject
+          </label>
+          <div class="relative">
+            <div x-ref="subjectTrigger" @click="toggle()"
+              class="py-1.5 sm:py-2 px-3 flex items-center justify-between w-full bg-layer border border-layer-line rounded-lg sm:text-sm text-layer-foreground cursor-pointer hover:bg-layer-hover focus:outline-hidden transition-colors">
+              <span x-text="metadata.subjects[0] || 'Select Subject'" :class="!metadata.subjects[0] && 'text-muted-foreground-1'"></span>
+              <svg class="shrink-0 size-4 text-muted-foreground-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+            </div>
+
+            <!-- Dropdown -->
+            <div x-show="open" @click.away="open = false" x-cloak x-transition
+              :class="position === 'bottom' ? 'top-full mt-1' : 'bottom-full mb-1'"
+              class="absolute z-50 w-full max-h-60 p-1 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden flex flex-col">
+              <div class="p-1">
+                <input type="text" x-model="search" placeholder="Search subjects..." class="block w-full text-xs sm:text-sm bg-layer border border-layer-line rounded-md text-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:ring-primary-focus py-1.5 px-2">
+              </div>
+              <div class="overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                <!-- Auto-detected Subject Item -->
+                <template x-if="detectedMetadata.subject && !search">
+                  <div @click="select(detectedMetadata.subject)" class="py-2 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md flex items-center justify-between">
+                    <div class="flex items-center gap-x-2 truncate">
+                      <span x-text="detectedMetadata.subject" class="truncate font-medium"></span>
+                      <span class="py-0.5 px-1.5 rounded-full text-[10px] font-medium bg-primary/10 text-primary border border-primary/20 shrink-0">Auto detected</span>
+                    </div>
+                    <template x-if="metadata.subjects.includes(detectedMetadata.subject)">
+                      <svg class="shrink-0 size-3.5 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </template>
+                  </div>
+                </template>
+                <template x-for="option in filteredOptions" :key="option">
+                  <div @click="select(option)" class="py-2 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md flex items-center justify-between">
+                    <span x-text="option"></span>
+                    <template x-if="metadata.subjects.includes(option)">
+                      <svg class="shrink-0 size-3.5 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </template>
+                  </div>
+                </template>
+
+                <!-- 
+                DEVELOPER NOTE: Empty State Placeholder
+                Use this when the database has zero existing subjects.
+                <div class="py-10 px-3 text-center">
+                  <p class="text-sm text-gray-500 font-medium">No subjects available</p>
+                  <p class="text-xs text-muted-foreground-1 mt-1">Start typing to create a new subject</p>
+                </div>
+                -->
+
+                <!-- No Results / Add New Subject -->
+                <template x-if="filteredOptions.length === 0 && search">
+                  <div @click="select(search)" class="py-2.5 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md border-t border-gray-100 dark:border-neutral-800 mt-1">
+                    <div class="flex items-center gap-x-2">
+                      <svg class="shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                      <span>Add "<span x-text="search" class="font-medium"></span>" as new subject</span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <label for="ebook-isbn" class="block mb-2 text-sm font-medium text-foreground">
+            ISBN
+          </label>
+          <input id="ebook-isbn" type="text" x-model="metadata.isbn" placeholder="e.g. 978-3-16-148410-0"
+            class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus">
+        </div>
+      </div>
+
+      <!-- Row 5: Description -->
+      <div class="space-y-2">
+        <label for="ebook-description" class="block mb-2 text-sm font-medium text-foreground">
+          Description
+        </label>
+        <textarea id="ebook-description" x-model="metadata.description"
+          class="py-1.5 sm:py-2 px-3 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-layer-foreground placeholder:text-muted-foreground-1 focus:border-primary-focus focus:z-10 focus:ring-primary-focus"
+          rows="3" placeholder="Provide an overview of this ebook and its key topics."></textarea>
+      </div>
+    </div>
+    <!-- End Body -->
+  </div>
+</div>
