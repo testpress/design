@@ -42,7 +42,8 @@
                 },
                 detectedMetadata: {
                     publisher: '',
-                    language: ''
+                    language: '',
+                    subject: ''
                 },
 
                 async handleFileSelect(event) {
@@ -98,6 +99,12 @@
                         this.metadata.author = metadata.creator || '';
                         this.detectedMetadata.publisher = metadata.publisher || '';
                         
+                        // Extract Subjects (can be array or string)
+                        if (metadata.subject) {
+                            const subjects = Array.isArray(metadata.subject) ? metadata.subject : [metadata.subject];
+                            this.detectedMetadata.subject = subjects[0] || ''; // Take first primary subject
+                        }
+
                         // Convert language code to primary readable name (Normalize to primary language only)
                         if (metadata.language) {
                             try {
@@ -119,6 +126,19 @@
                         
                         this.metadata.description = metadata.description || '';
                         
+                        // Try to extract Edition
+                        let detectedEdition = '';
+                        if (metadata.edition) {
+                            detectedEdition = metadata.edition;
+                        } else {
+                            // Check title for edition patterns (e.g., "2nd Edition", "Revised Edition")
+                            const editionMatch = this.metadata.title.match(/(\d+(st|nd|rd|th)\s+Edition|Revised\s+Edition|Special\s+Edition)/i);
+                            if (editionMatch) {
+                                detectedEdition = editionMatch[0];
+                            }
+                        }
+                        this.metadata.edition = detectedEdition;
+
                         // Extract year from publication date
                         if (metadata.pubdate) {
                             const date = new Date(metadata.pubdate);
@@ -135,27 +155,18 @@
                         if (metadata.identifier) {
                             const ids = Array.isArray(metadata.identifier) ? metadata.identifier : [metadata.identifier];
                             
-                            // 1. Try to find something explicitly marked as ISBN
-                            let isbnMatch = ids.find(id => {
+                            // Strictly look for ISBN (10 or 13 digits)
+                            const isbnId = ids.find(id => {
                                 const val = (typeof id === 'string' ? id : id.value) || '';
-                                return val.toLowerCase().includes('isbn');
+                                const digits = val.replace(/[^0-9]/g, '');
+                                return digits.length === 10 || digits.length === 13;
                             });
 
-                            // 2. If no explicit ISBN, look for a 10-13 digit number that isn't a URL
-                            if (!isbnMatch) {
-                                isbnMatch = ids.find(id => {
-                                    const val = (typeof id === 'string' ? id : id.value) || '';
-                                    const isUrl = val.includes('http') || val.includes('urn:') || val.includes('url:');
-                                    const digits = val.replace(/[^0-9]/g, '');
-                                    return !isUrl && (digits.length === 10 || digits.length === 13);
-                                });
-                            }
-
-                            if (isbnMatch) {
-                                const raw = typeof isbnMatch === 'string' ? isbnMatch : isbnMatch.value;
-                                this.metadata.isbn = raw.replace(/ISBN\s*[:\-]?\s*/gi, '').trim();
+                            if (isbnId) {
+                                const raw = typeof isbnId === 'string' ? isbnId : isbnId.value;
+                                this.metadata.isbn = raw.replace(/[^0-9X]/gi, '').trim();
                             } else {
-                                this.metadata.isbn = ''; // Don't show URLs or UUIDs as ISBN
+                                this.metadata.isbn = '';
                             }
                         }
 
@@ -199,7 +210,8 @@
                     };
                     this.detectedMetadata = {
                         publisher: '',
-                        language: ''
+                        language: '',
+                        subject: ''
                     };
                 }
             }));
