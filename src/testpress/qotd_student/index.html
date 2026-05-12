@@ -38,7 +38,7 @@ new_student_page: true
 
       <!-- Start Exam Button -->
       <div class="flex justify-center mt-6">
-        <button @click="isQuizOpen = true" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
+        <button @click="handleButtonClick('{{ state_key }}')" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
           {{ current_state.button_label }}
         </button>
       </div>
@@ -64,6 +64,7 @@ new_student_page: true
       correctAnswers: 0,
       userAnswers: [],
       touchStartX: 0,
+      isReviewMode: false,
       questions: [
         {
           text: "If a train travels at 60 km/h, how long does it take to cover 150 km?",
@@ -107,19 +108,41 @@ new_student_page: true
         }
       ],
 
+      handleButtonClick(status) {
+        if (status === 'completed') {
+          this.viewSolutions();
+        } else {
+          this.startQuiz();
+        }
+      },
+
       startQuiz() {
         this.isQuizOpen = true;
+        this.isReviewMode = false;
         this.showSummary = false;
         this.currentIndex = 0;
         this.selectedIdx = null;
         this.hasAnswered = false;
         this.correctAnswers = 0;
-        this.userAnswers = [];
+        this.userAnswers = Array(this.questions.length).fill(null);
+        document.body.style.overflow = 'hidden';
+      },
+
+      viewSolutions() {
+        this.isQuizOpen = true;
+        this.isReviewMode = true;
+        this.showSummary = false;
+        this.currentIndex = 0;
+        // Mocking user answers for review if it was already completed
+        // [Correct, Incorrect, Correct, Incorrect, Correct]
+        this.userAnswers = [0, 2, 0, 3, 2]; 
+        this.selectedIdx = this.userAnswers[this.currentIndex];
+        this.hasAnswered = true;
         document.body.style.overflow = 'hidden';
       },
 
       selectOption(idx) {
-        if (this.hasAnswered) return;
+        if (this.hasAnswered || this.isReviewMode) return;
         this.selectedIdx = idx;
         this.hasAnswered = true;
         this.userAnswers[this.currentIndex] = idx;
@@ -131,30 +154,19 @@ new_student_page: true
       nextQuestion() {
         if (this.currentIndex < this.questions.length - 1) {
           this.currentIndex++;
-          this.selectedIdx = this.userAnswers[this.currentIndex] ?? null;
-          this.hasAnswered = this.selectedIdx !== null;
+          this.selectedIdx = this.userAnswers[this.currentIndex];
+          this.hasAnswered = this.isReviewMode || this.selectedIdx !== null;
           this.$refs.quizBody.scrollTop = 0;
         } else {
           this.endQuiz();
         }
       },
 
-      startQuiz() {
-        this.isQuizOpen = true;
-        this.currentIndex = 0;
-        this.showSummary = false;
-        this.selectedIdx = null;
-        this.hasAnswered = false;
-        this.correctAnswers = 0;
-        this.userAnswers = Array(this.questions.length).fill(null);
-        document.body.style.overflow = 'hidden';
-      },
-
       previousQuestion() {
         if (this.currentIndex > 0) {
           this.currentIndex--;
-          this.selectedIdx = this.userAnswers[this.currentIndex] ?? null;
-          this.hasAnswered = this.selectedIdx !== null;
+          this.selectedIdx = this.userAnswers[this.currentIndex];
+          this.hasAnswered = this.isReviewMode || this.selectedIdx !== null;
           this.$refs.quizBody.scrollTop = 0;
         }
       },
