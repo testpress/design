@@ -1,17 +1,48 @@
     <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
     <script>
+        // Global helper for getting a comprehensive language list
+        window.getLanguageList = function() {
+            const codes = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'tr', 'vi', 'th', 'nl', 'pl', 'sv', 'da', 'fi', 'no', 'cs', 'el', 'hu', 'ro', 'sk', 'id', 'ms', 'bn', 'pa', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'uk', 'he', 'fa', 'ur'];
+            const displayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+            return codes.map(code => ({
+                id: code,
+                name: displayNames.of(code)
+            })).sort((a, b) => a.name.localeCompare(b.name));
+        };
+
         document.addEventListener('alpine:init', () => {
             Alpine.data('epubUpload', () => ({
                 status: 'idle', // idle, uploading, extracting, success, error
                 statusMessage: '',
                 fileName: '',
+                progress: 0,
+                currentStep: 0,
+                fileSize: '',
+                steps: [
+                    'Uploading file',
+                    'Validating EPUB structure',
+                    'Extracting metadata',
+                    'Detecting cover image',
+                    'Generating preview',
+                    'Security scanning',
+                    'Preparing reader assets'
+                ],
                 metadata: {
                     title: '',
                     author: '',
                     isbn: '',
                     publisher: '',
+                    language: '',
+                    publication_year: '',
+                    edition: '',
+                    subjects: [],
+                    description: '',
                     cover: null
+                },
+                detectedMetadata: {
+                    publisher: '',
+                    language: ''
                 },
 
                 async handleFileSelect(event) {
@@ -19,6 +50,13 @@
                     if (!file) return;
 
                     this.fileName = file.name;
+                    
+                    // Format file size
+                    const bytes = file.size;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    if (bytes === 0) this.fileSize = '0 Byte';
+                    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+                    this.fileSize = Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
 
                     if (!file.name.toLowerCase().endsWith('.epub')) {
                         this.status = 'error';
@@ -27,12 +65,21 @@
                     }
 
                     this.status = 'uploading';
-                    this.statusMessage = 'Uploading...';
+                    this.progress = 0;
+                    this.currentStep = 0;
 
-                    await new Promise(resolve => setTimeout(resolve, 800));
-
+                    // Simulate steps and progress
+                    const stepDuration = 500; // ms per step
+                    for (let step = 0; step < this.steps.length; step++) {
+                        this.currentStep = step;
+                        // Sub-steps for percentage increment
+                        for (let p = 0; p < 14; p++) {
+                            this.progress = Math.min(100, Math.floor((step / this.steps.length) * 100) + p);
+                            await new Promise(resolve => setTimeout(resolve, 30));
+                        }
+                    }
+                    this.progress = 100;
                     this.status = 'extracting';
-                    this.statusMessage = 'Extracting metadata...';
 
                     try {
                         // Check for ePub library (handling different potential global names)
@@ -49,7 +96,41 @@
 
                         this.metadata.title = metadata.title || '';
                         this.metadata.author = metadata.creator || '';
-                        this.metadata.publisher = metadata.publisher || '';
+                        this.detectedMetadata.publisher = metadata.publisher || '';
+                        
+                        // Convert language code to primary readable name (Normalize to primary language only)
+                        if (metadata.language) {
+                            try {
+                                // Extract primary language code (e.g., 'en-GB' -> 'en')
+                                const primaryCode = metadata.language.split('-')[0].split('_')[0];
+                                const displayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+                                const normalizedName = displayNames.of(primaryCode) || primaryCode;
+                                
+                                this.metadata.language = normalizedName;
+                                this.detectedMetadata.language = normalizedName;
+                            } catch (e) {
+                                this.metadata.language = metadata.language;
+                                this.detectedMetadata.language = metadata.language;
+                            }
+                        } else {
+                            this.metadata.language = '';
+                            this.detectedMetadata.language = '';
+                        }
+                        
+                        this.metadata.description = metadata.description || '';
+                        
+                        // Extract year from publication date
+                        if (metadata.pubdate) {
+                            const date = new Date(metadata.pubdate);
+                            if (!isNaN(date.getFullYear())) {
+                                this.metadata.publication_year = date.getFullYear().toString();
+                            }
+                        } else if (metadata.date) {
+                            const date = new Date(metadata.date);
+                            if (!isNaN(date.getFullYear())) {
+                                this.metadata.publication_year = date.getFullYear().toString();
+                            }
+                        }
                         
                         if (metadata.identifier) {
                             const ids = Array.isArray(metadata.identifier) ? metadata.identifier : [metadata.identifier];
@@ -101,12 +182,24 @@
                     this.status = 'idle';
                     this.statusMessage = '';
                     this.fileName = '';
+                    this.fileSize = '';
+                    this.progress = 0;
+                    this.currentStep = 0;
                     this.metadata = {
                         title: '',
                         author: '',
                         isbn: '',
                         publisher: '',
+                        language: '',
+                        publication_year: '',
+                        edition: '',
+                        subjects: [],
+                        description: '',
                         cover: null
+                    };
+                    this.detectedMetadata = {
+                        publisher: '',
+                        language: ''
                     };
                 }
             }));
