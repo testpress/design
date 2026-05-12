@@ -667,7 +667,7 @@
 
       <!-- Start Exam Button -->
       <div class="flex justify-center mt-6">
-        <button @click="isQuizOpen = true" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
+        <button @click="handleButtonClick('not_started')" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
           Start Quiz
         </button>
       </div>
@@ -779,7 +779,7 @@
 
       <!-- Start Exam Button -->
       <div class="flex justify-center mt-6">
-        <button @click="isQuizOpen = true" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
+        <button @click="handleButtonClick('in_progress')" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
           Resume Quiz
         </button>
       </div>
@@ -891,7 +891,7 @@
 
       <!-- Start Exam Button -->
       <div class="flex justify-center mt-6">
-        <button @click="isQuizOpen = true" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
+        <button @click="handleButtonClick('completed')" type="button" class="py-2.5 px-6 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none transition-all">
           View Solutions
         </button>
       </div>
@@ -946,8 +946,8 @@
               @click="endQuiz"
               type="button"
               class="ml-2 whitespace-nowrap py-1.5 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-red-500 text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-sm transition-colors"
+              x-text="isReviewMode ? 'Close' : 'End Quiz'"
             >
-              End Quiz
             </button>
           </div>
         </div>
@@ -1205,6 +1205,7 @@
     const option = {
       tooltip: {
         trigger: 'item',
+        confine: true,
         backgroundColor: isDarkMode ? '#171717' : '#ffffff',
         borderColor: isDarkMode ? '#3f3f46' : '#e4e4e7',
         textStyle: {
@@ -1288,6 +1289,7 @@
       correctAnswers: 0,
       userAnswers: [],
       touchStartX: 0,
+      isReviewMode: false,
       questions: [
         {
           text: "If a train travels at 60 km/h, how long does it take to cover 150 km?",
@@ -1331,19 +1333,41 @@
         }
       ],
 
+      handleButtonClick(status) {
+        if (status === 'completed') {
+          this.viewSolutions();
+        } else {
+          this.startQuiz();
+        }
+      },
+
       startQuiz() {
         this.isQuizOpen = true;
+        this.isReviewMode = false;
         this.showSummary = false;
         this.currentIndex = 0;
         this.selectedIdx = null;
         this.hasAnswered = false;
         this.correctAnswers = 0;
-        this.userAnswers = [];
+        this.userAnswers = Array(this.questions.length).fill(null);
+        document.body.style.overflow = 'hidden';
+      },
+
+      viewSolutions() {
+        this.isQuizOpen = true;
+        this.isReviewMode = true;
+        this.showSummary = false;
+        this.currentIndex = 0;
+        // Mocking user answers for review if it was already completed
+        // [Correct, Incorrect, Correct, Incorrect, Correct]
+        this.userAnswers = [0, 2, 0, 3, 2]; 
+        this.selectedIdx = this.userAnswers[this.currentIndex];
+        this.hasAnswered = true;
         document.body.style.overflow = 'hidden';
       },
 
       selectOption(idx) {
-        if (this.hasAnswered) return;
+        if (this.hasAnswered || this.isReviewMode) return;
         this.selectedIdx = idx;
         this.hasAnswered = true;
         this.userAnswers[this.currentIndex] = idx;
@@ -1355,30 +1379,19 @@
       nextQuestion() {
         if (this.currentIndex < this.questions.length - 1) {
           this.currentIndex++;
-          this.selectedIdx = this.userAnswers[this.currentIndex] ?? null;
-          this.hasAnswered = this.selectedIdx !== null;
+          this.selectedIdx = this.userAnswers[this.currentIndex];
+          this.hasAnswered = this.isReviewMode || this.selectedIdx !== null;
           this.$refs.quizBody.scrollTop = 0;
         } else {
           this.endQuiz();
         }
       },
 
-      startQuiz() {
-        this.isQuizOpen = true;
-        this.currentIndex = 0;
-        this.showSummary = false;
-        this.selectedIdx = null;
-        this.hasAnswered = false;
-        this.correctAnswers = 0;
-        this.userAnswers = Array(this.questions.length).fill(null);
-        document.body.style.overflow = 'hidden';
-      },
-
       previousQuestion() {
         if (this.currentIndex > 0) {
           this.currentIndex--;
-          this.selectedIdx = this.userAnswers[this.currentIndex] ?? null;
-          this.hasAnswered = this.selectedIdx !== null;
+          this.selectedIdx = this.userAnswers[this.currentIndex];
+          this.hasAnswered = this.isReviewMode || this.selectedIdx !== null;
           this.$refs.quizBody.scrollTop = 0;
         }
       },
