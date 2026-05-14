@@ -1,0 +1,160 @@
+{# mentor: object from follow_up_mentor_interventions #}
+{% set mk = mentor.mentor_key %}
+<section
+  data-intervention-case
+  data-mentor-name="{{ mentor.mentor_name | e }}"
+  data-mentor-key="{{ mk | e }}"
+  data-current-state="{{ mentor.current_state }}"
+  data-active-issues="{{ mentor.active_issues }}"
+  data-escalations="{{ mentor.escalations }}"
+  data-search-text="{{ mentor.mentor_name | e }} {{ mentor.current_state_label | e }}{% for ev in mentor.events %} {{ ev.note_body | default('') | e }} {{ ev.outcome_label | default('') | e }}{% endfor %}"
+  class="mb-5 last:mb-0 rounded-xl border border-stone-200 bg-white shadow-2xs dark:border-neutral-700 dark:bg-neutral-800 overflow-hidden">
+  <div class="p-4 sm:p-5 border-b border-stone-200 dark:border-neutral-700 bg-stone-50/80 dark:bg-neutral-900/50">
+    <div class="flex flex-col sm:flex-row sm:items-start gap-4">
+      <img src="{{ mentor.avatar_url }}" alt="" class="shrink-0 size-12 rounded-full object-cover ring-2 ring-white dark:ring-neutral-800">
+      <div class="min-w-0 flex-1 space-y-3">
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <h3 class="text-base font-semibold text-stone-800 dark:text-neutral-100">{{ mentor.mentor_name }}</h3>
+          {% if mentor.current_state == 'escalation_open' %}
+          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300">{{ mentor.current_state_label }}</span>
+          {% elif mentor.current_state == 'monitoring' %}
+          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-900 dark:bg-amber-500/15 dark:text-amber-200">{{ mentor.current_state_label }}</span>
+          {% elif mentor.current_state == 'resolved_watch' %}
+          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-teal-100 text-teal-800 dark:bg-teal-500/15 dark:text-teal-200">{{ mentor.current_state_label }}</span>
+          {% else %}
+          <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-200">{{ mentor.current_state_label }}</span>
+          {% endif %}
+        </div>
+        <dl class="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-xs">
+          <div>
+            <dt class="text-stone-500 dark:text-neutral-400">Active issues</dt>
+            <dd class="mt-0.5 font-semibold tabular-nums text-stone-800 dark:text-neutral-200">{{ mentor.active_issues }}</dd>
+          </div>
+          <div>
+            <dt class="text-stone-500 dark:text-neutral-400">Follow-up cycles</dt>
+            <dd class="mt-0.5 font-semibold tabular-nums text-stone-800 dark:text-neutral-200">{{ mentor.follow_up_cycles }}</dd>
+          </div>
+          <div>
+            <dt class="text-stone-500 dark:text-neutral-400">Escalations</dt>
+            <dd class="mt-0.5 font-semibold tabular-nums {% if mentor.escalations > 0 %}text-red-700 dark:text-red-400{% else %}text-stone-800 dark:text-neutral-200{% endif %}">{{ mentor.escalations }}</dd>
+          </div>
+          <div>
+            <dt class="text-stone-500 dark:text-neutral-400">Open tasks</dt>
+            <dd class="mt-0.5 font-semibold tabular-nums text-stone-800 dark:text-neutral-200">{{ mentor.open_tasks }}</dd>
+          </div>
+        </dl>
+        <p class="text-xs text-stone-500 dark:text-neutral-400">
+          <span class="font-medium text-stone-600 dark:text-neutral-300">Last follow-up:</span> {{ mentor.last_follow_up }}
+        </p>
+        {% if mentor.progression_slugs and (mentor.progression_slugs | length) %}
+        <div class="pt-1">
+          <p class="text-[11px] font-medium uppercase tracking-wide text-stone-500 dark:text-neutral-500 mb-1.5">Intervention progression</p>
+          <div class="flex flex-wrap items-center gap-x-1 gap-y-1.5 text-xs">
+            {% for slug in mentor.progression_slugs %}
+              {% for o in follow_up_outcomes %}
+                {% if o.slug == slug %}
+              <span class="inline-flex items-center rounded-md px-2 py-0.5 font-medium border
+                {% if slug == 'escalated_to_management' %}border-red-200 bg-red-50 text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200
+                {% elif slug == 'no_improvement_observed' %}border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100
+                {% elif slug == 'issue_identified' %}border-orange-200 bg-orange-50 text-orange-900 dark:border-orange-500/25 dark:bg-orange-500/10 dark:text-orange-100
+                {% elif slug == 'issue_resolved' %}border-teal-200 bg-teal-50 text-teal-900 dark:border-teal-500/25 dark:bg-teal-500/10 dark:text-teal-100
+                {% elif slug == 'improvement_observed' %}border-green-200 bg-green-50 text-green-900 dark:border-green-500/25 dark:bg-green-500/10 dark:text-green-100
+                {% else %}border-stone-200 bg-white text-stone-800 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200{% endif %}">{{ o.label }}</span>
+                {% endif %}
+              {% endfor %}
+              {% if not loop.last %}
+              <span class="text-stone-400 dark:text-neutral-500 select-none" aria-hidden="true">→</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="divide-y divide-stone-100 dark:divide-neutral-700/80" data-intervention-events>
+    {% for ev in mentor.events %}
+    {% set ev_idx = loop.index0 %}
+    <article
+      data-intervention-event
+      data-outcome="{{ ev.outcome | default('') | e }}"
+      data-mentor="{{ mentor.mentor_name | e }}"
+      class="relative {% if ev.outcome == 'escalated_to_management' %}bg-red-50/40 dark:bg-red-500/5{% elif ev.outcome == 'no_improvement_observed' %}bg-amber-50/30 dark:bg-amber-500/5{% elif ev.outcome == 'issue_resolved' %}bg-teal-50/25 dark:bg-teal-500/5{% elif ev.outcome == 'improvement_observed' %}bg-green-50/25 dark:bg-green-500/5{% endif %}">
+      <div class="flex gap-0">
+        <div class="w-1 shrink-0 self-stretch rounded-e-sm {% if ev.outcome == 'escalated_to_management' %}bg-red-500{% elif ev.outcome == 'no_improvement_observed' %}bg-amber-500{% elif ev.outcome == 'issue_identified' %}bg-orange-500{% elif ev.outcome == 'issue_resolved' %}bg-teal-500{% elif ev.outcome == 'improvement_observed' %}bg-green-500{% else %}bg-stone-300 dark:bg-neutral-600{% endif %}" aria-hidden="true"></div>
+        <div class="min-w-0 flex-1 px-4 py-3 sm:px-5 sm:py-3.5">
+          <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <time class="text-xs font-medium tabular-nums text-stone-500 dark:text-neutral-400">{{ ev.date }} · {{ ev.time }}</time>
+            <span class="text-xs text-stone-400 dark:text-neutral-500">·</span>
+            <span class="text-sm font-semibold text-stone-800 dark:text-neutral-100">{{ ev.outcome_label }}</span>
+          </div>
+
+          {% if ev.todo_created or (ev.task_status and ev.task_status != 'none') %}
+          <div class="mt-2.5 flex flex-wrap items-center gap-2">
+            {% if ev.task_status == 'completed' %}
+            <span class="inline-flex items-center gap-1 rounded-md border border-green-200 bg-green-50 px-2 py-1 text-xs font-medium text-green-800 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200">
+              <svg class="size-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>
+              Task {{ ev.task_status_label }}{% if ev.todo_due %} · was due {{ ev.todo_due }}{% endif %}
+            </span>
+            {% elif ev.task_status == 'overdue' %}
+            <span class="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-800 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-200">
+              <svg class="size-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              Task {{ ev.task_status_label }}{% if ev.todo_due %} · {{ ev.todo_due }}{% endif %}
+            </span>
+            {% elif ev.task_status == 'due_today' %}
+            <span class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+              <svg class="size-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
+              Task {{ ev.task_status_label }}{% if ev.todo_due %} · {{ ev.todo_due }}{% endif %}
+            </span>
+            {% elif ev.task_status == 'pending' %}
+            <span class="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-medium text-stone-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200">
+              <svg class="size-3.5 shrink-0 text-stone-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              Task {{ ev.task_status_label }}{% if ev.todo_due %} · Due {{ ev.todo_due }}{% endif %}
+            </span>
+            {% elif ev.todo_created %}
+            <span class="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-xs font-medium text-stone-700 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-200">
+              To-do linked{% if ev.todo_due %} · Due {{ ev.todo_due }}{% endif %}
+            </span>
+            {% endif %}
+            {% if ev.follow_up_id and ev.todo_created %}
+              {% set linked_todos = (task_management_todos | filter('follow_up_id', ev.follow_up_id)) %}
+              {% set linked_task = null %}
+              {% if linked_todos and (linked_todos | length) %}
+                {% set linked_task = linked_todos[0] %}
+              {% endif %}
+              {% if not linked_task and ev.follow_up_id %}
+                {% for group in task_management_scheduled.groups %}
+                  {% if not linked_task %}
+                    {% set group_matches = (group.tasks | filter('follow_up_id', ev.follow_up_id)) %}
+                    {% if group_matches and (group_matches | length) %}
+                      {% set linked_task = group_matches[0] %}
+                    {% endif %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+              {% set todo_modal_id = 'hs-pro-fu-int-' ~ mk ~ '-' ~ ev_idx %}
+              {% set item = ev %}
+              <button type="button" class="text-xs font-medium text-green-700 underline decoration-2 underline-offset-2 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 focus:outline-hidden focus:underline" data-hs-overlay="#{{ todo_modal_id }}" aria-haspopup="dialog" aria-expanded="false" aria-controls="{{ todo_modal_id }}">Open task detail</button>
+              {% include './todo_detail_modal.html' %}
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <div class="mt-2.5">
+            <button type="button" class="hs-collapse-toggle inline-flex items-center gap-x-1 py-1 text-xs font-medium text-stone-600 hover:text-stone-800 dark:text-neutral-400 dark:hover:text-neutral-200 focus:outline-hidden" id="hs-int-note-toggle-{{ mk }}-{{ ev_idx }}" aria-expanded="false" aria-controls="hs-int-note-{{ mk }}-{{ ev_idx }}" data-hs-collapse="#hs-int-note-{{ mk }}-{{ ev_idx }}">
+              <svg class="hs-collapse-open:hidden shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-collapse-open:block hidden shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
+              <span class="hs-collapse-open:hidden">View note</span>
+              <span class="hs-collapse-open:inline hidden">Hide note</span>
+            </button>
+            <div id="hs-int-note-{{ mk }}-{{ ev_idx }}" class="hs-collapse hidden w-full overflow-hidden transition-[height] duration-200" role="region" aria-labelledby="hs-int-note-toggle-{{ mk }}-{{ ev_idx }}">
+              <p class="mt-2 text-xs leading-relaxed text-stone-500 dark:text-neutral-400 border-s-2 border-stone-200 ps-3 dark:border-neutral-600">{{ ev.note_body }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
