@@ -1,0 +1,103 @@
+{%- set oc_mix = mentor.follow_up_outcome_counts_last_90_days | default({ total: 0, by_outcome: {} }) -%}
+{%- set oc_total = oc_mix.total | default(0) -%}
+<div
+  class="p-5 flex flex-col bg-white dark:bg-neutral-800 border border-stone-200 dark:border-neutral-700 shadow-xs rounded-xl overflow-hidden w-full">
+  <div class="pb-5 flex flex-wrap justify-between items-center gap-2">
+    <div class="flex flex-wrap items-center gap-2">
+      <h2 class="font-medium text-stone-800 dark:text-neutral-200">
+        Outcome Distribution
+      </h2>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <a class="group inline-flex items-center gap-x-1.5 text-start whitespace-nowrap text-[13px] text-stone-600 dark:text-neutral-300 rounded-full underline-offset-2 hover:underline focus:outline-hidden focus:underline"
+        href="{{ '/simba/follow-ups/' | url }}">
+        View follow-up history
+        <svg class="shrink-0 size-3.5 group-hover:opacity-100 group-focus:opacity-100 transition duration-300"
+          xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path
+            class="lg:opacity-0 lg:-translate-x-1 lg:group-hover:opacity-100 lg:group-hover:translate-x-0 lg:transition"
+            d="M5 12h14" />
+          <path class="lg:-translate-x-1.5 lg:group-hover:translate-x-0 lg:transition" d="m12 5 7 7-7 7" />
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  {% if oc_total > 0 %}
+  <p id="mentor-fu-outcome-bar-desc" class="sr-only">
+    Mentor and team lead follow-up outcome distribution in the last ninety days:
+    {% for o in follow_up_outcomes %}
+    {% set cnt = oc_mix.by_outcome[o.slug] | default(0) %}
+    {{ o.label }} {{ cnt }}{% if not loop.last %}; {% endif %}
+    {% endfor %}
+  </p>
+  <div class="space-y-4">
+    <!-- Segmented bar (same height / rhythm as batch health bars) -->
+    <div class="flex gap-1.5 w-full h-2.5" role="img" aria-labelledby="mentor-fu-outcome-bar-desc">
+      {% for o in follow_up_outcomes %}
+      {% set cnt = oc_mix.by_outcome[o.slug] | default(0) %}
+      {% if cnt > 0 %}
+      {% set oc_bar = 'bg-stone-300 dark:bg-neutral-500' %}
+      {% if o.slug == 'issue_identified' %}
+      {% set oc_bar = 'bg-amber-400 dark:bg-amber-500' %}
+      {% elif o.slug == 'guidance_provided' %}
+      {% set oc_bar = 'bg-sky-500 dark:bg-sky-400' %}
+      {% elif o.slug == 'improvement_observed' %}
+      {% set oc_bar = 'bg-green-500' %}
+      {% elif o.slug == 'no_improvement_observed' %}
+      {% set oc_bar = 'bg-stone-300 dark:bg-neutral-500' %}
+      {% elif o.slug == 'escalated_to_management' %}
+      {% set oc_bar = 'bg-red-400' %}
+      {% elif o.slug == 'issue_resolved' %}
+      {% set oc_bar = 'bg-teal-500 dark:bg-teal-400' %}
+      {% endif %}
+      {% set pct = (cnt / oc_total * 100) | round(2) %}
+      <div class="overflow-hidden rounded-full {{ oc_bar }} min-w-px h-2.5" role="progressbar"
+        aria-valuenow="{{ pct | round(0) }}" aria-valuemin="0" aria-valuemax="100"
+        style="width: {{ pct }}%" title="{{ o.label }}: {{ cnt }} ({{ pct | round(0) }}%)"></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+
+    <!-- Legend: typography matches follow-up impact rows; dots match follow-up indicators (size-2 rounded-full) -->
+    <ul class="mt-7 grid grid-cols-1 sm:grid-cols-2 sm:gap-x-8 gap-y-3 list-none p-0 m-0" role="list">
+      {% for o in follow_up_outcomes %}
+      {% set cnt = oc_mix.by_outcome[o.slug] | default(0) %}
+      {% set pct = ((cnt / oc_total * 100) | round(0)) if oc_total > 0 else 0 %}
+      {% set oc_dot = 'bg-stone-300 dark:bg-neutral-500' %}
+      {% if o.slug == 'issue_identified' %}
+      {% set oc_dot = 'bg-amber-400 dark:bg-amber-500' %}
+      {% elif o.slug == 'guidance_provided' %}
+      {% set oc_dot = 'bg-sky-500 dark:bg-sky-400' %}
+      {% elif o.slug == 'improvement_observed' %}
+      {% set oc_dot = 'bg-green-500' %}
+      {% elif o.slug == 'no_improvement_observed' %}
+      {% set oc_dot = 'bg-stone-300 dark:bg-neutral-500' %}
+      {% elif o.slug == 'escalated_to_management' %}
+      {% set oc_dot = 'bg-red-400' %}
+      {% elif o.slug == 'issue_resolved' %}
+      {% set oc_dot = 'bg-teal-500 dark:bg-teal-400' %}
+      {% endif %}
+      <li class="flex items-center justify-between gap-2 min-w-0">
+        <span class="flex items-center gap-2 min-w-0">
+          <span class="shrink-0 size-2.5 inline-block {{ oc_dot }} rounded-xs me-2.5" aria-hidden="true"></span>
+          <span class="text-sm text-stone-600 dark:text-neutral-300 truncate">
+            {{ o.label }}
+          </span>
+        </span>
+        <span class="shrink-0 font-medium text-sm text-stone-800 dark:text-neutral-200 tabular-nums">
+          {{ cnt }}
+          <span class="font-normal text-stone-400 dark:text-neutral-500">({{ pct }}%)</span>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% else %}
+  <p class="mt-4 text-[13px] text-stone-500 dark:text-neutral-400">
+    No follow-ups with outcomes recorded in this period yet.
+  </p>
+  {% endif %}
+</div>

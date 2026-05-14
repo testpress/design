@@ -20,9 +20,9 @@ tailwindv4: true
       
   
   {% include './includes/filter.html' %}
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 p-3 sm:p-4 lg:flex-1">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 p-3 sm:p-4 lg:flex-1 h-full">
         {% include './includes/task_views_tablist.html' %}
-        <!-- Tab Content: Today + All Active Tasks (same layout; IDs scoped per tab) -->
+        <!-- Tab Content: Due today + All + Due soon + Completed (IDs scoped per tab) -->
         {% set tm_tab = 'today' %}
         {% include 'src/simba/task_management/includes/all_active_tasks_tab_content.html' %}
         {% set tm_tab = 'all' %}
@@ -51,6 +51,8 @@ tailwindv4: true
   </div>
 </div>
 {% include './includes/offset_canvas.html' %}
+<script type="application/json" id="tm-task-management-todos-json">{{ task_management_todos | dump | safe }}</script>
+<script type="application/json" id="tm-task-management-follow-ups-json">{{ follow_ups | dump | safe }}</script>
 {% include './includes/add_task_modal.html' %}
 {% endblock content %}
 {% block extra_scripts %}
@@ -107,7 +109,7 @@ tailwindv4: true
         var hay = (card.getAttribute('data-task-search') || '').toLowerCase();
         var sec = card.getAttribute('data-task-section');
         var queryMatch = !q || hay.indexOf(q) !== -1;
-        var hasFollowUp = hay.indexOf('linked follow-up') !== -1;
+        var hasFollowUp = hay.indexOf('linked note') !== -1;
         var followupMatch = followUpFilter === 'all'
           || (followUpFilter === 'linked' && hasFollowUp)
           || (followUpFilter === 'plain' && !hasFollowUp);
@@ -121,11 +123,24 @@ tailwindv4: true
         }
       });
 
+      if (suffix === 'scheduled') {
+        root.querySelectorAll('[data-scheduled-due-group]').forEach(function (groupEl) {
+          var visibleInGroup = 0;
+          groupEl.querySelectorAll('[data-task-card]').forEach(function (card) {
+            if (!card.classList.contains('hidden')) {
+              visibleInGroup += 1;
+            }
+          });
+          groupEl.classList.toggle('hidden', visibleInGroup === 0);
+        });
+      }
+
       if (pendingCountEl) pendingCountEl.textContent = String(pendingVisible);
       if (doneCountEl) doneCountEl.textContent = String(doneVisible);
 
       var totalVisible = pendingVisible + doneVisible;
-      var noMatches = Boolean(q) && totalVisible === 0;
+      var filterActive = followUpFilter !== 'all';
+      var noMatches = totalVisible === 0 && (Boolean(q) || filterActive);
 
       if (emptyEl) emptyEl.classList.toggle('hidden', !noMatches);
       if (sectionPending) sectionPending.classList.toggle('hidden', noMatches);
@@ -172,6 +187,239 @@ tailwindv4: true
       });
     }
     applyTaskSearchFilter();
+  })();
+</script>
+<script>
+  (function () {
+    var todosEl = document.getElementById('tm-task-management-todos-json');
+    var followUpsEl = document.getElementById('tm-task-management-follow-ups-json');
+    var overlay = document.getElementById('hs-pro-eakcmpd');
+    if (!todosEl || !overlay || typeof window.HSOverlay === 'undefined') {
+      return;
+    }
+
+    var tasks;
+    var fuById = {};
+    try {
+      tasks = JSON.parse(todosEl.textContent || '[]');
+      var followUps = JSON.parse((followUpsEl && followUpsEl.textContent) || '[]');
+      if (Array.isArray(followUps)) {
+        followUps.forEach(function (fu) {
+          if (fu && fu.id) {
+            fuById[fu.id] = fu;
+          }
+        });
+      }
+    } catch (err) {
+      return;
+    }
+
+    var BADGE_LAYOUT =
+      'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium';
+    var MENTOR_HEALTH_STYLES = {
+      at_risk: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300',
+      need_attention:
+        'bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300',
+      healthy: 'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300'
+    };
+
+    function taskById(id) {
+      for (var i = 0; i < tasks.length; i++) {
+        if (tasks[i].id === id) {
+          return tasks[i];
+        }
+      }
+      return null;
+    }
+
+    function resolveMentorHealthTier(fu) {
+      var tier = fu.mentor_health;
+      if (tier === 'at_risk' || tier === 'need_attention' || tier === 'healthy') {
+        return tier;
+      }
+      var rb = String(fu.risk_badge || '').trim().toLowerCase();
+      if (rb === 'at risk') {
+        return 'at_risk';
+      }
+      if (rb === 'need attention') {
+        return 'need_attention';
+      }
+      if (rb === 'healthy') {
+        return 'healthy';
+      }
+      if (rb) {
+        return 'at_risk';
+      }
+      return 'healthy';
+    }
+
+    function mentorHealthLabel(fu, tier) {
+      var custom = String(fu.risk_badge || '').trim();
+      if (custom) {
+        return custom;
+      }
+      if (tier === 'healthy') {
+        return 'Healthy';
+      }
+      if (tier === 'at_risk') {
+        return 'At Risk';
+      }
+      if (tier === 'need_attention') {
+        return 'Need Attention';
+      }
+      return '';
+    }
+
+    function applyMentorHealthBadge(fu) {
+      var wrap = document.getElementById('task-detail-fu-risk-badge-wrap');
+      var textEl = document.getElementById('task-detail-fu-risk-badge-text');
+      if (!wrap || !textEl) {
+        return;
+      }
+
+      var tier = resolveMentorHealthTier(fu);
+      var label = mentorHealthLabel(fu, tier);
+      var palette = MENTOR_HEALTH_STYLES[tier] || MENTOR_HEALTH_STYLES.healthy;
+
+      if (!label) {
+        wrap.className = 'hidden ' + BADGE_LAYOUT + ' ' + palette;
+        textEl.textContent = '';
+        return;
+      }
+
+      wrap.className = BADGE_LAYOUT + ' ' + palette;
+      textEl.textContent = label;
+    }
+
+    function applyFollowUpSection(fu) {
+      applyMentorHealthBadge(fu);
+
+      var fuAvatar = document.getElementById('task-detail-fu-avatar');
+      var fuSubject = document.getElementById('task-detail-fu-subject-name');
+      var contactRow = document.getElementById('task-detail-fu-contact-row');
+      var phoneWrap = document.getElementById('task-detail-fu-phone-wrap');
+      var phoneLink = document.getElementById('task-detail-fu-phone-link');
+      var phoneDisplay = document.getElementById('task-detail-fu-phone-display');
+      var emailWrap = document.getElementById('task-detail-fu-email-wrap');
+      var emailLink = document.getElementById('task-detail-fu-email-link');
+      var emailDisplay = document.getElementById('task-detail-fu-email-display');
+      var noteBody = document.getElementById('task-detail-fu-note-body');
+
+      if (fuAvatar) {
+        fuAvatar.src = fu.subject_avatar_url || '';
+        fuAvatar.alt = fu.subject_name || '';
+      }
+      if (fuSubject) {
+        fuSubject.textContent = fu.subject_name || '';
+      }
+      if (phoneWrap && phoneLink && phoneDisplay) {
+        if (fu.tel_href) {
+          phoneWrap.classList.remove('hidden');
+          phoneLink.href = fu.tel_href;
+          phoneDisplay.textContent = fu.phone_display || '';
+        } else {
+          phoneWrap.classList.add('hidden');
+        }
+      }
+      if (emailWrap && emailLink && emailDisplay) {
+        if (fu.email) {
+          emailWrap.classList.remove('hidden');
+          emailLink.href = 'mailto:' + fu.email;
+          emailDisplay.textContent = fu.email;
+        } else {
+          emailWrap.classList.add('hidden');
+        }
+      }
+      if (contactRow) {
+        contactRow.classList.toggle('hidden', !(fu.tel_href || fu.email));
+      }
+      if (noteBody) {
+        noteBody.textContent = fu.note_body || '';
+      }
+    }
+
+    function populateTaskDetailPanel(task) {
+      var titleEl = document.getElementById('task-detail-panel-title');
+      var descBlock = document.getElementById('task-detail-desc-block');
+      var descEl = document.getElementById('task-detail-panel-description');
+      var assigneeAvatar = document.getElementById('task-detail-panel-assignee-avatar');
+      var assigneeName = document.getElementById('task-detail-panel-assignee-name');
+      var createdEl = document.getElementById('task-detail-panel-created');
+      var dueEl = document.getElementById('task-detail-panel-due');
+      var fuSection = document.getElementById('task-detail-follow-up-section');
+
+      if (titleEl) {
+        titleEl.textContent = task.title || '';
+      }
+      if (task.description) {
+        if (descBlock) {
+          descBlock.classList.remove('hidden');
+        }
+        if (descEl) {
+          descEl.textContent = task.description;
+        }
+      } else if (descBlock) {
+        descBlock.classList.add('hidden');
+      }
+      if (assigneeAvatar) {
+        assigneeAvatar.src = task.assignee_avatar_url || '';
+        assigneeAvatar.alt = task.assignee_name || '';
+      }
+      if (assigneeName) {
+        assigneeName.textContent = task.assignee_name || '';
+      }
+      if (createdEl) {
+        createdEl.textContent = task.created_at || '';
+      }
+      if (dueEl) {
+        dueEl.textContent = task.due_at || '';
+      }
+
+      if (!fuSection) {
+        return;
+      }
+
+      if (!task.follow_up_id || !fuById[task.follow_up_id]) {
+        fuSection.classList.add('hidden');
+        return;
+      }
+
+      fuSection.classList.remove('hidden');
+      applyFollowUpSection(fuById[task.follow_up_id]);
+    }
+
+    document.addEventListener('click', function (event) {
+      var trigger = event.target.closest('.js-task-detail-open');
+      if (!trigger) {
+        return;
+      }
+      event.preventDefault();
+      var taskId = trigger.getAttribute('data-task-id');
+      if (!taskId) {
+        return;
+      }
+      var task = taskById(taskId);
+      if (!task) {
+        return;
+      }
+      populateTaskDetailPanel(task);
+      if (!overlay.classList.contains('opened')) {
+        window.HSOverlay.open(overlay);
+      }
+    });
+
+    document.addEventListener('click', function (event) {
+      if (!overlay.classList.contains('opened')) {
+        return;
+      }
+      if (overlay.contains(event.target)) {
+        return;
+      }
+      if (event.target.closest('[data-task-card]')) {
+        return;
+      }
+      window.HSOverlay.close(overlay);
+    });
   })();
 </script>
 <script>
