@@ -531,7 +531,31 @@
     <main id="content" class="pt-[3.75rem] lg:ps-[16.25rem]">
       <div class="p-2 sm:p-5 min-h-[90vh] space-y-5">
     
-<div x-data="sentinelProctoringWidget()" class="relative min-h-96">
+  <div class="flex flex-wrap items-center gap-3 mb-8 w-full max-w-2xl" x-data="{}">
+    <button type="button" 
+            @click="$dispatch('simulate-warning', 'Keep your face in view')"
+            class="py-2 px-4 sentinel-bg-primary sentinel-bg-primary-hover sentinel-text-on-dark text-sm font-medium rounded-lg shadow-sm transition-colors">
+        Toggle Warning
+    </button>
+
+    <button type="button" 
+            @click="$dispatch('simulate-state', { key: 'camera', status: 'error', message: 'Hardware failure' })"
+            class="py-2 px-4 sentinel-bg-primary sentinel-bg-primary-hover sentinel-text-on-dark text-sm font-medium rounded-lg shadow-sm transition-colors">
+        Cam Error
+    </button>
+
+    <button type="button" 
+            @click="$dispatch('simulate-state', { key: 'screen', status: 'degraded', message: 'Unstable connection' })"
+            class="py-2 px-4 sentinel-bg-primary sentinel-bg-primary-hover sentinel-text-on-dark text-sm font-medium rounded-lg shadow-sm transition-colors">
+        Screen Error
+    </button>
+
+    <button type="button" 
+            @click="$dispatch('simulate-state', { key: 'mic', status: 'degraded', message: 'High background noise' })"
+            class="py-2 px-4 sentinel-bg-primary sentinel-bg-primary-hover sentinel-text-on-dark text-sm font-medium rounded-lg shadow-sm transition-colors">
+        Mic Error
+    </button>
+  </div>
 
   <style>
     :root {
@@ -907,543 +931,391 @@
 
   </style>
 
-  <div class="flex flex-wrap gap-3 mb-6">
 
-    <button type="button" 
-            @click="startSession()"
-            class="py-2 px-4 text-nowrap inline-flex justify-center items-center gap-x-2 bg-primary-600 border border-primary-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-primary-700 focus:outline-hidden disabled:opacity-50 transition-colors">
-        Start session
-    </button>
+  <div x-data="sessionMonitor()"
+         x-init="init()"
+         @simulate-warning.window="warning = warning ? '' : $event.detail"
+         @simulate-state.window="toggleState($event.detail.key, $event.detail.status, $event.detail.message)"
+         @reset-monitor.window="resetStates()"
+         class="fixed select-none z-[9999] sentinel-monitor-floating"
+     :class="{
+       'w-80 h-96': mode === 'detailed',
+       'w-64 h-72': mode === 'compact',
+       'w-auto h-12': mode === 'minimized'
+     }"
+     :style="`left: ${position.x}px; top: ${position.y}px;`"
+     @window:resize.debounce.100ms="clampPosition()">
 
-    <button type="button" 
-            @click="simulatePrepFailed()"
-            class="py-2 px-4 text-nowrap inline-flex justify-center items-center gap-x-2 bg-primary-600 border border-primary-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-primary-700 focus:outline-hidden disabled:opacity-50 transition-colors">
-        Simulate preparation error
-    </button>
+    <!-- Session Monitor Container -->
+    <div class="relative sentinel-bg-surface backdrop-blur-md transition-all duration-300 rounded-2xl border sentinel-border-base sentinel-shadow-monitor"
+         :class="{ 
+            'overflow-hidden': mode !== 'detailed',
+            'overflow-visible': mode === 'detailed'
+         }">
 
-    <button type="button" 
-            @click="simulateCaptureFailed()"
-            class="py-2 px-4 text-nowrap inline-flex justify-center items-center gap-x-2 bg-primary-600 border border-primary-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-primary-700 focus:outline-hidden disabled:opacity-50 transition-colors">
-        Simulate capture failure
-    </button>
+        <div x-show="mode !== 'minimized'"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 -translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             @mousedown="startDrag($event)"
+             class="flex items-center justify-between px-4 py-3 cursor-grab active:cursor-grabbing border-b sentinel-separator">
+            
+            <span class="text-xs font-bold sentinel-text-muted uppercase tracking-widest">Session Monitor</span>
 
-    <button type="button" 
-            @click="simulateIdentityRejected()"
-            class="py-2 px-4 text-nowrap inline-flex justify-center items-center gap-x-2 bg-primary-600 border border-primary-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-primary-700 focus:outline-hidden disabled:opacity-50 transition-colors">
-        Simulate verification failed
-    </button>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-1.5">
+                    <div class="w-1.5 h-1.5 rounded-full sentinel-bg-success sentinel-shadow-success-glow"></div>
+                    <span class="text-xs font-bold sentinel-text-success uppercase tracking-widest">Active</span>
+                </div>
 
-
-    <button type="button" 
-            @click="simulateIdentityFailed()"
-            class="py-2 px-4 text-nowrap inline-flex justify-center items-center gap-x-2 bg-primary-600 border border-primary-600 text-white text-sm font-medium rounded-lg shadow-sm hover:bg-primary-700 focus:outline-hidden disabled:opacity-50 transition-colors">
-        Simulate verification limit over
-    </button>
-  </div>
-
-  <template x-teleport="body">
-    <div x-cloak x-show="stage !== 'hidden'">
-      
-      <div class="fixed inset-0 sentinel-modal-overlay-z sentinel-animate-fade-in bg-black/60 backdrop-blur-sm"
-           @click="stage = 'hidden'"></div>
-
-      <div class="fixed inset-0 sentinel-modal-dialog-z flex items-center justify-center p-4 pointer-events-none">
-        
-        <div role="dialog" aria-modal="true"
-             class="relative w-full sentinel-bg-surface pointer-events-auto flex flex-col sentinel-animate-fade-in-up max-w-xl sentinel-widget-container rounded-3xl shadow-2xl overflow-hidden">
-          
-          <div class="flex-1 flex flex-col overflow-y-auto min-h-0">
-            <div class="flex-1 py-6 px-8 flex flex-col">
-              <div x-show="['fetching_policy', 'preparing', 'permissions', 'validating', 'identity', 'ready'].includes(stage)"
-     class="flex items-center mb-4 text-sm font-semibold sentinel-text-muted font-sans tracking-wide uppercase"
-     role="progressbar"
-     :aria-valuenow="currentStep + 1"
-     aria-valuemin="1"
-     aria-valuemax="4"
-     :aria-label="stage === 'fetching_policy' ? 'Pre-setup' : 'Step ' + (currentStep + 1) + ' of 4'">
-  
-  <template x-if="stage === 'fetching_policy'">
-    <span class="sentinel-text-primary">Pre-setup</span>
-  </template>
-
-  <template x-if="stage !== 'fetching_policy'">
-    <div class="flex items-center">
-      <span class="sentinel-text-primary">
-        Step <span x-text="currentStep + 1"></span>
-      </span>
-      <span class="sentinel-text-separator mx-1.5 font-normal">/</span>
-      <span>4</span>
-    </div>
-  </template>
-</div>
-
-              <div x-show="stage === 'consent'" class="flex flex-col h-full sentinel-animate-fade-in-up">
-  
-  <!-- Header Block -->
-  <div class="flex-none">
-    <h1 class="m-0 mb-2 text-xl font-semibold sentinel-text-header leading-snug font-sans">
-      Before you begin
-    </h1>
-    <p class="m-0 text-sm sentinel-text-body leading-normal font-sans">
-      This session uses proctoring to maintain exam integrity. Depending on your configuration, the following may be required:
-    </p>
-  </div>
-
-  <!-- Requirements List Block -->
-  <div class="flex-1 flex flex-col mt-6 gap-2">
-    
-    <div class="flex-1 flex items-center gap-3 p-3 rounded-xl border-2 sentinel-border-base sentinel-bg-subtle">
-      <div class="shrink-0 w-10 h-10 rounded-lg sentinel-bg-icon-primary border-2 sentinel-border-icon-primary flex items-center justify-center sentinel-text-primary">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="block">
-          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
-        </svg>
-      </div>
-      <div>
-        <p class="m-0 mb-0.5 text-sm font-semibold sentinel-text-body font-sans">Camera access</p>
-        <p class="m-0 text-sm sentinel-text-muted leading-normal font-sans">Your webcam may be monitored during the session</p>
-      </div>
-    </div>
-
-    <div class="flex-1 flex items-center gap-3 p-3 rounded-xl border-2 sentinel-border-base sentinel-bg-subtle">
-      <div class="shrink-0 w-10 h-10 rounded-lg sentinel-bg-icon-primary border-2 sentinel-border-icon-primary flex items-center justify-center sentinel-text-primary">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="block">
-          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
-        </svg>
-      </div>
-      <div>
-        <p class="m-0 mb-0.5 text-sm font-semibold sentinel-text-body font-sans">Microphone access</p>
-        <p class="m-0 text-sm sentinel-text-muted leading-normal font-sans">Audio monitoring may be enabled for this session</p>
-      </div>
-    </div>
-
-    <div class="flex-1 flex items-center gap-3 p-3 rounded-xl border-2 sentinel-border-base sentinel-bg-subtle">
-      <div class="shrink-0 w-10 h-10 rounded-lg sentinel-bg-icon-primary border-2 sentinel-border-icon-primary flex items-center justify-center sentinel-text-primary">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="block">
-          <rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
-        </svg>
-      </div>
-      <div>
-        <p class="m-0 mb-0.5 text-sm font-semibold sentinel-text-body font-sans">Screen sharing</p>
-        <p class="m-0 text-sm sentinel-text-muted leading-normal font-sans">Your screen content may be recorded during the session</p>
-      </div>
-    </div>
-
-    <div class="flex-1 flex items-center gap-3 p-3 rounded-xl border-2 sentinel-border-base sentinel-bg-subtle">
-      <div class="shrink-0 w-10 h-10 rounded-lg sentinel-bg-icon-primary border-2 sentinel-border-icon-primary flex items-center justify-center sentinel-text-primary">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="block">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
-        </svg>
-      </div>
-      <div>
-        <p class="m-0 mb-0.5 text-sm font-semibold sentinel-text-body font-sans">Face verification</p>
-        <p class="m-0 text-sm sentinel-text-muted leading-normal font-sans">A photo may be taken to confirm your identity</p>
-      </div>
-    </div>
-    <p class="m-0 mt-1 text-xs sentinel-text-muted text-center font-sans">
-      Only the access required for your specific session will be requested.
-    </p>
-  </div>
-
-  <!-- Footer Block -->
-  <div class="flex-none pt-6">
-    <div class="flex justify-end gap-2.5">
-      <button @click="stage = 'hidden'" class="px-4 py-2 rounded-lg border-2 sentinel-border-base text-sm font-medium sentinel-text-action hover:sentinel-bg-subtle transition-colors">Cancel</button>
-      <button @click="goToStep('fetching_policy')" class="px-5 py-2 rounded-lg sentinel-bg-primary sentinel-bg-primary-hover text-sm font-semibold text-white shadow-sm transition-all transform active:scale-95">Agree & Continue</button>
-    </div>
-  </div>
-
-</div>
-
-              <div x-show="stage === 'fetching_policy'" class="flex flex-col h-full sentinel-animate-fade-in">
-  
-  <div class="flex-1 flex flex-col">
-    <div class="mb-5">
-      <h1 class="m-0 mb-1.5 text-xl font-semibold sentinel-text-header leading-snug font-sans">
-        Fetching session policy
-      </h1>
-      <p class="m-0 text-sm sentinel-text-body leading-normal font-sans">
-        We're retrieving the proctoring configuration for your exam. This will take a moment.
-      </p>
-    </div>
-  </div>
-
-  <div class="flex-none flex flex-col items-center justify-center my-6">
-    
-    <div class="relative mb-8">
-      <div class="relative h-1.5 w-64 sentinel-bg-primary-tint rounded-full overflow-hidden">
-        <div class="h-full w-full sentinel-gradient-primary rounded-full sentinel-animate-wobble"></div>
-      </div>
-    </div>
-
-    <p class="m-0 text-sm font-medium sentinel-text-subtle font-sans text-center">
-      Contacting server...
-    </p>
-  </div>
-
-  <div class="flex-1"></div>
-
-</div>
-
-              <div x-show="stage === 'preparing'" class="flex flex-col h-full sentinel-animate-fade-in">
-  
-  <template x-if="!preparingFailed">
-    <div class="flex flex-col h-full">
-      <div class="flex-1 flex flex-col">
-        <div class="mb-5">
-          <h1 class="m-0 mb-1.5 text-xl font-semibold sentinel-text-header leading-snug font-sans">
-            Preparing your setup
-          </h1>
-          <p class="m-0 text-sm sentinel-text-body leading-normal font-sans">
-            We're setting up a secure and stable environment for your session. This will take a moment.
-          </p>
-        </div>
-      </div>
-
-      <div class="flex-none flex flex-col items-center justify-center my-6">
-        
-        <div class="relative mb-8">
-          <div class="relative h-1.5 w-64 sentinel-bg-primary-tint rounded-full overflow-hidden">
-            <div class="h-full w-full sentinel-gradient-primary rounded-full sentinel-animate-wobble"></div>
-          </div>
-        </div>
-
-        <p class="m-0 text-sm font-medium sentinel-text-subtle font-sans text-center min-h-6" x-text="statusText"></p>
-      </div>
-
-      <div class="flex-1"></div>
-    </div>
-  </template>
-  <template x-if="preparingFailed">
-    <div class="flex-1 flex flex-col h-full">
-      
-      <div class="flex-1 flex flex-col justify-center items-center text-center">
-        <div class="flex justify-center mb-6">
-          <div class="w-16 h-16 rounded-full sentinel-bg-danger-subtle border-2 sentinel-border-danger-subtle flex items-center justify-center sentinel-animate-pop-in" aria-hidden="true">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="sentinel-text-danger">
-              <path d="M10.29 3.86l-8.47 14.14a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </div>
-        </div>
-
-        <h2 class="m-0 mb-2 text-lg font-semibold sentinel-text-header font-sans">We couldn't prepare your session</h2>
-        <p class="m-0 text-sm sentinel-text-muted leading-relaxed max-w-xs font-sans text-center">
-          There was a problem during setup. This could be a browser compatibility issue or a network error. Please try again.
-        </p>
-      </div>
-
-      <div class="flex flex-row items-center justify-end gap-2.5 mt-auto pt-5">
-        <button type="button" @click="stage = 'hidden'" 
-                class="px-4 py-2 rounded-lg border-2 sentinel-border-base text-sm font-medium sentinel-text-action hover:sentinel-bg-subtle transition-colors">
-          Cancel
-        </button>
-        <button type="button" @click="runSimulatedChecks()" 
-                class="px-5 py-2 rounded-lg sentinel-bg-primary sentinel-bg-primary-hover text-sm font-semibold text-white shadow-sm transition-all">
-          Try again
-        </button>
-      </div>
-    </div>
-  </template>
-
-</div>
-
-              <div x-show="stage === 'permissions'" class="flex flex-col h-full sentinel-animate-fade-in-up">
-  
-  <div class="flex-1 flex flex-col">
-    <div class="mb-5">
-      <h1 class="text-xl font-semibold sentinel-text-header leading-tight font-sans">Allow access to continue</h1>
-      <p class="mt-1 text-sm sentinel-text-body leading-relaxed font-sans">
-        This session requires access to camera, microphone and screen sharing. Allow each item below to proceed.
-      </p>
-    </div>
-  </div>
-
-  <div class="flex-none mb-5">
-    <div class="flex flex-col gap-2.5">
-      <template x-for="(perm, index) in permissions" :key="perm.name">
-         <div class="flex items-center gap-3 p-3 rounded-xl border-2 transition-all duration-300 sentinel-bg-subtle"
-              :class="{
-                 'sentinel-border-success': perm.state === 'granted',
-                 'sentinel-border-warning': perm.state === 'denied',
-                 'sentinel-border-primary': perm.state === 'requesting',
-                 'sentinel-border-base': perm.state === 'idle' || perm.state === 'retry',
-                 'opacity-100 grayscale-0': (activePermissionIndex === index || ['granted', 'denied'].includes(perm.state)),
-                 'opacity-50 grayscale': !(activePermissionIndex === index || ['granted', 'denied'].includes(perm.state))
-              }">
-
-          <div class="shrink-0 w-11 h-11 rounded-xl flex items-center justify-center sentinel-text-primary border-2 sentinel-border-icon-primary sentinel-bg-icon-primary">
-            <template x-if="perm.name === 'camera'">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="block">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
-              </svg>
-            </template>
-            <template x-if="perm.name === 'microphone'">
-               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="block">
-                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
-               </svg>
-            </template>
-            <template x-if="perm.name === 'screen'">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="block">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
-            </template>
-          </div>
-
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold sentinel-text-header" x-text="perm.label"></p>
-            <p class="text-xs sentinel-text-muted" x-text="perm.name === 'camera' ? 'Required to monitor you during the session' : (perm.name === 'microphone' ? 'Required for audio monitoring during the session' : 'Required to record your screen during the session')"></p>
-            <template x-if="perm.state === 'denied'">
-              <p class="text-xs font-medium sentinel-text-warning mt-0.5">Please provide browser permission to continue</p>
-            </template>
-          </div>
-
-          <div class="shrink-0 self-center">
-            <template x-if="perm.state === 'requesting'">
-               <svg width="18" height="18" viewBox="0 0 16 16" fill="none" class="sentinel-spinner">
-                 <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="2" stroke-dasharray="28" stroke-dashoffset="10" opacity="0.4" class="sentinel-text-primary-muted" />
-                 <path d="M 8 2 A 6 6 0 0 1 14 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="sentinel-text-primary" />
-               </svg>
-            </template>
-            <template x-if="perm.state === 'granted'">
-               <div class="w-6 h-6 rounded-full flex items-center justify-center text-white sentinel-animate-pop-in sentinel-bg-success-600">
-                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6L5 9L10 3"/></svg>
-               </div>
-            </template>
-            <template x-if="perm.state === 'denied'">
-               <button @click="requestPermission(perm.name)" 
-                       class="px-3.5 py-1.5 rounded-lg text-sm font-semibold text-white transition-colors sentinel-bg-warning sentinel-bg-warning-hover">
-                 Try again
-               </button>
-            </template>
-            <template x-if="(perm.state === 'idle' || perm.state === 'retry') && permissions.slice(0, index).every(p => p.state === 'granted')">
-               <button @click="requestPermission(perm.name)" class="px-4 py-1.5 rounded-lg sentinel-bg-primary sentinel-bg-primary-hover text-sm font-semibold text-white transition-colors">Allow</button>
-            </template>
-          </div>
-        </div>
-      </template>
-    </div>
-
-  </div>
-
-  <div class="flex-1 flex flex-col justify-end">
-    <div class="flex justify-end gap-2.5">
-      <button @click="stage = 'hidden'" class="px-4 py-2 rounded-lg border-2 sentinel-border-base text-sm font-medium sentinel-text-action hover:sentinel-bg-subtle transition-colors">Cancel</button>
-      <button :disabled="!permissions.every(p => p.state === 'granted')" 
-              @click="validatePermissions()" 
-              class="px-5 py-2 rounded-lg sentinel-bg-primary sentinel-bg-primary-hover text-sm font-semibold text-white shadow-sm disabled:opacity-40 disabled:cursor-not-allowed transition-all">
-        Continue
-      </button>
-    </div>
-  </div>
-</div>
-
-              <div x-show="stage === 'validating'" class="flex flex-col h-full sentinel-animate-fade-in">
-  
-  <div class="flex-1 flex flex-col">
-    <div class="mb-5">
-      <h1 class="m-0 mb-1.5 text-xl font-semibold sentinel-text-header leading-snug font-sans">
-        Checking your access
-      </h1>
-      <p class="m-0 text-sm sentinel-text-body leading-normal font-sans">
-        We're making sure the required access is working before your session starts.
-      </p>
-    </div>
-  </div>
-
-  <div class="flex-none flex flex-col items-center justify-center my-6">
-    
-    <div class="relative mb-8">
-      <div class="relative h-1.5 w-64 sentinel-bg-primary-tint rounded-full overflow-hidden">
-        <div class="h-full w-full sentinel-gradient-primary rounded-full sentinel-animate-wobble"></div>
-      </div>
-    </div>
-
-    <p class="m-0 text-sm sentinel-text-muted leading-normal max-w-72 font-sans text-center">
-      Finalizing access
-    </p>
-  </div>
-
-  <div class="flex-1"></div>
-
-</div>
-
-              <div x-show="stage === 'identity'" class="flex flex-col h-full sentinel-animate-fade-in-up">
-  
-  <template x-if="identitySubState !== 'failed'">
-    <div class="flex flex-col h-full">
-      <div class="mb-6">
-        <h1 class="text-xl font-semibold sentinel-text-header leading-tight font-sans">Verify your identity</h1>
-        <p class="mt-1 text-sm sentinel-text-muted leading-relaxed font-sans">Center your face in the frame. Capture happens automatically.</p>
-      </div>
-
-      <div class="relative flex-1 w-full sentinel-bg-preview rounded-2xl overflow-hidden mb-4 min-h-0 flex items-center justify-center shadow-inner">
-        <video id="sentinel-webcam-preview" 
-               autoplay 
-               playsinline 
-               muted 
-               class="absolute inset-0 w-full h-full object-cover sentinel-webcam-filter"
-               onloadedmetadata="this.play()"></video>
-
-        <template x-if="['capturing', 'capture-failed', 'rejected'].includes(identitySubState)">
-          <svg width="240" height="276" viewBox="0 0 240 276" fill="none" class="absolute z-10 transition-filter duration-500 sentinel-drop-shadow-subtle">
-            <g :stroke="identityStroke">
-              <ellipse cx="120" cy="138" rx="88" ry="110" stroke-width="2.5" :stroke-dasharray="['rejected', 'capture-failed'].includes(identitySubState) ? '0' : '10 6'" fill="none" />
-              <path d="M 32 80 L 32 60 Q 32 50 42 50 L 62 50" stroke-width="3.5" stroke-linecap="round" fill="none" />
-              <path d="M 208 80 L 208 60 Q 208 50 198 50 L 178 50" stroke-width="3.5" stroke-linecap="round" fill="none" />
-              <path d="M 32 200 L 32 220 Q 32 230 42 230 L 62 230" stroke-width="3.5" stroke-linecap="round" fill="none" />
-              <path d="M 208 200 L 208 220 Q 208 230 198 230 L 178 230" stroke-width="3.5" stroke-linecap="round" fill="none" />
-            </g>
-          </svg>
-        </template>
-
-        <template x-if="identitySubState === 'verifying'">
-          <div class="absolute inset-0 sentinel-bg-overlay-dark backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4">
-            <svg width="32" height="32" viewBox="0 0 16 16" fill="none" class="sentinel-spinner">
-              <circle cx="8" cy="8" r="6" stroke="rgb(var(--sentinel-border-on-dark-subtle))" stroke-width="2.5" stroke-dasharray="28" stroke-dashoffset="10" />
-              <path d="M 8 2 A 6 6 0 0 1 14 8" stroke="rgb(var(--sentinel-text-on-dark))" stroke-width="2.5" stroke-linecap="round" />
-            </svg>
-            <span class="text-sm font-semibold sentinel-text-on-dark tracking-wide">Processing Identity...</span>
-          </div>
-        </template>
-
-        <template x-if="identitySubState === 'verified'">
-          <div class="absolute inset-0 sentinel-bg-success-tint backdrop-blur-md z-30 flex flex-col items-center justify-center gap-4 sentinel-animate-fade-in">
-            <div class="w-16 h-16 rounded-full sentinel-bg-success flex items-center justify-center text-white sentinel-animate-pop-in sentinel-shadow-success-glow">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                <div class="flex items-center gap-1">
+                    <button @click="mode = 'minimized'"
+                            class="p-1 hover:sentinel-bg-subtle rounded-md transition-colors sentinel-text-muted hover:sentinel-text-body"
+                            title="Minimize">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <button @click="mode = (mode === 'detailed' ? 'compact' : 'detailed')"
+                            class="p-1 hover:sentinel-bg-subtle rounded-md transition-colors sentinel-text-muted hover:sentinel-text-body"
+                            title="Toggle Detailed View">
+                        <svg x-show="mode === 'detailed'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/>
+                        </svg>
+                        <svg x-show="mode === 'compact'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <span class="text-base font-bold sentinel-text-on-dark tracking-widest uppercase">Verified</span>
-          </div>
-        </template>
-
-        <div x-show="['capturing', 'capture-failed', 'rejected'].includes(identitySubState)" class="absolute bottom-0 inset-x-0 p-4 sentinel-bg-overlay-gradient flex items-center justify-center z-20">
-          <span class="text-sm font-semibold transition-all duration-300 text-center" 
-                :class="{
-                  'sentinel-text-danger-muted scale-105': identitySubState === 'rejected',
-                  'sentinel-text-warning-muted': identitySubState === 'capture-failed',
-                  'sentinel-text-on-dark-muted': identitySubState === 'capturing'
-                }"
-                x-text="identitySubState === 'rejected' ? 'Verification failed — please try again' : (identitySubState === 'capture-failed' ? 'Lighting or position issues — please center your face and improve lighting' : 'Center your face in the frame and look at the camera')"></span>
-        </div>
-      </div>
-
-      <div x-show="identitySubState === 'rejected' && attemptsRemaining !== undefined" 
-           class="mb-3 p-2 sentinel-bg-warning-subtle sentinel-text-warning text-sm font-bold text-center rounded-xl border-2 sentinel-border-warning-subtle sentinel-animate-fade-in-up">
-        <span x-text="attemptsRemaining === 1 ? 'Last attempt remaining' : attemptsRemaining + ' attempts remaining'"></span>
-      </div>
-
-
-    </div>
-  </template>
-
-  <template x-if="identitySubState === 'failed'">
-    <div class="flex-1 flex flex-col h-full">
-      
-      <div class="flex-1 flex flex-col justify-center items-center text-center">
-        <div class="flex justify-center mb-6">
-          <div class="w-16 h-16 rounded-full sentinel-bg-danger-subtle border-2 sentinel-border-danger-subtle flex items-center justify-center sentinel-animate-pop-in" aria-hidden="true">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="sentinel-text-danger">
-              <path d="M10.29 3.86l-8.47 14.14a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </div>
         </div>
 
-        <h2 class="m-0 mb-2 text-lg font-semibold sentinel-text-header font-sans">Verification Limit Reached</h2>
-        <p class="m-0 text-sm sentinel-text-muted leading-relaxed max-w-xs font-sans text-center">
-          You have exceeded the maximum number of attempts for identity verification. Please contact your administrator or support for further instructions.
-        </p>
-      </div>
-
-      <div class="flex flex-row items-center justify-end gap-2.5 mt-auto pt-5">
-        <button type="button" @click="stage = 'hidden'" 
-                class="px-4 py-2 rounded-lg border-2 sentinel-border-base text-sm font-medium sentinel-text-action hover:sentinel-bg-subtle transition-colors">
-          Close
-        </button>
-      </div>
-    </div>
-  </template>
-
-</div>
-              <div x-show="stage === 'ready'" class="flex flex-col h-full sentinel-animate-fade-in-up">
-  
-  <template x-if="engineStatus === 'starting'">
-    <div class="flex flex-col h-full">
-      <div class="flex-1 flex flex-col">
-        <div class="mb-5">
-          <h1 class="m-0 mb-1.5 text-xl font-semibold sentinel-text-header leading-snug font-sans">
-            Finalizing setup
-          </h1>
-          <p class="m-0 text-sm sentinel-text-body leading-normal font-sans">
-            We're starting the proctoring engine to ensure your session is secure.
-          </p>
-        </div>
-      </div>
-
-      <div class="flex-none flex flex-col items-center justify-center my-6">
-        <div class="relative mb-8">
-          <div class="relative h-1.5 w-64 sentinel-bg-primary-tint rounded-full overflow-hidden">
-            <div class="h-full w-full sentinel-gradient-primary rounded-full sentinel-animate-wobble"></div>
-          </div>
-        </div>
-        <p class="m-0 text-sm font-medium sentinel-text-subtle font-sans text-center">
-          Starting engine...
-        </p>
-      </div>
-
-      
-      <div class="flex-1 flex flex-col justify-end">
-        <div class="flex justify-end pt-4 pb-2">
-          <button disabled class="px-5 py-2 rounded-lg sentinel-bg-primary opacity-50 text-sm font-semibold text-white shadow-sm cursor-not-allowed">
-            Begin
-          </button>
-        </div>
-      </div>
-    </div>
-  </template>
-
-  <template x-if="engineStatus === 'started'">
-    <div class="flex flex-col h-full">
-      <div class="flex-1 flex flex-col items-center justify-center text-center sentinel-animate-fade-in">
-        <div class="mb-6 flex justify-center">
-          <div class="w-20 h-20 rounded-full sentinel-gradient-success border-2 border-white/20 flex items-center justify-center text-white sentinel-animate-pop-in">
-            <svg width="40" height="40" viewBox="0 0 32 32" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 16L13 21L24 10"/></svg>
-          </div>
-        </div>
-
-        <div class="mb-6">
-          <h1 class="text-xl font-semibold sentinel-text-header leading-tight font-sans">Setup complete</h1>
-          <p class="mt-2 text-sm sentinel-text-muted leading-relaxed font-sans">
-            Your setup is complete. You can now begin your session.
-          </p>
-        </div>
-
-        <p class="text-sm sentinel-text-subtle font-sans sentinel-animate-fade-in text-center" aria-live="polite">
-          Auto begins in <span x-text="countdown" class="font-medium sentinel-text-action"></span>s…
-        </p>
-      </div>
-
-      <div class="flex-none flex justify-end pt-4 pb-2">
-        <button @click="goToStep('hidden')" 
-                class="px-5 py-2 rounded-lg sentinel-bg-primary sentinel-bg-primary-hover text-sm font-semibold text-white shadow-sm transition-all transform active:scale-95">
-          Begin
-        </button>
-      </div>
-    </div>
-  </template>
-
-</div>
-
+        <div x-show="mode !== 'minimized'" 
+             x-transition:enter="transition ease-out duration-300 delay-75"
+             x-transition:enter-start="opacity-0 -translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             class="px-4 pt-4 flex flex-col gap-4">
+            
+            <!-- Session Duration (Shared between Detailed and Compact) -->
+            <div class="flex items-center justify-between">
+                <span class="text-xs font-bold sentinel-text-muted tracking-wider">Session Duration</span>
+                <span class="text-sm sentinel-text-body" x-text="formattedDuration">01:24:05</span>
             </div>
-          </div>
+
+            <!-- Webcam Preview Area -->
+            <div class="relative aspect-[4/3] sentinel-bg-preview rounded-xl overflow-hidden shadow-lg group"
+                 :class="{ 'mb-4': mode === 'compact' }">
+                <!-- REAL Webcam Video Feed -->
+                <video id="sentinel-webcam-preview" 
+                       autoplay 
+                       playsinline 
+                       muted 
+                       class="absolute inset-0 w-full h-full object-cover sentinel-webcam-filter"
+                       style="transform: scaleX(-1);"></video>
+                
+                <!-- Warning Overlay (Sticky at bottom) -->
+                <div x-show="warning"
+                     class="absolute bottom-0 inset-x-0 h-10 sentinel-warning-banner flex items-center px-4 gap-3">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span class="text-sm font-bold" x-text="warning">Keep your face in view</span>
+                </div>
+            </div>
+
+            <!-- Inputs Status (Detailed only) -->
+            <div x-show="mode === 'detailed'"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 -translate-y-2"
+                 x-transition:enter-end="opacity-100 translate-y-0"
+                 class="grid grid-cols-3 gap-2 pb-4">
+                
+                <!-- Camera Status -->
+                <div @mouseenter="hoverInput = 'camera'" @mouseleave="hoverInput = null"
+                     class="relative group/input sentinel-bg-glass-subtle backdrop-blur-md rounded-xl p-3 flex flex-col items-center gap-1 border sentinel-border-base transition-all duration-300">
+                    <!-- Warning Badge -->
+                    <div x-show="inputStates.camera.status !== 'healthy'" 
+                         class="absolute top-2 right-3 rounded-full p-0.5">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="sentinel-text-warning">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                    </div>
+
+                    <div class="relative">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                             :class="{
+                                'sentinel-text-primary': inputStates.camera.status === 'healthy',
+                                'sentinel-text-warning': inputStates.camera.status !== 'healthy'
+                             }">
+                            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold transition-colors"
+                          :class="{
+                            'sentinel-text-muted': inputStates.camera.status === 'healthy',
+                            'sentinel-text-warning': inputStates.camera.status !== 'healthy'
+                          }">Camera</span>
+                    
+                    <!-- Tooltip -->
+                    <div x-show="hoverInput === 'camera' && inputStates.camera.message"
+                         x-transition:enter="transition-opacity duration-200"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 p-2 sentinel-bg-tooltip backdrop-blur-md rounded-lg shadow-xl border sentinel-border-tooltip text-xs sentinel-text-tooltip text-center leading-tight z-50 pointer-events-none">
+                        <span x-text="inputStates.camera.message"></span>
+                        <div class="sentinel-tooltip-arrow absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 border border-t-0 border-l-0 sentinel-bg-tooltip sentinel-border-tooltip -z-10"></div>
+                    </div>
+                </div>
+
+                <!-- Screen Status -->
+                <div @mouseenter="hoverInput = 'screen'" @mouseleave="hoverInput = null"
+                     class="relative group/input sentinel-bg-glass-subtle backdrop-blur-md rounded-xl p-3 flex flex-col items-center gap-1 border sentinel-border-base transition-all duration-300">
+                    <!-- Warning Badge -->
+                    <div x-show="inputStates.screen.status !== 'healthy'" 
+                         class="absolute top-2 right-3 rounded-full p-0.5">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="sentinel-text-warning">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                    </div>
+
+                    <div class="relative">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                             :class="{
+                                'sentinel-text-primary': inputStates.screen.status === 'healthy',
+                                'sentinel-text-warning': inputStates.screen.status !== 'healthy'
+                             }">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold transition-colors"
+                          :class="{
+                            'sentinel-text-muted': inputStates.screen.status === 'healthy',
+                            'sentinel-text-warning': inputStates.screen.status !== 'healthy'
+                          }">Screen</span>
+
+                    <!-- Tooltip -->
+                    <div x-show="hoverInput === 'screen' && inputStates.screen.message"
+                         x-transition:enter="transition-opacity duration-200"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 p-2 sentinel-bg-tooltip backdrop-blur-md rounded-lg shadow-xl border sentinel-border-tooltip text-xs sentinel-text-tooltip text-center leading-tight z-50 pointer-events-none">
+                        <span x-text="inputStates.screen.message"></span>
+                        <div class="sentinel-tooltip-arrow absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 border border-t-0 border-l-0 sentinel-bg-tooltip sentinel-border-tooltip -z-10"></div>
+                    </div>
+                </div>
+
+                <!-- Mic Status -->
+                <div @mouseenter="hoverInput = 'mic'" @mouseleave="hoverInput = null"
+                     class="relative group/input sentinel-bg-glass-subtle backdrop-blur-md rounded-xl p-3 flex flex-col items-center gap-1 border sentinel-border-base transition-all duration-300">
+                    <!-- Warning Badge -->
+                    <div x-show="inputStates.mic.status !== 'healthy'" 
+                         class="absolute top-2 right-3 rounded-full p-0.5">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="sentinel-text-warning">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                        </svg>
+                    </div>
+
+                    <div class="relative">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+                             :class="{
+                                'sentinel-text-primary': inputStates.mic.status === 'healthy',
+                                'sentinel-text-warning': inputStates.mic.status !== 'healthy'
+                             }">
+                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" /><path d="M19 10v1a7 7 0 0 1-14 0v-1" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold transition-colors"
+                          :class="{
+                            'sentinel-text-muted': inputStates.mic.status === 'healthy',
+                            'sentinel-text-warning': inputStates.mic.status !== 'healthy'
+                          }">Mic</span>
+
+                    <!-- Tooltip -->
+                    <div x-show="hoverInput === 'mic' && inputStates.mic.message"
+                         x-transition:enter="transition-opacity duration-200"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         class="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-32 p-2 sentinel-bg-tooltip backdrop-blur-md rounded-lg shadow-xl border sentinel-border-tooltip text-xs sentinel-text-tooltip text-center leading-tight z-50 pointer-events-none">
+                        <span x-text="inputStates.mic.message"></span>
+                        <div class="sentinel-tooltip-arrow absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45 border border-t-0 border-l-0 sentinel-bg-tooltip sentinel-border-tooltip -z-10"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
 
+        <!-- Minimized Pill -->
+        <div x-show="mode === 'minimized'"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-2"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             @mousedown="startDrag($event)"
+             @click="mode = 'compact'"
+             class="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:sentinel-bg-subtle transition-colors">
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-bold sentinel-text-muted uppercase tracking-widest">Session Monitor</span>
+                <div class="flex items-center gap-1.5">
+                    <div class="w-1.5 h-1.5 rounded-full sentinel-bg-success"></div>
+                    <span class="text-xs font-bold sentinel-text-success uppercase tracking-widest">Active</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-2 ml-auto">
+                <template x-if="warning">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="sentinel-text-warning"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </template>
+
+                <button @click.stop="mode = 'compact'"
+                        class="p-1 hover:sentinel-bg-subtle rounded-md transition-colors sentinel-text-muted hover:sentinel-text-body"
+                        title="Maximize">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
     </div>
-  </template>
-
 </div>
+
+<script>
+function sessionMonitor() {
+    return {
+        mode: 'detailed', // detailed, compact, minimized
+        position: { x: window.innerWidth - 340, y: 40 },
+        isDragging: false,
+        dragOffset: { x: 0, y: 0 },
+        duration: 5045, // 01:24:05 for demo
+        warning: 'Keep your face in view',
+        stream: null,
+        hoverInput: null,
+        inputStates: {
+            camera: { status: 'healthy', message: '' },
+            screen: { status: 'healthy', message: '' },
+            mic: { status: 'healthy', message: '' }
+        },
+
+        init() {
+            const savedPos = localStorage.getItem('sentinel_monitor_pos');
+            if (savedPos) {
+                try {
+                    const parsed = JSON.parse(savedPos);
+                    this.position = parsed;
+                } catch(e) {}
+            }
+            
+            this.clampPosition();
+            this.startWebcam();
+
+            setInterval(() => {
+                this.duration++;
+            }, 1000);
+
+            window.addEventListener('mousemove', (e) => this.drag(e));
+            window.addEventListener('mouseup', () => this.endDrag());
+            window.addEventListener('beforeunload', () => this.stopWebcam());
+        },
+
+        toggleState(key, status, message) {
+            if (this.inputStates[key].status === status) {
+                this.inputStates[key].status = 'healthy';
+                this.inputStates[key].message = '';
+            } else {
+                this.inputStates[key].status = status;
+                this.inputStates[key].message = message;
+            }
+        },
+
+        resetStates() {
+            this.warning = '';
+            Object.keys(this.inputStates).forEach(k => {
+                this.inputStates[k].status = 'healthy';
+                this.inputStates[k].message = '';
+            });
+        },
+
+        async startWebcam() {
+            try {
+                this.stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: {
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
+                });
+                
+                const video = document.getElementById('sentinel-webcam-preview');
+                if (video) {
+                    video.srcObject = this.stream;
+                }
+            } catch (err) {
+                console.error("Error accessing webcam:", err);
+                this.warning = 'Camera access denied';
+                this.inputStates.camera.status = 'error';
+                this.inputStates.camera.message = 'Permission denied by browser';
+            }
+        },
+
+        stopWebcam() {
+            if (this.stream) {
+                this.stream.getTracks().forEach(track => track.stop());
+                this.stream = null;
+            }
+        },
+
+        get formattedDuration() {
+            const h = Math.floor(this.duration / 3600);
+            const m = Math.floor((this.duration % 3600) / 60);
+            const s = this.duration % 60;
+            return [h, m, s].map(v => v.toString().padStart(2, '0')).join(':');
+        },
+
+        startDrag(e) {
+            this.isDragging = true;
+            this.dragOffset.x = e.clientX - this.position.x;
+            this.dragOffset.y = e.clientY - this.position.y;
+        },
+
+        drag(e) {
+            if (!this.isDragging) return;
+            
+            let newX = e.clientX - this.dragOffset.x;
+            let newY = e.clientY - this.dragOffset.y;
+
+            this.position.x = newX;
+            this.position.y = newY;
+            this.clampPosition();
+        },
+
+        endDrag() {
+            if (this.isDragging) {
+                this.isDragging = false;
+                localStorage.setItem('sentinel_monitor_pos', JSON.stringify(this.position));
+            }
+        },
+
+        clampPosition() {
+            const margin = 20;
+            this.$nextTick(() => {
+                const widget = this.$el;
+                if (!widget) return;
+
+                const rect = widget.getBoundingClientRect();
+                const width = rect.width;
+                const height = rect.height;
+
+                if (this.position.x < margin) this.position.x = margin;
+                if (this.position.y < margin) this.position.y = margin;
+                
+                if (this.position.x + width > window.innerWidth - margin) {
+                    this.position.x = window.innerWidth - width - margin;
+                }
+                
+                if (this.position.y + height > window.innerHeight - margin) {
+                    this.position.y = window.innerHeight - height - margin;
+                }
+            });
+        }
+    }
+}
+</script>
+
+
 
       </div>
     </main>
@@ -1559,288 +1431,7 @@
   </div>
   </body>
 
-  
-  <script>
-function sentinelProctoringWidget() {
-  return {
-    stage: 'hidden',
-
-    streams: {
-      camera: null,
-      screen: null,
-      microphone: null
-    },
-
-    prepInterval: null,
-
-    // Preparing step state
-    statusIdx: 0,
-    statusSequence: [
-      'Loading session settings',
-      'Checking browser compatibility',
-      'Checking available devices',
-      'Preparing secure setup'
-    ],
-    preparingFailed: false,
-    
-    // Permissions state
-    permissions: [
-      { name: 'camera', label: 'Camera', state: 'idle' },
-      { name: 'microphone', label: 'Microphone', state: 'idle' },
-      { name: 'screen', label: 'Screen sharing', state: 'idle' }
-    ],
-    
-    // Identity state
-    identitySubState: 'capturing', // capturing, capture-failed, verifying, verified, rejected, failed
-    attemptsRemaining: 2,
-    
-    // Ready state
-    engineStatus: 'starting', // starting, started
-    countdown: 5,
-    
-    get identityStroke() {
-      if (this.identitySubState === 'rejected') return 'rgb(var(--sentinel-danger-400))';
-      if (this.identitySubState === 'capture-failed') return 'rgb(var(--sentinel-warning-400))';
-      return 'rgb(var(--sentinel-border-on-dark))';
-    },
-
-    init() {
-      console.log('Sentinel Widget Initialized');
-      // Cleanup streams on page unload just in case
-      window.addEventListener('beforeunload', () => this.stopAllStreams());
-    },
-
-    get statusText() {
-      return this.statusSequence[this.statusIdx];
-    },
-
-    get activePermissionIndex() {
-      return this.permissions.findIndex(p => p.state !== 'granted');
-    },
-
-    get currentStep() {
-      const mapping = {
-        'preparing': 0,
-        'permissions': 1,
-        'validating': 1,
-        'identity': 2,
-        'ready': 3
-      };
-
-      return mapping[this.stage] ?? 0;
-    },
-
-    goToStep(step) {
-      console.log('Navigating to:', step);
-      this.stage = step;
-      
-      if (step === 'fetching_policy') {
-        setTimeout(() => {
-          if (this.stage === 'fetching_policy') {
-            this.goToStep('preparing');
-          }
-        }, 1500);
-      }
-
-      if (step === 'preparing' && !this.preparingFailed) {
-        this.runSimulatedChecks();
-      }
-      
-      if (step === 'identity') {
-        this.setupCameraPreview();
-        // Auto-verify after 3 seconds
-        setTimeout(() => {
-          if (this.stage === 'identity' && this.identitySubState === 'capturing') {
-            this.simulateIdentityVerification();
-          }
-        }, 3000);
-      }
-
-      if (step === 'ready') {
-        this.initializeEngine();
-      }
-
-      if (step === 'hidden') {
-        this.stopAllStreams();
-      }
-    },
-
-    runSimulatedChecks() {
-      this.statusIdx = 0;
-      this.preparingFailed = false;
-      
-      if (this.prepInterval) clearInterval(this.prepInterval);
-      this.prepInterval = setInterval(() => {
-        if (this.statusIdx < this.statusSequence.length - 1) {
-          this.statusIdx++;
-        } else {
-          clearInterval(this.prepInterval);
-          setTimeout(() => this.goToStep('permissions'), 800);
-        }
-      }, 1000);
-    },
-
-    async requestPermission(name) {
-      const perm = this.permissions.find(p => p.name === name);
-      if (!perm) return;
-      
-      perm.state = 'requesting';
-      
-      try {
-        if (name === 'camera') {
-          this.streams.camera = await navigator.mediaDevices.getUserMedia({ video: true });
-          console.log('Camera access granted');
-        } else if (name === 'microphone') {
-          this.streams.microphone = await navigator.mediaDevices.getUserMedia({ audio: true });
-          console.log('Microphone access granted');
-        } else if (name === 'screen') {
-          this.streams.screen = await navigator.mediaDevices.getDisplayMedia({ video: true });
-          console.log('Screen sharing access granted');
-        }
-        
-        perm.state = 'granted';
-
-      } catch (err) {
-        console.error(`Permission denied for ${name}:`, err);
-        perm.state = 'denied'; 
-      }
-    },
-
-    validatePermissions() {
-      if (this.stage === 'identity') return;
-      this.stage = 'validating';
-      console.log('Validating permissions...');
-      
-      setTimeout(() => {
-        if (this.stage === 'validating') {
-          this.goToStep('identity');
-        }
-      }, 2000);
-    },
-
-    setupCameraPreview() {
-      // Connect stream to video element in identity step
-      this.$nextTick(() => {
-        const video = document.getElementById('sentinel-webcam-preview');
-        if (video && this.streams.camera) {
-          video.srcObject = this.streams.camera;
-        }
-      });
-    },
-
-    stopAllStreams() {
-      Object.values(this.streams).forEach(stream => {
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-        }
-      });
-      this.streams.camera = null;
-      this.streams.screen = null;
-      this.streams.microphone = null;
-      console.log('All media streams stopped');
-    },
-
-    simulateIdentityVerification() {
-      this.identitySubState = 'verifying';
-      console.log('Identity: Verifying preview...');
-      
-      setTimeout(() => {
-        this.identitySubState = 'verified';
-        console.log('Identity: Verified!');
-        setTimeout(() => this.goToStep('ready'), 1500);
-      }, 3000);
-    },
-
-    initializeEngine() {
-      this.engineStatus = 'starting';
-      console.log('Proctoring Engine: Initializing...');
-      
-      // Simulate engine startup delay
-      setTimeout(() => {
-        this.engineStatus = 'started';
-        console.log('Proctoring Engine: Started!');
-        this.startCountdown();
-      }, 3000);
-    },
-
-    startCountdown() {
-      this.countdown = 5;
-      const timer = setInterval(() => {
-        if (this.stage !== 'ready') {
-          clearInterval(timer);
-          return;
-        }
-
-        if (this.countdown > 0) {
-          this.countdown--;
-        } else {
-          clearInterval(timer);
-          this.goToStep('hidden');
-          console.log('Workflow Completed');
-        }
-      }, 1000);
-    },
-
-    //  Simulation Helpers 
-
-    resetState() {
-      this.stopAllStreams();
-      this.stage = 'hidden';
-      this.statusIdx = 0;
-      this.preparingFailed = false;
-      this.identitySubState = 'capturing';
-      this.attemptsRemaining = 2;
-      this.engineStatus = 'starting';
-      this.permissions.forEach(p => p.state = 'idle');
-    },
-
-    startSession() {
-      this.resetState();
-      this.stage = 'consent';
-    },
-
-    simulatePrepFailed() {
-      this.resetState();
-      this.stage = 'preparing';
-      this.statusIdx = 0;
-      setTimeout(() => {
-        this.statusIdx = 1; // Checking browser compatibility
-        setTimeout(() => {
-          this.preparingFailed = true;
-        }, 1000);
-      }, 1000);
-    },
-
-    simulateIdentityRejected() {
-      this.resetState();
-      this.stage = 'identity';
-      this.identitySubState = 'verifying';
-      setTimeout(() => {
-        this.identitySubState = 'rejected';
-        this.attemptsRemaining = 1;
-      }, 2000);
-    },
-
-    simulateIdentityFailed() {
-      this.resetState();
-      this.stage = 'identity';
-      this.identitySubState = 'verifying';
-      setTimeout(() => {
-        this.identitySubState = 'failed';
-        this.attemptsRemaining = 0;
-      }, 2000);
-    },
-
-    simulateCaptureFailed() {
-      this.resetState();
-      this.stage = 'identity';
-      this.identitySubState = 'capture-failed';
-    }
-  }
-}
-</script>
-
-
+   
   
   <script src="/node_modules/preline/dist/preline.js"></script>
   
