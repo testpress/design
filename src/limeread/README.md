@@ -32,6 +32,7 @@ To align with shadcn's atomic structure, we use reusable component files powered
 ## 4. Design & Styling Constraints (No Custom Styling)
 - **Strict Styling Restrictions**: The AI must **never** design or introduce custom styling/classes on its own.
 - **Use Existing Theme**: Only use classes and colors already present/configured in the existing system.
+- **Iconography**: Only use raw SVG icons derived from the **Lucide** icon library. Do not import external icon libraries or use other icon sets.
 - **Fallback**: If a class or design rule is missing from the existing system, the AI must halt and ask the user how to proceed instead of guessing or introducing ad-hoc style/design custom rules.
 
 ---
