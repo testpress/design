@@ -73,6 +73,7 @@ module.exports = config => {
     config.addPassthroughCopy("css/simba.css");
     config.addPassthroughCopy("css/odinhire.css");
     config.addPassthroughCopy("css/limeread.css");
+    config.addPassthroughCopy("css/sentinel.css");
     config.addPassthroughCopy({
         "src/odinhire/node_modules/preline/dist/preline.js":
             "src/odinhire/node_modules/preline/dist/preline.js",
