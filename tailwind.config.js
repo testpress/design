@@ -7,7 +7,7 @@ module.exports = {
   content: [
     "./src/**/*.{html,js}",
     "!./src/simba/**",
-    "!./src/sentinel/sdk_v2/**",
+    "!./src/sentinel/proctor_widget/**",
     "node_modules/preline/dist/*.js",
     "node_modules/@themesberg/tailwind-datepicker/dist/js/*.js"
   ],
