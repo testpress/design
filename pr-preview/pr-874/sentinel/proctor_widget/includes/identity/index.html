@@ -1,0 +1,98 @@
+<div x-show="stage === 'identity'" class="flex flex-col h-full sentinel-animate-fade-in-up">
+  
+  <template x-if="identitySubState !== 'failed'">
+    <div class="flex flex-col h-full">
+      <div class="mb-6">
+        <h1 class="text-xl font-semibold text-foreground leading-tight font-sans">Verify your identity</h1>
+        <p class="mt-1 text-sm text-muted-foreground-1 leading-relaxed font-sans">Center your face in the frame. Capture happens automatically.</p>
+      </div>
+
+      <div class="relative flex-1 w-full bg-gray-900 rounded-2xl overflow-hidden mb-4 min-h-0 flex items-center justify-center shadow-inner">
+        <video id="sentinel-webcam-preview" 
+               autoplay 
+               playsinline 
+               muted 
+               class="absolute inset-0 w-full h-full object-cover grayscale-[20%] brightness-[110%] contrast-[110%]"
+               onloadedmetadata="this.play()"></video>
+
+        <template x-if="['capturing', 'capture-failed', 'rejected'].includes(identitySubState)">
+          <svg width="240" height="276" viewBox="0 0 240 276" fill="none" class="absolute z-10 transition-filter duration-500 drop-shadow-[0_0_12px_rgba(255,255,255,0.1)]">
+            <g :stroke="identityStroke">
+              <ellipse cx="120" cy="138" rx="88" ry="110" stroke-width="2.5" :stroke-dasharray="['rejected', 'capture-failed'].includes(identitySubState) ? '0' : '10 6'" fill="none" />
+              <path d="M 32 80 L 32 60 Q 32 50 42 50 L 62 50" stroke-width="3.5" stroke-linecap="round" fill="none" />
+              <path d="M 208 80 L 208 60 Q 208 50 198 50 L 178 50" stroke-width="3.5" stroke-linecap="round" fill="none" />
+              <path d="M 32 200 L 32 220 Q 32 230 42 230 L 62 230" stroke-width="3.5" stroke-linecap="round" fill="none" />
+              <path d="M 208 200 L 208 220 Q 208 230 198 230 L 178 230" stroke-width="3.5" stroke-linecap="round" fill="none" />
+            </g>
+          </svg>
+        </template>
+
+        <template x-if="identitySubState === 'verifying'">
+          <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm z-20 flex flex-col items-center justify-center gap-4">
+            <svg width="32" height="32" viewBox="0 0 16 16" fill="none" class="sentinel-spinner">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" class="text-white/30" stroke-width="2.5" stroke-dasharray="28" stroke-dashoffset="10" />
+              <path d="M 8 2 A 6 6 0 0 1 14 8" stroke="currentColor" class="text-white" stroke-width="2.5" stroke-linecap="round" />
+            </svg>
+            <span class="text-sm font-semibold text-white tracking-wide">Processing Identity...</span>
+          </div>
+        </template>
+
+        <template x-if="identitySubState === 'verified'">
+          <div class="absolute inset-0 bg-emerald-500/20 backdrop-blur-md z-30 flex flex-col items-center justify-center gap-4 sentinel-animate-fade-in">
+            <div class="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center text-white sentinel-animate-pop-in shadow-[0_0_30px_rgba(16,185,129,0.5)]">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <span class="text-base font-bold text-white tracking-widest uppercase">Verified</span>
+          </div>
+        </template>
+
+        <div x-show="['capturing', 'capture-failed', 'rejected'].includes(identitySubState)" class="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent flex items-center justify-center z-20">
+          <span class="text-sm font-semibold transition-all duration-300 text-center" 
+                :class="{
+                  'text-red-400 scale-105': identitySubState === 'rejected',
+                  'text-amber-400': identitySubState === 'capture-failed',
+                  'text-white/90': identitySubState === 'capturing'
+                }"
+                x-text="identitySubState === 'rejected' ? 'Verification failed — please try again' : (identitySubState === 'capture-failed' ? 'Lighting or position issues — please center your face and improve lighting' : 'Center your face in the frame and look at the camera')"></span>
+        </div>
+      </div>
+
+      <div x-show="identitySubState === 'rejected' && attemptsRemaining !== undefined" 
+           class="mb-3 p-2 bg-amber-50 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 text-sm font-bold text-center rounded-xl border-1.5 border-amber-600/20 dark:border-amber-400/20 sentinel-animate-fade-in-up">
+        <span x-text="attemptsRemaining === 1 ? 'Last attempt remaining' : attemptsRemaining + ' attempts remaining'"></span>
+      </div>
+
+
+    </div>
+  </template>
+
+  <template x-if="identitySubState === 'failed'">
+    <div class="flex-1 flex flex-col h-full">
+      
+      <div class="flex-1 flex flex-col justify-center items-center text-center">
+        <div class="flex justify-center mb-6">
+          <div class="w-16 h-16 rounded-full bg-red-50 dark:bg-red-900/40 border-1.5 border-red-600/50 dark:border-red-400/50 flex items-center justify-center sentinel-animate-pop-in" aria-hidden="true">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor" fill-opacity="0.12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 dark:text-red-400">
+              <path d="M10.29 3.86l-8.47 14.14a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+          </div>
+        </div>
+
+        <h2 class="m-0 mb-2 text-lg font-semibold text-foreground font-sans">Verification Limit Reached</h2>
+        <p class="m-0 text-sm text-muted-foreground-1 leading-relaxed max-w-xs font-sans text-center">
+          You have exceeded the maximum number of attempts for identity verification. Please contact your administrator or support for further instructions.
+        </p>
+      </div>
+
+      <div class="flex flex-row items-center justify-end gap-2.5 mt-auto pt-5">
+        <button type="button" @click="stage = 'hidden'" 
+                class="px-4 py-2 rounded-lg border-1.5 border-border text-sm font-medium text-muted-foreground-2 hover:bg-background-1 transition-colors">
+          Close
+        </button>
+      </div>
+    </div>
+  </template>
+
+</div>
