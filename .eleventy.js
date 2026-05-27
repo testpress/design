@@ -87,6 +87,10 @@ module.exports = config => {
             "src/simba/node_modules/preline/dist/preline.js",
     });
     config.addPassthroughCopy({
+        "src/sentinel/node_modules/preline/dist/preline.js":
+            "src/sentinel/node_modules/preline/dist/preline.js",
+    });
+    config.addPassthroughCopy({
         "src/simba/node_modules/apexcharts/dist/apexcharts.css":
             "src/simba/node_modules/apexcharts/dist/apexcharts.css",
     });
