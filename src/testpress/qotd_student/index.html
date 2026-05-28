@@ -59,7 +59,7 @@ new_student_page: true
       isQuizOpen: false,
       showSummary: false,
       currentIndex: 0,
-      selectedIdx: null,
+      selectedIdxs: [],
       hasAnswered: false,
       correctAnswers: 0,
       userAnswers: [],
@@ -99,12 +99,12 @@ new_student_page: true
           explanation: "Using s = ut + ½at², where u=0, a=10, s=80. 80 = 0 + ½(10)t² => 80 = 5t² => t² = 16 => t = 4 s."
         },
         {
-          text: "If a car travels at 72 km/h, its velocity in m/s is:",
-          options: ["10 m/s", "15 m/s", "20 m/s", "25 m/s"],
-          correctIdx: 2,
-          subject: "Physics",
-          difficulty: "Medium",
-          explanation: "72 km/h × (1000 m/km) × (1 h/3600 s) = 20 m/s."
+          text: "Which of the following are prime numbers?",
+          options: ["2", "4", "5", "9"],
+          correctIdx: [0, 2],
+          subject: "Maths",
+          difficulty: "Easy",
+          explanation: "2 and 5 are prime numbers because they are only divisible by 1 and themselves."
         }
       ],
 
@@ -120,8 +120,8 @@ new_student_page: true
         this.isQuizOpen = true;
         this.isReviewMode = false;
         this.showSummary = false;
-        this.currentIndex = 0;
-        this.selectedIdx = null;
+        this.currentIndex = 0,
+        this.selectedIdxs = [];
         this.hasAnswered = false;
         this.correctAnswers = 0;
         this.userAnswers = Array(this.questions.length).fill(null);
@@ -135,18 +135,48 @@ new_student_page: true
         this.currentIndex = 0;
         // Mocking user answers for review if it was already completed
         // [Correct, Incorrect, Correct, Incorrect, Correct]
-        this.userAnswers = [0, 2, 0, 3, 2]; 
-        this.selectedIdx = this.userAnswers[this.currentIndex];
+        this.userAnswers = [[0], [2], [0], [3], [0, 2]]; 
+        this.selectedIdxs = this.userAnswers[this.currentIndex];
         this.hasAnswered = true;
         document.body.style.overflow = 'hidden';
       },
 
       selectOption(idx) {
         if (this.hasAnswered || this.isReviewMode) return;
-        this.selectedIdx = idx;
+        
+        const isMultiSelect = Array.isArray(this.questions[this.currentIndex].correctIdx);
+        
+        if (isMultiSelect) {
+          const index = this.selectedIdxs.indexOf(idx);
+          if (index > -1) {
+            this.selectedIdxs.splice(index, 1);
+          } else {
+            this.selectedIdxs.push(idx);
+          }
+        } else {
+          this.selectedIdxs = [idx];
+        }
+      },
+
+      isCorrectOption(idx) {
+        if (!this.questions[this.currentIndex]) return false;
+        let correct = this.questions[this.currentIndex].correctIdx;
+        if (!Array.isArray(correct)) correct = [correct];
+        return correct.includes(idx);
+      },
+
+      checkAnswer() {
+        if (this.selectedIdxs.length === 0 || this.hasAnswered) return;
         this.hasAnswered = true;
-        this.userAnswers[this.currentIndex] = idx;
-        if (idx === this.questions[this.currentIndex].correctIdx) {
+        this.userAnswers[this.currentIndex] = [...this.selectedIdxs];
+        
+        let correct = this.questions[this.currentIndex].correctIdx;
+        if (!Array.isArray(correct)) correct = [correct];
+        
+        const isCorrect = this.selectedIdxs.length === correct.length && 
+                          this.selectedIdxs.every(val => correct.includes(val));
+                          
+        if (isCorrect) {
           this.correctAnswers++;
         }
       },
@@ -154,8 +184,8 @@ new_student_page: true
       nextQuestion() {
         if (this.currentIndex < this.questions.length - 1) {
           this.currentIndex++;
-          this.selectedIdx = this.userAnswers[this.currentIndex];
-          this.hasAnswered = this.isReviewMode || this.selectedIdx !== null;
+          this.selectedIdxs = this.userAnswers[this.currentIndex] || [];
+          this.hasAnswered = this.isReviewMode || this.selectedIdxs.length > 0;
           this.$refs.quizBody.scrollTop = 0;
         } else {
           this.endQuiz();
@@ -165,8 +195,8 @@ new_student_page: true
       previousQuestion() {
         if (this.currentIndex > 0) {
           this.currentIndex--;
-          this.selectedIdx = this.userAnswers[this.currentIndex];
-          this.hasAnswered = this.isReviewMode || this.selectedIdx !== null;
+          this.selectedIdxs = this.userAnswers[this.currentIndex] || [];
+          this.hasAnswered = this.isReviewMode || this.selectedIdxs.length > 0;
           this.$refs.quizBody.scrollTop = 0;
         }
       },
