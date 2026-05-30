@@ -1,0 +1,126 @@
+{% from "./input.html" import input %}
+{% macro select(label="", name="", id="", placeholder="Select option...", options=[], selected_value="", required=false, disabled=false, multiple=false, search=false, help_text="", error_message="") %}
+{% set element_id = id if id else name %}
+
+<div class="space-y-2" 
+     x-data="uiSelect({ 
+        multiple: {{ 'true' if multiple else 'false' }}, 
+        searchable: {{ 'true' if search else 'false' }}, 
+        selectedValue: '{{ selected_value }}', 
+        options: {{ options | dump | escape | default('[]') }} 
+     })"
+     @click.outside="open = false">
+
+    {% if label %}
+    <label for="{{ element_id }}" class="block text-sm font-medium text-gray-800 dark:text-white">
+        {{ label }}{% if required %}<span class="text-red-500 ml-1">*</span>{% endif %}
+    </label>
+    {% endif %}
+
+    <div class="relative">
+        <!-- Hidden Native Select for Form Submission -->
+        <select name="{{ name }}" id="{{ element_id }}" {% if multiple %}multiple{% endif %} {% if required %}required{% endif %} {% if disabled %}disabled{% endif %} class="hidden" x-ref="select">
+            <option value=""></option>
+            {% for opt in options %}
+                <option value="{{ opt.value }}" :selected="isSelected('{{ opt.value }}')">{{ opt.label }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Custom Select Toggle -->
+        <div @click="{% if not disabled %}open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() }){% endif %}"
+             class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer {% if disabled %}opacity-50 pointer-events-none bg-gray-50 dark:bg-neutral-800{% else %}hover:bg-gray-50 dark:hover:bg-neutral-700{% endif %}
+                    {% if error_message %}border-red-500 dark:border-red-500 focus-within:border-red-500 dark:focus-within:border-red-500 focus-within:ring-red-500 dark:focus-within:ring-red-500{% else %}border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600{% endif %}
+                    {% if multiple %}ps-1 pe-9 min-h-[42px] flex-wrap{% else %}py-2 sm:py-2.5 px-3 pe-9{% endif %}">
+             
+            <!-- Multi Select Tags -->
+            <template x-if="multiple">
+                <div class="flex flex-wrap items-center gap-1 w-full">
+                    <template x-for="tag in selectedLabels" :key="tag.value">
+                        <div class="flex items-center relative z-10 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-full p-1 m-0.5">
+                            <template x-if="tag.icon">
+                                <div class="size-5 ms-1 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="tag.icon"></div>
+                            </template>
+                            <div class="whitespace-nowrap text-gray-800 dark:text-neutral-200 px-2 text-xs font-medium" x-text="tag.label"></div>
+                            <div @click.stop="removeSelected(tag.value)" class="inline-flex shrink-0 justify-center items-center size-5 rounded-full bg-gray-100 dark:bg-neutral-700 text-gray-800 dark:text-neutral-200 hover:bg-gray-200 dark:hover:bg-neutral-600 focus:outline-none focus:bg-gray-200 dark:focus:bg-neutral-600 cursor-pointer">
+                                <svg class="shrink-0 w-3 h-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </div>
+                        </div>
+                    </template>
+                    <!-- Placeholder (Multiple) -->
+                    <div x-show="selected.length === 0" class="text-gray-500 dark:text-neutral-400 px-2 my-1" x-text="'{{ placeholder }}'"></div>
+                </div>
+            </template>
+
+            <!-- Single Select Text -->
+            <template x-if="!multiple">
+                <div class="w-full truncate text-start flex items-center">
+                    <template x-if="singleSelectedOption && singleSelectedOption.icon">
+                        <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="singleSelectedOption.icon"></div>
+                    </template>
+                    <span x-show="singleSelectedLabel" x-text="singleSelectedLabel"></span>
+                    <span x-show="!singleSelectedLabel" class="text-gray-500 dark:text-neutral-400" x-text="'{{ placeholder }}'"></span>
+                </div>
+            </template>
+
+            <!-- Chevron/Caret Indicator -->
+            <div class="absolute top-1/2 end-3 -translate-y-1/2">
+                <svg class="w-4 h-4 text-gray-500 dark:text-neutral-400 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+        </div>
+
+        <!-- Dropdown Menu -->
+        <div x-show="open" x-cloak 
+             x-transition:enter="transition ease-out duration-100"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-75"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             
+            <!-- Search Input -->
+            <template x-if="searchable">
+                <div class="p-2 sticky top-0 bg-white dark:bg-neutral-900 z-10 border-b border-gray-100 dark:border-neutral-800 -mx-1 -mt-1 mb-1" x-init="setTimeout(() => lucide.createIcons({root: $el}), 0)">
+                    {{ input(
+                        name="select_search",
+                        placeholder="Search...",
+                        icon="search",
+                        x_model="searchQuery",
+                        x_ref="searchInput",
+                        extra_classes="!bg-transparent",
+                        extra_attrs="@click.stop"
+                    ) }}
+                </div>
+            </template>
+
+            <template x-for="opt in filteredOptions" :key="opt.value">
+                <div @click="toggleOption(opt.value)"
+                     class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none"
+                     :class="isSelected(opt.value) ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : 'hover:bg-gray-50 dark:hover:bg-neutral-800/50'">
+                    <div class="flex items-center">
+                        <template x-if="opt.icon">
+                            <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
+                        </template>
+                        <span x-text="opt.label"></span>
+                    </div>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                </div>
+            </template>
+            
+            <div x-show="filteredOptions.length === 0" class="py-2 px-4 text-sm text-gray-500 dark:text-neutral-400 text-center">
+                No options found
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Text -->
+    {% if help_text and not error_message %}
+    <p class="text-sm text-gray-500 dark:text-neutral-400 mt-2">{{ help_text }}</p>
+    {% endif %}
+
+    <!-- Error Message -->
+    {% if error_message %}
+    <p class="text-sm text-red-500 mt-2">{{ error_message }}</p>
+    {% endif %}
+</div>
+{% endmacro %}

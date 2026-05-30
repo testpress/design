@@ -1,0 +1,143 @@
+# How to Ask AI to Design Pages
+
+## Rule
+
+Always reference the UI system docs.
+
+Keep prompts short.
+
+Do not over-explain unless needed.
+
+---
+
+## Standard Prompt
+
+Use this for most pages:
+
+```txt id="qz2v7p"
+Follow `ui-system/docs`.
+
+Design this page from the provided PRD.
+
+Create in a separate page file.
+```
+
+---
+
+## List Page Prompt
+
+For management/list pages:
+
+```txt id="lx1k9m"
+Follow `ui-system/docs`.
+
+Design this list page from the provided PRD.
+
+Create in a separate page file.
+```
+
+Examples:
+
+* Users List
+* Student Management
+* Payment History
+* Subscription Plans
+
+---
+
+## Form Page Prompt
+
+For create/edit forms:
+
+```txt id="jv8r3t"
+Follow `ui-system/docs`.
+
+Design this form page from the provided PRD.
+
+Create in a separate page file.
+```
+
+Examples:
+
+* Create Course
+* Edit Subscription Plan
+* Add Promotion
+
+---
+
+## Dashboard / Analytics Prompt
+
+For dashboard pages:
+
+```txt id="r8x2mn"
+Follow `ui-system/docs`.
+
+Design this dashboard page from the provided PRD.
+
+Create in a separate page file.
+```
+
+---
+
+## If Page Needs Special Instruction
+
+Add only what is necessary.
+
+Example:
+
+```txt id="mp4z7q"
+Follow `ui-system/docs`.
+
+Design this page from the provided PRD.
+
+Use tabs for status grouping.
+
+Create in a separate page file.
+```
+
+Example:
+
+```txt id="nq5w8r"
+Follow `ui-system/docs`.
+
+Design this page from the provided PRD.
+
+Keep mobile experience clean.
+
+Create in a separate page file.
+```
+
+---
+
+## What NOT To Do
+
+Avoid giant prompts.
+
+Do NOT repeat rules already inside docs.
+
+Bad:
+
+```txt id="e7p4kx"
+Use components only
+Use dark mode
+Be responsive
+Maintain spacing
+Do not invent UI
+```
+
+These should already exist inside `ui-system/docs`.
+
+If repeated often, the docs are failing.
+
+---
+
+## Goal
+
+Good UI system =
+
+```txt id="o2x9vs"
+small prompt
+consistent UI
+reusable components
+predictable output
+```
