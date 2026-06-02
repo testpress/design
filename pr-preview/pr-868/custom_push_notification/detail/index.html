@@ -813,7 +813,88 @@
           </div>
 
           <div class="col-span-full sm:ml-4" x-cloak x-show="isCriteriaSelected(4)">
-            <label for="id_push_notification_title" class="block text-sm font-medium leading-6 text-gray-900">Select Batches</label>
+            <div class="flex justify-between items-center">
+              <label for="id_push_notification_title" class="block text-sm font-medium leading-6 text-gray-900">Select Batches</label>
+              
+              <div class="hs-dropdown relative inline-flex [--strategy:fixed] [--placement:bottom-right]">
+                <button id="hs-dropdown-tags" type="button" class="hs-dropdown-toggle inline-flex items-center gap-x-1 text-sm font-medium text-green-600 hover:text-green-500">
+                  Assign via tags
+                </button>
+
+                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden z-[100] transition-[opacity,margin] duration-100 w-80 bg-white rounded-xl shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] p-5 pb-8 border border-stone-200 overflow-visible" aria-labelledby="hs-dropdown-tags">
+                  <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-base font-bold text-stone-800">Tags</h3>
+                    <button type="button" class="hs-dropdown-toggle text-stone-400 hover:text-stone-600 focus:outline-none transition-colors">
+                      <svg class="size-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    </button>
+                  </div>
+
+                  <!-- Tag Search/Input -->
+                  <div class="relative mb-4" @click.stop>
+                    <div class="w-full min-h-[44px] px-3 py-2 border border-stone-200 rounded-lg bg-white flex flex-wrap gap-1.5 items-center cursor-text focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-all">
+                      <input 
+                        type="text" 
+                        x-model="tags.tagSearch" 
+                        @focus="tags.isInputFocused = true"
+                        @blur="setTimeout(() => tags.isInputFocused = false, 200)"
+                        @keydown.enter.prevent="tags.addTag(tags.tagSearch)"
+                        placeholder="Type to search..." 
+                        class="flex-1 min-w-[120px] border-none focus:ring-0 p-0 text-sm placeholder:text-stone-400 bg-transparent"
+                      >
+                    </div>
+
+                    <!-- Suggestions Dropdown -->
+                    <div x-show="tags.isInputFocused || tags.tagSearch.trim().length > 0" 
+                         @click.stop
+                         class="absolute z-[110] w-full mt-2 max-h-[220px] p-1 space-y-0.5 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden overflow-y-auto">
+                      <div class="flex flex-col">
+                        <template x-for="tag in tags.filteredItems" :key="tag.name">
+                          <div class="relative group">
+                            <button 
+                              @click="addTagAndPopulateBatches(tag)"
+                              @mouseenter="tags.showPopover(tag.name)"
+                              @mouseleave="tags.hidePopover()"
+                              class="py-2 px-3 w-full text-start rounded-lg cursor-pointer hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition-colors"
+                            >
+                              <div class="flex flex-col items-start gap-0.5 min-w-0 text-left">
+                                <span class="text-sm font-medium text-gray-800" x-text="tag.name"></span>
+                                <span class="text-xs text-gray-400 leading-4 whitespace-normal break-words" x-text="tags.getBatchPreview(tag)"></span>
+                              </div>
+                            </button>
+
+                            <!-- Popover -->
+                            <div 
+                              x-show="tags.activePopover === tag.name"
+                              x-transition:enter="transition ease-out duration-100"
+                              x-transition:enter-start="opacity-0 scale-95"
+                              x-transition:enter-end="opacity-100 scale-100"
+                              x-transition:leave="transition ease-in duration-75"
+                              x-transition:leave-start="opacity-100 scale-100"
+                              x-transition:leave-end="opacity-0 scale-95"
+                              class="absolute left-full top-0 ml-2 z-[120] w-56 bg-white border border-gray-200 rounded-lg shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] p-3 pointer-events-none"
+                              style="min-width: 200px;"
+                            >
+                              <p class="text-xs font-semibold text-gray-700 mb-1">
+                                <span class="text-gray-400 font-normal">Tag: </span>
+                                <span x-text="tag.name"></span>
+                              </p>
+                              <p class="text-xs font-semibold text-gray-500 mb-1">Batches:</p>
+                              <p class="text-xs text-gray-600 leading-relaxed" x-text="tags.getBatchFull(tag)"></p>
+                            </div>
+                          </div>
+                        </template>
+
+                        <template x-if="tags.tagSearch.trim().length === 0 && tags.filteredItems.length === 0">
+                          <div class="py-2 px-4 text-sm text-gray-400 italic">
+                            No more tags available
+                          </div>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="mt-2">
               <div class="">
                 <ul class="flex flex-wrap gap-2 pr-[5rem] md:pr-[8rem] mt-2">
@@ -867,66 +948,7 @@
                   </div>
                 </div>
               </div>
-              <div class="mt-1 hs-dropdown relative inline-flex [--strategy:fixed] [--placement:bottom-left]">
-                <button id="hs-dropdown-tags" type="button" class="hs-dropdown-toggle inline-flex items-center gap-x-1 text-sm font-medium text-green-600 hover:text-green-500">
-                  Assign via tags
-                </button>
 
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden z-[100] transition-[opacity,margin] duration-100 w-80 bg-white rounded-xl shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] p-5 pb-8 border border-stone-200 overflow-visible" aria-labelledby="hs-dropdown-tags">
-                  <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-base font-bold text-stone-800">Tags</h3>
-                    <button type="button" class="hs-dropdown-toggle text-stone-400 hover:text-stone-600 focus:outline-none transition-colors">
-                      <svg class="size-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-                    </button>
-                  </div>
-
-                  <!-- Tag Search/Input -->
-                  <div class="relative mb-4" @click.stop>
-                    <div class="w-full min-h-[44px] px-3 py-2 border border-stone-200 rounded-lg bg-white flex flex-wrap gap-1.5 items-center cursor-text focus-within:border-green-500 focus-within:ring-1 focus-within:ring-green-500 transition-all">
-                      <input 
-                        type="text" 
-                        x-model="tags.tagSearch" 
-                        @focus="tags.isInputFocused = true"
-                        @blur="setTimeout(() => tags.isInputFocused = false, 200)"
-                        @keydown.enter.prevent="tags.addTag(tags.tagSearch)"
-                        placeholder="Type to search..." 
-                        class="flex-1 min-w-[120px] border-none focus:ring-0 p-0 text-sm placeholder:text-stone-400 bg-transparent"
-                      >
-                    </div>
-
-                    <!-- Suggestions Dropdown -->
-                    <div x-show="tags.isInputFocused || tags.tagSearch.trim().length > 0" 
-                         @click.stop
-                         class="absolute z-[110] w-full mt-2 max-h-[185px] p-1 space-y-0.5 bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden overflow-y-auto">
-                      <div class="flex flex-col">
-                        <template x-for="tag in tags.filteredItems" :key="tag">
-                          <button 
-                            @click="tags.addTag(tag)"
-                            class="py-2 px-4 w-full text-start text-sm text-gray-800 cursor-pointer hover:bg-gray-100 rounded-lg focus:outline-none focus:bg-gray-100 transition-colors"
-                          >
-                            <span x-text="tag"></span>
-                          </button>
-                        </template>
-
-                        <template x-if="tags.tagSearch.trim().length > 0 && !tags.items.map(t => t.toLowerCase()).includes(tags.tagSearch.toLowerCase().trim()) && !tags.selectedItems.map(t => t.toLowerCase()).includes(tags.tagSearch.toLowerCase().trim())">
-                          <button 
-                            @click.stop="tags.addTag(tags.tagSearch)"
-                            class="py-2 px-4 w-full text-start text-sm text-gray-800 cursor-pointer hover:bg-gray-100 rounded-lg focus:outline-none focus:bg-gray-100 border-t border-gray-100 transition-colors"
-                          >
-                            Add "<span x-text="tags.tagSearch"></span>"
-                          </button>
-                        </template>
-
-                        <template x-if="tags.tagSearch.trim().length === 0 && tags.filteredItems.length === 0">
-                          <div class="py-2 px-4 text-sm text-gray-400 italic">
-                            No more tags available
-                          </div>
-                        </template>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
               <div class="mt-2 flex flex-wrap gap-1.5">
                 <template x-for="(tag, index) in tags.selectedItems" :key="tag">
@@ -1574,6 +1596,7 @@
   </div>
 </div>
 <!-- End Add Event Modal -->
+
       </div>
     </main>
   </div>
@@ -1637,28 +1660,151 @@
       customdieldcritertia: { ...select2('', true) },
       tags: {
         selectedItems: [],
-        items: ['Priority', '2024', 'UPSC', 'History', 'Economy', 'Art', 'Literature', 'Exam', 'Mock', 'Practice'],
+        items: [
+          {
+            name: 'Python Students',
+            batches: [
+              { id: 1, name: 'Pathology' },
+              { id: 2, name: 'Dental' },
+              { id: 3, name: 'Residency' },
+              { id: 4, name: 'NEET Coaching' },
+              { id: 5, name: 'Charted Accountants' }
+            ]
+          },
+          {
+            name: 'Priority',
+            batches: [
+              { id: 1, name: 'Pathology' },
+              { id: 4, name: 'NEET Coaching' }
+            ]
+          },
+          {
+            name: '2024',
+            batches: [
+              { id: 2, name: 'Dental' },
+              { id: 3, name: 'Residency' }
+            ]
+          },
+          {
+            name: 'UPSC',
+            batches: [
+              { id: 3, name: 'Residency' },
+              { id: 5, name: 'Charted Accountants' }
+            ]
+          },
+          {
+            name: 'History',
+            batches: [
+              { id: 1, name: 'Pathology' }
+            ]
+          },
+          {
+            name: 'Economy',
+            batches: [
+              { id: 2, name: 'Dental' },
+              { id: 4, name: 'NEET Coaching' },
+              { id: 5, name: 'Charted Accountants' }
+            ]
+          },
+          {
+            name: 'Exam',
+            batches: [
+              { id: 1, name: 'Pathology' },
+              { id: 2, name: 'Dental' },
+              { id: 3, name: 'Residency' },
+              { id: 4, name: 'NEET Coaching' }
+            ]
+          },
+          {
+            name: 'Mock',
+            batches: [
+              { id: 3, name: 'Residency' }
+            ]
+          },
+          {
+            name: 'Practice',
+            batches: [
+              { id: 4, name: 'NEET Coaching' },
+              { id: 5, name: 'Charted Accountants' }
+            ]
+          }
+        ],
         tagSearch: '',
         isInputFocused: false,
+        activePopover: null,
 
         get filteredItems() {
           const search = this.tagSearch.trim().toLowerCase();
-          return this.items.filter(t => 
-            t.toLowerCase().startsWith(search) && 
-            !this.selectedItems.map(st => st.toLowerCase()).includes(t.toLowerCase())
+          return this.items.filter(t =>
+            t.name.toLowerCase().startsWith(search) &&
+            !this.selectedItems.map(st => st.toLowerCase()).includes(t.name.toLowerCase())
           );
         },
 
+        getBatchPreview(tag) {
+          if (!tag.batches || tag.batches.length === 0) return 'No batches';
+          const maxChars = 30;
+          let result = '';
+          let count = 0;
+          for (let i = 0; i < tag.batches.length; i++) {
+            const part = (i === 0 ? '' : ', ') + tag.batches[i].name;
+            if (result.length + part.length > maxChars && i > 0) {
+              const remaining = tag.batches.length - i;
+              return result + ' +' + remaining + ' more';
+            }
+            result += part;
+            count = i + 1;
+          }
+          return result;
+        },
+
+        getBatchFull(tag) {
+          if (!tag.batches || tag.batches.length === 0) return 'No batches';
+          return tag.batches.map(b => b.name).join(', ');
+        },
+
         addTag(tag) {
-          const trimmed = tag.trim();
-          if (trimmed && !this.selectedItems.map(st => st.toLowerCase()).includes(trimmed.toLowerCase())) {
-            this.selectedItems.push(trimmed);
+          const tagObj = typeof tag === 'string'
+            ? this.items.find(t => t.name.toLowerCase() === tag.trim().toLowerCase()) || { name: tag.trim(), batches: [] }
+            : tag;
+          if (tagObj.name && !this.selectedItems.map(st => st.toLowerCase()).includes(tagObj.name.toLowerCase())) {
+            this.selectedItems.push(tagObj.name);
           }
           this.tagSearch = '';
+          this.activePopover = null;
         },
 
         removeTag(index) {
           this.selectedItems.splice(index, 1);
+        },
+
+        showPopover(tagName) {
+          this.activePopover = tagName;
+        },
+
+        hidePopover() {
+          this.activePopover = null;
+        }
+      },
+
+      addTagAndPopulateBatches(tag) {
+        // Add tag to selected tags
+        if (tag.name && !this.tags.selectedItems.map(st => st.toLowerCase()).includes(tag.name.toLowerCase())) {
+          this.tags.selectedItems.push(tag.name);
+        }
+        this.tags.tagSearch = '';
+        this.tags.activePopover = null;
+        this.tags.isInputFocused = false;
+
+        // Populate batches from tag, skipping duplicates
+        if (tag.batches && tag.batches.length > 0) {
+          const existingIds = new Set(this.batches.selectedItems.map(b => b.id));
+          for (const batch of tag.batches) {
+            if (!existingIds.has(batch.id)) {
+              this.batches.selectedItems.push({ id: batch.id, name: batch.name });
+              existingIds.add(batch.id);
+            }
+          }
         }
       },
 
