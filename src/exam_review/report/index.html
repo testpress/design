@@ -1,0 +1,111 @@
+---
+title: Exam PDF Report
+tags: testpress
+date: 2025-06-01
+---
+
+{% extends "../base.html" %}
+
+{% block content %}
+<!-- Background wrapper for centering the canvas in the browser -->
+<div class="flex justify-center w-full bg-gray-100 min-h-screen">
+  
+  <!-- Content Column (Responsive up to 1000px, keeps everything aligned relative to sidebar) -->
+  <div style="width: 100%; max-width: 794px;" class="flex flex-col relative pb-8 ">
+    
+    <!-- Actual PDF Target -->
+    <div id="pdf-report-content" class="shrink-0 bg-white shadow-lg text-gray-800  min-h-[1414px] p-5 space-y-10">
+        {% include "./includes/heading.html" %}
+        {% include "./includes/student_exam_info.html" %}
+        {% include "./includes/overall_performance_summary.html" %}
+        {% include "./includes/proctoring_report.html" %}
+        {% include "./includes/section_report.html" %}
+        {% include "./includes/subject_report.html" %}
+        {% include "./includes/topic_report.html" %}
+        {% include "./includes/difficulty_report.html" %}
+        {% include "./includes/question_report.html" %}
+    </div>
+
+    <!-- FLOATING DOWNLOAD BUTTON (Aligned to content, floats at bottom) -->
+    <div class="fixed bottom-8 flex justify-center z-50 pointer-events-none" style="width: 1000px;">
+      <button onclick="downloadPDF()" id="download-btn" class="pointer-events-auto py-3 px-6 inline-flex items-center gap-x-2 text-base font-bold rounded-full border border-transparent bg-indigo-600 text-white hover:bg-indigo-700 shadow-xl hover:shadow-2xl transition-all">
+        <svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        Download Report PDF
+      </button>
+    </div>
+
+  </div>
+
+</div>
+{% endblock content %}
+
+{% block script %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+  // Draw Native Canvas Donut Chart for pristine PDF rendering
+  document.addEventListener("DOMContentLoaded", function() {
+    var canvas = document.getElementById('pdf-donut-chart');
+    if (canvas) {
+      var ctx = canvas.getContext('2d');
+      var x = 80, y = 80, radius = 64;
+      var startAngle = -0.5 * Math.PI;
+      
+      // Correct (75%)
+      var endAngle = startAngle + (0.75 * 2 * Math.PI);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, startAngle, endAngle);
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#10b981';
+      ctx.stroke();
+      
+      // Incorrect (15%)
+      startAngle = endAngle;
+      endAngle = startAngle + (0.15 * 2 * Math.PI);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, startAngle, endAngle);
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#ef4444';
+      ctx.stroke();
+      
+      // Unanswered (10%)
+      startAngle = endAngle;
+      endAngle = startAngle + (0.10 * 2 * Math.PI);
+      ctx.beginPath();
+      ctx.arc(x, y, radius, startAngle, endAngle);
+      ctx.lineWidth = 14;
+      ctx.strokeStyle = '#f97316';
+      ctx.stroke();
+    }
+  });
+
+  function downloadPDF() {
+    var element = document.getElementById('pdf-report-content');
+    var btn = document.getElementById('download-btn');
+    
+    // Add loading state to button
+    var originalText = btn.innerHTML;
+    btn.innerHTML = '<span class="animate-spin inline-block size-4 border-[3px] border-current border-t-transparent text-white rounded-full"></span> Generating...';
+    btn.disabled = true;
+    
+    var opt = {
+      margin:       0.2,
+      filename:     'Comprehensive_Exam_Review_Report.pdf',
+      image:        { type: 'jpeg', quality: 1 },
+      html2canvas:  { scale: 2, useCORS: true, allowTaint: true },
+      jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['css', 'legacy'], avoid: '.break-inside-avoid' }
+    };
+    
+    // Pass the exact pristine container
+    html2pdf().set(opt).from(element).save().then(function() {
+      // Restore button
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    }).catch(function(err) {
+      console.error(err);
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+    });
+  }
+</script>
+{% endblock script %}
