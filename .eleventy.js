@@ -69,7 +69,7 @@ module.exports = config => {
         if (!Array.isArray(items)) return [];
         return items.filter(item => item.job_id === jobId);
     });
-    config.addPassthroughCopy({ "src/api": "api" });
+    config.addPassthroughCopy({ "src/testpress/api": "api" });
     config.addPassthroughCopy("css/simba.css");
     config.addPassthroughCopy("css/odinhire.css");
     config.addPassthroughCopy("css/limeread.css");
