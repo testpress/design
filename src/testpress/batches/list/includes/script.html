@@ -13,6 +13,11 @@
       search: '',
       tags: initialTags || [],
       options: ['Premium', 'UPSC 2024', 'Priority', 'Pro', 'Weekend', 'Sci & Tech', 'Crash Course', 'Monthly', 'Current Affairs'],
+      activeFilters: [],
+      shouldShowRow() {
+        if (this.activeFilters.length === 0) return true;
+        return this.activeFilters.some(f => this.tags.includes(f));
+      },
       toggle(triggerEl, popoverId) {
         this.open = !this.open;
         console.log('[tablePopover] toggle called. New open state:', this.open, 'popoverId:', popoverId);
@@ -76,6 +81,57 @@
         }
         this.search = '';
         this.reposition();
+      }
+    };
+  }
+
+  function tagFilterDropdown() {
+    return {
+      allTags: [
+        'Premium',
+        'UPSC 2024',
+        'Priority',
+        'Pro',
+        'Weekend',
+        'Sci & Tech',
+        'Crash Course',
+        'Monthly',
+        'Current Affairs'
+      ],
+      searchQuery: '',
+      stagedTags: [],
+      appliedTags: [],
+      activeTagFilterCount: 0,
+
+      get filteredTags() {
+        const query = this.searchQuery.toLowerCase().trim();
+        return this.allTags.filter(tag => 
+          tag.toLowerCase().includes(query) && !this.stagedTags.includes(tag)
+        );
+      },
+      toggleStagedTag(tag) {
+        if (this.stagedTags.includes(tag)) {
+          this.stagedTags = this.stagedTags.filter(t => t !== tag);
+        } else {
+          this.stagedTags.push(tag);
+        }
+      },
+      clearAll() {
+        this.stagedTags = [];
+        this.appliedTags = [];
+        this.activeTagFilterCount = 0;
+        window.dispatchEvent(new CustomEvent('filter-tags', { detail: { tags: [] } }));
+      },
+      applyFilter() {
+        this.appliedTags = [...this.stagedTags];
+        this.activeTagFilterCount = this.appliedTags.length;
+        window.dispatchEvent(new CustomEvent('filter-tags', { detail: { tags: this.appliedTags } }));
+      },
+      init() {
+        this.$el.addEventListener('close.hs.dropdown', () => {
+          this.stagedTags = [...this.appliedTags];
+          this.searchQuery = '';
+        });
       }
     };
   }
