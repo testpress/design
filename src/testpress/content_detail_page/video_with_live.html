@@ -1,0 +1,114 @@
+---
+title: Content Detail Page
+date: 2023-05-30
+---
+
+{% extends "layouts/student_base.html" %}
+{% block script %}
+<script>
+  function syncChatHeight() {
+    const videoContainer = document.getElementById('live-video-container');
+    const chatBox = document.getElementById('live-chat-box');
+    if (videoContainer && chatBox) {
+      if (window.innerWidth >= 1024) {
+        // Desktop behavior: stretch video to fill remaining screen space
+        document.body.style.overflow = ''; // Release scroll lock
+        
+        // Calculate the absolute top of the video container regardless of scroll position
+        const absoluteTop = videoContainer.getBoundingClientRect().top + window.scrollY;
+        
+        // Calculate exactly how much space is left to hit the bottom of the screen
+        // (subtracting 24px to leave a clean bottom margin matching the layout's gap)
+        const targetHeight = window.innerHeight - absoluteTop - 24;
+        
+        // Ensure the video doesn't get crushed on extremely wide/short monitors
+        if (targetHeight > 350) {
+          videoContainer.style.height = targetHeight + "px";
+        } else {
+          videoContainer.style.height = "500px"; // Safe fallback
+        }
+        
+        chatBox.style.height = ''; // Reset mobile specific height, allow h-full to stretch
+        const rect = videoContainer.getBoundingClientRect();
+        if (rect && rect.height) {
+          chatBox.style.maxHeight = rect.height + "px";
+        }
+      } else {
+        // Mobile behavior: fill remaining viewport height
+        videoContainer.style.height = ''; // Reset the desktop video filling for phone
+        document.body.style.overflow = 'hidden'; // Lock body scroll to eliminate gaps
+        chatBox.style.maxHeight = 'none'; // Reset desktop maxHeight
+        
+        // Calculate the absolute top offset of the chat box relative to the document
+        const absoluteTop = chatBox.getBoundingClientRect().top + window.scrollY;
+        
+        // Set exact height with 100dvh to perfectly align with mobile browser UI
+        chatBox.style.height = (window.innerHeight - absoluteTop) + "px"; // Fallback
+        chatBox.style.height = `calc(100dvh - ${absoluteTop}px)`; // Modern mobile fix
+      }
+    }
+  }
+  window.addEventListener('load', syncChatHeight);
+  window.addEventListener('resize', syncChatHeight);
+
+  document.addEventListener("DOMContentLoaded", function() {
+    const videoContainer = document.getElementById('live-video-container');
+    if (videoContainer && window.ResizeObserver) {
+      new ResizeObserver(syncChatHeight).observe(videoContainer);
+    }
+  });
+</script>
+{% endblock script %}
+
+{% block extra_head %} 
+ <style>
+  .vjs-marker {
+    position: absolute;
+    background: #FFD700;
+    width: 5px;
+    height: 110%;
+    top: -5%;
+    z-index: 30;
+    margin-left: -3px;
+  }
+
+  .vjs-marker:hover span {
+    opacity: 1;
+  }
+
+  .vjs-marker span {
+    position: absolute;
+    bottom: 15px;
+    opacity: 0;
+    margin-left: -20px;
+    z-index: 90;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 8px;
+    font-size: 10px;
+  }
+    </style>
+    <link href="https://static.testpress.in/static/css/videojs.css" rel="stylesheet"/>
+    <script src="https://static.testpress.in/static/js/video.min.js?v=7.21.4"></script>
+    <link href="https://vjs.zencdn.net/7.8.4/video-js.css" rel="stylesheet" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/videojs-markers@1.0.0/dist/videojs.markers.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/videojs-markers@1.0.0/dist/videojs-markers.min.js"></script>
+    <script src="https://vjs.zencdn.net/ie8/1.1.2/videojs-ie8.min.js"></script>
+
+	<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+	{% include "./includes/content_scripts.html" %}
+	{% include "./includes/search_script.html" %}
+{% endblock extra_head %}
+
+{% block content %}
+{% set show_live_chat_toggle = true %}
+<div x-data="contents">
+	{% include "./includes/mobile_sidebar.html" %}  
+	{% include "./includes/desktop_sidebar.html" %}  
+	<main class="lg:pl-96 dark:bg-neutral-800">
+		{% include "./includes/navigate_content.html" %}
+		{% include "./includes/video_with_live_content.html" %}
+	</main>
+	{% include "./includes/global_search_modal.html"%}
+</div>
+{% endblock %}
