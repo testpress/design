@@ -1,0 +1,100 @@
+---
+member_view: "My Books"
+permalink: limeread/member_my_books/
+tags: limeread
+---
+
+{% extends "../layouts/member_base.html" %}
+
+{% block body_class %}bg-background text-foreground transition-colors duration-300 antialiased{% endblock %}
+{% block main_content %} mx-auto max-w-[85rem] p-4 sm:p-6 lg:p-8 {% endblock %}
+{% block content %} 
+  {% include "./heading.html" %}
+  <div class="mb-6">
+    {% include "./course_chip.html" %}
+  </div>
+  <div class="space-y-6 md:space-y-12">
+    {% include "./continue_reading.html" %}
+    {% include "./currently_borrowed.html" %}
+    {% include "./expiring_soon.html" %}
+  </div>
+{% endblock content %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('carousel', () => ({
+        isDragging: false,
+        startX: 0,
+        scrollLeftPos: 0,
+        canScrollLeft: false,
+        canScrollRight: true,
+        showArrows: false,
+
+        init() {
+            this.$nextTick(() => {
+                this.checkScroll();
+            });
+            window.addEventListener('resize', () => this.checkScroll());
+        },
+        
+        checkScroll() {
+            const el = this.$refs.slider;
+            if (!el) return;
+            
+            // Show arrows only if scrollWidth is greater than clientWidth
+            this.showArrows = el.scrollWidth > el.clientWidth;
+            
+            // Allow a 1px margin of error for fractional pixel rendering
+            this.canScrollLeft = Math.ceil(el.scrollLeft) > 0;
+            this.canScrollRight = Math.ceil(el.scrollLeft + el.clientWidth) < el.scrollWidth;
+        },
+
+        scrollLeft() {
+            const el = this.$refs.slider;
+            if (!el) return;
+            el.scrollBy({ left: -(el.clientWidth / 2), behavior: 'smooth' });
+            setTimeout(() => this.checkScroll(), 400); // Wait for smooth scroll to finish
+        },
+
+        scrollRight() {
+            const el = this.$refs.slider;
+            if (!el) return;
+            el.scrollBy({ left: el.clientWidth / 2, behavior: 'smooth' });
+            setTimeout(() => this.checkScroll(), 400);
+        },
+
+        startDrag(e) {
+            const el = this.$refs.slider;
+            if (!el) return;
+            this.isDragging = true;
+            this.startX = e.pageX - el.offsetLeft;
+            this.scrollLeftPos = el.scrollLeft;
+            el.classList.remove('snap-x'); // smooth drag
+            el.style.cursor = 'grabbing';
+            el.style.userSelect = 'none';
+        },
+
+        onDrag(e) {
+            if (!this.isDragging) return;
+            e.preventDefault();
+            const el = this.$refs.slider;
+            const x = e.pageX - el.offsetLeft;
+            const walk = (x - this.startX) * 2; // scroll-fast multiplier
+            el.scrollLeft = this.scrollLeftPos - walk;
+            this.checkScroll();
+        },
+
+        endDrag() {
+            if (!this.isDragging) return;
+            this.isDragging = false;
+            const el = this.$refs.slider;
+            el.classList.add('snap-x');
+            el.style.cursor = '';
+            el.style.removeProperty('user-select');
+            this.checkScroll();
+        }
+    }));
+});
+</script>
+{% endblock %}
