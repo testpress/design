@@ -1,15 +1,16 @@
-<div class="flex flex-col bg-white border border-gray-200 shadow-xs rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
-  <!-- Header -->
-  <div class="px-5 py-4 flex justify-between items-center gap-x-4">
+<div class="bg-gradient-to-r from-cyan-500 to-teal-500 rounded-xl p-[2px]">
+  <div class="flex flex-col bg-white rounded-[11px] shadow-sm overflow-hidden">
+    <!-- Header -->
+    <div class="px-5 py-4 flex justify-between items-center gap-x-4 bg-gradient-to-r from-cyan-500 to-teal-500">
     <div>
-      <h2 class="inline-block font-semibold text-sm sm:text-base text-gray-800 dark:text-neutral-200">
+      <h2 class="inline-block font-semibold text-sm sm:text-base text-white">
         Exam centers
       </h2>
     </div>
-  </div>
+    </div>
 
-  <!-- Body -->
-  <div class="border-t border-gray-200 dark:border-neutral-700">
+    <!-- Body -->
+    <div class="border-t border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 rounded-b-xl">
     <div
       x-data="{
         query: '',
@@ -17,9 +18,9 @@
         sortKey: 'name',
         sortDir: 'asc',
         rows: [
-          { id: 1, name: 'Downtown Test Center', detailHref: '/testpress/offline_center_exams/exam/centre/', state: 'Tamil Nadu', venue: 'Chennai Central Hall', address: '123 Main St, Chennai', contactName: 'Raj Kumar', contactPhone: '+91 98765 43210', sessionCount: 4, capacity: 900, allocated: 832, registered: 800, biometrics: 780, photos: 765, present: 768, absent: 64, online: true, clientNodes: '10/10', battery: 85 },
-          { id: 2, name: 'North Campus Hub', detailHref: '/testpress/offline_center_exams/exam/centre/', state: 'Karnataka', venue: 'Bangalore North Campus', address: '45 College Rd, Bangalore', contactName: 'Priya S.', contactPhone: '+91 87654 32109', sessionCount: 3, capacity: 700, allocated: 650, registered: 620, biometrics: 610, photos: 600, present: 598, absent: 52, online: true, clientNodes: '10/10', battery: 72 },
-          { id: 3, name: 'South Zone Centre', detailHref: '/testpress/offline_center_exams/exam/centre/', state: 'Telangana', venue: 'Hyderabad South Block', address: '78 MG Rd, Hyderabad', contactName: 'Anil M.', contactPhone: '+91 76543 21098', sessionCount: 2, capacity: 500, allocated: 450, registered: 0, biometrics: 0, photos: 0, present: 0, absent: 0, online: false, clientNodes: '0/10', battery: 5 }
+          { id: 1, name: 'Downtown Test Center', detailHref: '/testpress/offline_center_exams/exam/centre/', state: 'Tamil Nadu', city: 'Chennai', venue: 'Chennai Central Hall', address: '123 Main St, Chennai', contactName: 'Raj Kumar', contactPhone: '+91 98765 43210', sessionCount: 4, capacity: 900, allocated: 832, registered: 800, biometrics: 780, photos: 765, present: 768, submitted: 750, absent: 64, online: true, clientNodes: '10/10', battery: 85 },
+          { id: 2, name: 'North Campus Hub', detailHref: '/testpress/offline_center_exams/exam/centre/', state: 'Karnataka', city: 'Bangalore', venue: 'Bangalore North Campus', address: '45 College Rd, Bangalore', contactName: 'Priya S.', contactPhone: '+91 87654 32109', sessionCount: 3, capacity: 700, allocated: 650, registered: 620, biometrics: 610, photos: 600, present: 598, submitted: 590, absent: 52, online: true, clientNodes: '10/10', battery: 72 },
+          { id: 3, name: 'South Zone Centre', detailHref: '/testpress/offline_center_exams/exam/centre/', state: 'Telangana', city: 'Hyderabad', venue: 'Hyderabad South Block', address: '78 MG Rd, Hyderabad', contactName: 'Anil M.', contactPhone: '+91 76543 21098', sessionCount: 2, capacity: 500, allocated: 450, registered: 0, biometrics: 0, photos: 0, present: 0, submitted: 0, absent: 0, online: false, clientNodes: '0/10', battery: 5 }
         ],
         setSort(key, dir) {
           this.sortKey = key
@@ -36,6 +37,11 @@
           if (q) list = list.filter(r => r.name.toLowerCase().includes(q))
           if (this.healthFilter === 'healthy') list = list.filter(r => r.online)
           if (this.healthFilter === 'needs_attention') list = list.filter(r => !r.online)
+          const loc = typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('examLocationFilter')
+          if (loc) {
+            if (loc.state && loc.state !== 'All') list = list.filter(r => r.state === loc.state)
+            if (loc.city && loc.city !== 'All') list = list.filter(r => r.city === loc.city)
+          }
           return list
         },
         get sortedRows() {
@@ -44,12 +50,13 @@
           return [...this.filteredRows].sort((a, b) => {
             if (key === 'name') return (a.name.localeCompare(b.name)) * dir
             if (key === 'online') return ((a.online ? 1 : 0) - (b.online ? 1 : 0)) * dir
-            const numKeys = ['allocated', 'registered', 'biometrics', 'photos', 'present', 'absent', 'battery']
+            const numKeys = ['allocated', 'registered', 'biometrics', 'photos', 'present', 'submitted', 'absent', 'battery']
             if (numKeys.includes(key)) return (a[key] - b[key]) * dir
             return 0
           })
         }
       }"
+      x-init="$watch('sortedRows', function(v) { var s = typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('examExport'); if (s) s.rows = v || []; }); $nextTick(function() { var s = typeof Alpine !== 'undefined' && Alpine.store && Alpine.store('examExport'); if (s) s.rows = $data.sortedRows || []; })"
       class="p-5 space-y-4">
       <div class="grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5">
         <div>
@@ -63,9 +70,9 @@
             <input type="text" name="q" x-model="query" class="py-[7px] ps-10 pe-8 block w-full bg-gray-100 border-transparent rounded-lg text-sm placeholder:text-gray-500 focus:border-emerald-500 focus:ring-emerald-600 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder-neutral-500" placeholder="Search center">
           </div>
         </div>
-        <div class="flex md:justify-end items-center gap-x-2">
+        <div class="flex md:justify-end items-center gap-x-2 flex-wrap">
           <div class="hs-dropdown [--auto-close:true] relative inline-flex">
-            <button id="hs-centers-health-filter" type="button" class="py-1.5 sm:py-2 px-2.5 inline-flex items-center gap-x-1.5 text-sm font-medium rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 shadow-xs hover:bg-gray-50 dark:hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-emerald-500" aria-haspopup="menu" aria-expanded="false" aria-label="Filter by health">
+            <button id="hs-centers-health-filter" type="button" class="py-1.5 sm:py-2 px-2.5 inline-flex items-center gap-x-1.5 text-sm font-medium rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:outline-none focus:ring-2 focus:ring-emerald-500" aria-haspopup="menu" aria-expanded="false" aria-label="Filter by health">
               <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
               </svg>
@@ -173,6 +180,20 @@
                 </th>
                 <th scope="col" class="min-w-20">
                   <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
+                    <button id="hs-centers-sort-submitted" type="button" class="whitespace-nowrap px-4 py-3 text-start w-full flex items-center gap-x-1 text-sm font-normal text-gray-500 focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-700 dark:text-neutral-400" aria-haspopup="menu" aria-expanded="false">
+                      Appeared
+                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+                    </button>
+                    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_10px_rgba(0,0,0,0.2)] dark:bg-neutral-900" role="menu" aria-labelledby="hs-centers-sort-submitted">
+                      <div class="p-1">
+                        <button type="button" @click="setSort('submitted','asc')" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800">Sort ascending</button>
+                        <button type="button" @click="setSort('submitted','desc')" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800">Sort descending</button>
+                      </div>
+                    </div>
+                  </div>
+                </th>
+                <th scope="col" class="min-w-20">
+                  <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
                     <button id="hs-centers-sort-absent" type="button" class="whitespace-nowrap px-4 py-3 text-start w-full flex items-center gap-x-1 text-sm font-normal text-gray-500 focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-700 dark:text-neutral-400" aria-haspopup="menu" aria-expanded="false">
                       Absent
                       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
@@ -267,6 +288,7 @@
                   <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400 tabular-nums" x-text="row.biometrics"></td>
                   <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400 tabular-nums" x-text="row.photos"></td>
                   <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400 tabular-nums" x-text="row.present"></td>
+                  <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400 tabular-nums" x-text="row.submitted"></td>
                   <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400 tabular-nums" x-text="row.absent"></td>
                   <td class="px-4 py-3 whitespace-nowrap">
                     <div class="flex items-center gap-x-1.5">
