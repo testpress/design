@@ -7,10 +7,15 @@ permalink: "/chapter_content_resource/"
 
 {% extends "layouts/admin_base.html" %}
 
+{% from "../../ui-system/components/modal.html" import modal %}
+{% from "../../ui-system/components/input.html" import input %}
+{% from "../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../ui-system/components/upload.html" import upload %}
+
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock body_class %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
+<div x-data="resourcePage()" class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
     <div class="py-6 px-2 sm:px-6 lg:py-0 lg:px-0 lg:col-span-3">
         {% include "partials/admin_exam_sidebar.html" %}
     </div>
@@ -18,10 +23,121 @@ permalink: "/chapter_content_resource/"
         {% include "./includes/header.html" %}
         {% include "./includes/resources.html" %}
     </div>
+
+    {# Edit Resource Modal #}
+    {% call modal(
+        id="edit-resource-modal",
+        title="Edit Resource",
+        confirm_text="Update changes",
+        cancel_text="Cancel"
+    ) %}
+      <div class="space-y-5">
+        {{ input(
+            name="edit_resource_name",
+            label="Resource Name",
+            required=true,
+            x_model="editName",
+            placeholder="e.g. Question Paper"
+        ) }}
+
+        {{ upload(
+            name="edit_resource_file",
+            label="Resource File",
+            required=true,
+            max_size="10MB",
+            accepted_formats="pdf",
+            help_text="Only PDF files are supported"
+        ) }}
+
+        {{ date_picker(
+            name="edit_available_from",
+            label="Available From",
+            placeholder="Select date and time",
+            datetime=true,
+            show_clear=true,
+            show_today=true,
+            help_text="Leave blank to make the resource available immediately."
+        ) }}
+
+        {{ date_picker(
+            name="edit_available_until",
+            label="Available Until",
+            placeholder="Select date and time",
+            datetime=true,
+            show_clear=true,
+            show_today=true,
+            help_text="Leave blank to keep the resource available indefinitely."
+        ) }}
+      </div>
+    {% endcall %}
+
+    {# Delete Resource Modal #}
+    {% call modal(
+        id="delete-resource-modal",
+        title="Delete Resource",
+        variant="danger",
+        confirm_text="Delete Resource",
+        cancel_text="Cancel"
+    ) %}
+      <div class="space-y-3">
+        <p class="text-sm text-gray-800 dark:text-neutral-200">
+          Are you sure you want to delete <strong class="font-semibold text-gray-900 dark:text-white">"<span x-text="deleteName"></span>"</strong>? Students will no longer be able to access it.
+        </p>
+      </div>
+    {% endcall %}
 </div>
 {% endblock content %}
 
 {% block script %}
     {% include "../../ui-system/scripts/upload_script.html" %}
     {% include "../../ui-system/scripts/date_picker_script.html" %}
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('resourcePage', () => ({
+                editName: '',
+                editAvailableFrom: '',
+                editAvailableUntil: '',
+                deleteName: '',
+
+                openEditModal(resource) {
+                    this.editName = resource.name;
+                    
+                    // Parse availability (e.g. "Jun 20, 2026 - Jun 30, 2026")
+                    if (resource.availability && resource.availability !== 'Always Available') {
+                        const parts = resource.availability.split(' - ');
+                        this.editAvailableFrom = parts[0] ? parts[0] + ' 10:00 AM' : '';
+                        this.editAvailableUntil = parts[1] ? parts[1] + ' 05:00 PM' : '';
+                    } else {
+                        this.editAvailableFrom = '';
+                        this.editAvailableUntil = '';
+                    }
+
+                    // Open the modal
+                    this.$dispatch('open-modal-edit-resource-modal');
+
+                    // Dispatch values to sub-components once opened
+                    this.$nextTick(() => {
+                        this.$dispatch('set-date-value', { name: 'edit_available_from', value: this.editAvailableFrom });
+                        this.$dispatch('set-date-value', { name: 'edit_available_until', value: this.editAvailableUntil });
+                        this.$dispatch('set-uploaded-file', {
+                            name: 'edit_resource_file',
+                            files: [{
+                                name: resource.name + '.pdf',
+                                size: '2.4 MB',
+                                progress: 100,
+                                status: 'success',
+                                errorMessage: '',
+                                extension: 'pdf'
+                            }]
+                        });
+                    });
+                },
+
+                openDeleteModal(resource) {
+                    this.deleteName = resource.name;
+                    this.$dispatch('open-modal-delete-resource-modal');
+                }
+            }));
+        });
+    </script>
 {% endblock script %}

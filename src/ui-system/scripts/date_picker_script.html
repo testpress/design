@@ -70,18 +70,7 @@
 
                 // Pre-selected values
                 if (config.selectedValue) {
-                    if (this.range || this.range_datetime) {
-                        const parts = config.selectedValue.split('→');
-                        if (parts[0]) this.selectedDate = this.normalizeDate(new Date(parts[0].trim()));
-                        if (parts[1]) this.selectedEndDate = this.normalizeDate(new Date(parts[1].trim()));
-                    } else {
-                        this.selectedDate = this.normalizeDate(new Date(config.selectedValue));
-                    }
-                }
-
-                // If datetime, parse time from preselected
-                if ((this.datetime || this.range_datetime) && config.selectedValue) {
-                    // Simple parser or fallback to current
+                    this.parseAndSetValue(config.selectedValue);
                 }
 
                 // Set initial calendar display month/year based on selected date or today
@@ -226,6 +215,69 @@
 
             getTimeString(h, m, p) {
                 return `${h}:${String(m).padStart(2, '0')} ${p}`;
+            },
+
+            parseAndSetValue(valStr) {
+                if (!valStr) {
+                    this.selectedDate = null;
+                    this.selectedEndDate = null;
+                    this.inputValue = '';
+                    return;
+                }
+
+                if (this.range || this.range_datetime) {
+                    const parts = valStr.split('→');
+                    if (parts[0]) {
+                        const d1 = new Date(parts[0].trim());
+                        if (!isNaN(d1.getTime())) {
+                            this.selectedDate = this.normalizeDate(d1);
+                            if (this.range_datetime) {
+                                this.parseTime(parts[0].trim(), 'start');
+                            }
+                        }
+                    }
+                    if (parts[1]) {
+                        const d2 = new Date(parts[1].trim());
+                        if (!isNaN(d2.getTime())) {
+                            this.selectedEndDate = this.normalizeDate(d2);
+                            if (this.range_datetime) {
+                                this.parseTime(parts[1].trim(), 'end');
+                            }
+                        }
+                    }
+                } else {
+                    const d = new Date(valStr.trim());
+                    if (!isNaN(d.getTime())) {
+                        this.selectedDate = this.normalizeDate(d);
+                        if (this.datetime) {
+                            this.parseTime(valStr.trim(), 'start');
+                        }
+                    }
+                }
+
+                const baseDate = this.selectedDate || new Date();
+                this.currentMonth = baseDate.getMonth();
+                this.currentYear = baseDate.getFullYear();
+                this.updateInput();
+            },
+
+            parseTime(str, type) {
+                const match = str.match(/(\d+):(\d+)(?:\s*(AM|PM))?/i);
+                if (match) {
+                    let hour = parseInt(match[1]);
+                    let minute = parseInt(match[2]);
+                    let ampm = match[3] ? match[3].toUpperCase() : 'AM';
+
+                    if (type === 'start') {
+                        this.startHour = hour;
+                        this.startMinute = minute;
+                        this.startAmPm = ampm;
+                    } else {
+                        this.endHour = hour;
+                        this.endMinute = minute;
+                        this.endAmPm = ampm;
+                    }
+                }
             },
 
             updateInput() {
