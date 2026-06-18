@@ -213,21 +213,51 @@
     {% include "../scripts/upload_script.html" %}
     {% include "../scripts/date_picker_script.html" %}
     <script>
+        const mainContainer = document.getElementById('main-content');
+        const sections = document.querySelectorAll('main#main-content [id$="-component"]');
+        let isScrolling = false;
+
         document.querySelectorAll('aside nav a').forEach(anchor => {
             anchor.addEventListener('click', function(e) {
                 e.preventDefault();
                 const targetId = this.getAttribute('href').substring(1);
                 const targetElement = document.getElementById(targetId);
-                const mainContainer = document.getElementById('main-content');
                 
                 if (targetElement && mainContainer) {
+                    isScrolling = true;
                     const topPos = targetElement.offsetTop - 40;
                     mainContainer.scrollTop = topPos;
                     
                     window.history.pushState(null, null, '#' + targetId);
                     window.dispatchEvent(new Event('hashchange'));
+                    
+                    setTimeout(() => {
+                        isScrolling = false;
+                    }, 500);
                 }
             });
         });
+
+        if (mainContainer && sections.length > 0) {
+            mainContainer.addEventListener('scroll', () => {
+                if (isScrolling) return;
+
+                let currentSectionId = '';
+                const containerTop = mainContainer.getBoundingClientRect().top;
+
+                sections.forEach(section => {
+                    const rect = section.getBoundingClientRect();
+                    // Detect if the section's top has reached the viewport with some tolerance
+                    if (rect.top - containerTop <= 120) {
+                        currentSectionId = section.id;
+                    }
+                });
+
+                if (currentSectionId && window.location.hash !== '#' + currentSectionId) {
+                    window.history.replaceState(null, null, '#' + currentSectionId);
+                    window.dispatchEvent(new Event('hashchange'));
+                }
+            });
+        }
     </script>
 {% endblock %}
