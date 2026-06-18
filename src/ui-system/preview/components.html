@@ -98,6 +98,31 @@
                    :class="active === '#page-header-component' ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-neutral-800'">
                     <i data-lucide="heading" class="w-5 h-5 lg:w-4 lg:h-4"></i> Page Header
                 </a>
+                <a href="#breadcrumbs-component" @click="sidebarOpen = false"
+                   class="flex items-center gap-x-3.5 py-3 lg:py-2 px-4 lg:px-2.5 text-lg lg:text-sm rounded-lg"
+                   :class="active === '#breadcrumbs-component' ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-neutral-800'">
+                    <i data-lucide="route" class="w-5 h-5 lg:w-4 lg:h-4"></i> Breadcrumbs
+                </a>
+                <a href="#dropdown-component" @click="sidebarOpen = false"
+                   class="flex items-center gap-x-3.5 py-3 lg:py-2 px-4 lg:px-2.5 text-lg lg:text-sm rounded-lg"
+                   :class="active === '#dropdown-component' ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-neutral-800'">
+                    <i data-lucide="menu" class="w-5 h-5 lg:w-4 lg:h-4"></i> Dropdown
+                </a>
+                <a href="#tooltip-component" @click="sidebarOpen = false"
+                   class="flex items-center gap-x-3.5 py-3 lg:py-2 px-4 lg:px-2.5 text-lg lg:text-sm rounded-lg"
+                   :class="active === '#tooltip-component' ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-neutral-800'">
+                    <i data-lucide="help-circle" class="w-5 h-5 lg:w-4 lg:h-4"></i> Tooltip
+                </a>
+                <a href="#upload-component" @click="sidebarOpen = false"
+                   class="flex items-center gap-x-3.5 py-3 lg:py-2 px-4 lg:px-2.5 text-lg lg:text-sm rounded-lg"
+                   :class="active === '#upload-component' ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-neutral-800'">
+                    <i data-lucide="upload-cloud" class="w-5 h-5 lg:w-4 lg:h-4"></i> Upload
+                </a>
+                <a href="#date-picker-component" @click="sidebarOpen = false"
+                   class="flex items-center gap-x-3.5 py-3 lg:py-2 px-4 lg:px-2.5 text-lg lg:text-sm rounded-lg"
+                   :class="active === '#date-picker-component' ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-neutral-800'">
+                    <i data-lucide="calendar" class="w-5 h-5 lg:w-4 lg:h-4"></i> Date Picker
+                </a>
             </nav>
         </div>
     </aside>
@@ -158,6 +183,26 @@
                 {% include "./includes/page-header.html" %}
             </div>
 
+            <div id="breadcrumbs-component" class="scroll-mt-28 lg:scroll-mt-10">
+                {% include "./includes/breadcrumbs.html" %}
+            </div>
+
+            <div id="dropdown-component" class="scroll-mt-28 lg:scroll-mt-10">
+                {% include "./includes/dropdown.html" %}
+            </div>
+
+            <div id="tooltip-component" class="scroll-mt-28 lg:scroll-mt-10">
+                {% include "./includes/tooltip.html" %}
+            </div>
+
+            <div id="upload-component" class="scroll-mt-28 lg:scroll-mt-10">
+                {% include "./includes/upload.html" %}
+            </div>
+
+            <div id="date-picker-component" class="scroll-mt-28 lg:scroll-mt-10">
+                {% include "./includes/date-picker.html" %}
+            </div>
+
         </div>
     </main>
 </div>
@@ -165,22 +210,61 @@
 
 {% block extra_scripts %}
     {% include "../scripts/select_script.html" %}
+    {% include "../scripts/upload_script.html" %}
+    {% include "../scripts/date_picker_script.html" %}
     <script>
+        const mainContainer = document.getElementById('main-content');
+        const sections = document.querySelectorAll('main#main-content [id$="-component"]');
+        let isScrolling = false;
+
         document.querySelectorAll('aside nav a').forEach(anchor => {
             anchor.addEventListener('click', function(e) {
                 e.preventDefault();
                 const targetId = this.getAttribute('href').substring(1);
                 const targetElement = document.getElementById(targetId);
-                const mainContainer = document.getElementById('main-content');
                 
                 if (targetElement && mainContainer) {
+                    isScrolling = true;
                     const topPos = targetElement.offsetTop - 40;
                     mainContainer.scrollTop = topPos;
                     
                     window.history.pushState(null, null, '#' + targetId);
                     window.dispatchEvent(new Event('hashchange'));
+                    
+                    setTimeout(() => {
+                        isScrolling = false;
+                    }, 500);
                 }
             });
         });
+
+        if (mainContainer && sections.length > 0) {
+            mainContainer.addEventListener('scroll', () => {
+                if (isScrolling) return;
+
+                let currentSectionId = '';
+                const containerTop = mainContainer.getBoundingClientRect().top;
+                
+                // Edge case: check if we scrolled to the very bottom
+                const isAtBottom = mainContainer.scrollHeight - mainContainer.scrollTop <= mainContainer.clientHeight + 10;
+
+                if (isAtBottom) {
+                    currentSectionId = sections[sections.length - 1].id;
+                } else {
+                    sections.forEach(section => {
+                        const rect = section.getBoundingClientRect();
+                        // Active component is the one that spans across the focal line (60px below container top)
+                        if (rect.top - containerTop <= 60 && rect.bottom - containerTop > 60) {
+                            currentSectionId = section.id;
+                        }
+                    });
+                }
+
+                if (currentSectionId && window.location.hash !== '#' + currentSectionId) {
+                    window.history.replaceState(null, null, '#' + currentSectionId);
+                    window.dispatchEvent(new Event('hashchange'));
+                }
+            });
+        }
     </script>
 {% endblock %}

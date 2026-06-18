@@ -1,0 +1,164 @@
+{% macro dropdown(
+  trigger="Menu",
+  items=[],
+  placement="bottom-end",
+  width="small",
+  id="",
+  extra_classes="",
+  trigger_classes=""
+) %}
+
+{% set width_classes = {
+  'auto': 'w-auto',
+  'small': 'w-40',
+  'medium': 'w-48',
+  'large': 'w-56'
+} %}
+{% set final_width = width_classes[width] if width_classes[width] is defined else width %}
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = '{{ placement }}';
+         console.log('Placement:', placement);
+         if (placement === 'bottom-end') {
+           this.right = window.innerWidth - rect.right;
+           this.left = 'auto';
+         } else if (placement === 'bottom-start') {
+           this.left = rect.left;
+           this.right = 'auto';
+         } else if (placement === 'top-start') {
+           this.left = rect.left;
+           this.right = 'auto';
+           const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+           this.top = rect.top - menuHeight - 4;
+         } else if (placement === 'top-end') {
+           this.right = window.innerWidth - rect.right;
+           this.left = 'auto';
+           const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+           this.top = rect.top - menuHeight - 4;
+         }
+       }
+     }" 
+     @click.outside="open = false" 
+     @keydown.escape.window="open = false"
+     class="inline-flex {{ extra_classes }}">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    {% if trigger == "⋮" or trigger == "ellipsis-vertical" %}
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 {{ trigger_classes }}" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    {% elif trigger == "ellipsis-horizontal" %}
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 {{ trigger_classes }}" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+      </button>
+    {% elif trigger == "Actions" %}
+      <button type="button" class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700 {{ trigger_classes }}" aria-haspopup="menu" :aria-expanded="open.toString()">
+        Actions
+        <i data-lucide="chevron-down" class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+      </button>
+    {% else %}
+      {{ trigger | safe }}
+    {% endif %}
+  </div>
+
+  <!-- Dropdown Menu -->
+  <div x-show="open" 
+       x-ref="menu"
+       x-cloak
+       x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] {{ final_width }} bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ 
+         top: top + 'px', 
+         left: left === 'auto' ? 'auto' : left + 'px', 
+         right: right === 'auto' ? 'auto' : right + 'px' 
+       }"
+       role="menu"
+       aria-orientation="vertical">
+    
+    <div class="p-1">
+      {% if items and items | length > 0 %}
+        {% for item in items %}
+          {% if item.divider %}
+            <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+          {% else %}
+            {% set tag_name = 'a' if item.url else 'button' %}
+            {% set tag_attrs = 'href=' ~ item.url if item.url else 'type=button' %}
+            
+            {% if item.variant == 'danger' %}
+              {% set text_classes = 'text-red-500 hover:bg-red-600/10 focus:bg-red-600/10' %}
+              {% set icon_color = 'text-red-500 dark:text-red-500' %}
+            {% else %}
+              {% set text_classes = 'text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800' %}
+              {% set icon_color = 'text-gray-500 dark:text-neutral-400' %}
+            {% endif %}
+            
+            {% set disabled_classes = 'opacity-50 pointer-events-none' if item.disabled else '' %}
+            
+            <{{ tag_name }} {{ tag_attrs }} 
+               class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 {{ text_classes }} {{ disabled_classes }}"
+               {% if item.disabled %}disabled{% endif %}
+               {{ item.attrs | safe if item.attrs }}
+               {{ item.x_on | safe if item.x_on }}>
+              {% if item.icon %}
+                {% if item.icon.indexOf('<svg') > -1 %}
+                  {{ item.icon | safe }}
+                {% else %}
+                  <i data-lucide="{{ item.icon }}" class="shrink-0 size-3.5 {{ icon_color }}"></i>
+                {% endif %}
+              {% endif %}
+              {{ item.label }}
+            </{{ tag_name }}>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        {{ caller() if caller }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endmacro %}

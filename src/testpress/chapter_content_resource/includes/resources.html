@@ -1,0 +1,97 @@
+{% from "../../../ui-system/components/table.html" import table %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/pagination.html" import pagination %}
+{% from "../../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+
+{% set columns = [
+  "Resource",
+  "Availability",
+  "Status",
+  { label: "Actions", classes: "px-6 py-3 text-end" }
+] %}
+
+{% set rows = [] %}
+{% for resource in chapter_content_resources %}
+  {# Map each status to a badge variant #}
+  {% if resource.status == "Active" %}
+    {% set status_variant = "success" %}
+    {% set status_icon = "check-circle" %}
+  {% elif resource.status == "Scheduled" %}
+    {% set status_variant = "info" %}
+    {% set status_icon = "calendar-clock" %}
+  {% else %}
+    {% set status_variant = "neutral" %}
+    {% set status_icon = "circle-off" %}
+  {% endif %}
+
+  {# Resource cell content #}
+  {% set resource_html %}
+    <div class="flex items-center gap-x-2">
+      <span class="font-medium text-gray-800 dark:text-neutral-200">{{ resource.name }}</span>
+      {% if resource.locked %}
+        {{ tooltip(
+          content="Learners must attempt this content before accessing this resource.",
+          trigger='<i data-lucide="lock" class="size-3.5 text-gray-400 dark:text-neutral-500 cursor-pointer"></i>',
+          placement="top",
+          width="w-60 text-center"
+        ) }}
+      {% endif %}
+    </div>
+  {% endset %}
+
+  {# Status cell content #}
+  {% set status_html %}
+    {{ badge(text=resource.status, variant=status_variant, icon=status_icon, size="sm") }}
+  {% endset %}
+
+  {# Actions cell content #}
+  {% set actions_html %}
+    <div class="flex items-center justify-end">
+      {{ dropdown(
+        trigger="ellipsis-vertical",
+        placement="bottom-end",
+        width="small",
+        items=[
+          { label: "Download", icon: "download" },
+          { label: "Edit", icon: "pencil", x_on: '@click="openEditModal({ name: \'' ~ resource.name ~ '\', availability: \'' ~ resource.availability ~ '\' })"' },
+          { divider: true },
+          { label: "Delete", icon: "trash-2", variant: "danger", x_on: '@click="openDeleteModal({ name: \'' ~ resource.name ~ '\' })"' }
+        ]
+      ) }}
+    </div>
+  {% endset %}
+
+
+
+{% set row = [
+    { content: resource_html },
+    resource.availability,
+    { content: status_html },
+    { content: actions_html, classes: "px-6 py-4 whitespace-nowrap text-end" }
+  ] %}
+  {% set _ = rows.push(row) %}
+{% endfor %}
+
+<div x-show="!isEmpty" x-cloak>
+{{ table(
+  columns=columns,
+  rows=rows,
+  hoverable=false,
+  pagination=pagination(items=[1, 2, 3, '...', 10], current=1, show_go_to=true)
+) }}
+</div>
+
+<div x-show="isEmpty" x-cloak>
+{{ empty_state(
+  title="No Resources Yet",
+  description="Add downloadable resources that learners can access alongside this content.",
+  icon="files",
+  primary_action_text="Add Resource",
+  primary_action_attrs="@click=\"$dispatch('open-modal-add-resource-modal')\"",
+  primary_action_icon="plus",
+  wrap_card=true,
+  extra_classes="rounded-none sm:rounded-xl border-x-0 sm:border-x"
+) }}
+</div>
