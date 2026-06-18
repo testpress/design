@@ -524,3 +524,44 @@ Used for grouping page sections.
 
 * Maintain consistent section spacing.
 
+
+---
+
+# Utility / Scheduling
+
+## date_picker
+
+### Purpose
+
+Used for selecting single dates, times, or date ranges with twin-calendar grids.
+
+### Supported Parameters
+
+* label
+* name
+* id
+* placeholder
+* required
+* disabled
+* readonly
+* single
+* datetime
+* range
+* range_datetime
+* inline
+* min_date
+* max_date
+* show_time
+* show_clear
+* show_today
+* selected_value
+* error_message
+
+### Usage Rules
+
+* Use `single` for publishing, birth dates, or target deadlines.
+* Use `datetime` when precise scheduling hour/minute coordinates are required.
+* Use `range` or `range_datetime` for course access periods or exam window definitions.
+* Set `show_clear` to allow resetting values in optional fields.
+
+

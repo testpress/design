@@ -1,0 +1,489 @@
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('uiDatePicker', (config = {}) => ({
+            // Configuration
+            single: config.single !== undefined ? config.single : true,
+            datetime: config.datetime || false,
+            range: config.range || false,
+            range_datetime: config.range_datetime || false,
+            inline: config.inline || false,
+            disabled: config.disabled || false,
+            required: config.required || false,
+            readonly: config.readonly || false,
+            placeholder: config.placeholder || 'Select date',
+            showTime: config.showTime || false,
+            showClear: config.showClear || false,
+            showToday: config.showToday || false,
+
+            // Values
+            selectedDate: null,
+            selectedEndDate: null,
+            hoverDate: null,
+
+            // Time state
+            startHour: 12,
+            startMinute: '00',
+            startAmPm: 'PM',
+            endHour: 12,
+            endMinute: '00',
+            endAmPm: 'PM',
+
+            // Calendar display state
+            currentMonth: new Date().getMonth(),
+            currentYear: new Date().getFullYear(),
+            open: false,
+            openUp: false,
+            inputValue: '',
+            top: 0,
+            left: 0,
+            _triggerEl: null,
+            _menuEl: null,
+            _scrollHandler: null,
+
+            // Constant helpers
+            monthNames: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+            monthsShort: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            yearRange: [],
+
+            // Min / Max bounds
+            minDate: null,
+            maxDate: null,
+
+            // Backups for cancellation
+            backupDate: null,
+            backupEndDate: null,
+            backupStartHour: 12,
+            backupStartMinute: '00',
+            backupStartAmPm: 'PM',
+            backupEndHour: 12,
+            backupEndMinute: '00',
+            backupEndAmPm: 'PM',
+
+            init() {
+                // Initialize min/max dates
+                if (config.min_date) {
+                    this.minDate = this.normalizeDate(new Date(config.min_date));
+                }
+                if (config.max_date) {
+                    this.maxDate = this.normalizeDate(new Date(config.max_date));
+                }
+
+                // Pre-selected values
+                if (config.selectedValue) {
+                    if (this.range || this.range_datetime) {
+                        const parts = config.selectedValue.split('→');
+                        if (parts[0]) this.selectedDate = this.normalizeDate(new Date(parts[0].trim()));
+                        if (parts[1]) this.selectedEndDate = this.normalizeDate(new Date(parts[1].trim()));
+                    } else {
+                        this.selectedDate = this.normalizeDate(new Date(config.selectedValue));
+                    }
+                }
+
+                // If datetime, parse time from preselected
+                if ((this.datetime || this.range_datetime) && config.selectedValue) {
+                    // Simple parser or fallback to current
+                }
+
+                // Set initial calendar display month/year based on selected date or today
+                const baseDate = this.selectedDate || new Date();
+                this.currentMonth = baseDate.getMonth();
+                this.currentYear = baseDate.getFullYear();
+
+                // Generate year list
+                const startYr = this.currentYear - 5;
+                const endYr = this.currentYear + 10;
+                for (let y = startYr; y <= endYr; y++) {
+                    this.yearRange.push(y);
+                }
+
+                this.updateInput();
+
+                // Watch open state to take backups and position
+                this.$watch('open', (val) => {
+                    if (val) {
+                        this.backupDate = this.selectedDate ? new Date(this.selectedDate) : null;
+                        this.backupEndDate = this.selectedEndDate ? new Date(this.selectedEndDate) : null;
+                        this.backupStartHour = this.startHour;
+                        this.backupStartMinute = this.startMinute;
+                        this.backupStartAmPm = this.startAmPm;
+                        this.backupEndHour = this.endHour;
+                        this.backupEndMinute = this.endMinute;
+                        this.backupEndAmPm = this.endAmPm;
+
+                        if (!this.inline) {
+                            this._triggerEl = this.$refs.trigger;
+                            this._menuEl = this.$refs.menu;
+                            this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+                            this.$nextTick(() => {
+                                this.updatePosition();
+                            });
+                            window.addEventListener('scroll', this._scrollHandler, true);
+                            window.addEventListener('resize', this._scrollHandler, true);
+                        }
+                    } else {
+                        if (this._scrollHandler) {
+                            window.removeEventListener('scroll', this._scrollHandler, true);
+                            window.removeEventListener('resize', this._scrollHandler, true);
+                        }
+                    }
+                });
+
+                if (!this.inline) {
+                    this.$cleanup(() => {
+                        if (this._scrollHandler) {
+                            window.removeEventListener('scroll', this._scrollHandler, true);
+                            window.removeEventListener('resize', this._scrollHandler, true);
+                        }
+                    });
+                }
+
+                this.$watch('startHour', () => this.handleTimeChange());
+                this.$watch('startMinute', () => this.handleTimeChange());
+                this.$watch('startAmPm', () => this.handleTimeChange());
+                this.$watch('endHour', () => this.handleTimeChange());
+                this.$watch('endMinute', () => this.handleTimeChange());
+                this.$watch('endAmPm', () => this.handleTimeChange());
+            },
+
+            updatePosition() {
+                const trigger = this._triggerEl;
+                if (!trigger) return;
+
+                const rect = trigger.getBoundingClientRect();
+                const dropdownHeight = (this.range || this.range_datetime) ? 425 : 385;
+                const dropdownWidth = (this.range || this.range_datetime) && window.innerWidth >= 640 ? 640 : 320;
+
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+
+                if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+                    // Open upward
+                    this.top = rect.top - dropdownHeight - 8;
+                    this.openUp = true;
+                } else {
+                    // Open downward
+                    this.top = rect.bottom + 8;
+                    this.openUp = false;
+                }
+
+                // Horizontal alignment
+                if (rect.left + dropdownWidth > window.innerWidth) {
+                    this.left = window.innerWidth - dropdownWidth - 16;
+                } else {
+                    this.left = rect.left;
+                }
+            },
+
+            normalizeDate(date) {
+                if (!date || isNaN(date.getTime())) return null;
+                const d = new Date(date);
+                d.setHours(0, 0, 0, 0);
+                return d;
+            },
+
+            formatDateString(date) {
+                if (!date) return '';
+                const day = date.getDate();
+                const month = this.monthsShort[date.getMonth()];
+                const year = date.getFullYear();
+                return `${month} ${day}, ${year}`;
+            },
+
+            getTimeString(h, m, p) {
+                return `${h}:${String(m).padStart(2, '0')} ${p}`;
+            },
+
+            updateInput() {
+                if (this.range || this.range_datetime) {
+                    if (this.selectedDate && this.selectedEndDate) {
+                        let startStr = this.formatDateString(this.selectedDate);
+                        let endStr = this.formatDateString(this.selectedEndDate);
+
+                        if (this.range_datetime) {
+                            startStr += ' ' + this.getTimeString(this.startHour, this.startMinute, this.startAmPm);
+                            endStr += ' ' + this.getTimeString(this.endHour, this.endMinute, this.endAmPm);
+                        }
+                        this.inputValue = `${startStr} → ${endStr}`;
+                    } else {
+                        this.inputValue = '';
+                    }
+                } else {
+                    if (this.selectedDate) {
+                        let str = this.formatDateString(this.selectedDate);
+                        if (this.datetime) {
+                            str += ' ' + this.getTimeString(this.startHour, this.startMinute, this.startAmPm);
+                        }
+                        this.inputValue = str;
+                    } else {
+                        this.inputValue = '';
+                    }
+                }
+            },
+
+            getDays() {
+                const year = this.currentYear;
+                const month = this.currentMonth;
+
+                // Month first day and total days
+                const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun
+                const totalDays = new Date(year, month + 1, 0).getDate();
+                const prevTotalDays = new Date(year, month, 0).getDate();
+
+                // Shift starts so Monday is index 0
+                let startDayOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+                const days = [];
+
+                // Prev month padding
+                for (let i = startDayOffset - 1; i >= 0; i--) {
+                    const dayNum = prevTotalDays - i;
+                    const date = new Date(year, month - 1, dayNum);
+                    days.push({
+                        day: dayNum,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                // Current month
+                for (let i = 1; i <= totalDays; i++) {
+                    const date = new Date(year, month, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: true,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                // Next month padding to reach 42 cells (6 rows)
+                const totalCells = days.length <= 35 ? 35 : 42;
+                const nextDaysCount = totalCells - days.length;
+                for (let i = 1; i <= nextDaysCount; i++) {
+                    const date = new Date(year, month + 1, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                return days;
+            },
+
+            // Get days for the second calendar pane (next month)
+            getRightDays() {
+                let nextMonth = this.currentMonth + 1;
+                let nextYear = this.currentYear;
+                if (nextMonth > 11) {
+                    nextMonth = 0;
+                    nextYear += 1;
+                }
+
+                const firstDayIndex = new Date(nextYear, nextMonth, 1).getDay();
+                const totalDays = new Date(nextYear, nextMonth + 1, 0).getDate();
+                const prevTotalDays = new Date(nextYear, nextMonth, 0).getDate();
+
+                let startDayOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+                const days = [];
+
+                for (let i = startDayOffset - 1; i >= 0; i--) {
+                    const dayNum = prevTotalDays - i;
+                    const date = new Date(nextYear, nextMonth - 1, dayNum);
+                    days.push({
+                        day: dayNum,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                for (let i = 1; i <= totalDays; i++) {
+                    const date = new Date(nextYear, nextMonth, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: true,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                const totalCells = days.length <= 35 ? 35 : 42;
+                const nextDaysCount = totalCells - days.length;
+                for (let i = 1; i <= nextDaysCount; i++) {
+                    const date = new Date(nextYear, nextMonth + 1, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                return days;
+            },
+
+            getRightMonthName() {
+                let nextMonth = this.currentMonth + 1;
+                if (nextMonth > 11) nextMonth = 0;
+                return this.monthNames[nextMonth];
+            },
+
+            getRightYear() {
+                let nextMonth = this.currentMonth + 1;
+                let nextYear = this.currentYear;
+                if (nextMonth > 11) nextYear += 1;
+                return nextYear;
+            },
+
+            isDateDisabled(date) {
+                if (this.disabled) return true;
+                const dateMs = date.getTime();
+                if (this.minDate && dateMs < this.minDate.getTime()) return true;
+                if (this.maxDate && dateMs > this.maxDate.getTime()) return true;
+                return false;
+            },
+
+            prevMonth() {
+                if (this.currentMonth === 0) {
+                    this.currentMonth = 11;
+                    this.currentYear -= 1;
+                } else {
+                    this.currentMonth -= 1;
+                }
+            },
+
+            nextMonth() {
+                if (this.currentMonth === 11) {
+                    this.currentMonth = 0;
+                    this.currentYear += 1;
+                } else {
+                    this.currentMonth += 1;
+                }
+            },
+
+            selectDay(date) {
+                if (this.isDateDisabled(date)) return;
+
+                if (this.range || this.range_datetime) {
+                    if (!this.selectedDate || (this.selectedDate && this.selectedEndDate)) {
+                        this.selectedDate = date;
+                        this.selectedEndDate = null;
+                    } else if (this.selectedDate && !this.selectedEndDate) {
+                        if (date < this.selectedDate) {
+                            this.selectedDate = date;
+                        } else {
+                            this.selectedEndDate = date;
+                        }
+                    }
+                } else {
+                    this.selectedDate = date;
+                    if (!this.datetime && !this.inline) {
+                        this.updateInput();
+                        this.open = false;
+                    } else if (this.inline) {
+                        this.updateInput();
+                    }
+                }
+            },
+
+            handleTimeChange() {
+                if (this.inline) {
+                    this.updateInput();
+                }
+            },
+
+            selectToday() {
+                const today = this.normalizeDate(new Date());
+                if (this.isDateDisabled(today)) return;
+
+                this.selectedDate = today;
+                this.currentMonth = today.getMonth();
+                this.currentYear = today.getFullYear();
+
+                if (this.range || this.range_datetime) {
+                    this.selectedEndDate = null;
+                } else if (!this.datetime && !this.inline) {
+                    this.updateInput();
+                    this.open = false;
+                } else {
+                    this.updateInput();
+                }
+            },
+
+            clearValue() {
+                this.selectedDate = null;
+                this.selectedEndDate = null;
+                this.inputValue = '';
+                if (!this.inline) {
+                    this.open = false;
+                }
+            },
+
+            apply() {
+                this.updateInput();
+                this.open = false;
+            },
+
+            cancel() {
+                this.selectedDate = this.backupDate;
+                this.selectedEndDate = this.backupEndDate;
+                this.startHour = this.backupStartHour;
+                this.startMinute = this.backupStartMinute;
+                this.startAmPm = this.backupStartAmPm;
+                this.endHour = this.backupEndHour;
+                this.endMinute = this.backupEndMinute;
+                this.endAmPm = this.backupEndAmPm;
+                this.updateInput();
+                this.open = false;
+            },
+
+            // Highlighting checks
+            isToday(date) {
+                const today = new Date();
+                return date.getDate() === today.getDate() &&
+                       date.getMonth() === today.getMonth() &&
+                       date.getFullYear() === today.getFullYear();
+            },
+
+            isSelected(date) {
+                if (!date) return false;
+                if (this.selectedDate && date.getTime() === this.selectedDate.getTime()) return true;
+                if (this.selectedEndDate && date.getTime() === this.selectedEndDate.getTime()) return true;
+                return false;
+            },
+
+            isInRange(date) {
+                if (!date) return false;
+                if (this.selectedDate && this.selectedEndDate) {
+                    return date > this.selectedDate && date < this.selectedEndDate;
+                }
+                if (this.selectedDate && !this.selectedEndDate && this.hoverDate) {
+                    return date > this.selectedDate && date < this.hoverDate;
+                }
+                return false;
+            },
+
+            isRangeStart(date) {
+                return this.selectedDate && date.getTime() === this.selectedDate.getTime();
+            },
+
+            isRangeEnd(date) {
+                if (this.selectedEndDate) {
+                    return date.getTime() === this.selectedEndDate.getTime();
+                }
+                if (this.selectedDate && this.hoverDate) {
+                    return date.getTime() === this.hoverDate.getTime();
+                }
+                return false;
+            },
+
+            hasValue() {
+                return !!this.selectedDate;
+            }
+        }));
+    });
+</script>
