@@ -127,16 +127,7 @@
                         }
                     }
                 });
-
-                if (!this.inline) {
-                    this.$cleanup(() => {
-                        if (this._scrollHandler) {
-                            window.removeEventListener('scroll', this._scrollHandler, true);
-                            window.removeEventListener('resize', this._scrollHandler, true);
-                        }
-                    });
-                }
-
+ 
                 this.$watch('startHour', () => this.handleTimeChange());
                 this.$watch('startMinute', () => this.handleTimeChange());
                 this.$watch('startAmPm', () => this.handleTimeChange());
@@ -147,30 +138,74 @@
 
             updatePosition() {
                 const trigger = this._triggerEl;
+                const menu = this._menuEl;
                 if (!trigger) return;
 
                 const rect = trigger.getBoundingClientRect();
-                const dropdownHeight = (this.range || this.range_datetime) ? 425 : 385;
-                const dropdownWidth = (this.range || this.range_datetime) && window.innerWidth >= 640 ? 640 : 320;
+
+                // Measure the actual dropdown menu height and width if rendered
+                let dropdownHeight = (this.range || this.range_datetime) ? 425 : 385;
+                let dropdownWidth = (this.range || this.range_datetime) && window.innerWidth >= 640 ? 640 : 320;
+
+                if (menu) {
+                    const originalDisplay = menu.style.display;
+                    const originalVisibility = menu.style.visibility;
+                    const originalPosition = menu.style.position;
+
+                    // Temporarily make it visible to get accurate dimensions
+                    if (window.getComputedStyle(menu).display === 'none') {
+                        menu.style.display = 'block';
+                        menu.style.visibility = 'hidden';
+                        menu.style.position = 'fixed';
+                    }
+
+                    dropdownHeight = menu.offsetHeight || dropdownHeight;
+                    dropdownWidth = menu.offsetWidth || dropdownWidth;
+
+                    // Restore original styles
+                    menu.style.display = originalDisplay;
+                    menu.style.visibility = originalVisibility;
+                    menu.style.position = originalPosition;
+                }
+
+                // Find the nearest containing block parent for a fixed element.
+                let containingBlock = null;
+                let parent = trigger.parentElement;
+                while (parent && parent !== document.body) {
+                    const style = window.getComputedStyle(parent);
+                    if (style.transform !== 'none' || style.perspective !== 'none' || style.filter !== 'none') {
+                        containingBlock = parent;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+
+                let offsetTop = 0;
+                let offsetLeft = 0;
+                if (containingBlock) {
+                    const parentRect = containingBlock.getBoundingClientRect();
+                    offsetTop = parentRect.top;
+                    offsetLeft = parentRect.left;
+                }
 
                 const spaceBelow = window.innerHeight - rect.bottom;
                 const spaceAbove = rect.top;
 
                 if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
                     // Open upward
-                    this.top = rect.top - dropdownHeight - 8;
+                    this.top = rect.top - dropdownHeight - 8 - offsetTop;
                     this.openUp = true;
                 } else {
                     // Open downward
-                    this.top = rect.bottom + 8;
+                    this.top = rect.bottom + 8 - offsetTop;
                     this.openUp = false;
                 }
 
                 // Horizontal alignment
                 if (rect.left + dropdownWidth > window.innerWidth) {
-                    this.left = window.innerWidth - dropdownWidth - 16;
+                    this.left = window.innerWidth - dropdownWidth - 16 - offsetLeft;
                 } else {
-                    this.left = rect.left;
+                    this.left = rect.left - offsetLeft;
                 }
             },
 
@@ -372,28 +407,30 @@
                     if (!this.selectedDate || (this.selectedDate && this.selectedEndDate)) {
                         this.selectedDate = date;
                         this.selectedEndDate = null;
+                        this.updateInput();
                     } else if (this.selectedDate && !this.selectedEndDate) {
                         if (date < this.selectedDate) {
                             this.selectedDate = date;
+                            this.updateInput();
                         } else {
                             this.selectedEndDate = date;
+                            this.updateInput();
+                            if (!this.range_datetime && !this.inline) {
+                                this.open = false;
+                            }
                         }
                     }
                 } else {
                     this.selectedDate = date;
+                    this.updateInput();
                     if (!this.datetime && !this.inline) {
-                        this.updateInput();
                         this.open = false;
-                    } else if (this.inline) {
-                        this.updateInput();
                     }
                 }
             },
 
             handleTimeChange() {
-                if (this.inline) {
-                    this.updateInput();
-                }
+                this.updateInput();
             },
 
             selectToday() {
@@ -421,24 +458,6 @@
                 if (!this.inline) {
                     this.open = false;
                 }
-            },
-
-            apply() {
-                this.updateInput();
-                this.open = false;
-            },
-
-            cancel() {
-                this.selectedDate = this.backupDate;
-                this.selectedEndDate = this.backupEndDate;
-                this.startHour = this.backupStartHour;
-                this.startMinute = this.backupStartMinute;
-                this.startAmPm = this.backupStartAmPm;
-                this.endHour = this.backupEndHour;
-                this.endMinute = this.backupEndMinute;
-                this.endAmPm = this.backupEndAmPm;
-                this.updateInput();
-                this.open = false;
             },
 
             // Highlighting checks
