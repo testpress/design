@@ -1,0 +1,143 @@
+{% from "../../../ui-system/components/table.html" import table %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/pagination.html" import pagination %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/popover.html" import popover %}
+
+<div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 sm:rounded-xl shadow-sm overflow-hidden" x-show="!isEmpty" x-cloak>
+    {% set columns = [
+      "Email Profile",
+      "Reply-To Email",
+      "Courses",
+      { label: "", classes: "px-6 py-3 text-end" }
+    ] %}
+
+    {% set rows = [] %}
+    {% for profile in email_profiles %}
+      {# Profile Identity cell content #}
+      {% set identity_html %}
+        <div class="grow">
+          <span class="font-medium text-gray-800 dark:text-neutral-200">
+            {{ profile.name }}
+          </span>
+          <ul class="flex flex-wrap items-center whitespace-nowrap gap-1.5 mt-1">
+            <li class="inline-flex items-center relative text-xs text-gray-500 dark:text-neutral-400 pe-2 last:pe-0 last:after:hidden after:absolute after:top-1/2 after:end-0 after:inline-block after:size-[3px] after:bg-gray-400 dark:after:bg-neutral-600 after:rounded-full after:-translate-y-1/2">
+              <p class="text-xs text-gray-500 dark:text-neutral-400">
+                {{ profile.sender_name }}
+              </p>
+            </li>
+            <li class="inline-flex items-center relative text-xs text-gray-500 dark:text-neutral-400">
+              <p class="text-xs text-gray-500 dark:text-neutral-400">
+                {{ profile.sender_email }}
+              </p>
+            </li>
+          </ul>
+        </div>
+      {% endset %}
+      {% set reply_to_html %}
+        {% if profile.reply_to_email %}
+          <span class="text-sm text-gray-800 dark:text-neutral-200">{{ profile.reply_to_email }}</span>
+        {% else %}
+          <div class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-neutral-400">
+            <i data-lucide="corner-down-left" class="size-3.5"></i>
+            <span>Institute Default</span>
+          </div>
+        {% endif %}
+      {% endset %}
+
+      {# Courses popover cell content #}
+      {% set courses_html %}
+        {% if profile.course_count == 0 %}
+          <span class="text-sm text-gray-500 dark:text-neutral-400">
+            0 Courses
+          </span>
+        {% else %}
+          {% set courses_trigger %}
+            <span class="rounded-md px-2 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200 cursor-pointer border border-gray-200 dark:border-neutral-700 font-medium">
+              {{ profile.course_count }}
+              {% if profile.course_count == 1 %}
+                Course
+              {% else %}
+                Courses
+              {% endif %}
+            </span>
+          {% endset %}
+          {% set courses_popover_content %}
+            <div class="p-3">
+              <ul class="space-y-1 list-disc ps-4 max-h-48 overflow-y-auto">
+                {% for course in profile.courses %}
+                <li class="text-xs text-gray-800 dark:text-neutral-200 marker:text-gray-400 dark:marker:text-neutral-600">
+                  {{ course }}
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endset %}
+          {{ popover(trigger=courses_trigger, content=courses_popover_content, placement="bottom", width="w-56", trigger_type="hover") }}
+        {% endif %}
+      {% endset %}
+
+      {# Actions cell content #}
+      {% set actions_html %}
+        <div class="flex items-center justify-end">
+          {{ dropdown(
+            trigger="ellipsis-vertical",
+            placement="bottom-end",
+            width="small",
+            items=[
+              { label: "Edit", icon: "pencil", x_on: '@click="openEditModal({ name: \'' ~ profile.name ~ '\', senderName: \'' ~ profile.sender_name ~ '\', senderEmail: \'' ~ profile.sender_email ~ '\', replyToEmail: \'' ~ profile.reply_to_email ~ '\', courses: ' ~ (profile.courses | dump | replace('"', '\'')) ~ ' })"' },
+              { label: "Delete", icon: "trash-2", variant: "danger", x_on: '@click="openDeleteModal({ name: \'' ~ profile.name ~ '\', courses: ' ~ (profile.courses | dump | replace('"', '\'')) ~ ' })"' }
+            ]
+          ) }}
+        </div>
+      {% endset %}
+
+      {% set row = [
+          { content: identity_html },
+          { content: reply_to_html },
+          { content: courses_html },
+          { content: actions_html, classes: "px-6 py-4 whitespace-nowrap text-end" }
+        ] %}
+        {% set _ = rows.push(row) %}
+    {% endfor %}
+
+    {% set filter_empty_html %}
+      <div class="p-5 min-h-100 flex flex-col justify-center items-center text-center">
+        <div class="mx-auto flex justify-center items-center size-12 bg-gray-100 dark:bg-neutral-800 rounded-full">
+          <i data-lucide="search" class="shrink-0 size-6 text-gray-500 dark:text-neutral-400"></i>
+        </div>
+        <div class="max-w-sm mx-auto">
+          <p class="mt-2 font-medium text-gray-800 dark:text-neutral-200">No Matching Email Profiles</p>
+          <p class="mb-5 mt-1 text-sm text-gray-500 dark:text-neutral-400">We couldn't find any email profiles matching your search or filter criteria.</p>
+        </div>
+        <div class="flex items-center gap-x-2">
+          {{ button(text="Clear Search", variant="primary", extra_attrs="@click='clearSearch()'") }}
+        </div>
+      </div>
+    {% endset %}
+
+    {{ table(
+      columns=columns,
+      rows=rows,
+      hoverable=false,
+      search_enabled=true,
+      search_placeholder="Search by profile name, sender name, or email...",
+      pagination=pagination(items=[1, 2, 3, '...', 10], current=1, show_go_to=true),
+      empty_state_html=filter_empty_html
+    ) }}
+</div>
+
+<div x-show="isEmpty" x-cloak>
+{{ empty_state(
+  title="No Email Profiles Yet",
+  description="Email profiles let you send course communications from dedicated sender names and email addresses.",
+  icon="mail",
+  primary_action_text="Create Email Profile",
+  primary_action_attrs="@click=\"openCreateModal()\"",
+  primary_action_icon="plus",
+  wrap_card=true,
+  extra_classes="rounded-none sm:rounded-xl border-x-0 sm:border-x"
+) }}
+</div>

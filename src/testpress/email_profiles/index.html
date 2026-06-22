@@ -1,0 +1,224 @@
+---
+title: Email Profiles
+tags: testpress
+date: 2026-06-22
+permalink: "/email_profiles/"
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% from "../../ui-system/components/modal.html" import modal %}
+{% from "../../ui-system/components/input.html" import input %}
+{% from "../../ui-system/components/select.html" import select %}
+{% from "../../ui-system/components/popover.html" import popover %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock body_class %}
+
+{% block content %}
+<div x-data="emailProfiles()" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-10 space-y-5" @input.debounce.200ms="onSearch($event)">
+    {% include "./includes/header.html" %}
+    {% include "./includes/list.html" %}
+
+    {% set course_options = [
+      { label: "UPSC Foundation 2026", value: "UPSC Foundation 2026" },
+      { label: "GS Foundation Batch", value: "GS Foundation Batch" },
+      { label: "Indian Polity Masterclass", value: "Indian Polity Masterclass" },
+      { label: "History Optional Program", value: "History Optional Program" },
+      { label: "Geography Optional Program", value: "Geography Optional Program" },
+      { label: "Economics for UPSC", value: "Economics for UPSC" },
+      { label: "Ethics Case Studies", value: "Ethics Case Studies" },
+      { label: "Essay Writing Program", value: "Essay Writing Program" },
+      { label: "Prelims Strategy Workshop", value: "Prelims Strategy Workshop" },
+      { label: "Mains Enrichment Course", value: "Mains Enrichment Course" },
+      { label: "Current Affairs Integration", value: "Current Affairs Integration" },
+      { label: "UPSC Advanced Mentorship", value: "UPSC Advanced Mentorship" },
+      { label: "Daily Current Affairs", value: "Daily Current Affairs" },
+      { label: "Monthly Magazine Program", value: "Monthly Magazine Program" },
+      { label: "Editorial Analysis Series", value: "Editorial Analysis Series" },
+      { label: "Government Schemes Tracker", value: "Government Schemes Tracker" },
+      { label: "International Relations Updates", value: "International Relations Updates" },
+      { label: "Prelims Test Series 2026", value: "Prelims Test Series 2026" },
+      { label: "CSAT Mock Series", value: "CSAT Mock Series" }
+    ] %}
+
+    {# Create / Edit Profile Modal #}
+    {% call modal(
+        id="profile-modal",
+        title="Email Profile",
+        confirm_text="Save Profile",
+        cancel_text="Cancel"
+    ) %}
+      <div class="space-y-5">
+        {{ input(
+            name="profile_name",
+            label="Profile Name",
+            required=true,
+            x_model="form.name",
+            placeholder="e.g. UPSC Faculty Team",
+            help_text="Used internally to identify this email profile."
+        ) }}
+
+        {{ input(
+            name="sender_name",
+            label="Sender Name",
+            required=true,
+            x_model="form.senderName",
+            placeholder="e.g. Vision IAS UPSC Faculty",
+            help_text="Displayed to learners as the sender name in emails."
+        ) }}
+
+        {{ input(
+            name="sender_email",
+            label="Sender Email",
+            required=true,
+            type="email",
+            x_model="form.senderEmail",
+            placeholder="e.g. upsc@visionias.academy",
+            help_text="Emails for assigned courses will be sent from this address."
+        ) }}
+
+        {{ input(
+            name="reply_to_email",
+            label="Reply-To Email",
+            type="email",
+            required=true,
+            x_model="form.replyToEmail",
+            placeholder="e.g. faculty-upsc@visionias.academy",
+            help_text="Replies from learners will be delivered to this address."
+        ) }}
+
+        {{ select(
+            label="Assigned Courses",
+            name="courses",
+            multiple=true,
+            search=true,
+            placeholder="Select courses...",
+            options=course_options,
+            help_text="Select the courses that should use this email profile for outgoing emails.",
+            extra_attrs="@change=\"form.courses = Array.from($event.target.selectedOptions).map(opt => opt.value)\""
+        ) }}
+      </div>
+    {% endcall %}
+
+    {# Delete Profile Modal #}
+    {% call modal(
+        id="delete-profile-modal",
+        title="Delete Email Profile",
+        variant="danger",
+        confirm_text="Delete Profile",
+        cancel_text="Cancel"
+    ) %}
+      <div class="space-y-4">
+        <p class="text-sm text-gray-800 dark:text-neutral-200">
+          Are you sure you want to delete the <strong class="font-semibold text-gray-900 dark:text-white">"<span x-text="deleteData.name"></span>"</strong> profile?
+        </p>
+        <div class="text-sm text-gray-800 dark:text-neutral-200 inline-flex items-center gap-1.5 flex-wrap">
+          <span>This profile is currently assigned to <strong class="font-semibold text-gray-900 dark:text-white"><span x-text="deleteData.courseCount"></span> courses</strong>.</span>
+
+          {# Inline Info Icon Popover #}
+          {% set courses_trigger %}
+            <button type="button" class="inline-flex items-center justify-center text-gray-400 hover:text-gray-500 dark:text-neutral-500 dark:hover:text-neutral-400 focus:outline-hidden">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+            </button>
+          {% endset %}
+
+          {% set courses_popover_content %}
+            <div class="p-3">
+              <ul class="space-y-1 list-disc ps-4 max-h-48 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                <template x-for="course in deleteData.courses" :key="course">
+                  <li class="text-xs text-gray-800 dark:text-neutral-200 marker:text-gray-400 dark:marker:text-neutral-600" x-text="course"></li>
+                </template>
+              </ul>
+            </div>
+          {% endset %}
+
+          {{ popover(trigger=courses_trigger, content=courses_popover_content, placement="top", width="w-56", trigger_type="hover") }}
+        </div>
+        <div class="p-4 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-100 dark:border-yellow-900/50">
+            <p class="text-sm text-yellow-800 dark:text-yellow-200">
+                <i data-lucide="alert-triangle" class="size-4 inline-block mr-1 align-text-bottom"></i>
+                Courses using this profile will automatically switch to the institute default email settings.
+            </p>
+        </div>
+      </div>
+    {% endcall %}
+</div>
+{% endblock content %}
+
+{% block script %}
+    {% include "../../ui-system/scripts/select_script.html" %}
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('emailProfiles', () => ({
+                form: {
+                    id: null,
+                    name: '',
+                    senderName: '',
+                    senderEmail: '',
+                    replyToEmail: ''
+                },
+                deleteData: {
+                    name: '',
+                    courses: [],
+                    courseCount: 0
+                },
+                isEmpty: new URLSearchParams(window.location.search).get('status') === 'empty',
+                isFilterEmpty: new URLSearchParams(window.location.search).get('status') === 'filter_empty',
+                onSearch(e) {
+                    if (e.target.name === 'table_search') {
+                        const lowercaseQuery = e.target.value.toLowerCase().trim();
+                        const rows = document.querySelectorAll('table tbody tr');
+                        let anyVisible = false;
+                        rows.forEach(row => {
+                            const text = row.textContent.toLowerCase();
+                            const visible = text.includes(lowercaseQuery);
+                            row.style.display = visible ? '' : 'none';
+                            if (visible) anyVisible = true;
+                        });
+                        this.isFilterEmpty = lowercaseQuery.length > 0 && !anyVisible;
+                    }
+                },
+                clearSearch() {
+                    const input = document.querySelector('[name="table_search"]');
+                    if (input) {
+                        input.value = '';
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                },
+                
+                openCreateModal() {
+                    this.form = { id: null, name: '', senderName: '', senderEmail: '', replyToEmail: '', courses: [] };
+                    document.querySelector('#modal-title-profile-modal').textContent = "Create Email Profile";
+                    this.$dispatch('open-modal-profile-modal');
+                    this.$nextTick(() => {
+                        const selectEl = document.querySelector('[name="courses"]')?.closest('[x-data]');
+                        if (selectEl) {
+                            selectEl.dispatchEvent(new CustomEvent('set-selected-values', { detail: [] }));
+                        }
+                    });
+                },
+
+                openEditModal(profile) {
+                    this.form = { ...profile };
+                    document.querySelector('#modal-title-profile-modal').textContent = "Edit Email Profile";
+                    this.$dispatch('open-modal-profile-modal');
+                    this.$nextTick(() => {
+                        const selectEl = document.querySelector('[name="courses"]')?.closest('[x-data]');
+                        if (selectEl) {
+                            selectEl.dispatchEvent(new CustomEvent('set-selected-values', { detail: profile.courses || [] }));
+                        }
+                    });
+                },
+
+                openDeleteModal(profile) {
+                    this.deleteData = { 
+                        name: profile.name,
+                        courses: profile.courses || [],
+                        courseCount: (profile.courses || []).length
+                    };
+                    this.$dispatch('open-modal-delete-profile-modal');
+                }
+            }));
+        });
+    </script>
+{% endblock script %}
