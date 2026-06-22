@@ -9,7 +9,6 @@ permalink: "/email_profiles/"
 
 {% from "../../ui-system/components/modal.html" import modal %}
 {% from "../../ui-system/components/input.html" import input %}
-{% from "../../ui-system/components/select.html" import select %}
 {% from "../../ui-system/components/popover.html" import popover %}
 
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock body_class %}
@@ -18,28 +17,6 @@ permalink: "/email_profiles/"
 <div x-data="emailProfiles()" class="max-w-7xl mx-auto px-0 sm:px-6 lg:px-8 py-10 space-y-5" @input.debounce.200ms="onSearch($event)">
     {% include "./includes/header.html" %}
     {% include "./includes/list.html" %}
-
-    {% set course_options = [
-      { label: "UPSC Foundation 2026", value: "UPSC Foundation 2026" },
-      { label: "GS Foundation Batch", value: "GS Foundation Batch" },
-      { label: "Indian Polity Masterclass", value: "Indian Polity Masterclass" },
-      { label: "History Optional Program", value: "History Optional Program" },
-      { label: "Geography Optional Program", value: "Geography Optional Program" },
-      { label: "Economics for UPSC", value: "Economics for UPSC" },
-      { label: "Ethics Case Studies", value: "Ethics Case Studies" },
-      { label: "Essay Writing Program", value: "Essay Writing Program" },
-      { label: "Prelims Strategy Workshop", value: "Prelims Strategy Workshop" },
-      { label: "Mains Enrichment Course", value: "Mains Enrichment Course" },
-      { label: "Current Affairs Integration", value: "Current Affairs Integration" },
-      { label: "UPSC Advanced Mentorship", value: "UPSC Advanced Mentorship" },
-      { label: "Daily Current Affairs", value: "Daily Current Affairs" },
-      { label: "Monthly Magazine Program", value: "Monthly Magazine Program" },
-      { label: "Editorial Analysis Series", value: "Editorial Analysis Series" },
-      { label: "Government Schemes Tracker", value: "Government Schemes Tracker" },
-      { label: "International Relations Updates", value: "International Relations Updates" },
-      { label: "Prelims Test Series 2026", value: "Prelims Test Series 2026" },
-      { label: "CSAT Mock Series", value: "CSAT Mock Series" }
-    ] %}
 
     {# Create / Edit Profile Modal #}
     {% call modal(
@@ -74,7 +51,7 @@ permalink: "/email_profiles/"
             type="email",
             x_model="form.senderEmail",
             placeholder="e.g. upsc@visionias.academy",
-            help_text="Emails for assigned courses will be sent from this address."
+            help_text="Outgoing emails will be sent from this address."
         ) }}
 
         {{ input(
@@ -84,18 +61,7 @@ permalink: "/email_profiles/"
             required=true,
             x_model="form.replyToEmail",
             placeholder="e.g. faculty-upsc@visionias.academy",
-            help_text="Replies from learners will be delivered to this address."
-        ) }}
-
-        {{ select(
-            label="Assigned Courses",
-            name="courses",
-            multiple=true,
-            search=true,
-            placeholder="Select courses...",
-            options=course_options,
-            help_text="Select the courses that should use this email profile for outgoing emails.",
-            extra_attrs="@change=\"form.courses = Array.from($event.target.selectedOptions).map(opt => opt.value)\""
+            help_text="Replies will be delivered to this address."
         ) }}
       </div>
     {% endcall %}
@@ -164,6 +130,19 @@ permalink: "/email_profiles/"
                 },
                 isEmpty: new URLSearchParams(window.location.search).get('status') === 'empty',
                 isFilterEmpty: new URLSearchParams(window.location.search).get('status') === 'filter_empty',
+                init() {
+                    if (this.isFilterEmpty) {
+                        this.$nextTick(() => {
+                            document.querySelectorAll('table tbody tr[style]').forEach(r => {});
+                            document.querySelectorAll('table tbody tr').forEach(row => {
+                                // hide only data rows (not the empty state row which has x-show)
+                                if (!row.hasAttribute('x-show')) {
+                                    row.style.display = 'none';
+                                }
+                            });
+                        });
+                    }
+                },
                 onSearch(e) {
                     if (e.target.name === 'table_search') {
                         const lowercaseQuery = e.target.value.toLowerCase().trim();
@@ -187,27 +166,15 @@ permalink: "/email_profiles/"
                 },
                 
                 openCreateModal() {
-                    this.form = { id: null, name: '', senderName: '', senderEmail: '', replyToEmail: '', courses: [] };
+                    this.form = { id: null, name: '', senderName: '', senderEmail: '', replyToEmail: '' };
                     document.querySelector('#modal-title-profile-modal').textContent = "Create Email Profile";
                     this.$dispatch('open-modal-profile-modal');
-                    this.$nextTick(() => {
-                        const selectEl = document.querySelector('[name="courses"]')?.closest('[x-data]');
-                        if (selectEl) {
-                            selectEl.dispatchEvent(new CustomEvent('set-selected-values', { detail: [] }));
-                        }
-                    });
                 },
 
                 openEditModal(profile) {
                     this.form = { ...profile };
                     document.querySelector('#modal-title-profile-modal').textContent = "Edit Email Profile";
                     this.$dispatch('open-modal-profile-modal');
-                    this.$nextTick(() => {
-                        const selectEl = document.querySelector('[name="courses"]')?.closest('[x-data]');
-                        if (selectEl) {
-                            selectEl.dispatchEvent(new CustomEvent('set-selected-values', { detail: profile.courses || [] }));
-                        }
-                    });
                 },
 
                 openDeleteModal(profile) {
