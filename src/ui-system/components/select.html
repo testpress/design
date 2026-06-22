@@ -9,7 +9,9 @@
         selectedValue: '{{ selected_value }}', 
         options: {{ options | dump | escape | default('[]') }} 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     {% if label %}
     <label for="{{ element_id }}" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -27,7 +29,8 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="{% if not disabled %}open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() }){% endif %}"
+        <div x-ref="toggle"
+             @click="{% if not disabled %}open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() }){% endif %}"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer {% if disabled %}opacity-50 pointer-events-none bg-gray-50 dark:bg-neutral-800{% else %}hover:bg-gray-50 dark:hover:bg-neutral-700{% endif %}
                     {% if error_message %}border-red-500 dark:border-red-500 focus-within:border-red-500 dark:focus-within:border-red-500 focus-within:ring-red-500 dark:focus-within:ring-red-500{% else %}border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600{% endif %}
                     {% if multiple %}ps-1 pe-9 min-h-[42px] flex-wrap{% else %}py-2 sm:py-2.5 px-3 pe-9{% endif %}">
@@ -70,13 +73,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
