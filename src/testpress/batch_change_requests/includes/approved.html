@@ -1,0 +1,105 @@
+{% from "../../../ui-system/components/table.html" import table %}
+{% from "../../../ui-system/components/button_group.html" import button_group %}
+{% from "./macros.html" import render_batches %}
+
+{% set approved_columns = [
+  { label: "Request", classes: "px-6 py-3 max-w-sm" },
+  "Requested By",
+  "Approved By",
+  { label: "Approved At", sortable: true },
+  { label: "", classes: "px-6 py-3 text-end" }
+] %}
+
+{% set approved_rows = [] %}
+{% for request in approved_batch_requests %}
+  
+  {% set request_html %}
+    <div class="flex flex-col items-start w-full">
+      <div class="flex items-center gap-1.5">
+        <a href="#" class="text-sm font-semibold text-primary-600 dark:text-primary-500 hover:text-primary-700 dark:hover:text-primary-400 hover:underline transition-colors leading-tight truncate">
+          {{ request.request.entity.name }}
+        </a>
+      </div>
+      <div class="text-sm text-gray-500 dark:text-neutral-400 mt-1.5 leading-snug whitespace-normal">
+        {% if request.request.operation == 'move_access' or request.request.operation == 'update_access' %}
+          {% if request.request.remove_batches | length == 1 and request.request.add_batches | length == 1 %}
+            Move from {{ render_batches(request.request.remove_batches) }} to {{ render_batches(request.request.add_batches) }}
+          {% else %}
+            <ul class="flex flex-wrap items-center whitespace-nowrap gap-2">
+              <li class="inline-flex items-center relative pe-2.5 last:pe-0 last:after:hidden after:absolute after:top-1/2 after:end-0 after:inline-block after:size-[3px] after:bg-gray-400 dark:after:bg-neutral-600 after:rounded-full after:-translate-y-1/2">
+                {{ render_batches(request.request.add_batches, prefix="+") }}
+              </li>
+              <li class="inline-flex items-center relative">
+                {{ render_batches(request.request.remove_batches, prefix="-") }}
+              </li>
+            </ul>
+          {% endif %}
+        {% elif request.request.operation == 'grant_access' %}
+          Grant access to {{ render_batches(request.request.add_batches) }}
+        {% elif request.request.operation == 'revoke_access' %}
+          Revoke access from {{ render_batches(request.request.remove_batches) }}
+        {% elif request.request.operation == 'create_subscription' %}
+          Create subscription for <a href="#" class="font-medium text-gray-800 dark:text-neutral-200 hover:underline">{{ request.request.batch.name }}</a>
+        {% elif request.request.operation == 'extend_subscription' %}
+          Extend <a href="#" class="font-medium text-gray-800 dark:text-neutral-200 hover:underline">{{ request.request.batch.name }}</a> expiry to <span class="font-medium text-gray-800 dark:text-neutral-200">{{ request.request.new_expiry_date }}</span>
+        {% elif request.request.operation == 'delete_subscription' %}
+          Delete subscription for <a href="#" class="font-medium text-gray-800 dark:text-neutral-200 hover:underline">{{ request.request.batch.name }}</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endset %}
+
+  {% set requested_by_html %}
+    <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
+      {{ request.requested_by.name }}
+    </a>
+  {% endset %}
+
+  {% set approved_by_html %}
+    <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
+      {{ request.approved_by.name }}
+    </a>
+  {% endset %}
+
+  {% set approved_at_html %}
+    <span class="text-sm text-gray-500 dark:text-neutral-400">
+      {{ request.approved_at }}
+    </span>
+  {% endset %}
+
+  {% set actions_html %}
+    <div class="flex items-center justify-end">
+      {{ button_group(items=[{ label: "View", url: "#" }]) }}
+    </div>
+  {% endset %}
+
+  {% set row = [
+    { content: request_html, classes: "px-6 py-4 max-w-sm" },
+    { content: requested_by_html, classes: "px-6 py-4 whitespace-nowrap" },
+    { content: approved_by_html, classes: "px-6 py-4 whitespace-nowrap" },
+    { content: approved_at_html, classes: "px-6 py-4 whitespace-nowrap" },
+    { content: actions_html, classes: "px-6 py-4 whitespace-nowrap text-end" }
+  ] %}
+  {% set approved_rows = (approved_rows.push(row), approved_rows) %}
+{% endfor %}
+
+<div x-show="currentTab === 'approved'" x-cloak>
+  {{ table(
+    columns=approved_columns,
+    rows=approved_rows,
+    selectable=false,
+    responsive=true,
+    pagination=pagination_html,
+    search_enabled=true,
+    search_placeholder="Search by member, course, batch, or requester...",
+    filters=filters_html,
+    table_tabs=table_tabs_html,
+    table_container_classes="px-5",
+    header_border_inset=true,
+    footer_border_inset=true,
+    transparent_header=true,
+    search_variant="solid",
+    header_pt="pt-4",
+    header_pb="pb-4"
+  ) }}
+</div>
