@@ -1,0 +1,104 @@
+{% from "../../../ui-system/components/table.html" import table %}
+{% from "../../../ui-system/components/popover.html" import popover %}
+{% from "../../../ui-system/components/button_group.html" import button_group %}
+{% from "./macros.html" import render_batches, render_request_summary %}
+
+{% set columns = [
+  { label: "Request", classes: "px-6 py-3 max-w-sm" },
+  { label: "Reason", classes: "px-6 py-3" },
+  "Requested By",
+  { label: "Requested At", sortable: true },
+  { label: "", classes: "px-6 py-3 text-end" }
+] %}
+
+{% set rows = [] %}
+{% for request in pending_batch_requests %}
+  
+  {% set request_html %}
+    <div id="row-summary-{{ loop.index }}">
+      {{ render_request_summary(request) }}
+    </div>
+  {% endset %}
+
+  {% set reason_html %}
+    {% if request.reason %}
+      {% if request.reason | length > 60 %}
+        {% set reason_trigger %}
+          <div class="cursor-pointer max-w-[240px]">
+            <p class="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2 whitespace-normal">
+              {{ request.reason }}
+            </p>
+          </div>
+        {% endset %}
+        {% set reason_popover_content %}
+          <div class="px-4 py-3 max-w-xs">
+            <p class="text-sm text-gray-800 dark:text-neutral-200 whitespace-normal">
+              {{ request.reason }}
+            </p>
+          </div>
+        {% endset %}
+        {{ popover(trigger=reason_trigger, content=reason_popover_content, trigger_type="hover", placement="top", width="w-max") }}
+      {% else %}
+        <div class="max-w-[240px]">
+          <p class="text-sm text-gray-600 dark:text-neutral-400 whitespace-normal">
+            {{ request.reason }}
+          </p>
+        </div>
+      {% endif %}
+    {% else %}
+      <span class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+    {% endif %}
+  {% endset %}
+
+  {% set requested_by_html %}
+    <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
+      {{ request.requested_by.name }}
+    </a>
+  {% endset %}
+
+  {% set requested_at_html %}
+    <span class="text-sm text-gray-500 dark:text-neutral-400">
+      {{ request.requested_at }}
+    </span>
+  {% endset %}
+
+  {% set actions_html %}
+    <div class="flex items-center justify-end">
+      {% set action_items = [
+        { tooltip: "Approve", icon: "check", icon_only: true, variant: "success", attrs: "data-summary='" ~ request_html | escape ~ "' @click.prevent=\"$dispatch('open-modal-approve-request-modal'); approveModalData = { requestSummary: $el.dataset.summary }\"" },
+        { tooltip: "Reject", icon: "x", icon_only: true, variant: "danger", attrs: "data-summary='" ~ request_html | escape ~ "' @click.prevent=\"$dispatch('open-modal-reject-request-modal'); rejectModalData = { requestSummary: $el.dataset.summary }\"" }
+      ] %}
+      {{ button_group(items=action_items) }}
+    </div>
+  {% endset %}
+
+  {% set row = [
+    { content: request_html, classes: "px-6 py-4 max-w-sm" },
+    { content: reason_html, classes: "px-6 py-4" },
+    { content: requested_by_html, classes: "px-6 py-4 whitespace-nowrap" },
+    { content: requested_at_html, classes: "px-6 py-4 whitespace-nowrap" },
+    { content: actions_html, classes: "px-6 py-4 whitespace-nowrap text-end" }
+  ] %}
+  {% set rows = (rows.push(row), rows) %}
+{% endfor %}
+
+<div x-show="currentTab === 'pending'">
+  {{ table(
+    columns=columns,
+    rows=rows,
+    selectable=true,
+    responsive=true,
+    pagination=pagination_html,
+    search_enabled=true,
+    search_placeholder="Search by member, course, batch, or requester...",
+    filters=filters_html,
+    table_tabs=table_tabs_html,
+    table_container_classes="px-5",
+    header_border_inset=true,
+    footer_border_inset=true,
+    transparent_header=true,
+    search_variant="solid",
+    header_pt="pt-4",
+    header_pb="pb-4"
+  ) }}
+</div>
