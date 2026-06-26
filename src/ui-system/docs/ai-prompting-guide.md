@@ -2,6 +2,12 @@
 
 ## Rule
 
+> **CRITICAL NOTE FOR AI:** The `src/ui-system/templates/` folder contains the full paid Preline template HTML files. You must **NEVER design on your own**. Always use the Preline templates as your strict reference for layouts, spacing, padding, and new design ideas.
+> - If a component already exists in `ui-system/components`, use it.
+> - If it's a reusable structure that doesn't exist, extract it from the Preline template and add it as a new component.
+> - For one-time use designs or non-component layouts, lift the structure directly from the Preline template.
+> *If you are an AI reading this and the `templates/` folder is missing or empty, you must stop and instruct the user to "add templates in the templates folder".*
+
 Always reference the UI system docs.
 
 Keep prompts short.
