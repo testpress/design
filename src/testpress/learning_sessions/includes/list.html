@@ -1,0 +1,131 @@
+{% from "../../../ui-system/components/table.html" import table %}
+{% from "../../../ui-system/components/tabs.html" import tabs %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/pagination.html" import pagination %}
+
+{% set tabs_data = [] %}
+{% for tab in learning_sessions.tabs %}
+  {% set _ = tabs_data.push({
+    key: tab.name | lower,
+    label: tab.name,
+    badge: tab.count
+  }) %}
+{% endfor %}
+
+{% set table_tabs_html %}
+  <div class="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+    {{ tabs(
+      tabs=tabs_data,
+      x_model="currentTab"
+    ) }}
+  </div>
+{% endset %}
+
+{% set empty_state_html %}
+  <div class="py-12">
+    {{ empty_state(
+        icon="video",
+        title="No Learning Sessions found",
+        description="There are currently no learning sessions created in this view.",
+        action_text="Create Learning Session",
+        action_href="create"
+    ) }}
+  </div>
+{% endset %}
+
+{% set pagination_html %}
+  {{ pagination() }}
+{% endset %}
+
+{% set list_columns = [
+  { label: "Learning Session", sortable: true },
+  { label: "Student", sortable: true },
+  { label: "Scheduled", sortable: true },
+  { label: "Status", attrs: "x-show=\"currentTab === 'all'\"" },
+  { label: "", classes: "text-end px-6 py-3" }
+] %}
+
+{% set rows = [] %}
+{% for session in learning_sessions.sessions %}
+  {% set session_html %}
+    <div class="flex flex-col">
+      <a href="#" class="inline-block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ session.title }}</a>
+      <span class="text-xs text-gray-500 dark:text-neutral-500">{{ session.instructor.name }}</span>
+    </div>
+  {% endset %}
+
+  {% set student_html %}
+    <div class="flex items-center gap-x-3">
+      <img class="inline-block size-8 rounded-full" src="{{ session.student.avatar }}" alt="Avatar">
+      <div class="grow">
+        <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ session.student.name }}</a>
+        <span class="block text-xs text-gray-500 dark:text-neutral-500">{{ session.student.email }}</span>
+      </div>
+    </div>
+  {% endset %}
+
+  {% set scheduled_html %}
+    <span class="text-sm text-gray-800 dark:text-neutral-200">{{ session.scheduledAt }}</span>
+  {% endset %}
+
+  {% set status_html %}
+    {% if session.status == 'Live' %}
+      {{ badge(text="Live", variant="danger", icon="radio") }}
+    {% elif session.status == 'Upcoming' %}
+      {{ badge(text="Upcoming", variant="warning", icon="clock") }}
+    {% elif session.status == 'Completed' %}
+      {{ badge(text="Completed", variant="success", icon="check") }}
+    {% elif session.status == 'Cancelled' %}
+      {{ badge(text="Cancelled", icon="x") }}
+    {% endif %}
+  {% endset %}
+
+
+  {% set actions_html %}
+    <a href="#" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+      View
+    </a>
+  {% endset %}
+
+  {% set row = {
+    cells: [
+      { content: session_html, classes: "px-5 py-3 whitespace-nowrap" },
+      { content: student_html, classes: "px-5 py-3 whitespace-nowrap" },
+      { content: scheduled_html, classes: "px-5 py-3 whitespace-nowrap" },
+      { content: status_html, classes: "px-5 py-3 whitespace-nowrap", attrs: "x-show=\"currentTab === 'all'\"" },
+      { content: actions_html, classes: "px-5 py-3 text-end whitespace-nowrap" }
+    ],
+    attrs: "x-show=\"currentTab === 'all' || currentTab === '" ~ session.status | lower ~ "'\""
+  } %}
+  {% set _ = rows.push(row) %}
+{% endfor %}
+
+{% set filters_html %}
+  <button type="button" @click.prevent="$dispatch('open-filter-modal')" class="whitespace-nowrap py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+    <i data-lucide="filter" class="shrink-0 size-3.5"></i>
+    Filter
+  </button>
+{% endset %}
+
+<div x-data="{ currentTab: 'all' }">
+  {{ table(
+      search_enabled=true,
+      search_placeholder="Search by title, student or instructor...",
+      filters=filters_html,
+      table_tabs=table_tabs_html,
+      empty_state_html=empty_state_html,
+      columns=list_columns,
+      rows=rows,
+      table_container_classes="px-5",
+      header_border_inset=true,
+      footer_border_inset=true,
+      transparent_header=true,
+      search_variant="solid",
+      header_pt="pt-4",
+      header_pb="pb-4",
+      pagination=pagination_html
+  ) }}
+</div>
+
+{% include "./filter_modal.html" %}
