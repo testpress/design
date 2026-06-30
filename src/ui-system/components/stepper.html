@@ -1,0 +1,105 @@
+{% macro stepper(
+    steps=[],
+    variant="default",
+    orientation="horizontal",
+    size="md",
+    current_step=1,
+    clickable=false,
+    disabled=false,
+    full_width=true,
+    show_description=true,
+    show_icons=false,
+    show_numbers=true,
+    show_connector=true,
+    upcoming_style="solid",
+    extra_classes=""
+) %}
+
+{% if steps | length == 0 %}
+  <div class="p-4 text-center text-sm text-gray-500 dark:text-neutral-400 bg-gray-50 dark:bg-neutral-800 rounded-lg border border-gray-200 dark:border-neutral-700">
+    No steps configured
+  </div>
+{% else %}
+  <ul class="relative flex {{ 'flex-col sm:flex-row' if orientation == 'horizontal' else 'flex-col' }} gap-2 {{ 'w-full' if full_width else '' }} {{ extra_classes }}">
+    {% for step in steps %}
+      {% set loop_index = loop.index %}
+      {% set status = step.status %}
+      {% if not status %}
+        {% if current_step %}
+          {% if loop_index < current_step %}
+            {% set status = 'completed' %}
+          {% elif loop_index == current_step %}
+            {% set status = 'current' %}
+          {% else %}
+            {% set status = 'upcoming' %}
+          {% endif %}
+        {% else %}
+          {% set status = 'upcoming' %}
+        {% endif %}
+      {% endif %}
+
+      {# Set up colors based on status #}
+      {% set bg_class = 'bg-gray-100 dark:bg-neutral-700' %}
+      {% set text_class = 'text-gray-800 dark:text-neutral-200' %}
+      {% set connector_class = 'bg-gray-200 dark:bg-neutral-600' %}
+      
+      {% if status == 'upcoming' and upcoming_style == 'outline' %}
+        {% set bg_class = 'bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700' %}
+        {% set text_class = 'text-gray-800 dark:text-white' %}
+      {% endif %}
+      
+      {% if status == 'completed' %}
+        {% set bg_class = 'bg-primary-600 dark:bg-primary-500' %}
+        {% set text_class = 'text-white' %}
+        {% set connector_class = 'bg-primary-600 dark:bg-primary-500' %}
+      {% elif status == 'current' %}
+        {% set bg_class = 'bg-primary-600 dark:bg-primary-500' %}
+        {% set text_class = 'text-white' %}
+      {% elif status == 'error' %}
+        {% set bg_class = 'bg-red-500 dark:bg-red-600' %}
+        {% set text_class = 'text-white' %}
+      {% elif status == 'disabled' or disabled %}
+        {% set bg_class = 'bg-gray-50 dark:bg-neutral-800' %}
+        {% set text_class = 'text-gray-400 dark:text-neutral-500' %}
+      {% endif %}
+
+      <li class="{{ 'sm:shrink sm:basis-0 flex-1' if orientation == 'horizontal' else '' }} group flex gap-x-2 {{ 'sm:block' if orientation == 'horizontal' else '' }} {{ 'opacity-50 pointer-events-none' if status == 'disabled' or disabled else '' }}">
+        
+        <div class="min-w-7 min-h-7 flex flex-col items-center {{ 'sm:w-full sm:inline-flex sm:flex-wrap sm:flex-row' if orientation == 'horizontal' else '' }} text-xs align-middle">
+          
+          <{% if clickable and status != 'disabled' and not disabled %}button type="button"{% else %}span{% endif %} class="size-7 flex justify-center items-center shrink-0 font-medium rounded-full {{ bg_class }} {{ text_class }} {{ 'cursor-pointer hover:opacity-80 transition-opacity' if clickable and status != 'disabled' and not disabled else '' }}">
+            
+            {% if show_icons and step.icon %}
+              <i data-lucide="{{ step.icon }}" class="w-4 h-4"></i>
+            {% elif status == 'completed' %}
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+            {% elif status == 'error' %}
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            {% elif show_numbers %}
+              {{ loop_index }}
+            {% else %}
+               <!-- empty dot -->
+            {% endif %}
+
+          </{% if clickable and status != 'disabled' and not disabled %}button{% else %}span{% endif %}>
+          
+          {% if show_connector %}
+          <div class="mt-2 w-px h-full {{ 'sm:mt-0 sm:ms-2 sm:w-full sm:h-px sm:flex-1' if orientation == 'horizontal' else '' }} {{ connector_class }} group-last:hidden transition-colors"></div>
+          {% endif %}
+        </div>
+        
+        <div class="grow pt-1 {{ 'sm:pt-0 sm:grow-0 sm:mt-3 pb-5 sm:pb-0' if orientation == 'horizontal' else 'pb-5' }}">
+          <span class="block text-sm font-medium {{ 'text-gray-800 dark:text-neutral-200' if status != 'disabled' and not disabled else 'text-gray-400 dark:text-neutral-500' }}">
+            {{ step.title }}
+          </span>
+          {% if show_description and variant == 'default' and step.description %}
+          <p class="text-sm {{ 'text-gray-500 dark:text-neutral-400' if status != 'disabled' and not disabled else 'text-gray-400 dark:text-neutral-500' }}">
+            {{ step.description }}
+          </p>
+          {% endif %}
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endmacro %}
