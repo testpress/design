@@ -3,96 +3,78 @@
 {% from "../../../ui-system/components/button_group.html" import button_group %}
 {% from "./macros.html" import render_batches, render_request_summary %}
 
-{% set rejected_columns = [
-  { label: "Request", classes: "px-6 py-3 max-w-sm" },
-  "Requested By",
-  "Rejected By",
-  { label: "Rejected At", sortable: true },
-  { label: "Reason", classes: "px-6 py-3" }
-] %}
-
-{% set rejected_rows = [] %}
-{% for request in rejected_batch_requests %}
-  
-  {% set request_html %}
-    {{ render_request_summary(request) }}
-  {% endset %}
-
-  {% set requested_by_html %}
-    <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
-      {{ request.requested_by.name }}
-    </a>
-  {% endset %}
-
-  {% set rejected_by_html %}
-    <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
-      {{ request.rejected_by.name }}
-    </a>
-  {% endset %}
-
-  {% set rejected_at_html %}
-    <span class="text-sm text-gray-500 dark:text-neutral-400">
-      {{ request.rejected_at }}
-    </span>
-  {% endset %}
-
-  {% set reason_html %}
-    {% if request.reason %}
-      {% if request.reason | length > 60 %}
-        {% set reason_trigger %}
-          <div class="cursor-pointer max-w-[240px]">
-            <p class="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2 whitespace-normal">
-              {{ request.reason }}
-            </p>
-          </div>
-        {% endset %}
-        {% set reason_popover_content %}
-          <div class="px-4 py-3 max-w-xs">
-            <p class="text-sm text-gray-800 dark:text-neutral-200 whitespace-normal">
-              {{ request.reason }}
-            </p>
-          </div>
-        {% endset %}
-        {{ popover(trigger=reason_trigger, content=reason_popover_content, trigger_type="hover", placement="top", width="w-max") }}
-      {% else %}
-        <div class="max-w-[240px]">
-          <p class="text-sm text-gray-600 dark:text-neutral-400 whitespace-normal">
-            {{ request.reason }}
-          </p>
-        </div>
-      {% endif %}
-    {% else %}
-      <span class="text-sm text-gray-400 dark:text-neutral-500">-</span>
-    {% endif %}
-  {% endset %}
-
-  {% set row = [
-    { content: request_html, classes: "px-6 py-4 max-w-sm" },
-    { content: requested_by_html, classes: "px-6 py-4 whitespace-nowrap" },
-    { content: rejected_by_html, classes: "px-6 py-4 whitespace-nowrap" },
-    { content: rejected_at_html, classes: "px-6 py-4 whitespace-nowrap" },
-    { content: reason_html, classes: "px-6 py-4" }
-  ] %}
-  {% set rejected_rows = (rejected_rows.push(row), rejected_rows) %}
-{% endfor %}
-
 <div x-show="currentTab === 'rejected'" x-cloak>
-  {{ table(
-    columns=rejected_columns,
-    rows=rejected_rows,
-    selectable=false,
-    responsive=true,
-    pagination=pagination_html,
+  {% set table_header %}
+    <th scope="col" class="px-6 py-3 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 max-w-sm">Request</th>
+    <th scope="col" class="px-6 py-3 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">Requested By</th>
+    <th scope="col" class="px-6 py-3 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">Rejected By</th>
+    <th scope="col" class="p-0 text-start">
+      <button type="button" class="w-full flex items-center gap-x-1 text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-750 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-750 text-start transition-colors px-6 py-3" aria-label="Sort Rejected At">
+        Rejected At
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+      </button>
+    </th>
+    <th scope="col" class="px-6 py-3 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">Reason</th>
+  {% endset %}
+
+  {% call table(
+    pagination=true,
     search_enabled=true,
     search_placeholder="Search by member, course, batch, or requester...",
     filters=filters_html,
-    table_tabs=table_tabs_html,
-    table_container_classes="px-5",
-    header_border_inset=true,
-    footer_border_inset=true,
-    transparent_header=true,
-    search_variant="solid",
-    header_pt="pt-4",
-    header_pb="pb-4"
-  ) }}
+    table_tabs=tabs_data,
+    table_header=table_header
+  ) %}
+        {% for request in rejected_batch_requests %}
+          <tr>
+            <td class="px-6 py-4 max-w-sm align-middle text-sm">
+              {{ render_request_summary(request) }}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap align-middle text-sm">
+              <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
+                {{ request.requested_by.name }}
+              </a>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap align-middle text-sm">
+              <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
+                {{ request.rejected_by.name }}
+              </a>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap align-middle text-sm">
+              <span class="text-sm text-gray-500 dark:text-neutral-400">
+                {{ request.rejected_at }}
+              </span>
+            </td>
+            <td class="px-6 py-4 align-middle text-sm">
+              {% if request.reason %}
+                {% if request.reason | length > 60 %}
+                  {% set reason_trigger %}
+                    <div class="cursor-pointer max-w-[240px]">
+                      <p class="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2 whitespace-normal">
+                        {{ request.reason }}
+                      </p>
+                    </div>
+                  {% endset %}
+                  {% set reason_popover_content %}
+                    <div class="px-4 py-3 max-w-xs">
+                      <p class="text-sm text-gray-800 dark:text-neutral-200 whitespace-normal">
+                        {{ request.reason }}
+                      </p>
+                    </div>
+                  {% endset %}
+                  {{ popover(trigger=reason_trigger, content=reason_popover_content, trigger_type="hover", placement="top", width="w-max") }}
+                {% else %}
+                  <div class="max-w-[240px]">
+                    <p class="text-sm text-gray-600 dark:text-neutral-400 whitespace-normal">
+                      {{ request.reason }}
+                    </p>
+                  </div>
+                {% endif %}
+              {% else %}
+                <span class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+  {% endcall %}
 </div>

@@ -13,14 +13,11 @@
   }) %}
 {% endfor %}
 
-{% set table_tabs_html %}
-  <div class="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-    {{ tabs(
-      tabs=tabs_data,
-      x_model="currentTab"
-    ) }}
-  </div>
-{% endset %}
+{% set pagination_data = {
+  items: [1, 2, 3, '...', 10],
+  current: 1,
+  show_go_to: true
+} %}
 
 {% set empty_state_html %}
   <div class="py-12">
@@ -34,73 +31,6 @@
   </div>
 {% endset %}
 
-{% set pagination_html %}
-  {{ pagination() }}
-{% endset %}
-
-{% set list_columns = [
-  { label: "Learning Session", sortable: true },
-  { label: "Student", sortable: true },
-  { label: "Scheduled", sortable: true },
-  { label: "Status", attrs: "x-show=\"currentTab === 'all'\"" },
-  { label: "", classes: "text-end px-6 py-3" }
-] %}
-
-{% set rows = [] %}
-{% for session in learning_sessions.sessions %}
-  {% set session_html %}
-    <div class="flex flex-col">
-      <a href="/learning_sessions/{{ session.id }}/" class="inline-block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ session.title }}</a>
-      <span class="text-xs text-gray-500 dark:text-neutral-500">{{ session.instructor.name }}</span>
-    </div>
-  {% endset %}
-
-  {% set student_html %}
-    <div class="flex items-center gap-x-3">
-      <img class="inline-block size-8 rounded-full" src="{{ session.student.avatar }}" alt="Avatar">
-      <div class="grow">
-        <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ session.student.name }}</a>
-        <span class="block text-xs text-gray-500 dark:text-neutral-500">{{ session.student.email }}</span>
-      </div>
-    </div>
-  {% endset %}
-
-  {% set scheduled_html %}
-    <span class="text-sm text-gray-800 dark:text-neutral-200">{{ session.scheduledAt }}</span>
-  {% endset %}
-
-  {% set status_html %}
-    {% if session.status == 'Live' %}
-      {{ badge(text="Live", variant="danger", icon="radio") }}
-    {% elif session.status == 'Upcoming' %}
-      {{ badge(text="Upcoming", variant="warning", icon="clock") }}
-    {% elif session.status == 'Completed' %}
-      {{ badge(text="Completed", variant="success", icon="check") }}
-    {% elif session.status == 'Cancelled' %}
-      {{ badge(text="Cancelled", icon="x") }}
-    {% endif %}
-  {% endset %}
-
-
-  {% set actions_html %}
-    <a href="/learning_sessions/{{ session.id }}/" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
-      View
-    </a>
-  {% endset %}
-
-  {% set row = {
-    cells: [
-      { content: session_html, classes: "px-5 py-3 whitespace-nowrap" },
-      { content: student_html, classes: "px-5 py-3 whitespace-nowrap" },
-      { content: scheduled_html, classes: "px-5 py-3 whitespace-nowrap" },
-      { content: status_html, classes: "px-5 py-3 whitespace-nowrap", attrs: "x-show=\"currentTab === 'all'\"" },
-      { content: actions_html, classes: "px-5 py-3 text-end whitespace-nowrap" }
-    ],
-    attrs: "x-show=\"currentTab === 'all' || currentTab === '" ~ session.status | lower ~ "'\""
-  } %}
-  {% set _ = rows.push(row) %}
-{% endfor %}
-
 {% set filters_html %}
   <button type="button" @click.prevent="$dispatch('open-filter-modal')" class="whitespace-nowrap py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
     <i data-lucide="filter" class="shrink-0 size-3.5"></i>
@@ -108,24 +38,89 @@
   </button>
 {% endset %}
 
+{% set table_header %}
+  <th scope="col" class="p-0 text-start">
+    <button type="button" class="w-full flex items-center gap-x-1 text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-750 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-750 text-start transition-colors px-5 py-2.5" aria-label="Sort Learning Session">
+      Learning Session
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+    </button>
+  </th>
+  <th scope="col" class="p-0 text-start">
+    <button type="button" class="w-full flex items-center gap-x-1 text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-750 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-750 text-start transition-colors px-5 py-2.5" aria-label="Sort Student">
+      Student
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+    </button>
+  </th>
+  <th scope="col" class="p-0 text-start">
+    <button type="button" class="w-full flex items-center gap-x-1 text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-750 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-750 text-start transition-colors px-5 py-2.5" aria-label="Sort Scheduled">
+      Scheduled
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+    </button>
+  </th>
+  <th scope="col" class="px-5 py-2.5 text-start text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400" x-show="currentTab === 'all'">
+    Status
+  </th>
+  <th scope="col" class="text-end px-6 py-3 text-start text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400">
+    
+  </th>
+{% endset %}
+
 <div x-data="{ currentTab: 'all' }">
-  {{ table(
+  {% call table(
       search_enabled=true,
       search_placeholder="Search by title, student or instructor...",
       filters=filters_html,
-      table_tabs=table_tabs_html,
-      empty_state_html=empty_state_html,
-      columns=list_columns,
-      rows=rows,
-      table_container_classes="px-5",
-      header_border_inset=true,
-      footer_border_inset=true,
-      transparent_header=true,
-      search_variant="solid",
-      header_pt="pt-4",
-      header_pb="pb-4",
-      pagination=pagination_html
-  ) }}
+      table_tabs=tabs_data,
+      pagination=true,
+      table_header=table_header
+  ) %}
+    {% if learning_sessions.sessions and learning_sessions.sessions | length > 0 %}
+      {% for session in learning_sessions.sessions %}
+        <tr x-show="currentTab === 'all' || currentTab === '{{ session.status | lower }}'">
+          <td class="px-5 py-3 whitespace-nowrap align-middle text-sm">
+            <div class="flex flex-col">
+              <a href="/learning_sessions/{{ session.id }}/" class="inline-block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ session.title }}</a>
+              <span class="text-xs text-gray-500 dark:text-neutral-500">{{ session.instructor.name }}</span>
+            </div>
+          </td>
+          <td class="px-5 py-3 whitespace-nowrap align-middle text-sm">
+            <div class="flex items-center gap-x-3">
+              <img class="inline-block size-8 rounded-full" src="{{ session.student.avatar }}" alt="Avatar">
+              <div class="grow">
+                <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ session.student.name }}</a>
+                <span class="block text-xs text-gray-500 dark:text-neutral-500">{{ session.student.email }}</span>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-3 whitespace-nowrap align-middle text-sm text-gray-600 dark:text-neutral-300">
+            <span class="text-sm text-gray-800 dark:text-neutral-200">{{ session.scheduledAt }}</span>
+          </td>
+          <td class="px-5 py-3 whitespace-nowrap align-middle text-sm text-gray-600 dark:text-neutral-300" x-show="currentTab === 'all'">
+            {% if session.status == 'Live' %}
+              {{ badge(text="Live", variant="danger", icon="radio") }}
+            {% elif session.status == 'Upcoming' %}
+              {{ badge(text="Upcoming", variant="warning", icon="clock") }}
+            {% elif session.status == 'Completed' %}
+              {{ badge(text="Completed", variant="success", icon="check") }}
+            {% elif session.status == 'Cancelled' %}
+              {{ badge(text="Cancelled", icon="x") }}
+            {% endif %}
+          </td>
+          <td class="px-5 py-3 text-end whitespace-nowrap align-middle text-sm">
+            <a href="/learning_sessions/{{ session.id }}/" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+              View
+            </a>
+          </td>
+        </tr>
+      {% endfor %}
+    {% else %}
+      <tr>
+        <td colspan="5" class="py-0">
+          {{ empty_state_html | safe }}
+        </td>
+      </tr>
+    {% endif %}
+  {% endcall %}
 </div>
 
 {% include "./filter_modal.html" %}

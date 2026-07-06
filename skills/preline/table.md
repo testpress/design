@@ -225,3 +225,81 @@ Tab panels: first panel has no `hidden` class; others use `class="hidden"` and `
   </div>
 </div>
 ```
+
+## Simplified Nunjucks Macro (`table.html`)
+
+The `table` macro has been simplified to strictly follow the standard card structure above. It uses a single outer container with `p-5 space-y-4` and relies on `caller()` for the table contents, removing all inner padding (`px-5`, `pt-4`, etc.).
+
+### Proposed Macro Structure:
+```nunjucks
+{% macro table(
+  search_enabled=false, 
+  search_placeholder="Search...", 
+  filters="", 
+  table_tabs="",
+  pagination="",
+  table_container_classes=""
+) %}
+<div class="p-5 space-y-4 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl">
+  
+  {# Tabs Area #}
+  {% if table_tabs %}
+    {{ table_tabs | safe }}
+  {% endif %}
+
+  {# Filter Group #}
+  {% if search_enabled or filters %}
+    <div class="grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5">
+      <div>
+        {% if search_enabled %}
+          <div class="relative">
+            <div class="absolute inset-y-0 inset-s-0 flex items-center pointer-events-none z-20 ps-3.5">
+              <svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
+            <input name="table_search" type="text" class="py-1 sm:py-1.5 ps-10 pe-8 block w-full bg-gray-100 dark:bg-neutral-700 border-transparent text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 rounded-lg sm:text-sm focus:bg-white dark:focus:bg-neutral-800 focus:border-blue-700 dark:focus:border-blue-600 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none" placeholder="{{ search_placeholder }}">
+          </div>
+        {% endif %}
+      </div>
+      
+      <div class="flex flex-wrap md:justify-end items-center gap-x-2">
+        {% if filters %}
+          {{ filters | safe }}
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  {# Table Area (Uses Caller) #}
+  <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 {{ table_container_classes }}">
+    <div class="min-w-full inline-block align-middle">
+      {{ caller() }}
+    </div>
+  </div>
+
+  {# Pagination Area #}
+  {% if pagination %}
+    <div>
+      {{ pagination | safe }}
+    </div>
+  {% endif %}
+</div>
+{% endmacro %}
+```
+
+### Example Usage:
+```nunjucks
+{% call table(search_enabled=true, table_tabs=my_tabs, filters=my_filters, pagination=my_pagination) %}
+  <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+    <thead>
+      <tr>
+        <th class="px-5 py-2.5 text-start">...</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+      <tr>
+        <td class="px-5 py-3 whitespace-nowrap">...</td>
+      </tr>
+    </tbody>
+  </table>
+{% endcall %}
+```

@@ -3,102 +3,95 @@
 {% from "../../../ui-system/components/button_group.html" import button_group %}
 {% from "./macros.html" import render_batches, render_request_summary %}
 
-{% set columns = [
-  { label: "Request", classes: "px-6 py-3 max-w-sm" },
-  { label: "Reason", classes: "px-6 py-3" },
-  "Requested By",
-  { label: "Requested At", sortable: true },
-  { label: "", classes: "px-6 py-3 text-end" }
-] %}
-
-{% set rows = [] %}
-{% for request in pending_batch_requests %}
-  
-  {% set request_html %}
-    <div id="row-summary-{{ loop.index }}">
-      {{ render_request_summary(request) }}
-    </div>
-  {% endset %}
-
-  {% set reason_html %}
-    {% if request.reason %}
-      {% if request.reason | length > 60 %}
-        {% set reason_trigger %}
-          <div class="cursor-pointer max-w-[240px]">
-            <p class="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2 whitespace-normal">
-              {{ request.reason }}
-            </p>
-          </div>
-        {% endset %}
-        {% set reason_popover_content %}
-          <div class="px-4 py-3 max-w-xs">
-            <p class="text-sm text-gray-800 dark:text-neutral-200 whitespace-normal">
-              {{ request.reason }}
-            </p>
-          </div>
-        {% endset %}
-        {{ popover(trigger=reason_trigger, content=reason_popover_content, trigger_type="hover", placement="top", width="w-max") }}
-      {% else %}
-        <div class="max-w-[240px]">
-          <p class="text-sm text-gray-600 dark:text-neutral-400 whitespace-normal">
-            {{ request.reason }}
-          </p>
-        </div>
-      {% endif %}
-    {% else %}
-      <span class="text-sm text-gray-400 dark:text-neutral-500">-</span>
-    {% endif %}
-  {% endset %}
-
-  {% set requested_by_html %}
-    <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
-      {{ request.requested_by.name }}
-    </a>
-  {% endset %}
-
-  {% set requested_at_html %}
-    <span class="text-sm text-gray-500 dark:text-neutral-400">
-      {{ request.requested_at }}
-    </span>
-  {% endset %}
-
-  {% set actions_html %}
-    <div class="flex items-center justify-end">
-      {% set action_items = [
-        { tooltip: "Approve", icon: "check", icon_only: true, variant: "success", attrs: "data-summary='" ~ request_html | escape ~ "' @click.prevent=\"$dispatch('open-modal-approve-request-modal'); approveModalData = { requestSummary: $el.dataset.summary }\"" },
-        { tooltip: "Reject", icon: "x", icon_only: true, variant: "danger", attrs: "data-summary='" ~ request_html | escape ~ "' @click.prevent=\"$dispatch('open-modal-reject-request-modal'); rejectModalData = { requestSummary: $el.dataset.summary }\"" }
-      ] %}
-      {{ button_group(items=action_items) }}
-    </div>
-  {% endset %}
-
-  {% set row = [
-    { content: request_html, classes: "px-6 py-4 max-w-sm" },
-    { content: reason_html, classes: "px-6 py-4" },
-    { content: requested_by_html, classes: "px-6 py-4 whitespace-nowrap" },
-    { content: requested_at_html, classes: "px-6 py-4 whitespace-nowrap" },
-    { content: actions_html, classes: "px-6 py-4 whitespace-nowrap text-end" }
-  ] %}
-  {% set rows = (rows.push(row), rows) %}
-{% endfor %}
-
 <div x-show="currentTab === 'pending'">
-  {{ table(
-    columns=columns,
-    rows=rows,
-    selectable=true,
-    responsive=true,
-    pagination=pagination_html,
+  {% set table_header %}
+    <th scope="col" class="px-3 py-2.5 text-start">
+      <input type="checkbox" class="shrink-0 size-4 bg-transparent border-gray-300 dark:border-neutral-600 rounded-sm shadow-2xs text-blue-600 dark:text-blue-500" @change="selectedRows = $event.target.checked ? Array.from($el.closest('table').querySelectorAll('tbody input[type=checkbox]')).map(cb => cb.value) : []" :checked="selectedRows.length > 0 && selectedRows.length === Array.from($el.closest('table').querySelectorAll('tbody input[type=checkbox]')).length">
+    </th>
+    <th scope="col" class="px-6 py-3 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 max-w-sm">Request</th>
+    <th scope="col" class="px-6 py-3 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">Reason</th>
+    <th scope="col" class="px-6 py-3 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">Requested By</th>
+    <th scope="col" class="p-0 text-start">
+      <button type="button" class="w-full flex items-center gap-x-1 text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-750 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-750 text-start transition-colors px-6 py-3" aria-label="Sort Requested At">
+        Requested At
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+      </button>
+    </th>
+    <th scope="col" class="px-6 py-3 text-end text-sm font-normal text-gray-500 dark:text-neutral-400"></th>
+  {% endset %}
+
+  {% call table( 
     search_enabled=true,
     search_placeholder="Search by member, course, batch, or requester...",
     filters=filters_html,
-    table_tabs=table_tabs_html,
-    table_container_classes="px-5",
-    header_border_inset=true,
-    footer_border_inset=true,
-    transparent_header=true,
-    search_variant="solid",
-    header_pt="pt-4",
-    header_pb="pb-4"
-  ) }}
+    table_tabs=tabs_data,
+    pagination=true,
+    table_header=table_header
+  ) %}
+        {% for request in pending_batch_requests %}
+          <tr>
+            <td class="px-3 py-4 whitespace-nowrap align-middle">
+              <input type="checkbox" class="shrink-0 size-4 bg-transparent border-gray-300 dark:border-neutral-600 rounded-sm shadow-2xs text-blue-600 dark:text-blue-500" value="{{ loop.index }}" x-model="selectedRows">
+            </td>
+            <td class="px-6 py-4 max-w-sm align-middle text-sm">
+              <div id="row-summary-{{ loop.index }}">
+                {{ render_request_summary(request) }}
+              </div>
+            </td>
+            <td class="px-6 py-4 align-middle text-sm">
+              {% if request.reason %}
+                {% if request.reason | length > 60 %}
+                  {% set reason_trigger %}
+                    <div class="cursor-pointer max-w-[240px]">
+                      <p class="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2 whitespace-normal">
+                        {{ request.reason }}
+                      </p>
+                    </div>
+                  {% endset %}
+                  {% set reason_popover_content %}
+                    <div class="px-4 py-3 max-w-xs">
+                      <p class="text-sm text-gray-800 dark:text-neutral-200 whitespace-normal">
+                        {{ request.reason }}
+                      </p>
+                    </div>
+                  {% endset %}
+                  {{ popover(trigger=reason_trigger, content=reason_popover_content, trigger_type="hover", placement="top", width="w-max") }}
+                {% else %}
+                  <div class="max-w-[240px]">
+                    <p class="text-sm text-gray-600 dark:text-neutral-400 whitespace-normal">
+                      {{ request.reason }}
+                    </p>
+                  </div>
+                {% endif %}
+              {% else %}
+                <span class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+              {% endif %}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap align-middle text-sm">
+              <a href="#" target="_blank" class="text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">
+                {{ request.requested_by.name }}
+              </a>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap align-middle text-sm">
+              <span class="text-sm text-gray-500 dark:text-neutral-400">
+                {{ request.requested_at }}
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap align-middle text-end text-sm">
+              <div class="flex items-center justify-end">
+                {% set request_html %}
+                  <div id="row-summary-{{ loop.index }}">
+                    {{ render_request_summary(request) }}
+                  </div>
+                {% endset %}
+                {% set action_items = [
+                  { tooltip: "Approve", icon: "check", icon_only: true, variant: "success", attrs: "data-summary='" ~ request_html | escape ~ "' @click.prevent=\"$dispatch('open-modal-approve-request-modal'); approveModalData = { requestSummary: $el.dataset.summary }\"" },
+                  { tooltip: "Reject", icon: "x", icon_only: true, variant: "danger", attrs: "data-summary='" ~ request_html | escape ~ "' @click.prevent=\"$dispatch('open-modal-reject-request-modal'); rejectModalData = { requestSummary: $el.dataset.summary }\"" }
+                ] %}
+                {{ button_group(items=action_items) }}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+  {% endcall %}
 </div>

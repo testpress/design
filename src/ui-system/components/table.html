@@ -1,179 +1,79 @@
-{% from "./checkbox.html" import checkbox %}
-{% from "./card.html" import card %}
 {% from "./input.html" import input %}
+{% from "./tabs.html" import tabs as tabs_macro %}
+{% from "./pagination.html" import pagination as pagination_macro %}
 
 {% macro table(
-  columns=[], 
-  rows=[], 
-  striped=false, 
-  hoverable=false, 
-  compact=false, 
-  responsive=true, 
-  selectable=false,
-  title="", 
-  description="", 
   search_enabled=false, 
   search_placeholder="Search...", 
   filters="", 
-  primary_action="", 
-  toolbar_actions="", 
-  pagination="",
   table_tabs="",
-  empty_state_html="",
+  pagination="",
+  table_header="",
   table_container_classes="",
-  header_border_inset=false,
-  footer_border_inset=false,
-  transparent_header=false,
-  search_variant="standard",
-  header_pt="pt-5",
-  header_pb="pb-5"
+  hoverable=false
 ) %}
-
-{% call card(padding="p-0", extra_classes="rounded-none sm:rounded-xl") %}
+<div class="p-5 space-y-4 flex flex-col bg-white dark:bg-neutral-800 border-y sm:border-y sm:border-x border-gray-200 dark:border-neutral-700 shadow-2xs rounded-none sm:rounded-xl">
   
   {# Tabs Area #}
   {% if table_tabs %}
-  <div class="px-5 pt-4">
-    {{ table_tabs | safe }}
-  </div>
+    {% if table_tabs[0] and table_tabs[0].label %}
+      <div class="overflow-x-auto [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+        {{ tabs_macro(tabs=table_tabs, x_model="currentTab") }}
+      </div>
+    {% else %}
+      {{ table_tabs | safe }}
+    {% endif %}
   {% endif %}
 
-  {# Header / Toolbar Area #}
-  {% if title or description or search_enabled or filters or primary_action or toolbar_actions %}
-  <div class="px-5 {{ header_pt }} {{ '' if header_border_inset else 'border-b border-gray-200 dark:border-neutral-700' }}">
-    <div class="{{ header_pb }} {{ 'border-b border-gray-200 dark:border-neutral-700' if header_border_inset else '' }}">
-    
-    {# Top row: Title/Desc + Primary Action #}
-    {% if title or description or primary_action %}
-    <div class="flex items-center justify-between gap-4 {% if search_enabled or filters or toolbar_actions %}mb-5{% endif %}">
-      <div class="flex-1">
-        {% if title %}
-        <h2 class="text-lg font-semibold text-gray-800 dark:text-white">{{ title }}</h2>
-        {% endif %}
-        {% if description %}
-        <p class="text-sm text-gray-500 dark:text-neutral-400">{{ description }}</p>
+  {# Filter Group #}
+  {% if search_enabled or filters %}
+    <div class="grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5">
+      <div>
+        {% if search_enabled %}
+          {{ input(name="table_search", placeholder=search_placeholder, icon="search", variant="solid") }}
         {% endif %}
       </div>
-      {% if primary_action %}
-      <div class="shrink-0">
-        {{ primary_action | safe }}
-      </div>
-      {% endif %}
-    </div>
-    {% endif %}
-
-    {# Bottom row: Search + Filters + Actions #}
-    {% if search_enabled or filters or toolbar_actions %}
-    <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-      {% if search_enabled %}
-      <div class="w-full sm:w-auto sm:max-w-md flex-1">
-        {{ input(name="table_search", placeholder=search_placeholder, icon="search", variant=search_variant) }}
-      </div>
-      {% endif %}
       
-      {% if filters or toolbar_actions %}
-      <div class="flex items-center gap-2 sm:ms-auto">
-        {{ filters | safe }}
-        {{ toolbar_actions | safe }}
+      <div class="flex flex-wrap md:justify-end items-center gap-x-2">
+        {% if filters %}
+          {{ filters | safe }}
+        {% endif %}
       </div>
-      {% endif %}
     </div>
-    {% endif %}
-
-    </div>
-  </div>
   {% endif %}
 
-  {% set has_header = title or description or search_enabled or filters or primary_action or toolbar_actions %}
   {# Table Area #}
-  <div class="overflow-hidden {% if not has_header %}sm:rounded-t-xl{% endif %} {% if not pagination %}sm:rounded-b-xl{% endif %} {{ table_container_classes }}">
-    <div class="{% if responsive %}overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500{% endif %}">
-      <div class="min-w-full inline-block align-middle">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
-          <thead class="{% if not transparent_header %}bg-gray-50 dark:bg-neutral-800{% endif %}">
-            <tr>
-              {% if selectable %}
-              <th scope="col" class="py-2.5 ps-4 pe-3 text-start w-8">
-                {{ checkbox(
-                  name="select_all", 
-                  id="select_all", 
-                  label="Select All", 
-                  sr_only_label=true,
-                  extra_attrs="@change=\"selectedRows = $event.target.checked ? Array.from({length: " ~ (rows | length) ~ "}, (_, i) => String(i + 1)) : []\" :checked=\"selectedRows.length === " ~ (rows | length) ~ " && " ~ (rows | length) ~ " > 0\""
-                ) }}
-              </th>
-              {% endif %}
-              
-              {% for col in columns %}
-                {% set col_label = col.label if col.label is defined else col %}
-                {% set col_classes = col.classes if col.classes is defined else ("px-5 py-2.5" if not compact else "px-4 py-2") %}
-                {% set is_sortable = col.sortable if col.sortable is defined else false %}
-                {% set col_attrs = col.attrs if col.attrs is defined else "" %}
-                
-                {% if is_sortable %}
-                  <th scope="col" {{ col_attrs | safe }} class="p-0 text-start">
-                    <button type="button" class="w-full flex items-center gap-x-1 text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-750 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-750 text-start transition-colors {{ col_classes }}" aria-label="Sort {{ col_label }}">
-                      {{ col_label | safe }}
-                      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
-                    </button>
-                  </th>
-                {% else %}
-                  <th scope="col" {{ col_attrs | safe }} class="{{ col_classes }} text-start text-sm text-nowrap whitespace-nowrap font-normal text-gray-500 dark:text-neutral-400">
-                    {{ col_label | safe }}
-                  </th>
-                {% endif %}
-              {% endfor %}
+  <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 {% if hoverable %}[&_tbody_tr:hover]:bg-gray-50 dark:[&_tbody_tr:hover]:bg-neutral-800/50{% endif %} {{ table_container_classes }}">
+    <div class="min-w-full inline-block align-middle">
+      <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+        {% if table_header %}
+          <thead class="bg-white dark:bg-neutral-800">
+            <tr class="border-t border-gray-200 dark:border-neutral-700">
+              {{ table_header | safe }}
             </tr>
           </thead>
-          
-          <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
-            {% if rows and rows | length > 0 %}
-              {% for row in rows %}
-                {% set row_cells = row.cells if row.cells is defined else row %}
-                {% set row_attrs = row.attrs if row.attrs is defined else "" %}
-                <tr {{ row_attrs | safe }} class="{% if striped %}even:bg-gray-50 dark:even:bg-neutral-800/50{% endif %} {% if hoverable %}hover:bg-gray-50 dark:hover:bg-neutral-800/50{% endif %}">
-                  
-                  {% if selectable %}
-                  <td class="{% if not compact %}py-4{% else %}py-2{% endif %} ps-4 align-middle">
-                     {{ checkbox(name="select_" ~ loop.index, id="select_" ~ loop.index, label="Select Row", sr_only_label=true, x_model="selectedRows", value=loop.index) }}
-                  </td>
-                  {% endif %}
-
-                  {% for cell in row_cells %}
-                    {% set cell_content = cell.content if cell.content is defined else cell %}
-                    {% set cell_classes = cell.classes if cell.classes is defined else ("px-4 py-3 whitespace-nowrap" if not compact else "px-4 py-2") %}
-                    {% set cell_attrs = cell.attrs if cell.attrs is defined else "" %}
-                    
-                    <td {{ cell_attrs | safe }} class="{{ cell_classes }} align-middle text-sm {% if loop.first and not cell.classes %}font-medium text-gray-800 dark:text-neutral-200{% else %}text-gray-600 dark:text-neutral-300{% endif %}">
-                      {{ cell_content | safe }}
-                    </td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            {% endif %}
-            {% if empty_state_html and (rows | length == 0) %}
-            <tr>
-              <td colspan="{{ columns | length + (1 if selectable else 0) }}" class="py-0">
-                {{ empty_state_html | safe }}
-              </td>
-            </tr>
-            {% endif %}
-          </tbody>
-        </table>
-      </div>
+        {% endif %}
+        <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+          {% if caller %}
+            {{ caller() }}
+          {% endif %}
+        </tbody>
+      </table>
     </div>
   </div>
 
   {# Pagination Area #}
-  {% if pagination and (rows | length > 0) %}
-  <div class="px-4 sm:px-5 pb-4 sm:pb-3 {{ '' if footer_border_inset else 'border-t border-gray-200 dark:border-neutral-700 pt-4 sm:pt-3' }}">
-    <div class="{{ 'border-t border-gray-200 dark:border-neutral-700 pt-4 sm:pt-3' if footer_border_inset else '' }}">
-      {{ pagination | safe }}
+  {% if pagination %}
+    <div>
+      {% if pagination === true %}
+        {{ pagination_macro() }}
+      {% elif pagination.items %}
+        {{ pagination_macro(items=pagination.items, current=pagination.current | default(1), show_go_to=pagination.show_go_to | default(true), results_count=pagination.results_count | default("")) }}
+      {% else %}
+        {{ pagination | safe }}
+      {% endif %}
     </div>
-  </div>
   {% endif %}
 
-{% endcall %}
-
+</div>
 {% endmacro %}
-
