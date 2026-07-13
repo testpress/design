@@ -695,6 +695,11 @@
             // Simulated toast
             alert(`PDF '${name}' deleted successfully.`);
         },
+        handleAddFolder(e) {
+            const { name } = e.detail;
+            // Simulated toast
+            alert(`Folder '${name}' created successfully.`);
+        },
         init() {
             this.$watch('searchInput', Alpine.debounce((value) => {
                 this.searchQuery = value;
@@ -754,7 +759,7 @@
             });
             this.hasFolderMatches = hasMatch;
         }
-    }" @execute-move.window="handleMove" @execute-rename.window="handleRename" @execute-delete-pdf.window="handleDeletePdf">
+    }" @execute-move.window="handleMove" @execute-rename.window="handleRename" @execute-delete-pdf.window="handleDeletePdf" @execute-add-folder.window="handleAddFolder">
     
 
 
@@ -877,6 +882,7 @@
         
 
 
+
 <!-- Mobile Drawer Overlay -->
 <div x-show="mobileFoldersOpen" x-cloak
   x-effect="if (mobileFoldersOpen) document.body.style.overflow = 'hidden'; else document.body.style.overflow = '';"
@@ -896,14 +902,98 @@
     
     <!-- Add Folder Tooltip -->
     <div class="flex items-center gap-1">
-      <div class="hs-tooltip [--placement:bottom] inline-block">
-        <button type="button" class="hs-tooltip-toggle flex justify-center items-center size-7 text-sm text-gray-500 hover:bg-gray-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-4"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-        </button>
-        <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-[100] py-1 px-2 bg-white border border-gray-200 text-xs font-medium text-gray-800 rounded shadow-sm dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300" role="tooltip">
-          Add folder
-        </span>
-      </div>
+      
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'bottom';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-3606">
+      <button type="button" @click="$dispatch('open-modal-add-folder')" class="flex justify-center items-center size-7 text-sm text-gray-500 hover:bg-gray-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-4"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-3606"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal max-w-xs">
+
+      Add folder
+
+      <!-- Arrow -->
+      
+        <span class="absolute bottom-full -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
+  </div>
+
       <!-- Close drawer button (mobile only) -->
       <button @click="mobileFoldersOpen = false" type="button" class="lg:hidden flex justify-center items-center size-7 text-sm text-gray-500 hover:bg-gray-100 rounded-full focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
@@ -3970,6 +4060,7 @@
 
 
 
+
 <div class="flex-1 min-w-0">
     
 
@@ -4373,12 +4464,98 @@
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="renamedItems['102'] || 'Cell Structure Notes v2'">Cell Structure Notes v2</span>
                                 
-                                <div class="hs-tooltip inline-block">
-                                    <i data-lucide="file-clock" class="hs-tooltip-toggle size-4 text-blue-500 focus:outline-none"></i>
-                                    <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-[100] py-1.5 px-2.5 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700 whitespace-normal max-w-[200px] text-center" role="tooltip">
-                                        This PDF is being prepared for use in the whiteboard.
-                                    </span>
-                                </div>
+                                
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'bottom';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-4820">
+      <i data-lucide="file-clock" class="size-4 text-blue-500 focus:outline-none cursor-help"></i>
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-4820"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal max-w-xs">
+
+      This PDF is being prepared for use in the whiteboard.
+
+      <!-- Arrow -->
+      
+        <span class="absolute bottom-full -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
+  </div>
+
                                 
                             </div>
                             <div class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5">
@@ -5665,12 +5842,98 @@
                             <div class="flex items-center gap-2">
                                 <span class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="renamedItems['105'] || 'Calculus Derivatives Practice'">Calculus Derivatives Practice</span>
                                 
-                                <div class="hs-tooltip inline-block">
-                                    <i data-lucide="triangle-alert" class="hs-tooltip-toggle size-4 text-amber-500 focus:outline-none"></i>
-                                    <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-[100] py-1.5 px-2.5 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700 whitespace-normal max-w-[200px] text-center" role="tooltip">
-                                        This PDF couldn't be prepared for use in the whiteboard. Try uploading it again.
-                                    </span>
-                                </div>
+                                
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'bottom';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-4885">
+      <i data-lucide="triangle-alert" class="size-4 text-amber-500 focus:outline-none cursor-help"></i>
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-4885"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal max-w-xs">
+
+      This PDF couldn't be prepared for use in the whiteboard. Try uploading it again.
+
+      <!-- Arrow -->
+      
+        <span class="absolute bottom-full -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
+  </div>
+
                                 
                             </div>
                             <div class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5">
@@ -7423,7 +7686,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-8363">
+         aria-describedby="tooltip-2363">
       
                   <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none" aria-label="Cancel upload">
                     <i data-lucide="pause" class="shrink-0 size-4"></i>
@@ -7435,7 +7698,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-8363"
+         id="tooltip-2363"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -7528,7 +7791,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-2334">
+         aria-describedby="tooltip-8355">
       
                     <button type="button" @click.stop="replaceIndex = index; $refs.fileInput.click()" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Replace file">
                       <i data-lucide="refresh-cw" class="shrink-0 size-4"></i>
@@ -7540,7 +7803,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-2334"
+         id="tooltip-8355"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -7628,7 +7891,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-3666">
+         aria-describedby="tooltip-5698">
       
                     <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Delete file">
                       <i data-lucide="trash-2" class="shrink-0 size-4"></i>
@@ -7640,7 +7903,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-3666"
+         id="tooltip-5698"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -10313,6 +10576,233 @@
     
 
     Delete PDF
+
+    
+
+  
+    </button>
+  
+
+
+            
+          </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+
+
+
+<div x-data="{
+    folderName: '',
+    
+    openModal() {
+        this.folderName = '';
+        this.$dispatch('open-modal-add-folder-modal');
+        
+        // Focus the input after modal finishes opening
+        setTimeout(() => {
+            const inputEl = document.getElementById('new_folder_name');
+            if (inputEl) {
+                inputEl.focus();
+            }
+        }, 100);
+    },
+
+    submitAdd() {
+        if (!this.folderName.trim()) {
+            this.$dispatch('close-modal-add-folder-modal');
+            return;
+        }
+        
+        // Dispatch add folder event to root component
+        this.$dispatch('execute-add-folder', {
+            name: this.folderName.trim()
+        });
+        
+        this.$dispatch('close-modal-add-folder-modal');
+    }
+}" @open-modal-add-folder.window="openModal()">
+
+    
+
+
+
+<div x-data="{ 
+       open: false,
+       toggle() { this.open = !this.open; },
+       init() {
+         this.$watch('open', value => {
+           if (value) {
+             document.body.classList.add('overflow-hidden');
+             this.$nextTick(() => {
+               if (this.$refs.closeBtn) this.$refs.closeBtn.focus();
+               if (window.lucide) { window.lucide.createIcons(); }
+             });
+           } else {
+             document.body.classList.remove('overflow-hidden');
+           }
+         });
+       }
+     }"
+     @open-modal-add-folder-modal.window="open = true"
+     @close-modal-add-folder-modal.window="open = false"
+     class="inline-block">
+
+  
+  
+
+  
+  <div x-show="open"
+       x-cloak
+       class="fixed inset-0 z-[10000] overflow-y-auto"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="modal-title-add-folder-modal">
+    
+    
+    <div x-show="open"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @click="open = false"
+         class="fixed inset-0 bg-neutral-900/50 dark:bg-neutral-900/80 backdrop-blur-sm"></div>
+
+    
+    <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+      
+      
+      <div x-show="open"
+           x-transition:enter="transition ease-out duration-300"
+           x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+           x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+           x-transition:leave="transition ease-in duration-200"
+           x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+           x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+           @keydown.escape.window="open = false"
+           class="relative overflow-hidden rounded-xl bg-white dark:bg-neutral-800 text-start shadow-xl sm:my-8 w-full sm:max-w-md border border-gray-200 dark:border-neutral-700 flex flex-col max-h-[90vh]">
+        
+        
+        <div class="py-2.5 px-4 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700">
+          <div>
+            <h2 id="modal-title-add-folder-modal" class="font-semibold text-gray-800 dark:text-neutral-200 text-sm sm:text-base">
+              Add New Folder
+            </h2>
+            
+          </div>
+          <button x-ref="closeBtn" type="button" @click="open = false" class="size-8 shrink-0 flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-50 dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700" aria-label="Close">
+            <span class="sr-only">Close</span>
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        
+        <div class="overflow-y-auto p-5 space-y-5 flex-1 min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 text-sm text-gray-700 dark:text-neutral-300">
+          
+        
+        
+<div class="w-full">
+  
+    <label for="new_folder_name" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+      Name
+    </label>
+  
+
+  <div class="relative w-full" x-data="{ inputValue: '' }">
+    
+    
+    
+    
+      
+    
+
+    <input type="text" 
+           id="new_folder_name" 
+           name="new_folder_name"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none   "
+           placeholder=""
+           
+           
+           x-model="folderName"
+           x-ref="addFolderInput"
+           @keydown.enter='submitAdd()'>
+           
+    
+  </div>
+  
+  
+</div>
+
+        
+    
+        </div>
+
+        
+        
+          <div class="p-4 flex justify-end gap-x-2">
+            
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"   @click="open = false">
+  
+
+    
+    
+
+    Cancel
+
+    
+
+  
+    </button>
+  
+
+
+            
+            
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:bg-primary-700 dark:focus:ring-offset-neutral-800"   @click="$dispatch('modal-confirmed-add-folder-modal'); open = false" @click='submitAdd()'>
+  
+
+    
+    
+
+    Add
 
     
 

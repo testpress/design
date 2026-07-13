@@ -1,6 +1,7 @@
 
 
 
+
 <!-- Mobile Drawer Overlay -->
 <div x-show="mobileFoldersOpen" x-cloak
   x-effect="if (mobileFoldersOpen) document.body.style.overflow = 'hidden'; else document.body.style.overflow = '';"
@@ -20,14 +21,98 @@
     
     <!-- Add Folder Tooltip -->
     <div class="flex items-center gap-1">
-      <div class="hs-tooltip [--placement:bottom] inline-block">
-        <button type="button" class="hs-tooltip-toggle flex justify-center items-center size-7 text-sm text-gray-500 hover:bg-gray-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-4"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-        </button>
-        <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-[100] py-1 px-2 bg-white border border-gray-200 text-xs font-medium text-gray-800 rounded shadow-sm dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300" role="tooltip">
-          Add folder
-        </span>
-      </div>
+      
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'bottom';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-4458">
+      <button type="button" @click="$dispatch('open-modal-add-folder')" class="flex justify-center items-center size-7 text-sm text-gray-500 hover:bg-gray-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-4"><path d="M5 12h14"/><path d="M12 5v14"/></svg></button>
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-4458"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal max-w-xs">
+
+      Add folder
+
+      <!-- Arrow -->
+      
+        <span class="absolute bottom-full -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
+  </div>
+
       <!-- Close drawer button (mobile only) -->
       <button @click="mobileFoldersOpen = false" type="button" class="lg:hidden flex justify-center items-center size-7 text-sm text-gray-500 hover:bg-gray-100 rounded-full focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
