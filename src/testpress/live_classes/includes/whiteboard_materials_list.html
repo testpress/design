@@ -10,7 +10,6 @@
             </div>
         </th>
         {{ table_th(text="Name", sortable=true) }}
-        {{ table_th(text="Folder") }}
         {{ table_th(text="Uploaded By") }}
         {{ table_th(text="Uploaded On", sortable=true) }}
         <th scope="col" class="px-5 py-2.5 text-end"></th>
@@ -33,6 +32,8 @@
         search_enabled=true,
         search_placeholder="Search PDFs...",
         search_x_model="searchInput",
+        search_variant="standard",
+        search_padding_class="py-1.5",
         filters=filters,
         table_header=table_header,
         pagination=true,
@@ -53,7 +54,7 @@
                                 <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ item.title }}</span>
                                 {% if item.status == 'Processing' %}
                                 <div class="hs-tooltip inline-block">
-                                    <i data-lucide="loader-circle" class="hs-tooltip-toggle size-4 text-blue-500 animate-spin focus:outline-none"></i>
+                                    <i data-lucide="file-clock" class="hs-tooltip-toggle size-4 text-blue-500 focus:outline-none"></i>
                                     <span class="hs-tooltip-content hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-[100] py-1.5 px-2.5 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700 whitespace-normal max-w-[200px] text-center" role="tooltip">
                                         This PDF is being prepared for use in the whiteboard.
                                     </span>
@@ -73,30 +74,6 @@
                         </div>
                 {% endcall %}
 
-                {% call table_td() %}
-                    {% set folderPath = "" %}
-                    {% for folder in whiteboard_materials.folders %}
-                        {% if folder.id == item.folderId %}
-                            {% set folderPath = folder.name %}
-                        {% endif %}
-                        {% for subfolder in folder.subfolders %}
-                            {% if subfolder.id == item.folderId %}
-                                {% set folderPath = folder.name ~ " / " ~ subfolder.name %}
-                            {% endif %}
-                        {% endfor %}
-                    {% endfor %}
-                    
-                    {% if folderPath %}
-                        <a href="#" @click.prevent="selectedFolderId = '{{ item.folderId }}'" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 dark:text-neutral-400 dark:hover:text-primary-500 hover:underline">
-                            <i data-lucide="folder" class="size-3.5"></i>
-                            {{ folderPath }}
-                        </a>
-                    {% else %}
-                        <a href="#" @click.prevent="selectedFolderId = ''" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 dark:text-neutral-400 dark:hover:text-primary-500 hover:underline">
-                            Uncategorized
-                        </a>
-                    {% endif %}
-                {% endcall %}
 
                 {% call table_td() %}
                     <div class="flex items-center gap-x-3">
@@ -124,15 +101,28 @@
             </tr>
         {% endfor %}
         <tr x-show="!hasVisibleRows" x-cloak>
-            <td colspan="6" class="p-0 border-b-0">
-                {{ empty_state(
-                    title="No matching PDFs found",
-                    description="Try adjusting your search or filters to find the PDFs you're looking for.",
-                    icon="search",
-                    secondary_action_text="Clear Filters",
-                    secondary_action_attrs="@click.prevent=\"searchInput = ''; searchQuery = ''; selectedFolderId = 'all';\"",
-                    wrap_card=false
-                ) }}
+            <td colspan="5" class="p-0 border-b-0">
+                <div x-show="searchQuery.trim() !== ''">
+                    {{ empty_state(
+                        title="No matching PDFs found",
+                        description="Try adjusting your search or filters to find the PDFs you're looking for.",
+                        icon="search",
+                        secondary_action_text="Clear Filters",
+                        secondary_action_attrs="@click.prevent=\"searchInput = ''; searchQuery = ''; selectedFolderId = 'all';\"",
+                        wrap_card=false
+                    ) }}
+                </div>
+                <div x-show="searchQuery.trim() === ''">
+                    {{ empty_state(
+                        title="No PDFs in this folder",
+                        description="Upload PDFs or move existing ones into this folder to use them in live class whiteboards.",
+                        icon="folder-open",
+                        primary_action_text="Upload PDFs",
+                        primary_action_icon="plus",
+                        primary_action_attrs="data-hs-overlay=\"#upload-pdf-modal\"",
+                        wrap_card=false
+                    ) }}
+                </div>
             </td>
         </tr>
     {% endcall %}
