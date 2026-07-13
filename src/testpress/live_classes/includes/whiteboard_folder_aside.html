@@ -1,4 +1,5 @@
 {% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
 
 <!-- Mobile Drawer Overlay -->
 <div x-show="mobileFoldersOpen" x-cloak
@@ -85,8 +86,9 @@
 
         <!-- Dynamic Folders -->
         {% for folder in whiteboard_materials.folders %}
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || '{{ folder.name | replace("'", "\\'") }}'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()){% if folder.subfolders | length > 0 %} || expanded || {% for sub in folder.subfolders %}'{{ sub.name | replace("'", "\\'") }}'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()){% if not loop.last %} || {% endif %}{% endfor %}{% endif %}">
+          <li data-name="{{ folder.name }}"
+              x-data="{ expanded: false, folderId: '{{ folder.id }}', folderCount: {{ folder.count }}, folderSubCount: {{ folder.subfolders | length }}, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()){% if folder.subfolders | length > 0 %} || expanded || {% for sub in folder.subfolders %}'{{ sub.name | replace("'", "\\'") }}'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()){% if not loop.last %} || {% endif %}{% endfor %}{% endif %}">
             
             {% if folder.subfolders | length > 0 %}
             <div @click="expanded = !expanded" 
@@ -115,29 +117,16 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-{{ folder.id }}" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
-
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-{{ folder.id }}">
-                    <div class="p-1 space-y-0.5">
-                      {% if folder.count == 0 and folder.subfolders | length == 0 %}
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      {% endif %}
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['{{ folder.id }}'] || '{{ folder.name | replace(\"'\", \"\\'\") }}', id: '{{ folder.id }}' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+                <div class="inline-flex shrink-0" @click.stop>
+                  {{ dropdown(
+                    trigger="ellipsis-vertical",
+                    trigger_classes="opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full",
+                    placement="bottom-end",
+                    items=[
+                      ({ "label": "Add Subfolder", "icon": "folder-plus", "attrs": "@click=\"openAddSubfolder()\"" } if folder.count == 0 and folder.subfolders | length == 0),
+                      { "label": "Rename", "icon": "edit-2", "attrs": "@click=\"openRename()\"" }
+                    ] | select | list
+                  ) }}
                 </div>
 
                 {% if folder.subfolders | length > 0 %}
