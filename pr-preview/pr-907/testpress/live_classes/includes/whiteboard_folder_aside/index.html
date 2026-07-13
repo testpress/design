@@ -10,18 +10,105 @@
     <h2 class="text-lg font-medium text-gray-900 dark:text-neutral-200">Folders</h2>
     
     <!-- Add Folder Button -->
-    <button @click="$dispatch('open-modal-add-folder')" type="button" class="py-1 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 12h14"></path>
-        <path d="M12 5v14"></path>
-      </svg>
+    <div class="flex items-center" x-show="pageStatus !== 'empty-onboarding'">
+      
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'bottom';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-8306">
+      <button @click="$dispatch('open-modal-add-folder')" type="button" class="flex justify-center items-center size-7 text-sm text-gray-500 hover:bg-gray-100 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-4"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></button>
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-8306"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal max-w-xs">
+
       Add folder
-    </button>
+
+      <!-- Arrow -->
+      
+        <span class="absolute bottom-full -translate-x-1/2 border-4 border-transparent border-b-gray-900 dark:border-b-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
   </div>
 
-  <nav aria-label="Directory" class="min-h-0 flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-neutral-700 dark:hover:[&::-webkit-scrollbar-thumb]:bg-neutral-600">
-    <div class="relative">
-      <ul role="list" class="relative z-0 divide-y divide-gray-100 dark:divide-neutral-700">
+    </div>
+  </div>
+
+  <nav aria-label="Directory" class="min-h-0 flex-1 flex flex-col overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-neutral-700 dark:hover:[&::-webkit-scrollbar-thumb]:bg-neutral-600">
+    <div class="relative flex-1 flex flex-col">
+      <ul role="list" class="relative z-0 divide-y divide-gray-100 dark:divide-neutral-700 flex-1 flex flex-col">
         
         <!-- All PDFs -->
         <li @click="setFolder('all')" class="relative flex items-center space-x-3 px-6 py-4 cursor-pointer transition-colors duration-150" :class="isFolderSelected('all') ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-gray-50 dark:hover:bg-neutral-700/50'">
@@ -89,7 +176,7 @@
                     
                     
                 
-                63 items
+                <span x-text="pageStatus === 'empty-onboarding' ? '0 items' : '63 items'">63 items</span>
               </p>
             </div>
           </div>
@@ -105,13 +192,54 @@
           <div class="min-w-0 flex-1">
             <div class="focus:outline-hidden">
               <p class="text-sm font-medium text-gray-900 dark:text-neutral-200">Uncategorized</p>
-              <p class="truncate text-xs text-gray-500 dark:text-neutral-500">3 items</p>
+              <p class="truncate text-xs text-gray-500 dark:text-neutral-500">
+                <span x-text="pageStatus === 'empty-onboarding' ? '0 items' : '3 items'">3 items</span>
+              </p>
             </div>
           </div>
         </li>
 
+        <!-- Empty State for Folders -->
+        <li x-show="pageStatus === 'empty-onboarding'" x-cloak class="flex-1 px-6 py-8 flex flex-col items-center text-center justify-center border-t border-gray-100 dark:border-neutral-700">
+          <p class="text-sm text-gray-500 dark:text-neutral-400 mb-4">
+            Create folders to organize your<br>whiteboard materials.
+          </p>
+          
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-xs bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"   @click="$dispatch('open-modal-add-folder')">
+  
+
+    
+    
+      <i data-lucide="plus" class="shrink-0 size-3"></i>
+    
+
+    New Folder
+
+    
+
+  
+    </button>
+  
+
+
+        </li>
+
         <!-- Collection Search -->
-        <li x-effect="checkFolderMatches()" class="px-6 py-3 bg-white dark:bg-neutral-800 border-b border-t border-gray-100 dark:border-neutral-700 sticky top-0 z-10">
+        <li x-show="pageStatus !== 'empty-onboarding'" x-effect="checkFolderMatches()" class="px-6 py-3 bg-white dark:bg-neutral-800 border-b border-t border-gray-100 dark:border-neutral-700 sticky top-0 z-10">
           
 <div class="w-full">
   
@@ -153,7 +281,7 @@
         
           <li data-name="Biology 101"
               x-data="{ expanded: false, folderId: '1', folderCount: 12, folderSubCount: 2, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Biology 101') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Biology 101'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Biology 101') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Botany'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Zoology'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Botany'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Zoology'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="expanded = !expanded" 
@@ -389,7 +517,7 @@
         
           <li data-name="Physics Formulas"
               x-data="{ expanded: false, folderId: '2', folderCount: 5, folderSubCount: 2, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Physics Formulas') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Physics Formulas'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Physics Formulas') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Kinematics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Thermodynamics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Kinematics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Thermodynamics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="expanded = !expanded" 
@@ -625,7 +753,7 @@
         
           <li data-name="Chemistry Basics"
               x-data="{ expanded: false, folderId: '3', folderCount: 8, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Chemistry Basics') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Chemistry Basics'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Chemistry Basics') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('3')" 
@@ -828,7 +956,7 @@
         
           <li data-name="Mathematics"
               x-data="{ expanded: false, folderId: '4', folderCount: 15, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Mathematics') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Mathematics'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Mathematics') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('4')" 
@@ -1031,7 +1159,7 @@
         
           <li data-name="History - World War II"
               x-data="{ expanded: false, folderId: '5', folderCount: 3, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'History - World War II') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'History - World War II'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'History - World War II') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('5')" 
@@ -1234,7 +1362,7 @@
         
           <li data-name="Geography"
               x-data="{ expanded: false, folderId: '6', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Geography') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Geography'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Geography') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('6')" 
@@ -1464,7 +1592,7 @@
         
           <li data-name="Literature"
               x-data="{ expanded: false, folderId: '7', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Literature') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Literature'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Literature') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('7')" 
@@ -1694,7 +1822,7 @@
         
           <li data-name="Computer Science"
               x-data="{ expanded: false, folderId: '8', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Computer Science') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Computer Science'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Computer Science') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('8')" 
@@ -1924,7 +2052,7 @@
         
           <li data-name="Economics"
               x-data="{ expanded: false, folderId: '9', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Economics') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Economics'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Economics') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('9')" 
@@ -2154,7 +2282,7 @@
         
           <li data-name="Psychology"
               x-data="{ expanded: false, folderId: '10', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Psychology') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Psychology'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Psychology') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('10')" 
@@ -2384,7 +2512,7 @@
         
           <li data-name="Sociology"
               x-data="{ expanded: false, folderId: '11', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Sociology') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Sociology'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Sociology') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('11')" 
@@ -2614,7 +2742,7 @@
         
           <li data-name="Philosophy"
               x-data="{ expanded: false, folderId: '12', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Philosophy') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Philosophy'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Philosophy') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('12')" 
@@ -2844,7 +2972,7 @@
         
           <li data-name="Political Science"
               x-data="{ expanded: false, folderId: '13', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Political Science') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Political Science'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Political Science') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('13')" 
@@ -3074,7 +3202,7 @@
         
           <li data-name="Art History"
               x-data="{ expanded: false, folderId: '14', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Art History') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Art History'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Art History') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('14')" 
@@ -3304,7 +3432,7 @@
         
           <li data-name="Music Theory"
               x-data="{ expanded: false, folderId: '15', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || 'Music Theory') }); }, openDelete() { this.$dispatch('open-modal-delete-folder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Music Theory'), count: this.folderCount, subCount: this.folderSubCount }); }, openAddSubfolder() { this.$dispatch('open-modal-add-subfolder', { id: this.folderId, name: (renamedItems[this.folderId] || 'Music Theory') }); } }"
-              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+              x-show="pageStatus !== 'empty-onboarding' && (!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()))">
             
             
             <div @click="setFolder('15')" 
