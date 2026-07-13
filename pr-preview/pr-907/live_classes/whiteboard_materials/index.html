@@ -870,6 +870,7 @@
     <div class="flex gap-x-6">
         
 
+
 <!-- Mobile Drawer Overlay -->
 <div x-show="mobileFoldersOpen" x-cloak
   x-effect="if (mobileFoldersOpen) document.body.style.overflow = 'hidden'; else document.body.style.overflow = '';"
@@ -1037,8 +1038,9 @@
 
         <!-- Dynamic Folders -->
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Biology 101'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Botany'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Zoology'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Biology 101"
+              x-data="{ expanded: false, folderId: '1', folderCount: 12, folderSubCount: 2, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Botany'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Zoology'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="expanded = !expanded" 
@@ -1063,25 +1065,143 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-1" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-1">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['1'] || 'Biology 101', id: '1' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1125,8 +1245,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Physics Formulas'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Kinematics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Thermodynamics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Physics Formulas"
+              x-data="{ expanded: false, folderId: '2', folderCount: 5, folderSubCount: 2, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || expanded || 'Kinematics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase()) || 'Thermodynamics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="expanded = !expanded" 
@@ -1151,25 +1272,143 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-2" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-2">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['2'] || 'Physics Formulas', id: '2' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1213,8 +1452,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Chemistry Basics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Chemistry Basics"
+              x-data="{ expanded: false, folderId: '3', folderCount: 8, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('3')" 
@@ -1239,25 +1479,143 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-3" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-3">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['3'] || 'Chemistry Basics', id: '3' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1268,8 +1626,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Mathematics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Mathematics"
+              x-data="{ expanded: false, folderId: '4', folderCount: 15, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('4')" 
@@ -1294,25 +1653,143 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-4" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-4">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['4'] || 'Mathematics', id: '4' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1323,8 +1800,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'History - World War II'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="History - World War II"
+              x-data="{ expanded: false, folderId: '5', folderCount: 3, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('5')" 
@@ -1349,25 +1827,143 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-5" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-5">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['5'] || 'History - World War II', id: '5' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1378,8 +1974,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Geography'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Geography"
+              x-data="{ expanded: false, folderId: '6', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('6')" 
@@ -1404,29 +2001,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-6" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-6">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['6'] || 'Geography', id: '6' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1437,8 +2175,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Literature'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Literature"
+              x-data="{ expanded: false, folderId: '7', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('7')" 
@@ -1463,29 +2202,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-7" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-7">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['7'] || 'Literature', id: '7' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1496,8 +2376,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Computer Science'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Computer Science"
+              x-data="{ expanded: false, folderId: '8', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('8')" 
@@ -1522,29 +2403,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-8" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-8">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['8'] || 'Computer Science', id: '8' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1555,8 +2577,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Economics'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Economics"
+              x-data="{ expanded: false, folderId: '9', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('9')" 
@@ -1581,29 +2604,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-9" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-9">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['9'] || 'Economics', id: '9' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1614,8 +2778,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Psychology'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Psychology"
+              x-data="{ expanded: false, folderId: '10', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('10')" 
@@ -1640,29 +2805,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-10" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-10">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['10'] || 'Psychology', id: '10' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1673,8 +2979,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Sociology'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Sociology"
+              x-data="{ expanded: false, folderId: '11', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('11')" 
@@ -1699,29 +3006,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-11" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-11">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['11'] || 'Sociology', id: '11' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1732,8 +3180,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Philosophy'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Philosophy"
+              x-data="{ expanded: false, folderId: '12', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('12')" 
@@ -1758,29 +3207,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-12" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-12">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['12'] || 'Philosophy', id: '12' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1791,8 +3381,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Political Science'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Political Science"
+              x-data="{ expanded: false, folderId: '13', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('13')" 
@@ -1817,29 +3408,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-13" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-13">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['13'] || 'Political Science', id: '13' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1850,8 +3582,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Art History'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Art History"
+              x-data="{ expanded: false, folderId: '14', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('14')" 
@@ -1876,29 +3609,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-14" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-14">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['14'] || 'Art History', id: '14' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -1909,8 +3783,9 @@
             
           </li>
         
-          <li x-data="{ expanded: false }"
-              x-show="!sidebarFolderSearch || 'Music Theory'.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
+          <li data-name="Music Theory"
+              x-data="{ expanded: false, folderId: '15', folderCount: 0, folderSubCount: 0, openRename() { this.$dispatch('open-modal-rename', { type: 'folder', id: this.folderId, name: (renamedItems[this.folderId] || this.$el.dataset.name) }); } }"
+              x-show="!sidebarFolderSearch || $el.dataset.name.toLowerCase().includes(sidebarFolderSearch.toLowerCase())">
             
             
             <div @click="setFolder('15')" 
@@ -1935,29 +3810,170 @@
               <!-- RIGHT PART -->
               <div class="flex items-center space-x-1 shrink-0">
                 <!-- Folder Actions Dropdown -->
-                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0" @click.stop>
-                  <button id="hs-pro-fldmd-15" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-600 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-600 opacity-0 group-hover:opacity-100 focus:opacity-100">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <circle cx="12" cy="8" r="1"></circle>
-                      <circle cx="12" cy="16" r="1"></circle>
-                    </svg>
-                  </button>
+                <div class="inline-flex shrink-0" @click.stop>
+                  
 
-                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-40 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-800 dark:border-neutral-700" role="menu" aria-orientation="vertical" aria-labelledby="hs-pro-fldmd-15">
-                    <div class="p-1 space-y-0.5">
-                      
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Add Subfolder
-                      </button>
-                      
-                      <button type="button" @click.stop="$dispatch('open-modal-rename', { type: 'folder', name: renamedItems['15'] || 'Music Theory', id: '15' })" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Rename
-                      </button>
-                      <button type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-700 whitespace-nowrap">
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            let rightPos = window.innerWidth - rect.right;
+            if (window.innerWidth - rightPos < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.right = rightPos;
+              this.left = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.right = window.innerWidth - rect.right;
+              this.left = 'auto';
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 opacity-0 group-hover:opacity-100 focus:opacity-100 !rounded-full" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openAddSubfolder()"
+               >
+              
+                
+                  <i data-lucide="folder-plus" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Add Subfolder
+              
+            </button>
+          
+        
+          
+            
+            
+            
+            
+              
+              
+            
+            
+            
+            
+            <button type=button 
+               class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:bg-gray-100 dark:focus:bg-neutral-800 "
+               
+               @click="openRename()"
+               >
+              
+                
+                  <i data-lucide="edit-2" class="shrink-0 size-4  text-gray-500 dark:text-neutral-400"></i>
+                
+              
+              
+                Rename
+              
+            </button>
+          
+        
+      
+    </div>
+  </template>
+</div>
+
                 </div>
 
                 
@@ -2236,8 +4252,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -2249,22 +4265,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -2356,7 +4369,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -2504,8 +4518,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -2517,22 +4531,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -2624,7 +4635,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -2765,8 +4777,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -2778,22 +4790,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -2885,7 +4894,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -3026,8 +5036,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -3039,22 +5049,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -3146,7 +5153,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -3287,8 +5295,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -3300,22 +5308,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -3407,7 +5412,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -3548,8 +5554,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -3561,22 +5567,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -3668,7 +5671,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -3816,8 +5820,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -3829,22 +5833,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -3936,7 +5937,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -4077,8 +6079,8 @@
           }
        }
      }" 
-     @click.outside="open = false" 
      @keydown.escape.window="open = false"
+     class="inline-flex ">
      class="inline-flex ">
   
   <!-- Trigger -->
@@ -4090,22 +6092,19 @@
     
   </div>
 
-  <!-- Dropdown Menu -->
-  <div x-show="open" 
-       x-ref="menu"
-       x-cloak
-       x-transition:enter="transition ease-out duration-100"
+  <template x-teleport="body">
+    <div x-show="open" 
+         x-ref="menu"
+         x-cloak
+         @click.outside="if ($refs.trigger && !$refs.trigger.contains($event.target)) open = false"
+         x-transition:enter="transition ease-out duration-100"
        x-transition:enter-start="opacity-0 scale-95"
        x-transition:enter-end="opacity-100 scale-100"
        x-transition:leave="transition ease-in duration-75"
        x-transition:leave-start="opacity-100 scale-100"
        x-transition:leave-end="opacity-0 scale-95"
        class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-       x-bind:style="{ 
-         top: top + 'px', 
-         left: left === 'auto' ? 'auto' : left + 'px', 
-         right: right === 'auto' ? 'auto' : right + 'px' 
-       }"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
        role="menu"
        aria-orientation="vertical">
     
@@ -4197,7 +6196,8 @@
           
         
       
-  </div>
+    </div>
+  </template>
 </div>
 
                 
@@ -5464,7 +7464,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-4934">
+         aria-describedby="tooltip-6458">
       
                   <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none" aria-label="Cancel upload">
                     <i data-lucide="pause" class="shrink-0 size-4"></i>
@@ -5476,7 +7476,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-4934"
+         id="tooltip-6458"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -5569,7 +7569,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-2649">
+         aria-describedby="tooltip-9643">
       
                     <button type="button" @click.stop="replaceIndex = index; $refs.fileInput.click()" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Replace file">
                       <i data-lucide="refresh-cw" class="shrink-0 size-4"></i>
@@ -5581,7 +7581,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-2649"
+         id="tooltip-9643"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -5669,7 +7669,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-9866">
+         aria-describedby="tooltip-3941">
       
                     <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Delete file">
                       <i data-lucide="trash-2" class="shrink-0 size-4"></i>
@@ -5681,7 +7681,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-9866"
+         id="tooltip-3941"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
