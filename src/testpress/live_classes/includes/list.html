@@ -1,0 +1,232 @@
+{% from "../../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/popover.html" import popover %}
+{% from "../../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../../ui-system/components/pagination.html" import pagination %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+
+  {% set all_count = 0 %}
+  {% set upcoming_count = 0 %}
+  {% set live_count = 0 %}
+  {% set completed_count = 0 %}
+  {% set cancelled_count = 0 %}
+
+  {% for class in live_classes %}
+    {% set all_count = all_count + 1 %}
+    {% if class.status == 'Upcoming' %}
+      {% set upcoming_count = upcoming_count + 1 %}
+    {% elif class.status == 'Live' %}
+      {% set live_count = live_count + 1 %}
+    {% elif class.status == 'Completed' %}
+      {% set completed_count = completed_count + 1 %}
+    {% elif class.status == 'Cancelled' %}
+      {% set cancelled_count = cancelled_count + 1 %}
+    {% endif %}
+  {% endfor %}
+
+  {% set table_tabs = [
+    { key: "all", label: "All", badge: all_count },
+    { key: "upcoming", label: "Upcoming", badge: upcoming_count },
+    { key: "live", label: "Live", badge: live_count },
+    { key: "completed", label: "Completed", badge: completed_count },
+    { key: "cancelled", label: "Cancelled", badge: cancelled_count }
+  ] %}
+
+  {% set table_header %}
+    {{ table_th("Live Class", sortable=true) }}
+    {{ table_th("Scheduled", sortable=true) }}
+    {{ table_th("Host", sortable=true) }}
+    {{ table_th("Status", x_show="currentTab === 'all'") }}
+    {{ table_th("Cancellation Reason", x_show="currentTab === 'cancelled'", x_cloak=true) }}
+    {{ table_th(class="text-end") }}
+  {% endset %}
+
+  {% set filters_html %}
+    <button type="button" @click.prevent="$dispatch('open-drawer-live-classes-filter')" class="whitespace-nowrap py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+      <i data-lucide="filter" class="shrink-0 size-3.5"></i>
+      Filter
+    </button>
+  {% endset %}
+
+  {% set pagination_html %}
+    {{ pagination() }}
+  {% endset %}
+
+  <div x-data="{ currentTab: 'all' }">
+    {% call table(
+        search_enabled=true,
+        search_placeholder="Search live classes",
+        filters=filters_html,
+        table_tabs=table_tabs,
+        table_header=table_header,
+        pagination=pagination_html,
+        pagination_x_show="currentTab === 'all'"
+    ) %}
+      {% for class in live_classes %}
+        <tr x-show="currentTab === 'all' || currentTab === '{{ class.status | lower }}'">
+          {% call table_td() %}
+            <div class="flex flex-col">
+              <div class="flex items-center gap-x-2">
+                <a href="#" class="inline-block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ class.title }}</a>
+              </div>
+              <div class="flex items-center gap-x-1.5 mt-1 text-xs text-gray-500 dark:text-neutral-500">
+                {% if class.type == 'course_based' %}
+                  {% set icon_trigger %}
+                    <i data-lucide="book-open" stroke-width="1.5" class="size-3.5 shrink-0"></i>
+                  {% endset %}
+                  {{ tooltip(trigger=icon_trigger, content="Live class available through course") }}
+                  <span class="truncate">
+                    {% if class.course_count == 1 %}
+                      <a href="#" class="hover:underline focus:outline-hidden">{{ class.course_name }}</a>
+                    {% else %}
+                      {{ class.course_count }} Courses
+                    {% endif %}
+                  </span>
+                {% elif class.type == 'standalone' %}
+                  {% set icon_trigger %}
+                    <i data-lucide="{{ 'user' if class.participant_count == 1 else 'users' }}" stroke-width="1.5" class="size-3.5 shrink-0"></i>
+                  {% endset %}
+                  {{ tooltip(trigger=icon_trigger, content="One-to-One Live Class" if class.participant_count == 1 else "Group Live Class") }}
+                  <span class="truncate">
+                    {% if class.participant_count == 1 %}
+                      <a href="#" class="hover:underline focus:outline-hidden">{{ class.participant_name }}</a>
+                    {% else %}
+                      {{ class.participant_count }} Participants
+                    {% endif %}
+                  </span>
+                {% elif class.type == 'batch_based' %}
+                  {% set icon_trigger %}
+                    <i data-lucide="users" stroke-width="1.5" class="size-3.5 shrink-0"></i>
+                  {% endset %}
+                  {{ tooltip(trigger=icon_trigger, content="Group Live Class") }}
+                  <span class="truncate">
+                    {% if class.batch_count == 1 %}
+                      <a href="#" class="hover:underline focus:outline-hidden">{{ class.batch_name }}</a>
+                    {% else %}
+                      {{ class.batch_count }} Batches
+                    {% endif %}
+                  </span>
+                {% elif class.type == 'public' %}
+                  {% set icon_trigger %}
+                    <i data-lucide="megaphone" stroke-width="1.5" class="size-3.5 shrink-0"></i>
+                  {% endset %}
+                  {{ tooltip(trigger=icon_trigger, content="Public Live Class") }}
+                  <span class="truncate text-gray-600 dark:text-neutral-400">
+                    All learners
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+          {% endcall %}
+          {% call table_td(class="text-gray-600 dark:text-neutral-300") %}
+            <span class="text-sm text-gray-800 dark:text-neutral-200">{{ class.scheduledAt }}</span>
+          {% endcall %}
+          {% call table_td() %}
+            <div class="flex items-center gap-x-3">
+              <img class="inline-block size-8 rounded-full" src="{{ class.host.avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
+              <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ class.host.name }}</a>
+            </div>
+          {% endcall %}
+          {% call table_td(class="text-gray-600 dark:text-neutral-300", x_show="currentTab === 'all'") %}
+            {% if class.status == 'Live' %}
+              {{ badge(text="Live", variant="danger", icon="radio") }}
+            {% elif class.status == 'Upcoming' %}
+              {{ badge(text="Upcoming", variant="warning", icon="clock") }}
+            {% elif class.status == 'Completed' %}
+              {{ badge(text="Completed", variant="success", icon="check") }}
+            {% elif class.status == 'Cancelled' %}
+              {{ badge(text="Cancelled", icon="x") }}
+            {% endif %}
+          {% endcall %}
+          {% call table_td(class="align-middle text-sm", x_show="currentTab === 'cancelled'", x_cloak=true) %}
+            {% if class.cancelled_reason %}
+              {% if class.cancelled_reason | length > 60 %}
+                {% set reason_trigger %}
+                  <div class="cursor-pointer max-w-[240px]">
+                    <p class="text-sm text-gray-600 dark:text-neutral-400 line-clamp-2 whitespace-normal">
+                      {{ class.cancelled_reason }}
+                    </p>
+                  </div>
+                {% endset %}
+                {% set reason_popover_content %}
+                  <div class="px-4 py-3 max-w-xs">
+                    <p class="text-sm text-gray-800 dark:text-neutral-200 whitespace-normal">
+                      {{ class.cancelled_reason }}
+                    </p>
+                  </div>
+                {% endset %}
+                {{ popover(trigger=reason_trigger, content=reason_popover_content, trigger_type="hover", placement="top", width="w-max") }}
+              {% else %}
+                <div class="max-w-[240px]">
+                  <p class="text-sm text-gray-600 dark:text-neutral-400 whitespace-normal">
+                    {{ class.cancelled_reason }}
+                  </p>
+                </div>
+              {% endif %}
+            {% else %}
+              <span class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+            {% endif %}
+          {% endcall %}
+          {% call table_td(class="text-end") %}
+            <div class="flex justify-end items-center -space-x-px">
+              <a href="#" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-s-lg rounded-e-none border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                <span x-show="currentTab === 'all'">View</span>
+                <span x-cloak x-show="currentTab !== 'all'">
+                  {% if class.status == 'Upcoming' %}
+                    Start Class
+                  {% elif class.status == 'Live' %}
+                    Join
+                  {% else %}
+                    View
+                  {% endif %}
+                </span>
+              </a>
+              
+              {% set dropdown_trigger %}
+                <div class="relative inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white shadow-2xs hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:hover:bg-neutral-700">
+                  <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                    <svg class="pointer-events-none shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="1"></circle>
+                      <circle cx="12" cy="5" r="1"></circle>
+                      <circle cx="12" cy="19" r="1"></circle>
+                    </svg>
+                  </button>
+                </div>
+              {% endset %}
+
+              {% set items_upcoming = [] %}
+              {% set _ = items_upcoming.push({label: 'View', url: '#', icon: 'eye', attrs: "x-show=\"currentTab !== 'all'\""}) %}
+              {% set _ = items_upcoming.push({label: 'Start Class', url: '#', icon: 'play', attrs: "x-show=\"currentTab === 'all'\""}) %}
+              {% if class.type == 'course_based' and class.reserved == false %}
+                {% set _ = items_upcoming.push({label: 'Reserve Zoom License', icon: 'key', x_on: "@click=\"$dispatch('open-modal-reserve-license-modal', { className: '" ~ class.title | replace(\"'\", \"\\\\'\") ~ "' })\""}) %}
+              {% endif %}
+              {% set _ = items_upcoming.push({label: 'Cancel Class', icon: 'x-circle', x_on: "@click=\"$dispatch('open-modal-cancel-class-modal', { className: '" ~ class.title | replace(\"'\", \"\\\\'\") ~ "' })\""}) %}
+              {% set _ = items_upcoming.push({divider: true}) %}
+              {% set _ = items_upcoming.push({label: 'Edit', url: '#', icon: 'pencil'}) %}
+              {% set _ = items_upcoming.push({label: 'Delete', icon: 'trash-2', variant: 'danger', x_on: "@click=\"$dispatch('open-modal-delete-class-modal', { className: '" ~ class.title | replace(\"'\", \"\\\\'\") ~ "' })\""}) %}
+              
+              {% set items_live = [] %}
+              {% set _ = items_live.push({label: 'View', url: '#', icon: 'eye', attrs: "x-show=\"currentTab !== 'all'\""}) %}
+              {% set _ = items_live.push({label: 'Join', url: '#', icon: 'monitor-play', attrs: "x-show=\"currentTab === 'all'\""}) %}
+              {% if class.type == 'course_based' and class.reserved == false %}
+                {% set _ = items_live.push({label: 'Reserve Zoom License', icon: 'key', x_on: "@click=\"$dispatch('open-modal-reserve-license-modal', { className: '" ~ class.title | replace(\"'\", \"\\\\'\") ~ "' })\""}) %}
+              {% endif %}
+              {% set _ = items_live.push({label: 'Cancel Class', icon: 'x-circle', x_on: "@click=\"$dispatch('open-modal-cancel-class-modal', { className: '" ~ class.title | replace(\"'\", \"\\\\'\") ~ "' })\""}) %}
+              {% set _ = items_live.push({divider: true}) %}
+              {% set _ = items_live.push({label: 'Edit', url: '#', icon: 'pencil'}) %}
+              {% set _ = items_live.push({label: 'Delete', icon: 'trash-2', variant: 'danger', x_on: "@click=\"$dispatch('open-modal-delete-class-modal', { className: '" ~ class.title | replace(\"'\", \"\\\\'\") ~ "' })\""}) %}
+              
+              {% set items_default = [
+                {label: 'Edit', url: '#', icon: 'pencil'},
+                {label: 'Delete', icon: 'trash-2', variant: 'danger', x_on: "@click=\"$dispatch('open-modal-delete-class-modal', { className: '" ~ class.title | replace(\"'\", \"\\\\'\") ~ "' })\""}
+              ] %}
+
+              {% set final_items = items_upcoming if class.status == 'Upcoming' else (items_live if class.status == 'Live' else items_default) %}
+
+              {{ dropdown(trigger=dropdown_trigger, items=final_items, placement="bottom-end", width="medium") }}
+            </div>
+          {% endcall %}
+        </tr>
+      {% endfor %}
+    {% endcall %}
+  </div>
