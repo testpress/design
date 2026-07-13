@@ -16,6 +16,25 @@ permalink: "/live_classes/whiteboard_materials/"
         searchInput: '',
         searchQuery: '',
         mobileFoldersOpen: false,
+        movedItems: {},
+        renamedItems: {},
+        handleRename(e) {
+            const { type, id, newName } = e.detail;
+            this.renamedItems[id] = newName;
+            // Simulated toast
+            alert(`${type === 'pdf' ? 'PDF' : 'Folder'} renamed to '${newName}'.`);
+        },
+        handleMove(e) {
+            e.detail.items.forEach(id => {
+                this.movedItems[id] = e.detail.destFolderId || 'all';
+            });
+            const count = e.detail.items.length;
+            const destName = e.detail.destFolderName;
+            // Simulated toast
+            alert(count === 1 ? `PDF moved to ${destName}.` : `${count} PDFs moved to ${destName}.`);
+            this.selectedItems = [];
+            this.selectAll = false;
+        },
         init() {
             this.$watch('searchInput', Alpine.debounce((value) => {
                 this.searchQuery = value;
@@ -24,13 +43,14 @@ permalink: "/live_classes/whiteboard_materials/"
         get hasVisibleRows() {
             const materials = [
                 {% for item in whiteboard_materials.materials %}
-                { folderId: '{{ item.folderId }}', title: '{{ item.title | replace("'", "\\'") }}' },
+                { id: '{{ item.id }}', folderId: '{{ item.folderId }}', title: '{{ item.title | replace("'", "\\'") }}' },
                 {% endfor %}
             ];
-            return materials.some(item => 
-                (this.selectedFolderId === 'all' || this.selectedFolderId === item.folderId) && 
-                (!this.searchQuery || item.title.toLowerCase().includes(this.searchQuery.toLowerCase()))
-            );
+            return materials.some(item => {
+                const currentTitle = this.renamedItems[item.id] || item.title;
+                return (this.selectedFolderId === 'all' || this.selectedFolderId === (this.movedItems[item.id] || item.folderId)) && 
+                       (!this.searchQuery || currentTitle.toLowerCase().includes(this.searchQuery.toLowerCase()));
+            });
         },
         selectedItems: [],
         selectAll: false,
@@ -60,7 +80,7 @@ permalink: "/live_classes/whiteboard_materials/"
             });
             this.hasFolderMatches = hasMatch;
         }
-    }">
+    }" @execute-move.window="handleMove" @execute-rename.window="handleRename">
     {% include "./includes/whiteboard_materials_header.html" %}
     <div class="flex gap-x-6">
         {% include "./includes/whiteboard_folder_aside.html" %}
@@ -70,10 +90,14 @@ permalink: "/live_classes/whiteboard_materials/"
 </div>
 
 {% include "./includes/whiteboard_filter_drawer.html" %}
+{% include "./includes/upload_pdf_modal.html" %}
+{% include "./includes/move_pdf_modal.html" %}
+{% include "./includes/rename_modal.html" %}
 
 {% endblock %}
 
 {% block script %}
     {% include "../../ui-system/scripts/select_script.html" %}
     {% include "../../ui-system/scripts/date_picker_script.html" %}
+    {% include "../../ui-system/scripts/upload_script.html" %}
 {% endblock script %}
