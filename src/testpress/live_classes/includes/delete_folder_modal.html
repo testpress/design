@@ -1,0 +1,111 @@
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+{% from "./folder_tree_select.html" import folder_tree_select %}
+
+<div x-data="{
+    folderId: '',
+    folderName: '',
+    count: 0,
+    subCount: 0,
+    action: 'uncategorized', // 'uncategorized', 'move', 'delete'
+    destFolderId: '',
+    
+    get isEmpty() {
+        return this.count === 0 && this.subCount === 0;
+    },
+
+    openModal(e) {
+        this.folderId = e.detail.id;
+        this.folderName = e.detail.name || '';
+        this.count = parseInt(e.detail.count) || 0;
+        this.subCount = parseInt(e.detail.subCount) || 0;
+        this.action = 'uncategorized';
+        this.destFolderId = '';
+        this.$dispatch('open-modal-delete-folder-modal');
+    },
+
+    submitDelete() {
+        if (!this.folderId) return;
+        
+        if (!this.isEmpty && this.action === 'move') {
+            const input = document.querySelector('input[name=\'destination_folder_delete\']');
+            this.destFolderId = input ? input.value : '';
+            if (!this.destFolderId) return; // Prevent if no destination
+        }
+        
+        // Dispatch delete event to root component
+        this.$dispatch('execute-delete-folder', {
+            id: this.folderId,
+            name: this.folderName,
+            action: this.isEmpty ? 'delete' : this.action,
+            destFolderId: this.destFolderId
+        });
+        
+        this.$dispatch('close-modal-delete-folder-modal');
+    }
+}" @open-modal-delete-folder.window="openModal($event)">
+
+    {% call modal(
+        id="delete-folder-modal",
+        title="Delete Folder?",
+        size="sm",
+        confirm_text="Delete Folder",
+        variant="danger",
+        confirm_attrs=":disabled='!isEmpty && action === \"move\" && !destFolderId' @click='submitDelete()'"
+    ) %}
+        
+        <div class="text-sm text-gray-600 dark:text-neutral-400">
+            <!-- Empty state -->
+            <template x-if="isEmpty">
+                <div>
+                    <p>"<span class="font-medium text-gray-800 dark:text-neutral-200" x-text="folderName"></span>" is empty.</p>
+                    <p class="mt-2">Are you sure you want to delete this folder?</p>
+                </div>
+            </template>
+
+            <!-- Not empty state -->
+            <template x-if="!isEmpty">
+                <div class="space-y-4">
+                    <p>"<span class="font-medium text-gray-800 dark:text-neutral-200" x-text="folderName"></span>" contains <span x-text="count"></span> PDFs. Choose what to do before deleting them.</p>
+
+                    <div class="space-y-4">
+                        <div>
+                            {{ radio(
+                                name="folder_action",
+                                value="move",
+                                label="Move everything to another folder",
+                                x_model="action"
+                            ) }}
+                            
+                            <div x-show="action === 'move'" x-collapse>
+                                <div class="mt-2 pl-7">
+                                    {{ folder_tree_select(
+                                        name="destination_folder_delete",
+                                        placeholder="Select Folder...",
+                                        folders=whiteboard_materials.folders,
+                                        help_text=""
+                                    ) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        {{ radio(
+                            name="folder_action",
+                            value="uncategorized",
+                            label="Move PDFs to Uncategorized",
+                            x_model="action"
+                        ) }}
+
+                        {{ radio(
+                            name="folder_action",
+                            value="delete",
+                            label="Permanently delete the folder including all PDFs in it.",
+                            x_model="action"
+                        ) }}
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+    {% endcall %}
+</div>
