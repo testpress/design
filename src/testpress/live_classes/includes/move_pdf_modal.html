@@ -1,0 +1,70 @@
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "./folder_tree_select.html" import folder_tree_select %}
+
+<div x-data="{
+    moveType: 'single',
+    fileName: '',
+    count: 0,
+    itemsToMove: [],
+
+    openModal(e) {
+        this.moveType = e.detail.type;
+        this.fileName = e.detail.name || '';
+        this.count = e.detail.count || 0;
+        this.itemsToMove = e.detail.items || [e.detail.id];
+        
+        // Re-render confirm button text inside the modal using a simple workaround
+        const confirmBtn = document.querySelector('#move-pdf-modal .flex.justify-end button.bg-primary-600');
+        if (confirmBtn) {
+            confirmBtn.innerText = this.moveType === 'single' ? 'Move' : `Move ${this.count} PDFs`;
+        }
+        
+        // Dynamically update modal header title
+        const titleEl = document.querySelector('#modal-title-move-pdf-modal');
+        if (titleEl) {
+            titleEl.innerText = this.moveType === 'single' ? 'Move PDF' : `Move ${this.count} PDFs`;
+        }
+
+        this.$dispatch('open-modal-move-pdf-modal');
+    },
+
+    submitMove() {
+        const input = document.querySelector('input[name=\'destination_folder_move\']');
+        const destFolderId = input ? input.value : '';
+        
+        const destNameEl = document.querySelector('input[name=\'destination_folder_move\']').nextElementSibling.querySelector('span[x-show=\'selectedFolderName\']');
+        const destName = destNameEl && destNameEl.innerText ? destNameEl.innerText : 'Uncategorized';
+        
+        // Let root Alpine handle the move logic
+        this.$dispatch('execute-move', { 
+            items: this.itemsToMove, 
+            destFolderId: destFolderId,
+            destFolderName: destName
+        });
+
+        // Update the list view state
+        this.$dispatch('close-modal-move-pdf-modal');
+    }
+}" @open-modal-move-pdf.window="openModal($event)">
+
+    {% call modal(
+        id="move-pdf-modal",
+        title="Move PDF",
+        size="sm",
+        confirm_text="Move",
+        confirm_attrs="@click='submitMove()'"
+    ) %}
+        
+        <p class="text-sm text-gray-500 dark:text-neutral-400 mb-5" x-show="moveType === 'single'" x-html="`Select the destination folder you would like to move the file '<span class='font-medium text-gray-800 dark:text-neutral-200'>${fileName}</span>'.`"></p>
+        <p class="text-sm text-gray-500 dark:text-neutral-400 mb-5" x-show="moveType === 'bulk'" x-html="`Select the destination folder you would like to move the <span class='font-medium text-gray-800 dark:text-neutral-200'>${count} files</span>.`"></p>
+        
+        {{ folder_tree_select(
+            name="destination_folder_move",
+            label="Destination Folder",
+            placeholder="Select Folder...",
+            folders=whiteboard_materials.folders,
+            help_text=""
+        ) }}
+        
+    {% endcall %}
+</div>

@@ -1,0 +1,72 @@
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/input.html" import input %}
+
+<div x-data="{
+    type: 'pdf',
+    itemId: '',
+    oldName: '',
+    newName: '',
+
+    openModal(e) {
+        this.type = e.detail.type; // 'pdf' or 'folder'
+        this.itemId = e.detail.id;
+        this.oldName = e.detail.name || '';
+        this.newName = this.oldName;
+
+        const confirmBtn = document.querySelector('#rename-modal .flex.justify-end button.bg-primary-600');
+        if (confirmBtn) {
+            confirmBtn.innerText = 'Rename';
+        }
+        
+        // Dynamically update modal header title
+        const titleEl = document.querySelector('#modal-title-rename-modal');
+        if (titleEl) {
+            titleEl.innerText = this.type === 'pdf' ? 'Rename PDF' : 'Rename Folder';
+        }
+
+        this.$dispatch('open-modal-rename-modal');
+        
+        // Focus the input after modal finishes opening and setting its own default focus
+        setTimeout(() => {
+            const inputEl = document.getElementById('new_name');
+            if (inputEl) {
+                inputEl.focus();
+            }
+        }, 100);
+    },
+
+    submitRename() {
+        if (!this.newName.trim() || this.newName === this.oldName) {
+            this.$dispatch('close-modal-rename-modal');
+            return;
+        }
+        
+        // Dispatch the rename event to root Alpine component
+        this.$dispatch('execute-rename', {
+            type: this.type,
+            id: this.itemId,
+            newName: this.newName.trim()
+        });
+
+        this.$dispatch('close-modal-rename-modal');
+    }
+}" @open-modal-rename.window="openModal($event)">
+
+    {% call modal(
+        id="rename-modal",
+        title="Rename",
+        size="sm",
+        confirm_text="Rename",
+        confirm_attrs="@click='submitRename()'"
+    ) %}
+        
+        {{ input(
+            name="new_name",
+            label="Name",
+            x_model="newName",
+            x_ref="renameInput",
+            extra_attrs="@keydown.enter='submitRename()'"
+        ) }}
+        
+    {% endcall %}
+</div>

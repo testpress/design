@@ -1,0 +1,62 @@
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/input.html" import input %}
+
+<div x-data="{
+    parentFolderId: '',
+    parentFolderName: '',
+    subfolderName: '',
+    
+    openModal(e) {
+        this.parentFolderId = e.detail.id;
+        this.parentFolderName = e.detail.name || '';
+        this.subfolderName = '';
+        this.$dispatch('open-modal-add-subfolder-modal');
+        
+        // Focus the input after modal finishes opening
+        setTimeout(() => {
+            const inputEl = document.getElementById('new_subfolder_name');
+            if (inputEl) {
+                inputEl.focus();
+            }
+        }, 100);
+    },
+
+    submitAdd() {
+        if (!this.subfolderName.trim()) {
+            this.$dispatch('close-modal-add-subfolder-modal');
+            return;
+        }
+        
+        // Dispatch add subfolder event to root component
+        this.$dispatch('execute-add-subfolder', {
+            parentId: this.parentFolderId,
+            parentName: this.parentFolderName,
+            name: this.subfolderName.trim()
+        });
+        
+        this.$dispatch('close-modal-add-subfolder-modal');
+    }
+}" @open-modal-add-subfolder.window="openModal($event)">
+
+    {% call modal(
+        id="add-subfolder-modal",
+        title="Add Subfolder",
+        size="sm",
+        confirm_text="Add",
+        confirm_attrs="@click='submitAdd()'"
+    ) %}
+        
+        <p class="text-sm text-gray-600 dark:text-neutral-400 mb-4">
+            Create a subfolder for "<span class="font-medium text-gray-800 dark:text-neutral-200" x-text="parentFolderName"></span>"
+        </p>
+
+        {{ input(
+            name="new_subfolder_name",
+            label="Name",
+            x_model="subfolderName",
+            x_ref="addSubfolderInput",
+            extra_attrs="@keydown.enter='submitAdd()'"
+        ) }}
+        
+    {% endcall %}
+</div>

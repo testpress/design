@@ -1,0 +1,137 @@
+---
+title: Whiteboard Materials
+tags: testpress
+date: 2024-01-03
+permalink: "/live_classes/whiteboard_materials/"
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock body_class %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto sm:px-6 lg:px-8 py-10 space-y-5" x-data="{
+        pageStatus: new URLSearchParams(window.location.search).get('status') || '',
+        selectedFolderId: 'all',
+        sidebarFolderSearch: '',
+        searchInput: '',
+        searchQuery: '',
+        movedItems: {},
+        renamedItems: {},
+        handleRename(e) {
+            const { type, id, newName } = e.detail;
+            this.renamedItems[id] = newName;
+            // Simulated toast
+            alert(`${type === 'pdf' ? 'PDF' : 'Folder'} renamed to '${newName}'.`);
+        },
+        handleMove(e) {
+            e.detail.items.forEach(id => {
+                this.movedItems[id] = e.detail.destFolderId || 'all';
+            });
+            const count = e.detail.items.length;
+            const destName = e.detail.destFolderName;
+            // Simulated toast
+            alert(count === 1 ? `PDF moved to ${destName}.` : `${count} PDFs moved to ${destName}.`);
+            this.selectedItems = [];
+            this.selectedItems = [];
+            this.selectAll = false;
+        },
+        handleDeletePdf(e) {
+            const { id, name } = e.detail;
+            // Simulated toast
+            alert(`PDF '${name}' deleted successfully.`);
+        },
+        handleAddFolder(e) {
+            const { name } = e.detail;
+            // Simulated toast
+            alert(`Folder '${name}' created successfully.`);
+        },
+        handleAddSubfolder(e) {
+            const { parentName, name } = e.detail;
+            // Simulated toast
+            alert(`Subfolder '${name}' created inside '${parentName}'.`);
+        },
+        handleDeleteFolder(e) {
+            const { name, action, destFolderId } = e.detail;
+            let actionText = '';
+            if (action === 'delete') actionText = 'permanently deleted';
+            else if (action === 'uncategorized') actionText = 'with contents moved to Uncategorized';
+            else actionText = `with contents moved to folder ID ${destFolderId}`;
+            // Simulated toast
+            alert(`Folder '${name}' deleted (${actionText}).`);
+        },
+        init() {
+            this.$watch('searchInput', Alpine.debounce((value) => {
+                this.searchQuery = value;
+            }, 300));
+        },
+        get hasVisibleRows() {
+            const materials = [
+                {% for item in whiteboard_materials.materials %}
+                { id: '{{ item.id }}', folderId: '{{ item.folderId }}', title: '{{ item.title | replace("'", "\\'") }}' },
+                {% endfor %}
+            ];
+            return materials.some(item => {
+                const currentTitle = this.renamedItems[item.id] || item.title;
+                return (this.selectedFolderId === 'all' || this.selectedFolderId === (this.movedItems[item.id] || item.folderId)) && 
+                       (!this.searchQuery || currentTitle.toLowerCase().includes(this.searchQuery.toLowerCase()));
+            });
+        },
+        selectedItems: [],
+        selectAll: false,
+        toggleAll() {
+            if (this.selectAll) {
+                this.selectedItems = Array.from(document.querySelectorAll('.bulk-checkbox:not([style*=\'display: none\'])')).map(cb => cb.value);
+            } else {
+                this.selectedItems = [];
+            }
+        },
+        isFolderSelected(id) { return this.selectedFolderId === id; },
+        setFolder(id) { 
+            this.selectedFolderId = id; 
+        },
+        hasFolderMatches: true,
+        checkFolderMatches() {
+            if (!this.sidebarFolderSearch) {
+                this.hasFolderMatches = true;
+                return;
+            }
+            const term = this.sidebarFolderSearch.toLowerCase();
+            const folders = document.querySelectorAll('.folder-item');
+            let hasMatch = false;
+            folders.forEach(f => {
+                if (f.innerText.toLowerCase().includes(term)) hasMatch = true;
+            });
+            this.hasFolderMatches = hasMatch;
+        }
+    }" @execute-move.window="handleMove" @execute-rename.window="handleRename" @execute-delete-pdf.window="handleDeletePdf" @execute-add-folder.window="handleAddFolder" @execute-add-subfolder.window="handleAddSubfolder" @execute-delete-folder.window="handleDeleteFolder">
+    {% include "./includes/whiteboard_materials_header.html" %}
+    <div class="flex gap-x-6">
+        {% include "./includes/whiteboard_folder_aside.html" %}
+        <template x-if="pageStatus === 'empty-onboarding'">
+            {% include "./includes/whiteboard_materials_empty.html" %}
+        </template>
+        <template x-if="pageStatus !== 'empty-onboarding'">
+            {% include "./includes/whiteboard_materials_list.html" %}
+        </template>
+    </div>
+
+    {% include "./includes/whiteboard_folder_drawer.html" %}
+</div>
+
+{% include "./includes/whiteboard_filter_drawer.html" %}
+{% include "./includes/upload_pdf_modal.html" %}
+{% include "./includes/move_pdf_modal.html" %}
+{% include "./includes/rename_modal.html" %}
+{% include "./includes/delete_pdf_modal.html" %}
+{% include "./includes/add_folder_modal.html" %}
+{% include "./includes/add_subfolder_modal.html" %}
+{% include "./includes/delete_folder_modal.html" %}
+
+{% endblock %}
+
+{% block script %}
+    {% include "../../ui-system/scripts/select_script.html" %}
+    {% include "../../ui-system/scripts/date_picker_script.html" %}
+    {% include "../../ui-system/scripts/upload_script.html" %}
+{% endblock script %}

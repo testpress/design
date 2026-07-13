@@ -1,0 +1,128 @@
+{% from "../../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/tooltip.html" import tooltip %}
+
+<div class="flex-1 min-w-0">
+    {% set table_header %}
+        <th scope="col" class="px-5 py-2.5 w-8">
+            <div class="flex items-center h-5">
+                <input type="checkbox" x-model="selectAll" @change="toggleAll" class="border-gray-200 rounded text-primary-600 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-primary-500 dark:checked:border-primary-500 dark:focus:ring-offset-gray-800">
+            </div>
+        </th>
+        {{ table_th(text="Name", sortable=true) }}
+        {{ table_th(text="Uploaded By") }}
+        {{ table_th(text="Uploaded On", sortable=true) }}
+        <th scope="col" class="px-5 py-2.5 text-end"></th>
+    {% endset %}
+
+    {% set filters %}
+        <div class="flex items-center gap-2">
+            <button type="button" @click.prevent="$dispatch('open-modal-move-pdf', { type: 'bulk', count: selectedItems.length, items: selectedItems })" x-show="selectedItems.length > 0" x-cloak class="whitespace-nowrap py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+              <i data-lucide="folder-output" class="shrink-0 size-3.5"></i>
+              <span x-text="`Move to Folder (${selectedItems.length})`">Move to Folder</span>
+            </button>
+            <button type="button" @click.prevent="$dispatch('open-drawer-whiteboard-materials-filter')" class="whitespace-nowrap py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+              <i data-lucide="filter" class="shrink-0 size-3.5"></i>
+              Filter
+            </button>
+        </div>
+    {% endset %}
+
+    {% call table(
+        search_enabled=true,
+        search_placeholder="Search PDFs...",
+        search_x_model="searchInput",
+        search_variant="standard",
+        search_padding_class="py-1.5",
+        filters=filters,
+        table_header=table_header,
+        pagination=true,
+        pagination_x_show="hasVisibleRows",
+        padded=true
+    ) %}
+        {% for item in whiteboard_materials.materials %}
+            <tr class="group" x-show="(selectedFolderId === 'all' || selectedFolderId === (movedItems['{{ item.id }}'] || '{{ item.folderId }}')) && (!searchQuery || '{{ item.title | replace(\"'\", \"\\'\") }}'.toLowerCase().includes(searchQuery.toLowerCase()))">
+                {% call table_td(class="px-5 py-2.5 w-8") %}
+                  <div class="flex items-center h-5">
+                    <input type="checkbox" class="bulk-checkbox border-gray-200 rounded text-primary-600 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-primary-500 dark:checked:border-primary-500 dark:focus:ring-offset-gray-800" value="{{ item.id }}" x-model="selectedItems">
+                  </div>
+                {% endcall %}
+
+                {% call table_td() %}
+                    <div class="flex flex-col">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="renamedItems['{{ item.id }}'] || '{{ item.title | replace(\"'\", \"\\'\") }}'">{{ item.title }}</span>
+                                {% if item.status == 'Processing' %}
+                                {{ tooltip(
+                                    content="This PDF is being prepared for use in the whiteboard.",
+                                    placement="bottom",
+                                    trigger='<i data-lucide="file-clock" class="size-4 text-blue-500 focus:outline-none cursor-help"></i>'
+                                ) }}
+                                {% elif item.status == 'Failed' %}
+                                {{ tooltip(
+                                    content="This PDF couldn't be prepared for use in the whiteboard. Try uploading it again.",
+                                    placement="bottom",
+                                    trigger='<i data-lucide="triangle-alert" class="size-4 text-amber-500 focus:outline-none cursor-help"></i>'
+                                ) }}
+                                {% endif %}
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5">
+                                {{ item.pages }} {{ 'Page' if item.pages == 1 else 'Pages' }}
+                            </div>
+                        </div>
+                {% endcall %}
+
+
+                {% call table_td() %}
+                    <div class="flex items-center gap-x-3">
+                        <img class="inline-block size-8 rounded-full" src="{{ item.avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
+                        <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ item.uploadedBy }}</a>
+                    </div>
+                {% endcall %}
+
+                {% call table_td() %}
+                    <span class="text-sm text-gray-600 dark:text-neutral-400">{{ item.date }}</span>
+                {% endcall %}
+
+                {% call table_td(class="text-end") %}
+                    {{ dropdown(
+                        trigger="ellipsis-vertical",
+                        placement="bottom-end",
+                        items=[
+                            { "label": "Rename", "icon": "edit-2", "attrs": "@click.prevent=\"$dispatch('open-modal-rename', { type: 'pdf', name: renamedItems['" ~ item.id ~ "'] || '" ~ item.title | replace(\"'\", \"\\'\") ~ "', id: '" ~ item.id ~ "' })\"" },
+                            { "label": "Move", "icon": "folder-output", "attrs": "@click.prevent=\"$dispatch('open-modal-move-pdf', { type: 'single', name: renamedItems['" ~ item.id ~ "'] || '" ~ item.title | replace(\"'\", \"\\'\") ~ "', id: '" ~ item.id ~ "' })\"" },
+                            { "divider": true },
+                            { "label": "Delete", "icon": "trash-2", "variant": "danger", "attrs": "@click.prevent=\"$dispatch('open-modal-delete-pdf', { name: renamedItems['" ~ item.id ~ "'] || '" ~ item.title | replace(\"'\", \"\\'\") ~ "', id: '" ~ item.id ~ "' })\"" }
+                        ]
+                    ) }}
+                {% endcall %}
+            </tr>
+        {% endfor %}
+        <tr x-show="!hasVisibleRows" x-cloak>
+            <td colspan="5" class="p-0 border-b-0">
+                <div x-show="searchQuery.trim() !== ''">
+                    {{ empty_state(
+                        title="No matching PDFs found",
+                        description="Try adjusting your search or filters to find the PDFs you're looking for.",
+                        icon="search",
+                        secondary_action_text="Clear Filters",
+                        secondary_action_attrs="@click.prevent=\"searchInput = ''; searchQuery = ''; selectedFolderId = 'all';\"",
+                        wrap_card=false
+                    ) }}
+                </div>
+                <div x-show="searchQuery.trim() === ''">
+                    {{ empty_state(
+                        title="No PDFs in this folder",
+                        description="Upload PDFs or move existing ones into this folder to use them in live class whiteboards.",
+                        icon="folder-open",
+                        primary_action_text="Upload PDFs",
+                        primary_action_icon="plus",
+                        primary_action_attrs="@click.prevent=\"$dispatch('open-modal-upload-pdfs')\"",
+                        wrap_card=false
+                    ) }}
+                </div>
+            </td>
+        </tr>
+    {% endcall %}
+</div>
