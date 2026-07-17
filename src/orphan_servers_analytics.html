@@ -4,13 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Orphan Servers Analytics Dashboard</title>
-  <!-- Use Tailwind CDN so you can test this completely standalone locally -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+  
+  {% include 'src/ui-system/scripts/date_picker_script.html' %}
+  <!-- Select script not found in UI system, but datepicker covers main alpine logic -->
 </head>
 <body class="bg-gray-50 font-sans text-slate-800">
 
-<div class="min-h-screen bg-gray-50/50 p-8 font-sans">
+<div class="max-w-7xl mx-auto min-h-screen bg-gray-50/50 p-8 font-sans">
   <div class="flex justify-between items-center mb-8">
     <div>
       <h1 class="text-2xl font-bold text-slate-800">Orphan Servers Analytics Dashboard</h1>
@@ -18,113 +18,164 @@
     </div>
     <div class="flex items-center space-x-3">
       <form method="GET" class="flex items-center space-x-3">
-        {% if request.GET.search %}
-        <input type="hidden" name="search" value="{{ request.GET.search }}">
-        {% endif %}
-        {% if request.GET.sort %}
-        <input type="hidden" name="sort" value="{{ request.GET.sort }}">
-        {% endif %}
-        <div class="flex items-center bg-white border border-slate-200 rounded-md shadow-sm px-3 py-1.5 h-[38px]">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <input type="date" name="date" value="{{ request.GET.date }}" class="text-sm text-slate-600 focus:outline-none bg-transparent" title="Select specific date" onchange="this.form.submit()">
-        </div>
-        <div class="relative">
-          <select name="period" onchange="this.form.submit()" class="appearance-none bg-white border border-slate-200 text-slate-700 py-2 px-4 pr-8 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm h-[38px]">
-            <option value="30" {% if request.GET.period == '30' or not request.GET.period %}selected{% endif %}>Last 30 Days</option>
-            <option value="7" {% if request.GET.period == '7' %}selected{% endif %}>Last 7 Days</option>
-            <option value="all" {% if request.GET.period == 'all' %}selected{% endif %}>All Time</option>
-          </select>
-          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+        
+        <input type="hidden" name="search" value="Sample Data">
+        
+        
+        <input type="hidden" name="sort" value="Sample Data">
+        
+        
+        
+        {% include "components/date-picker.html" with name="date" placeholder="Select date" selected_value=request.GET.date %}
+
+        
+        <div x-data="{ 
+               open: false,
+               top: 0,
+               left: 'auto',
+               right: 'auto',
+               _triggerEl: null,
+               _menuEl: null,
+               _scrollHandler: null,
+               init() {
+                 this.$watch('open', value => {
+                   if (value) {
+                     this._triggerEl = this.$refs.trigger;
+                     this._menuEl = this.$refs.menu;
+                     this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+                     setTimeout(() => { this.updatePosition(); }, 0);
+                     window.addEventListener('scroll', this._scrollHandler, true);
+                     window.addEventListener('resize', this._scrollHandler, true);
+                   } else {
+                     if (this._scrollHandler) {
+                       window.removeEventListener('scroll', this._scrollHandler, true);
+                       window.removeEventListener('resize', this._scrollHandler, true);
+                     }
+                   }
+                 });
+               },
+               updatePosition() {
+                 const trigger = this._triggerEl;
+                 if (!trigger) return;
+                 const rect = trigger.getBoundingClientRect();
+                 this.top = rect.bottom + 4;
+                 const placement = 'bottom-end';
+                 const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+                 let rightPos = window.innerWidth - rect.right;
+                 if (window.innerWidth - rightPos < menuWidth) {
+                   this.left = rect.left;
+                   this.right = 'auto';
+                 } else {
+                   this.right = rightPos;
+                   this.left = 'auto';
+                 }
+               }
+             }" 
+             @keydown.escape.window="open = false" 
+             class="inline-flex relative">
+          <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+            <button type="button" class="flex justify-between items-center gap-x-2 bg-white border border-slate-200 text-slate-700 py-1.5 px-3 rounded-md shadow-sm text-sm hover:bg-slate-50 focus:outline-hidden min-w-[130px] h-[38px]" aria-haspopup="menu" :aria-expanded="open.toString()">
+              <span>
+                Last 7 Days
+                {% elif request.GET.period == 'all' %}All Time
+                {% else %}Last 30 Days
+              </span>
+              <i data-lucide="chevron-down" class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+            </button>
+          </div>
+          
+          <div x-show="open" x-ref="menu" x-cloak @click.outside="open = false" 
+               x-transition:enter="transition ease-out duration-100" 
+               x-transition:enter-start="opacity-0 scale-95" 
+               x-transition:enter-end="opacity-100 scale-100" 
+               x-transition:leave="transition ease-in duration-75" 
+               x-transition:leave-start="opacity-100 scale-100" 
+               x-transition:leave-end="opacity-0 scale-95" 
+               class="fixed z-[9999] w-48 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+               x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }" 
+               role="menu">
+            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=30&date=Sample Data&search=Sample Data&sort=Sample Data">
+              Last 30 Days
+            </a>
+            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=7&date=Sample Data&search=Sample Data&sort=Sample Data">
+              Last 7 Days
+            </a>
+            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=all&date=Sample Data&search=Sample Data&sort=Sample Data">
+              All Time
+            </a>
           </div>
         </div>
       </form>
-      
-      <button class="bg-white border border-slate-200 text-slate-600 p-2 rounded-md shadow-sm hover:bg-slate-50 transition h-[38px]">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-      </button>
     </div>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center">
-      <div class="flex-shrink-0 bg-red-50 p-4 rounded-full mr-6" style="margin-right: 1.5rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-      </div>
-      <div>
-        <h2 class="text-slate-600 font-medium text-sm mb-1">Active Anomalies</h2>
-        <div class="text-4xl font-bold text-red-600 mb-1">{{ active_anomalies_count }}</div>
-        <p class="text-xs text-slate-500">Servers requiring immediate action</p>
-      </div>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex items-center">
-      <div class="flex-shrink-0 bg-blue-50 p-4 rounded-full mr-6" style="margin-right: 1.5rem;">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      </div>
-      <div>
-        <h2 class="text-slate-600 font-medium text-sm mb-1">Total Wasted Hours</h2>
-        <div class="text-4xl font-bold text-blue-600 mb-1">{{ total_wasted_hours }} hrs</div>
-        <p class="text-xs text-slate-500">Across all organizations</p>
-      </div>
-    </div>
+    
+    {% include "components/stats-card.html" with title="Active Anomalies" value=active_anomalies_count description="Servers requiring immediate action" icon="alert-triangle" value_color="text-red-600 dark:text-red-500" %}
+    
+    
+    
+      {% include "components/stats-card.html" with title="Total Wasted Hours" value=value_str description="Across all organizations" icon="clock" value_color="text-primary dark:text-blue-500" %}
+    
   </div>
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-2 flex flex-col">
-      <h2 class="text-slate-800 font-semibold mb-4">Wasted Hours over the Last 30 Days</h2>
-      <div class="relative flex-grow w-full min-h-[250px]">
-        <canvas id="trendChart"></canvas>
-      </div>
-    </div>
-    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <h2 class="text-slate-800 font-semibold mb-6">Top Organizations by Cost Leakage</h2>
-      <div class="space-y-5">
-        {% for org in top_organizations %}
+    <div class="p-5 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl lg:col-span-2">
+      
+      <div class="flex justify-between">
         <div>
-          <div class="flex justify-between items-end mb-2">
+          <h2 class="inline-block font-medium text-gray-800 dark:text-neutral-200">
+            Wasted Hours
+          </h2>
+        </div>
+      </div>
+      
+
+      
+      <div id="hs-single-area-chart" class="min-h-[250px] mt-5"></div>
+    </div>
+    <div class="p-5 flex flex-col bg-card border border-card-line shadow-2xs rounded-xl">
+      <div class="flex flex-col gap-y-5">
+        
+        <!-- Sample Organization 1 -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
             <div class="flex items-center space-x-3">
-              <span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-1 rounded-full w-6 h-6 flex items-center justify-center">{{ forloop.counter }}</span>
-              <span class="text-sm font-medium text-slate-800">{{ org.name }}</span>
-              <span class="text-xs text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">{{ org.total_servers }} servers</span>
+              <div class="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary font-bold text-xs">
+                AC
+              </div>
+              <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">Acme Corp</span>
             </div>
-            <div class="text-xs">
-              <span class="font-semibold text-blue-600">{{ org.total_wasted_hours }} hrs</span>
-              <span class="text-slate-500 ml-1">({{ org.percentage }}%)</span>
+            <div class="flex items-center gap-x-4 text-sm text-gray-800 dark:text-neutral-200">
+              <span>14 servers</span>
+              <span>62 hours</span>
             </div>
           </div>
-          <div class="w-full bg-slate-100 rounded-full h-1.5">
-            <div class="bg-blue-600 h-1.5 rounded-full" style="width: {{ org.percentage }}%;"></div>
+          <div class="flex w-full h-4 bg-surface-1 dark:bg-neutral-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow="43" aria-valuemin="0" aria-valuemax="100">
+            <div class="flex flex-col justify-center rounded-full overflow-hidden bg-primary text-[10px] text-white text-center whitespace-nowrap transition duration-500" style="width: 43.7%">43.7%</div>
           </div>
         </div>
-        {% endfor %}
+
       </div>
     </div>
   </div>
-  <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-    <div class="p-6 border-b border-slate-200 flex justify-between items-center">
+  <div class="flex flex-col bg-white dark:bg-neutral-800 border-y sm:border-y sm:border-x border-gray-200 dark:border-neutral-700 shadow-2xs rounded-none sm:rounded-xl">
+    <div class="p-6 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
       <h2 class="text-slate-800 font-semibold">Active Anomalies</h2>
       <form method="GET" class="flex items-center space-x-3">
-        {% if request.GET.date %}
-        <input type="hidden" name="date" value="{{ request.GET.date }}">
-        {% endif %}
-        {% if request.GET.period %}
-        <input type="hidden" name="period" value="{{ request.GET.period }}">
-        {% endif %}
-        <input type="text" name="search" value="{{ request.GET.search }}" placeholder="Search by UUID..." class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        
+        <input type="hidden" name="date" value="Sample Data">
+        
+        
+        <input type="hidden" name="period" value="Sample Data">
+        
+        <input type="text" name="search" value="Sample Data" placeholder="Search by UUID..." class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
         <div class="relative flex items-center">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 absolute left-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
           </svg>
           <select name="sort" onchange="this.form.submit()" class="text-sm border border-slate-200 rounded-md pl-8 pr-8 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
-            <option value="newest" {% if request.GET.sort == 'newest' or not request.GET.sort %}selected{% endif %}>Newest First</option>
-            <option value="oldest" {% if request.GET.sort == 'oldest' %}selected{% endif %}>Oldest First</option>
-            <option value="wasted" {% if request.GET.sort == 'wasted' %}selected{% endif %}>Most Wasted Hours</option>
+            <option value="newest" selected>Newest First</option>
+            <option value="oldest" selected>Oldest First</option>
+            <option value="wasted" selected>Most Wasted Hours</option>
           </select>
           <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
             <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
@@ -132,82 +183,69 @@
         </div>
       </form>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm text-slate-600">
-        <thead class="bg-slate-50 text-slate-700 font-medium">
-          <tr>
-            <th class="px-6 py-4 border-b border-slate-200">Stream ID</th>
-            <th class="px-6 py-4 border-b border-slate-200">Organization</th>
-            <th class="px-6 py-4 border-b border-slate-200">Wasted Hours</th>
-            <th class="px-6 py-4 border-b border-slate-200">Latest Error Log</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100">
-          {% for stream in page_obj %}
+    
+    <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 [&_tbody_tr:hover]:bg-gray-50 dark:[&_tbody_tr:hover]:bg-neutral-800/50">
+      <div class="min-w-full inline-block align-middle">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+          <thead class="bg-gray-50 dark:bg-neutral-800">
+            <tr class="border-t border-gray-200 dark:border-neutral-700">
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Stream ID</th>
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Organization</th>
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Wasted Hours</th>
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Latest Error Log</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+          
           <tr class="hover:bg-slate-50/50 transition">
-            <td class="px-6 py-4 font-mono text-xs text-slate-800">{{ stream.uuid }}</td>
-            <td class="px-6 py-4">{{ stream.organization.name }}</td>
-            <td class="px-6 py-4 font-semibold text-red-600">{{ stream.wasted_hours }}</td>
+            <td class="px-6 py-4 font-mono text-xs text-slate-800">123e4567</td>
+            <td class="px-6 py-4">Acme Corp</td>
+            <td class="px-6 py-4 font-semibold text-red-600">12</td>
             <td class="px-6 py-4 text-xs text-slate-500 max-w-xs">
-              {% if stream.latest_error_log %}
-                {% if stream.log_url %}
-                  <a href="{{ stream.log_url }}" class="text-blue-600 hover:underline block truncate" target="_blank" title="View Full Logs">
-                    {{ stream.latest_error_log }}
-                  </a>
-                {% else %}
-                  <span class="block truncate text-slate-700" title="{{ stream.latest_error_log }}">
-                    {{ stream.latest_error_log }}
-                  </span>
-                {% endif %}
-              {% else %}
-                <span class="italic">No error log</span>
-              {% endif %}
+              <a href="#" class="text-primary hover:underline block truncate" title="View Full Logs">
+                UploadLiveStreamRecordingTask failed: Timeout...
+              </a>
             </td>
           </tr>
-          {% else %}
-          <tr>
-            <td colspan="4" class="px-6 py-8 text-center text-slate-500">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-green-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              All infrastructure is running normally. No active anomalies found.
+          <tr class="hover:bg-slate-50/50 transition">
+            <td class="px-6 py-4 font-mono text-xs text-slate-800">890f1234</td>
+            <td class="px-6 py-4">TechNova Solutions</td>
+            <td class="px-6 py-4 font-semibold text-red-600">8</td>
+            <td class="px-6 py-4 text-xs text-slate-500 max-w-xs">
+              <span class="italic">No error log</span>
             </td>
           </tr>
-          {% endfor %}
+
         </tbody>
       </table>
+      </div>
     </div>
     <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-sm text-slate-500">
       <div>
-        Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+        Showing Sample Data to Sample Data of Sample Data results
       </div>
-      <div class="flex space-x-1">
-        {% if page_obj.has_previous %}
-        <a href="?page={{ page_obj.previous_page_number }}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}" class="px-3 py-1 border border-slate-200 rounded text-slate-600 bg-white hover:bg-slate-50">&lt;</a>
-        {% else %}
-        <span class="px-3 py-1 border border-slate-200 rounded text-slate-400 bg-slate-50 cursor-not-allowed">&lt;</span>
-        {% endif %}
+      <form method="GET" class="flex items-center">
+        <input type="hidden" name="date" value="Sample Data">
+        <input type="hidden" name="period" value="Sample Data">
+        <input type="hidden" name="search" value="Sample Data">
+        <input type="hidden" name="sort" value="Sample Data">
         
-        <span class="px-3 py-1 border border-blue-500 rounded bg-blue-600 text-white font-medium">{{ page_obj.number }}</span>
-        
-        {% if page_obj.has_next %}
-        <a href="?page={{ page_obj.next_page_number }}{% if request.GET.date %}&date={{ request.GET.date }}{% endif %}{% if request.GET.period %}&period={{ request.GET.period }}{% endif %}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.sort %}&sort={{ request.GET.sort }}{% endif %}" class="px-3 py-1 border border-slate-200 rounded text-slate-600 bg-white hover:bg-slate-50">&gt;</a>
-        {% else %}
-        <span class="px-3 py-1 border border-slate-200 rounded text-slate-400 bg-slate-50 cursor-not-allowed">&gt;</span>
-        {% endif %}
-      </div>
+        {% include 'src/ui-system/components/pagination.html' %}
+      </form>
     </div>
   </div>
 </div>
 
-<script id="chart-dates-data" type="application/json">{{ chart_dates_json|safe }}</script>
-<script id="chart-wasted-hours-data" type="application/json">{{ chart_wasted_hours_json|safe }}</script>
+Sample Data
+Sample Data
+
+
+
+
 <script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('trendChart').getContext('2d');
-    
-    let chartDates = ["Last Week", "This Week"];
-    let chartData = [25, 14];
+  window.addEventListener('load', () => {
+    let chartDates = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
+    let chartData = [10, 20, 15, 25, 30];
     
     try {
         const datesText = document.getElementById('chart-dates-data').textContent.trim();
@@ -215,91 +253,192 @@
         if (datesText && datesText !== "" && !datesText.includes("{" + "{")) chartDates = JSON.parse(datesText);
         if (hoursText && hoursText !== "" && !hoursText.includes("{" + "{")) chartData = JSON.parse(hoursText);
     } catch (e) {
-        console.warn("Could not parse dynamic chart data in preview environment, using defaults.");
+        console.warn("Could not parse dynamic chart data");
     }
 
-    let gradient = ctx.createLinearGradient(0, 0, 0, 400);
-    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
-    gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
-    
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: chartDates,
-        datasets: [{
-          label: 'Wasted Hours',
-          data: chartData,
-          borderColor: '#2563eb',
-          backgroundColor: gradient,
-          borderWidth: 2,
-          pointBackgroundColor: '#2563eb',
-          pointBorderColor: '#ffffff',
-          pointBorderWidth: 2,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          fill: true,
-          tension: 0.3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            display: false
+    // Apex Total Sales Chart
+    (function () {
+      buildChart('#hs-single-area-chart', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'area',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Wasted Hours',
+            data: chartData
+          }
+        ],
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            type: 'vertical',
+            shadeIntensity: 1,
+            opacityFrom: 0.2,
+            opacityTo: 0.8
+          }
+        },
+        xaxis: {
+          type: 'category',
+          tickPlacement: 'on',
+          categories: chartDates,
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          crosshairs: {
+            stroke: {
+              dashArray: 0
+            },
+            dropShadow: {
+              show: false
+            }
           },
           tooltip: {
-            backgroundColor: '#1e293b',
-            padding: 12,
-            titleFont: { size: 13, family: "'Inter', sans-serif" },
-            bodyFont: { size: 14, weight: 'bold', family: "'Inter', sans-serif" },
-            displayColors: false,
-            callbacks: {
-              label: function(context) {
-                return context.parsed.y + ' hrs';
+            enabled: false
+          },
+          labels: {
+            style: {
+              colors: '#94a3b8',
+              fontSize: '13px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 400
+            },
+            formatter: (title) => title
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#94a3b8',
+              fontSize: '12px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: (value) => `${value >= 1000 ? `${value / 1000}k` : value} hrs`
+          }
+        },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: {
+              height: 200
+            },
+            labels: {
+              style: {
+                colors: '#94a3b8',
+                fontSize: '11px',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 400
+              },
+              offsetX: -2,
+              formatter: (title) => title
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: 0,
+                maxWidth: 140,
+                style: {
+                  colors: '#94a3b8',
+                  fontSize: '11px',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 400
+                },
+                formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
               }
             }
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            suggestedMax: 40,
-            grid: {
-              color: '#f1f5f9',
-              drawBorder: false,
-            },
-            ticks: {
-              color: '#64748b',
-              font: { family: "'Inter', sans-serif", size: 11 },
-              stepSize: 10
-            },
-            title: {
-              display: true,
-              text: 'Hours',
-              color: '#94a3b8',
-              align: 'end',
-              font: { size: 11 }
-            }
           },
-          x: {
-            grid: {
-              display: false,
-              drawBorder: false,
-            },
-            ticks: {
-              color: '#64748b',
-              font: { family: "'Inter', sans-serif", size: 11 }
+        }]
+      }), () => ({
+        colors: ['#2563eb'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e2e8f0'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
             }
           }
         },
-        interaction: {
-          mode: 'index',
-          intersect: false,
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+            }
+          }
+        }
+      }), () => ({
+        colors: ['#3b82f6'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
         },
-      }
-    });
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#334155'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+            }
+          }
+        }
+      }));
+    })();
+
+    // Initialize Lucide icons
+    lucide.createIcons();
   });
 </script>
 </body>
 </html>
+
