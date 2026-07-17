@@ -25,7 +25,587 @@
     display: block;
   }
 </style>
+
+<link rel="stylesheet" href="/pr-preview/pr-912/src/simba/node_modules/apexcharts/dist/apexcharts.css">
+<style type="text/css">
+  .apexcharts-tooltip.apexcharts-theme-light {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+</style>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('uiDatePicker', (config = {}) => ({
+            // Configuration
+            single: config.single !== undefined ? config.single : true,
+            datetime: config.datetime || false,
+            range: config.range || false,
+            range_datetime: config.range_datetime || false,
+            inline: config.inline || false,
+            disabled: config.disabled || false,
+            required: config.required || false,
+            readonly: config.readonly || false,
+            placeholder: config.placeholder || 'Select date',
+            showTime: config.showTime || false,
+            showClear: config.showClear || false,
+            showToday: config.showToday || false,
+            showFooterActions: config.showFooterActions || false,
+            dropdownAlign: config.dropdownAlign || 'left',
+
+            // Values
+            selectedDate: null,
+            selectedEndDate: null,
+            hoverDate: null,
+
+            // Time state
+            startHour: 12,
+            startMinute: '00',
+            startAmPm: 'PM',
+            endHour: 12,
+            endMinute: '00',
+            endAmPm: 'PM',
+
+            // Calendar display state
+            currentMonth: new Date().getMonth(),
+            currentYear: new Date().getFullYear(),
+            open: false,
+            openUp: false,
+            inputValue: '',
+            top: 0,
+            left: 0,
+            _triggerEl: null,
+            _menuEl: null,
+            _scrollHandler: null,
+
+            // Constant helpers
+            monthNames: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+            monthsShort: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+            yearRange: [],
+
+            // Min / Max bounds
+            minDate: null,
+            maxDate: null,
+
+            // Backups for cancellation
+            backupDate: null,
+            backupEndDate: null,
+            backupStartHour: 12,
+            backupStartMinute: '00',
+            backupStartAmPm: 'PM',
+            backupEndHour: 12,
+            backupEndMinute: '00',
+            backupEndAmPm: 'PM',
+
+            init() {
+                // Initialize min/max dates
+                if (config.min_date) {
+                    this.minDate = this.normalizeDate(new Date(config.min_date));
+                }
+                if (config.max_date) {
+                    this.maxDate = this.normalizeDate(new Date(config.max_date));
+                }
+
+                // Pre-selected values
+                if (config.selectedValue) {
+                    this.parseAndSetValue(config.selectedValue);
+                }
+
+                // Set initial calendar display month/year based on selected date or today
+                const baseDate = this.selectedDate || new Date();
+                this.currentMonth = baseDate.getMonth();
+                this.currentYear = baseDate.getFullYear();
+
+                // Generate year list
+                const startYr = this.currentYear - 5;
+                const endYr = this.currentYear + 10;
+                for (let y = startYr; y <= endYr; y++) {
+                    this.yearRange.push(y);
+                }
+
+                this.updateInput();
+
+                // Watch open state to take backups and position
+                this.$watch('open', (val) => {
+                    if (val) {
+                        this.backupDate = this.selectedDate ? new Date(this.selectedDate) : null;
+                        this.backupEndDate = this.selectedEndDate ? new Date(this.selectedEndDate) : null;
+                        this.backupStartHour = this.startHour;
+                        this.backupStartMinute = this.startMinute;
+                        this.backupStartAmPm = this.startAmPm;
+                        this.backupEndHour = this.endHour;
+                        this.backupEndMinute = this.endMinute;
+                        this.backupEndAmPm = this.endAmPm;
+
+                        if (!this.inline) {
+                            this._triggerEl = this.$refs.trigger;
+                            this._menuEl = this.$refs.menu;
+                            this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+                            this.$nextTick(() => {
+                                this.updatePosition();
+                            });
+                            window.addEventListener('scroll', this._scrollHandler, true);
+                            window.addEventListener('resize', this._scrollHandler, true);
+                        }
+                    } else {
+                        if (this._scrollHandler) {
+                            window.removeEventListener('scroll', this._scrollHandler, true);
+                            window.removeEventListener('resize', this._scrollHandler, true);
+                        }
+                    }
+                });
  
+                this.$watch('startHour', () => this.handleTimeChange());
+                this.$watch('startMinute', () => this.handleTimeChange());
+                this.$watch('startAmPm', () => this.handleTimeChange());
+                this.$watch('endHour', () => this.handleTimeChange());
+                this.$watch('endMinute', () => this.handleTimeChange());
+                this.$watch('endAmPm', () => this.handleTimeChange());
+            },
+
+            updatePosition() {
+                const trigger = this._triggerEl;
+                const menu = this._menuEl;
+                if (!trigger) return;
+
+                const rect = trigger.getBoundingClientRect();
+
+                // Measure the actual dropdown menu height and width if rendered
+                let dropdownHeight = (this.range || this.range_datetime) ? 425 : 385;
+                let dropdownWidth = (this.range || this.range_datetime) && window.innerWidth >= 640 ? 640 : 320;
+
+                if (menu) {
+                    const originalDisplay = menu.style.display;
+                    const originalVisibility = menu.style.visibility;
+                    const originalPosition = menu.style.position;
+
+                    // Temporarily make it visible to get accurate dimensions
+                    if (window.getComputedStyle(menu).display === 'none') {
+                        menu.style.display = 'block';
+                        menu.style.visibility = 'hidden';
+                        menu.style.position = 'fixed';
+                    }
+
+                    dropdownHeight = menu.offsetHeight || dropdownHeight;
+                    dropdownWidth = menu.offsetWidth || dropdownWidth;
+
+                    // Restore original styles
+                    menu.style.display = originalDisplay;
+                    menu.style.visibility = originalVisibility;
+                    menu.style.position = originalPosition;
+                }
+
+                // Find the nearest containing block parent for a fixed element.
+                let containingBlock = null;
+                let parent = trigger.parentElement;
+                while (parent && parent !== document.body) {
+                    const style = window.getComputedStyle(parent);
+                    if (style.transform !== 'none' || style.perspective !== 'none' || style.filter !== 'none') {
+                        containingBlock = parent;
+                        break;
+                    }
+                    parent = parent.parentElement;
+                }
+
+                let offsetTop = 0;
+                let offsetLeft = 0;
+                if (containingBlock) {
+                    const parentRect = containingBlock.getBoundingClientRect();
+                    offsetTop = parentRect.top;
+                    offsetLeft = parentRect.left;
+                }
+
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+
+                if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
+                    // Open upward
+                    this.top = rect.top - dropdownHeight - 8 - offsetTop;
+                    this.openUp = true;
+                } else {
+                    // Open downward
+                    this.top = rect.bottom + 8 - offsetTop;
+                    this.openUp = false;
+                }
+
+                // Horizontal alignment
+                if (this.dropdownAlign === 'right') {
+                    this.left = rect.right - dropdownWidth - offsetLeft;
+                    // Prevent overflowing the left edge of the screen
+                    if (this.left + offsetLeft < 16) {
+                        this.left = 16 - offsetLeft;
+                    }
+                } else {
+                    if (rect.left + dropdownWidth > window.innerWidth) {
+                        this.left = window.innerWidth - dropdownWidth - 16 - offsetLeft;
+                    } else {
+                        this.left = rect.left - offsetLeft;
+                    }
+                }
+            },
+
+            normalizeDate(date) {
+                if (!date || isNaN(date.getTime())) return null;
+                const d = new Date(date);
+                d.setHours(0, 0, 0, 0);
+                return d;
+            },
+
+            formatDateString(date) {
+                if (!date) return '';
+                const day = date.getDate();
+                const month = this.monthsShort[date.getMonth()];
+                const year = date.getFullYear();
+                return `${month} ${day}, ${year}`;
+            },
+
+            getTimeString(h, m, p) {
+                return `${h}:${String(m).padStart(2, '0')} ${p}`;
+            },
+
+            parseAndSetValue(valStr) {
+                if (!valStr) {
+                    this.selectedDate = null;
+                    this.selectedEndDate = null;
+                    this.inputValue = '';
+                    return;
+                }
+
+                if (this.range || this.range_datetime) {
+                    const parts = valStr.split('→');
+                    if (parts[0]) {
+                        const d1 = new Date(parts[0].trim());
+                        if (!isNaN(d1.getTime())) {
+                            this.selectedDate = this.normalizeDate(d1);
+                            if (this.range_datetime) {
+                                this.parseTime(parts[0].trim(), 'start');
+                            }
+                        }
+                    }
+                    if (parts[1]) {
+                        const d2 = new Date(parts[1].trim());
+                        if (!isNaN(d2.getTime())) {
+                            this.selectedEndDate = this.normalizeDate(d2);
+                            if (this.range_datetime) {
+                                this.parseTime(parts[1].trim(), 'end');
+                            }
+                        }
+                    }
+                } else {
+                    const d = new Date(valStr.trim());
+                    if (!isNaN(d.getTime())) {
+                        this.selectedDate = this.normalizeDate(d);
+                        if (this.datetime) {
+                            this.parseTime(valStr.trim(), 'start');
+                        }
+                    }
+                }
+
+                const baseDate = this.selectedDate || new Date();
+                this.currentMonth = baseDate.getMonth();
+                this.currentYear = baseDate.getFullYear();
+                this.updateInput();
+            },
+
+            parseTime(str, type) {
+                const match = str.match(/(\d+):(\d+)(?:\s*(AM|PM))?/i);
+                if (match) {
+                    let hour = parseInt(match[1]);
+                    let minute = parseInt(match[2]);
+                    let ampm = match[3] ? match[3].toUpperCase() : 'AM';
+
+                    if (type === 'start') {
+                        this.startHour = hour;
+                        this.startMinute = minute;
+                        this.startAmPm = ampm;
+                    } else {
+                        this.endHour = hour;
+                        this.endMinute = minute;
+                        this.endAmPm = ampm;
+                    }
+                }
+            },
+
+            updateInput() {
+                if (this.range || this.range_datetime) {
+                    if (this.selectedDate && this.selectedEndDate) {
+                        let startStr = this.formatDateString(this.selectedDate);
+                        let endStr = this.formatDateString(this.selectedEndDate);
+
+                        if (this.range_datetime) {
+                            startStr += ' ' + this.getTimeString(this.startHour, this.startMinute, this.startAmPm);
+                            endStr += ' ' + this.getTimeString(this.endHour, this.endMinute, this.endAmPm);
+                        }
+                        this.inputValue = `${startStr} → ${endStr}`;
+                    } else {
+                        this.inputValue = '';
+                    }
+                } else {
+                    if (this.selectedDate) {
+                        let str = this.formatDateString(this.selectedDate);
+                        if (this.datetime) {
+                            str += ' ' + this.getTimeString(this.startHour, this.startMinute, this.startAmPm);
+                        }
+                        this.inputValue = str;
+                    } else {
+                        this.inputValue = '';
+                    }
+                }
+            },
+
+            getDays() {
+                const year = this.currentYear;
+                const month = this.currentMonth;
+
+                // Month first day and total days
+                const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun
+                const totalDays = new Date(year, month + 1, 0).getDate();
+                const prevTotalDays = new Date(year, month, 0).getDate();
+
+                // Shift starts so Monday is index 0
+                let startDayOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+                const days = [];
+
+                // Prev month padding
+                for (let i = startDayOffset - 1; i >= 0; i--) {
+                    const dayNum = prevTotalDays - i;
+                    const date = new Date(year, month - 1, dayNum);
+                    days.push({
+                        day: dayNum,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                // Current month
+                for (let i = 1; i <= totalDays; i++) {
+                    const date = new Date(year, month, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: true,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                // Next month padding to reach 42 cells (6 rows)
+                const totalCells = days.length <= 35 ? 35 : 42;
+                const nextDaysCount = totalCells - days.length;
+                for (let i = 1; i <= nextDaysCount; i++) {
+                    const date = new Date(year, month + 1, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                return days;
+            },
+
+            // Get days for the second calendar pane (next month)
+            getRightDays() {
+                let nextMonth = this.currentMonth + 1;
+                let nextYear = this.currentYear;
+                if (nextMonth > 11) {
+                    nextMonth = 0;
+                    nextYear += 1;
+                }
+
+                const firstDayIndex = new Date(nextYear, nextMonth, 1).getDay();
+                const totalDays = new Date(nextYear, nextMonth + 1, 0).getDate();
+                const prevTotalDays = new Date(nextYear, nextMonth, 0).getDate();
+
+                let startDayOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+                const days = [];
+
+                for (let i = startDayOffset - 1; i >= 0; i--) {
+                    const dayNum = prevTotalDays - i;
+                    const date = new Date(nextYear, nextMonth - 1, dayNum);
+                    days.push({
+                        day: dayNum,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                for (let i = 1; i <= totalDays; i++) {
+                    const date = new Date(nextYear, nextMonth, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: true,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                const totalCells = days.length <= 35 ? 35 : 42;
+                const nextDaysCount = totalCells - days.length;
+                for (let i = 1; i <= nextDaysCount; i++) {
+                    const date = new Date(nextYear, nextMonth + 1, i);
+                    days.push({
+                        day: i,
+                        date: date,
+                        isCurrentMonth: false,
+                        isDisabled: this.isDateDisabled(date)
+                    });
+                }
+
+                return days;
+            },
+
+            getRightMonthName() {
+                let nextMonth = this.currentMonth + 1;
+                if (nextMonth > 11) nextMonth = 0;
+                return this.monthNames[nextMonth];
+            },
+
+            getRightYear() {
+                let nextMonth = this.currentMonth + 1;
+                let nextYear = this.currentYear;
+                if (nextMonth > 11) nextYear += 1;
+                return nextYear;
+            },
+
+            isDateDisabled(date) {
+                if (this.disabled) return true;
+                const dateMs = date.getTime();
+                if (this.minDate && dateMs < this.minDate.getTime()) return true;
+                if (this.maxDate && dateMs > this.maxDate.getTime()) return true;
+                return false;
+            },
+
+            prevMonth() {
+                if (this.currentMonth === 0) {
+                    this.currentMonth = 11;
+                    this.currentYear -= 1;
+                } else {
+                    this.currentMonth -= 1;
+                }
+            },
+
+            nextMonth() {
+                if (this.currentMonth === 11) {
+                    this.currentMonth = 0;
+                    this.currentYear += 1;
+                } else {
+                    this.currentMonth += 1;
+                }
+            },
+
+            selectDay(date) {
+                if (this.isDateDisabled(date)) return;
+
+                if (this.range || this.range_datetime) {
+                    if (!this.selectedDate || (this.selectedDate && this.selectedEndDate)) {
+                        this.selectedDate = date;
+                        this.selectedEndDate = null;
+                        this.updateInput();
+                    } else if (this.selectedDate && !this.selectedEndDate) {
+                        if (date < this.selectedDate) {
+                            this.selectedDate = date;
+                            this.updateInput();
+                        } else {
+                            this.selectedEndDate = date;
+                            this.updateInput();
+                            if (!this.range_datetime && !this.inline && !this.showFooterActions) {
+                                this.open = false;
+                            }
+                        }
+                    }
+                } else {
+                    this.selectedDate = date;
+                    this.updateInput();
+                    if (!this.datetime && !this.inline && !this.showFooterActions) {
+                        this.open = false;
+                    }
+                }
+            },
+
+            handleTimeChange() {
+                this.updateInput();
+            },
+
+            selectToday() {
+                const today = this.normalizeDate(new Date());
+                if (this.isDateDisabled(today)) return;
+
+                this.selectedDate = today;
+                this.currentMonth = today.getMonth();
+                this.currentYear = today.getFullYear();
+
+                if (this.range || this.range_datetime) {
+                    this.selectedEndDate = null;
+                } else if (!this.datetime && !this.inline) {
+                    this.updateInput();
+                    this.open = false;
+                } else {
+                    this.updateInput();
+                }
+            },
+
+            clearValue() {
+                this.selectedDate = null;
+                this.selectedEndDate = null;
+                this.inputValue = '';
+                if (!this.inline) {
+                    this.open = false;
+                }
+            },
+
+            // Highlighting checks
+            isToday(date) {
+                const today = new Date();
+                return date.getDate() === today.getDate() &&
+                       date.getMonth() === today.getMonth() &&
+                       date.getFullYear() === today.getFullYear();
+            },
+
+            isSelected(date) {
+                if (!date) return false;
+                if (this.selectedDate && date.getTime() === this.selectedDate.getTime()) return true;
+                if (this.selectedEndDate && date.getTime() === this.selectedEndDate.getTime()) return true;
+                return false;
+            },
+
+            isInRange(date) {
+                if (!date) return false;
+                if (this.selectedDate && this.selectedEndDate) {
+                    return date > this.selectedDate && date < this.selectedEndDate;
+                }
+                if (this.selectedDate && !this.selectedEndDate && this.hoverDate) {
+                    return date > this.selectedDate && date < this.hoverDate;
+                }
+                return false;
+            },
+
+            isRangeStart(date) {
+                return this.selectedDate && date.getTime() === this.selectedDate.getTime();
+            },
+
+            isRangeEnd(date) {
+                if (this.selectedEndDate) {
+                    return date.getTime() === this.selectedEndDate.getTime();
+                }
+                if (this.selectedDate && this.hoverDate) {
+                    return date.getTime() === this.hoverDate.getTime();
+                }
+                return false;
+            },
+
+            hasValue() {
+                return !!this.selectedDate;
+            }
+        }));
+    });
+</script>
+
+
 
   <script defer src="https://unpkg.com/alpinejs@3.4.2/dist/cdn.min.js"></script>
     <script src="/node_modules/preline/dist/preline.js"></script>
@@ -663,7 +1243,455 @@
       };
     }
   </script>
-     
+    
+
+
+<div class="max-w-7xl mx-auto min-h-screen bg-gray-50/50 p-8 font-sans">
+  <div class="flex justify-between items-center mb-8">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">Orphan Servers Analytics Dashboard</h1>
+      <p class="text-sm text-slate-500 mt-1">Monitor and take action on orphaned servers causing resource waste.</p>
+    </div>
+    <div class="flex items-center space-x-3">
+      <form method="GET" class="flex items-center space-x-3">
+        <input type="hidden" name="search" value="Sample Data">
+        <input type="hidden" name="sort" value="Sample Data">
+        
+
+        <div x-data="{ 
+               open: false,
+               top: 0,
+               left: 'auto',
+               right: 'auto',
+               _triggerEl: null,
+               _menuEl: null,
+               _scrollHandler: null,
+               init() {
+                 this.$watch('open', value => {
+                   if (value) {
+                     this._triggerEl = this.$refs.trigger;
+                     this._menuEl = this.$refs.menu;
+                     this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+                     setTimeout(() => { this.updatePosition(); }, 0);
+                     window.addEventListener('scroll', this._scrollHandler, true);
+                     window.addEventListener('resize', this._scrollHandler, true);
+                   } else {
+                     if (this._scrollHandler) {
+                       window.removeEventListener('scroll', this._scrollHandler, true);
+                       window.removeEventListener('resize', this._scrollHandler, true);
+                     }
+                   }
+                 });
+               },
+               updatePosition() {
+                 const trigger = this._triggerEl;
+                 if (!trigger) return;
+                 const rect = trigger.getBoundingClientRect();
+                 this.top = rect.bottom + 4;
+                 const placement = 'bottom-end';
+                 const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+                 let rightPos = window.innerWidth - rect.right;
+                 if (window.innerWidth - rightPos < menuWidth) {
+                   this.left = rect.left;
+                   this.right = 'auto';
+                 } else {
+                   this.right = rightPos;
+                   this.left = 'auto';
+                 }
+               }
+             }" 
+             @keydown.escape.window="open = false" 
+             class="inline-flex relative">
+          <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+            <button type="button" class="flex justify-between items-center gap-x-2 bg-white border border-slate-200 text-slate-700 py-1.5 px-3 rounded-md shadow-sm text-sm hover:bg-slate-50 focus:outline-hidden min-w-[130px] h-[38px]" aria-haspopup="menu" :aria-expanded="open.toString()">
+              <span>
+                Last 7 Days
+                All Time
+                Last 30 Days
+              </span>
+              <i data-lucide="chevron-down" class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+            </button>
+          </div>
+          <div x-show="open" x-ref="menu" x-cloak @click.outside="open = false" 
+               x-transition:enter="transition ease-out duration-100" 
+               x-transition:enter-start="opacity-0 scale-95" 
+               x-transition:enter-end="opacity-100 scale-100" 
+               x-transition:leave="transition ease-in duration-75" 
+               x-transition:leave-start="opacity-100 scale-100" 
+               x-transition:leave-end="opacity-0 scale-95" 
+               class="fixed z-[9999] w-48 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+               x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }" 
+               role="menu">
+            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=30&date=Sample Data&search=Sample Data&sort=Sample Data">
+              Last 30 Days
+            </a>
+            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=7&date=Sample Data&search=Sample Data&sort=Sample Data">
+              Last 7 Days
+            </a>
+            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=all&date=Sample Data&search=Sample Data&sort=Sample Data">
+              All Time
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <!-- Official Stats Card 1 -->
+    <div class="flex flex-col bg-white border border-surface-line shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+      <div class="p-4 md:p-5 flex justify-between gap-x-3">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-muted-foreground-1 dark:text-neutral-500">
+            Active Anomalies
+          </p>
+          <div class="mt-1 flex items-center gap-x-2">
+            <h3 class="text-xl sm:text-2xl font-medium text-foreground dark:text-neutral-200">
+              <span class="text-red-600 dark:text-red-500">12</span>
+            </h3>
+          </div>
+          <p class="mt-1 text-sm text-muted-foreground-1 dark:text-neutral-500">
+            Servers requiring immediate action
+          </p>
+        </div>
+        <div class="shrink-0 flex justify-center items-center size-[46px] bg-primary-100 text-primary rounded-full dark:bg-blue-900 dark:text-blue-200">
+          <i data-lucide="alert-triangle" class="size-5"></i>
+        </div>
+      </div>
+    </div>
+    <!-- Official Stats Card 2 -->
+    <div class="flex flex-col bg-white border border-surface-line shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+      <div class="p-4 md:p-5 flex justify-between gap-x-3">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-muted-foreground-1 dark:text-neutral-500">
+            Total Wasted Hours
+          </p>
+          <div class="mt-1 flex items-center gap-x-2">
+            <h3 class="text-xl sm:text-2xl font-medium text-foreground dark:text-neutral-200">
+              <span class="text-primary dark:text-blue-500">1,240 hrs</span>
+            </h3>
+          </div>
+          <p class="mt-1 text-sm text-muted-foreground-1 dark:text-neutral-500">
+            Across all organizations
+          </p>
+        </div>
+        <div class="shrink-0 flex justify-center items-center size-[46px] bg-primary-100 text-primary rounded-full dark:bg-blue-900 dark:text-blue-200">
+          <i data-lucide="clock" class="size-5"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <div class="p-5 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl lg:col-span-2">
+      <div class="flex justify-between">
+        <div>
+          <h2 class="inline-block font-medium text-gray-800 dark:text-neutral-200">
+            Wasted Hours
+          </h2>
+        </div>
+      </div>
+      <div id="hs-single-area-chart" class="min-h-[250px] mt-5"></div>
+    </div>
+    <div class="p-5 flex flex-col bg-card border border-card-line shadow-2xs rounded-xl">
+      <div class="flex flex-col gap-y-5">
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <div class="flex items-center space-x-3">
+              <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                Sample Data
+              </div>
+              <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">Sample Data</span>
+            </div>
+            <div class="flex items-center gap-x-4 text-sm text-gray-800 dark:text-neutral-200">
+              <span>Sample Data servers</span>
+              <span>Sample Data hours</span>
+            </div>
+          </div>
+          <div class="flex w-full h-4 bg-gray-200 dark:bg-neutral-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow="Sample Data" aria-valuemin="0" aria-valuemax="100">
+            <div class="flex flex-col justify-center rounded-full overflow-hidden bg-blue-600 text-[10px] text-white text-center whitespace-nowrap transition duration-500" style="width: Sample Data">Sample Data</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="flex flex-col bg-white dark:bg-neutral-800 border-y sm:border-y sm:border-x border-gray-200 dark:border-neutral-700 shadow-2xs rounded-none sm:rounded-xl">
+    <div class="p-6 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
+      <h2 class="text-slate-800 font-semibold">Active Anomalies</h2>
+      <form method="GET" class="flex items-center space-x-3">
+        <input type="hidden" name="date" value="Sample Data">
+        <input type="hidden" name="period" value="Sample Data">
+        <input type="text" name="search" value="Sample Data" placeholder="Search by UUID..." class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <div class="relative flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 absolute left-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          </svg>
+          <select name="sort" onchange="this.form.submit()" class="text-sm border border-slate-200 rounded-md pl-8 pr-8 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
+            <option value="newest" selected>Newest First</option>
+            <option value="oldest" selected>Oldest First</option>
+            <option value="wasted" selected>Most Wasted Hours</option>
+          </select>
+          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 [&_tbody_tr:hover]:bg-gray-50 dark:[&_tbody_tr:hover]:bg-neutral-800/50">
+      <div class="min-w-full inline-block align-middle">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+          <thead class="bg-gray-50 dark:bg-neutral-800">
+            <tr class="border-t border-gray-200 dark:border-neutral-700">
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Stream ID</th>
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Organization</th>
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Wasted Hours</th>
+              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Latest Error Log</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+          <tr class="hover:bg-slate-50/50 transition">
+            <td class="px-6 py-4 font-mono text-xs text-slate-800">Sample Data</td>
+            <td class="px-6 py-4">Sample Data</td>
+            <td class="px-6 py-4 font-semibold text-red-600">Sample Data</td>
+            <td class="px-6 py-4 text-xs text-slate-500 max-w-xs">
+                <a href="Sample Data#" class="text-blue-600 hover:underline block truncate" title="View Full Logs">
+                  Sample Data
+                </a>
+                <span class="italic">No error log</span>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="4" class="px-6 py-8">
+              <div class="p-5 flex flex-col justify-center items-center text-center">
+                <div class="max-w-md mx-auto">
+                  <div class="inline-flex size-8 items-center justify-center rounded-full bg-surface border border-surface-line text-surface-foreground">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+                  </div>
+                  <p class="mt-3 font-medium text-foreground">
+                    No anomalies found
+                  </p>
+                  <p class="mt-1 text-sm text-muted-foreground-1">
+                    Try adjusting your search or filters to find more anomalies
+                  </p>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+    <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-sm text-slate-500">
+      <div>
+        Showing Sample Data to Sample Data of Sample Data results
+      </div>
+      <form method="GET" class="flex items-center">
+        <input type="hidden" name="date" value="Sample Data">
+        <input type="hidden" name="period" value="Sample Data">
+        <input type="hidden" name="search" value="Sample Data">
+        <input type="hidden" name="sort" value="Sample Data">
+      </form>
+    </div>
+  </div>
+</div>
+Sample Data
+Sample Data
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preline/dist/helper-shared.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preline/dist/helper-apexcharts.js"></script>
+<script>
+  window.addEventListener('load', () => {
+    let chartDates = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
+    let chartData = [10, 20, 15, 25, 30];
+    try {
+        const datesText = document.getElementById('chart-dates-data').textContent.trim();
+        const hoursText = document.getElementById('chart-wasted-hours-data').textContent.trim();
+        if (datesText && datesText !== "" && !datesText.includes("{" + "{")) chartDates = JSON.parse(datesText);
+        if (hoursText && hoursText !== "" && !hoursText.includes("{" + "{")) chartData = JSON.parse(hoursText);
+    } catch (e) {
+        console.warn("Could not parse dynamic chart data");
+    }
+    // Apex Total Sales Chart
+    (function () {
+      buildChart('#hs-single-area-chart', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'area',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Wasted Hours',
+            data: chartData
+          }
+        ],
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'smooth',
+          width: 2
+        },
+        fill: {
+          type: 'gradient',
+          gradient: {
+            type: 'vertical',
+            shadeIntensity: 1,
+            opacityFrom: 0.2,
+            opacityTo: 0.8
+          }
+        },
+        xaxis: {
+          type: 'category',
+          tickPlacement: 'on',
+          categories: chartDates,
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          crosshairs: {
+            stroke: {
+              dashArray: 0
+            },
+            dropShadow: {
+              show: false
+            }
+          },
+          tooltip: {
+            enabled: false
+          },
+          labels: {
+            style: {
+              colors: '#94a3b8',
+              fontSize: '13px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 400
+            },
+            formatter: (title) => title
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#94a3b8',
+              fontSize: '12px',
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        tooltip: {
+          y: {
+            formatter: (value) => `${value >= 1000 ? `${value / 1000}k` : value} hrs`
+          }
+        },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: {
+              height: 200
+            },
+            labels: {
+              style: {
+                colors: '#94a3b8',
+                fontSize: '11px',
+                fontFamily: 'Inter, sans-serif',
+                fontWeight: 400
+              },
+              offsetX: -2,
+              formatter: (title) => title
+            },
+            yaxis: {
+              labels: {
+                align: 'left',
+                minWidth: 0,
+                maxWidth: 140,
+                style: {
+                  colors: '#94a3b8',
+                  fontSize: '11px',
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 400
+                },
+                formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+              }
+            }
+          },
+        }]
+      }), () => ({
+        colors: ['#2563eb'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e2e8f0'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+            }
+          }
+        }
+      }), () => ({
+        colors: ['#3b82f6'],
+        fill: {
+          gradient: {
+            shadeIntensity: .1,
+            opacityFrom: .5,
+            opacityTo: 0,
+            stops: [50, 100, 100, 100]
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#334155'
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+            }
+          }
+        }
+      }));
+    })();
+    // Initialize Lucide icons
+    lucide.createIcons();
+  });
+</script>
+
   </div>
 
    
