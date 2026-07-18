@@ -1,14 +1,23 @@
 ---
+slug: orphan-servers-analytics
+tags: testpress
 title: Orphan Servers Analytics Dashboard
+permalink: "/orphan-servers-analytics/"
 ---
-{% extends "src/_includes/layouts/admin_base.html" %}
+{% extends "src/testpress/layout/base.html" %}
 
 {% block extra_head %}
-{% include 'src/simba/helpers/apexcharts_style_dependencies.html' %}
-{% include 'src/ui-system/scripts/date_picker_script.html' %}
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preline/dist/helper-shared.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/preline/dist/helper-apexcharts.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.10.4/dist/cdn.min.js"></script>
 {% endblock extra_head %}
 
 {% block content %}
+{% from "src/ui-system/components/stats-card.html" import stats_card %}
+{% from "src/ui-system/components/dropdown.html" import dropdown %}
 
 
 <div class="max-w-7xl mx-auto min-h-screen bg-gray-50/50 p-8 font-sans">
@@ -19,133 +28,62 @@ title: Orphan Servers Analytics Dashboard
     </div>
     <div class="flex items-center space-x-3">
       <form method="GET" class="flex items-center space-x-3">
-        <input type="hidden" name="search" value="Sample Data">
-        <input type="hidden" name="sort" value="Sample Data">
-        {% include 'src/ui-system/components/date-picker.html' %}
-        <div x-data="{ 
-               open: false,
-               top: 0,
-               left: 'auto',
-               right: 'auto',
-               _triggerEl: null,
-               _menuEl: null,
-               _scrollHandler: null,
-               init() {
-                 this.$watch('open', value => {
-                   if (value) {
-                     this._triggerEl = this.$refs.trigger;
-                     this._menuEl = this.$refs.menu;
-                     this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
-                     setTimeout(() => { this.updatePosition(); }, 0);
-                     window.addEventListener('scroll', this._scrollHandler, true);
-                     window.addEventListener('resize', this._scrollHandler, true);
-                   } else {
-                     if (this._scrollHandler) {
-                       window.removeEventListener('scroll', this._scrollHandler, true);
-                       window.removeEventListener('resize', this._scrollHandler, true);
-                     }
-                   }
-                 });
-               },
-               updatePosition() {
-                 const trigger = this._triggerEl;
-                 if (!trigger) return;
-                 const rect = trigger.getBoundingClientRect();
-                 this.top = rect.bottom + 4;
-                 const placement = 'bottom-end';
-                 const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
-                 let rightPos = window.innerWidth - rect.right;
-                 if (window.innerWidth - rightPos < menuWidth) {
-                   this.left = rect.left;
-                   this.right = 'auto';
-                 } else {
-                   this.right = rightPos;
-                   this.left = 'auto';
-                 }
-               }
-             }" 
-             @keydown.escape.window="open = false" 
-             class="inline-flex relative">
-          <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
-            <button type="button" class="flex justify-between items-center gap-x-2 bg-white border border-slate-200 text-slate-700 py-1.5 px-3 rounded-md shadow-sm text-sm hover:bg-slate-50 focus:outline-hidden min-w-[130px] h-[38px]" aria-haspopup="menu" :aria-expanded="open.toString()">
-              <span>
-                Last 7 Days
-                All Time
-                Last 30 Days
-              </span>
-              <i data-lucide="chevron-down" class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
-            </button>
-          </div>
-          <div x-show="open" x-ref="menu" x-cloak @click.outside="open = false" 
-               x-transition:enter="transition ease-out duration-100" 
-               x-transition:enter-start="opacity-0 scale-95" 
-               x-transition:enter-end="opacity-100 scale-100" 
-               x-transition:leave="transition ease-in duration-75" 
-               x-transition:leave-start="opacity-100 scale-100" 
-               x-transition:leave-end="opacity-0 scale-95" 
-               class="fixed z-[9999] w-48 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
-               x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }" 
-               role="menu">
-            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=30&date=Sample Data&search=Sample Data&sort=Sample Data">
-              Last 30 Days
-            </a>
-            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=7&date=Sample Data&search=Sample Data&sort=Sample Data">
-              Last 7 Days
-            </a>
-            <a class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 bg-gray-100" href="?period=all&date=Sample Data&search=Sample Data&sort=Sample Data">
-              All Time
-            </a>
-          </div>
-        </div>
+        
+        <input type="hidden" name="search" value="">
+        
+        
+        <input type="hidden" name="sort" value="">
+        
+
+
+        {% set name = "date" %} {% set placeholder = "Select date" %}         {% set selected_value = "request.GET.date" %} 
+{% include "src/ui-system/components/date-picker.html" %}
+
+
+        {% set period_trigger %}
+<button type="button" class="flex justify-between items-center gap-x-2 bg-white border border-slate-200 text-slate-700 py-1.5 px-3 rounded-md shadow-sm text-sm hover:bg-slate-50 min-w-[130px] h-[38px]">
+  All Time
+  <i data-lucide="chevron-down" class="shrink-0 size-4"></i>
+</button>
+{% endset %}
+
+{{ dropdown(
+  trigger=period_trigger,
+  items=[
+    {"label": "All Time", "url": "?period=all"},
+    {"label": "Last 7 Days", "url": "?period=7"},
+    {"label": "Last 30 Days", "url": "?period=30"}
+  ],
+  placement="bottom-end",
+  width="small"
+) }}
+
       </form>
     </div>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    <!-- Official Stats Card 1 -->
-    <div class="flex flex-col bg-white border border-surface-line shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
-      <div class="p-4 md:p-5 flex justify-between gap-x-3">
-        <div>
-          <p class="text-xs uppercase tracking-wide text-muted-foreground-1 dark:text-neutral-500">
-            Active Anomalies
-          </p>
-          <div class="mt-1 flex items-center gap-x-2">
-            <h3 class="text-xl sm:text-2xl font-medium text-foreground dark:text-neutral-200">
-              <span class="text-red-600 dark:text-red-500">12</span>
-            </h3>
-          </div>
-          <p class="mt-1 text-sm text-muted-foreground-1 dark:text-neutral-500">
-            Servers requiring immediate action
-          </p>
-        </div>
-        <div class="shrink-0 flex justify-center items-center size-[46px] bg-primary-100 text-primary rounded-full dark:bg-blue-900 dark:text-blue-200">
-          <i data-lucide="alert-triangle" class="size-5"></i>
-        </div>
-      </div>
-    </div>
-    <!-- Official Stats Card 2 -->
-    <div class="flex flex-col bg-white border border-surface-line shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
-      <div class="p-4 md:p-5 flex justify-between gap-x-3">
-        <div>
-          <p class="text-xs uppercase tracking-wide text-muted-foreground-1 dark:text-neutral-500">
-            Total Wasted Hours
-          </p>
-          <div class="mt-1 flex items-center gap-x-2">
-            <h3 class="text-xl sm:text-2xl font-medium text-foreground dark:text-neutral-200">
-              <span class="text-primary dark:text-blue-500">1,240 hrs</span>
-            </h3>
-          </div>
-          <p class="mt-1 text-sm text-muted-foreground-1 dark:text-neutral-500">
-            Across all organizations
-          </p>
-        </div>
-        <div class="shrink-0 flex justify-center items-center size-[46px] bg-primary-100 text-primary rounded-full dark:bg-blue-900 dark:text-blue-200">
-          <i data-lucide="clock" class="size-5"></i>
-        </div>
-      </div>
-    </div>
+
+    {{ stats_card(
+  title="Active Anomalies",
+  value='<span class="text-red-600 dark:text-red-500">3</span>',
+  description="Servers requiring immediate action",
+  icon="alert-triangle"
+) }}
+
+
+    
+    {{ stats_card(
+  title="Total Wasted Hours",
+  value='<span class="text-blue-600 dark:text-blue-500">142 hrs</span>',
+  description="Across all organizations",
+  icon="clock"
+) }}
+    
   </div>
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-    <div class="p-5 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl lg:col-span-2">
+    <div
+      class="p-5 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl lg:col-span-2">
+
       <div class="flex justify-between">
         <div>
           <h2 class="inline-block font-medium text-gray-800 dark:text-neutral-200">
@@ -153,126 +91,195 @@ title: Orphan Servers Analytics Dashboard
           </h2>
         </div>
       </div>
+
+
+
       <div id="hs-single-area-chart" class="min-h-[250px] mt-5"></div>
     </div>
     <div class="p-5 flex flex-col bg-card border border-card-line shadow-2xs rounded-xl">
       <div class="flex flex-col gap-y-5">
+        
+{% set top_organizations = [
+  {"name": "Acme Corp", "code": "AC", "color_class": "bg-blue-100 text-blue-600", "percentage": "43.7%", "servers_count": 14, "wasted_hours": 62},
+  {"name": "TechNova Solutions", "code": "TE", "color_class": "bg-blue-100 text-blue-600", "percentage": "23.9%", "servers_count": 8, "wasted_hours": 34},
+  {"name": "CloudMatrix", "code": "CL", "color_class": "bg-blue-100 text-blue-600", "percentage": "14.8%", "servers_count": 5, "wasted_hours": 21},
+  {"name": "DataSprint", "code": "DA", "color_class": "bg-blue-100 text-blue-600", "percentage": "10.6%", "servers_count": 4, "wasted_hours": 15},
+  {"name": "Innovatech Labs", "code": "IN", "color_class": "bg-blue-100 text-blue-600", "percentage": "7.0%", "servers_count": 2, "wasted_hours": 10}
+] %}
+{% for org in top_organizations %}
+
         <div>
           <div class="flex justify-between items-center mb-2">
             <div class="flex items-center space-x-3">
-              <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
-                Sample Data
+              <div
+                class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs">
+                {{ org.code }}
               </div>
-              <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">Sample Data</span>
+              <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ org.name }}</span>
             </div>
             <div class="flex items-center gap-x-4 text-sm text-gray-800 dark:text-neutral-200">
-              <span>Sample Data servers</span>
-              <span>Sample Data hours</span>
+              <span>{{ org.servers_count }} servers</span>
+              <span>{{ org.wasted_hours }} hours</span>
             </div>
           </div>
-          <div class="flex w-full h-4 bg-gray-200 dark:bg-neutral-700 rounded-full overflow-hidden" role="progressbar" aria-valuenow="Sample Data" aria-valuemin="0" aria-valuemax="100">
-            <div class="flex flex-col justify-center rounded-full overflow-hidden bg-blue-600 text-[10px] text-white text-center whitespace-nowrap transition duration-500" style="width: Sample Data">Sample Data</div>
+          <div class="flex w-full h-4 bg-gray-200 dark:bg-neutral-700 rounded-full overflow-hidden" role="progressbar"
+            aria-valuenow="{{ org.percentage | replace("%", "") }}" aria-valuemin="0" aria-valuemax="100">
+            <div
+              class="flex flex-col justify-center rounded-full overflow-hidden bg-blue-600 dark:bg-blue-500 text-[10px] text-white text-center whitespace-nowrap transition duration-500"
+              style="width: {{ org.percentage }}">{{ org.percentage }}</div>
           </div>
         </div>
+        {% endfor %}
       </div>
     </div>
   </div>
-  <div class="flex flex-col bg-white dark:bg-neutral-800 border-y sm:border-y sm:border-x border-gray-200 dark:border-neutral-700 shadow-2xs rounded-none sm:rounded-xl">
+  <div
+    class="flex flex-col bg-white dark:bg-neutral-800 border-y sm:border-y sm:border-x border-gray-200 dark:border-neutral-700 shadow-2xs rounded-none sm:rounded-xl">
     <div class="p-6 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
       <h2 class="text-slate-800 font-semibold">Active Anomalies</h2>
       <form method="GET" class="flex items-center space-x-3">
-        <input type="hidden" name="date" value="Sample Data">
-        <input type="hidden" name="period" value="Sample Data">
-        <input type="text" name="search" value="Sample Data" placeholder="Search by UUID..." class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
+        
+        <input type="hidden" name="date" value="">
+        
+        
+        <input type="hidden" name="period" value="">
+        
+        <input type="text" name="search" value="" placeholder="Search by UUID..."
+          class="text-sm border border-slate-200 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500">
         <div class="relative flex items-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 absolute left-2.5 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 absolute left-2.5 pointer-events-none"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
           </svg>
-          <select name="sort" onchange="this.form.submit()" class="text-sm border border-slate-200 rounded-md pl-8 pr-8 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
-            <option value="newest" selected>Newest First</option>
+          <select name="sort" onchange="this.form.submit()"
+            class="text-sm border border-slate-200 rounded-md pl-8 pr-8 py-1.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none">
+            <option value="newest" selected>Newest
+              First</option>
             <option value="oldest" selected>Oldest First</option>
             <option value="wasted" selected>Most Wasted Hours</option>
           </select>
           <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+              <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+            </svg>
           </div>
         </div>
       </form>
     </div>
-    <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 [&_tbody_tr:hover]:bg-gray-50 dark:[&_tbody_tr:hover]:bg-neutral-800/50">
+
+    <div
+      class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 [&_tbody_tr:hover]:bg-gray-50 dark:[&_tbody_tr:hover]:bg-neutral-800/50">
       <div class="min-w-full inline-block align-middle">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
           <thead class="bg-gray-50 dark:bg-neutral-800">
             <tr class="border-t border-gray-200 dark:border-neutral-700">
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Stream ID</th>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Organization</th>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Wasted Hours</th>
-              <th scope="col" class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Latest Error Log</th>
+              <th scope="col"
+                class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Stream ID
+              </th>
+              <th scope="col"
+                class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">
+                Organization</th>
+              <th scope="col"
+                class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Wasted
+                Hours</th>
+              <th scope="col"
+                class="px-6 py-3 text-start text-xs font-medium text-gray-500 uppercase dark:text-neutral-500">Latest
+                Error Log</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
-          <tr class="hover:bg-slate-50/50 transition">
-            <td class="px-6 py-4 font-mono text-xs text-slate-800">Sample Data</td>
-            <td class="px-6 py-4">Sample Data</td>
-            <td class="px-6 py-4 font-semibold text-red-600">Sample Data</td>
-            <td class="px-6 py-4 text-xs text-slate-500 max-w-xs">
-                <a href="Sample Data#" class="text-blue-600 hover:underline block truncate" title="View Full Logs">
-                  Sample Data
+            
+{% set page_obj = [
+  {"server_id": "i-09f8e7d6c5b4a3...", "organization": "Acme Corp", "wasted_hours": 24, "latest_error_log": "Connection timeout during backup"},
+  {"server_id": "i-1a2b3c4d5e6f7g...", "organization": "TechNova Solutions", "wasted_hours": 18, "latest_error_log": "Disk space critical"},
+  {"server_id": "i-8h7g6f5e4d3c2b...", "organization": "CloudMatrix", "wasted_hours": 12, "latest_error_log": "High CPU utilization"}
+] %}
+{% for stream in page_obj %}
+
+            <tr class="hover:bg-slate-50/50 transition">
+              <td class="px-6 py-4 font-mono text-xs text-slate-800">{{ stream.uuid }}</td>
+              <td class="px-6 py-4">{{ stream.organization.name }}</td>
+              <td class="px-6 py-4 font-semibold text-red-600">{{ stream.wasted_hours }}</td>
+              <td class="px-6 py-4 text-xs text-slate-500 max-w-xs">
+                
+                <a href="{{ stream.log_url }}#"
+                  class="text-blue-600 hover:underline block truncate" title="View Full Logs">
+                  {{ stream.latest_error_log }}
                 </a>
+                
                 <span class="italic">No error log</span>
-            </td>
-          </tr>
-          <tr>
-            <td colspan="4" class="px-6 py-8">
-              <div class="p-5 flex flex-col justify-center items-center text-center">
-                <div class="max-w-md mx-auto">
-                  <div class="inline-flex size-8 items-center justify-center rounded-full bg-surface border border-surface-line text-surface-foreground">
-                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+                
+              </td>
+            </tr>
+            
+            <tr>
+              <td colspan="4" class="px-6 py-8">
+
+                <div class="p-5 flex flex-col justify-center items-center text-center">
+                  <div class="max-w-md mx-auto">
+                    <div
+                      class="inline-flex size-8 items-center justify-center rounded-full bg-surface border border-surface-line text-surface-foreground">
+                      <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="m21 21-4.34-4.34" />
+                        <circle cx="11" cy="11" r="8" />
+                      </svg>
+                    </div>
+                    <p class="mt-3 font-medium text-foreground">
+                      No anomalies found
+                    </p>
+                    <p class="mt-1 text-sm text-muted-foreground-1">
+                      Try adjusting your search or filters to find more anomalies
+                    </p>
                   </div>
-                  <p class="mt-3 font-medium text-foreground">
-                    No anomalies found
-                  </p>
-                  <p class="mt-1 text-sm text-muted-foreground-1">
-                    Try adjusting your search or filters to find more anomalies
-                  </p>
                 </div>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
     <div class="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between text-sm text-slate-500">
       <div>
-        Showing Sample Data to Sample Data of Sample Data results
+        Showing 1 to 3 of 3 results
       </div>
       <form method="GET" class="flex items-center">
-        <input type="hidden" name="date" value="Sample Data">
-        <input type="hidden" name="period" value="Sample Data">
-        <input type="hidden" name="search" value="Sample Data">
-        <input type="hidden" name="sort" value="Sample Data">
+        <input type="hidden" name="date" value="">
+        <input type="hidden" name="period" value="">
+        <input type="hidden" name="search" value="">
+        <input type="hidden" name="sort" value="">
+
+        {% include "src/ui-system/components/pagination.html" %}
       </form>
     </div>
   </div>
 </div>
-Sample Data
-Sample Data
+
+<script id="chart-dates-data" type="application/json">["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04", "2023-01-05"]</script>
+<script id="chart-wasted-hours-data" type="application/json">[12, 15, 14, 18, 10]</script>
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/preline/dist/helper-shared.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script src="https://cdn.jsdelivr.net/npm/preline/dist/helper-apexcharts.js"></script>
+
 <script>
   window.addEventListener('load', () => {
     let chartDates = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
     let chartData = [10, 20, 15, 25, 30];
+
     try {
-        const datesText = document.getElementById('chart-dates-data').textContent.trim();
-        const hoursText = document.getElementById('chart-wasted-hours-data').textContent.trim();
-        if (datesText && datesText !== "" && !datesText.includes("{" + "{")) chartDates = JSON.parse(datesText);
-        if (hoursText && hoursText !== "" && !hoursText.includes("{" + "{")) chartData = JSON.parse(hoursText);
+      const datesText = document.getElementById('chart-dates-data').textContent.trim();
+      const hoursText = document.getElementById('chart-wasted-hours-data').textContent.trim();
+      if (datesText && datesText !== "" && !datesText.includes("{" + "{")) chartDates = JSON.parse(datesText);
+      if (hoursText && hoursText !== "" && !hoursText.includes("{" + "{")) chartData = JSON.parse(hoursText);
     } catch (e) {
-        console.warn("Could not parse dynamic chart data");
+      console.warn("Could not parse dynamic chart data");
     }
+
     // Apex Total Sales Chart
     (function () {
       buildChart('#hs-single-area-chart', (mode) => ({
@@ -451,9 +458,17 @@ Sample Data
         }
       }));
     })();
+
     // Initialize Lucide icons
     lucide.createIcons();
   });
 </script>
 {% endblock content %}
-
+{% block extra_script %}
+<script>
+  window.addEventListener('load', () => {
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+    if (window.HSStaticMethods) window.HSStaticMethods.autoInit();
+  });
+</script>
+{% endblock %}
