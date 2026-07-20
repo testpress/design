@@ -11,12 +11,29 @@
 <div x-data="{
     folderId: null,
     folderName: '',
-    folderPath: ''
+    folderPath: '',
+    visibility: 'restricted',
+    hasChanges: false,
+    staffToRemove: null,
+    staff: [
+        { id: 1, name: 'Sarah Johnson', email: 'sarah.j@example.com', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80', role: 'editor' },
+        { id: 2, name: 'Michael Chen', email: 'michael.c@example.com', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80', role: 'viewer' }
+    ],
+    removeStaff() {
+        if (this.staffToRemove) {
+            this.staff = this.staff.filter(s => s.id !== this.staffToRemove.id);
+            this.staffToRemove = null;
+        }
+    },
+    init() {
+        this.$watch('visibility', () => this.hasChanges = true);
+    }
 }" @open-drawer-folder-permissions.window="
     folderId = $event.detail.folderId;
     folderName = $event.detail.folderName || 'Folder';
-    // Use the folder name as the subtitle path with bold styling
-    folderPath = `Manage who can access <span class="font-semibold text-gray-800 dark:text-neutral-200">&quot;${folderName}&quot;</span>`;
+    folderPath = folderName;
+    visibility = 'restricted';
+    hasChanges = false;
 ">
 
 {% call drawer(
@@ -25,15 +42,128 @@
     subtitle="<span x-text='folderPath'></span>", 
     placement="right", 
     size="lg", 
-    extra_classes="bg-gray-50 dark:bg-neutral-900"
+    extra_classes="bg-gray-50 dark:bg-neutral-900 flex flex-col"
 ) %}
 
 <div class="flex-1 overflow-y-auto bg-gray-50 dark:bg-neutral-900/50 relative">
   <div class="p-6 space-y-6">
-    <p class="text-sm text-gray-500">Permissions content goes here...</p>
+    
+    <!-- Visibility Section -->
+    <div class="bg-white rounded-xl border border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-200 dark:border-neutral-700">
+        <h4 class="font-semibold text-gray-800 dark:text-neutral-200">Visibility</h4>
+      </div>
+      <div class="p-5 grid sm:grid-cols-2 gap-4">
+        <!-- Public Radio -->
+        {{ radio(
+            name="visibility",
+            value="public",
+            label="Public",
+            description="Accessible to all staff members.",
+            x_model="visibility",
+            variant="card"
+        ) }}
+    
+        <!-- Restricted Radio -->
+        {{ radio(
+            name="visibility",
+            value="restricted",
+            label="Restricted",
+            description="Accessible only to selected staff members.",
+            x_model="visibility",
+            variant="card"
+        ) }}
+      </div>
+    </div>
+
+    <!-- Staff with Access Section -->
+    <div x-show="visibility === 'restricted'" x-collapse class="bg-white rounded-xl border border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-200 dark:border-neutral-700 sm:flex sm:items-center sm:justify-between gap-4">
+        <div>
+          <h4 class="font-semibold text-gray-800 dark:text-neutral-200">Staff with access</h4>
+        </div>
+      </div>
+      <div class="p-5">
+        
+        <div x-show="staff.length === 0">
+          {{ empty_state(
+              title="No staff members have access yet",
+              description="Add staff members to give them access to this folder.",
+              icon="users",
+              compact=true,
+              wrap_card=false
+          ) }}
+        </div>
+    
+        <!-- Staff List -->
+        <div x-show="staff.length > 0">
+          <div class="space-y-3">
+            <template x-for="member in staff" :key="member.id">
+            <div class="flex flex-col border border-gray-200 rounded-xl dark:border-neutral-700">
+              <div class="flex items-center justify-between p-4">
+                <div class="flex items-center gap-3">
+                  <img :src="member.avatar" alt="Avatar" class="size-10 rounded-full">
+                  <div>
+                    <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="member.name"></p>
+                    <p class="text-sm text-gray-500 dark:text-neutral-500" x-text="member.email"></p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                   <!-- Role Dropdown inline -->
+                   {% set role_trigger %}
+                     <button type="button" class="inline-flex items-center gap-x-1 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-neutral-300 dark:hover:text-neutral-100 focus:outline-hidden rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors">
+                       <span x-text="member.role === 'editor' ? 'Editor' : 'Viewer'"></span>
+                       <i data-lucide="chevron-down" class="size-4 text-gray-500"></i>
+                     </button>
+                   {% endset %}
+                   
+                   {{ dropdown(
+                       trigger=role_trigger,
+                       placement="bottom-end",
+                       width="large",
+                       items=[
+                           { label: "Viewer", description: "Can view and use materials, but can't make changes.", x_on: "@click=\"member.role = 'viewer'; open = false\"" },
+                           { label: "Editor", description: "Can upload, edit, move, and delete materials.", x_on: "@click=\"member.role = 'editor'; open = false\"" }
+                       ]
+                   ) }}
+                   
+                   {% call dropdown(trigger="ellipsis-vertical", placement="bottom-end", width="auto", extra_classes="ml-1") %}
+                     <button type="button" @click="staffToRemove = member; $dispatch('open-modal-remove-access'); open = false" class="w-full flex items-center gap-2 px-3 py-1.5 text-[13px] text-red-600 hover:bg-red-50 focus:bg-red-50 focus:outline-hidden dark:text-red-500 dark:hover:bg-red-500/10 dark:focus:bg-red-500/10">
+                       <i data-lucide="trash-2" class="size-4"></i> Remove Access
+                     </button>
+                   {% endcall %}
+                </div>
+              </div>
+            </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 </div>
 
+<div class="p-4 border-t border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 flex justify-end gap-3 shrink-0">
+    {{ button(text="Cancel", variant="secondary", extra_attrs="@click=\"open = false\"") }}
+    {{ button(text="Save Changes", variant="primary", extra_attrs=":disabled=\"!hasChanges\"", extra_classes="disabled:opacity-50 disabled:cursor-not-allowed") }}
+</div>
+
+{% endcall %}
+
+<!-- Remove Access Modal -->
+{% call modal(
+    id="remove-access",
+    title="Remove access?",
+    variant="danger",
+    confirm_text="Remove",
+    cancel_text="Cancel",
+    confirm_attrs="@click=\"removeStaff(); $dispatch('close-modal-remove-access')\""
+) %}
+  <p class="text-sm text-gray-500 dark:text-neutral-400">
+    <span x-text="staffToRemove?.name" class="font-semibold text-gray-800 dark:text-neutral-200"></span> will no longer be able to access this folder unless permission is inherited from a parent folder.
+  </p>
 {% endcall %}
 
 </div>
