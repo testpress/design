@@ -8,6 +8,53 @@ document.addEventListener('alpine:init', () => {
         selected: config.multiple ? (config.selectedValue ? String(config.selectedValue).split(',') : []) : String(config.selectedValue || ''),
         searchQuery: '',
         
+        top: 'auto',
+        bottom: 'auto',
+        left: 0,
+        width: 0,
+        placement: 'bottom',
+        
+        init() {
+            this.$el.addEventListener('set-selected-values', (e) => {
+                this.selected = Array.isArray(e.detail) ? e.detail.map(String) : [String(e.detail)];
+            });
+            this.$watch('open', value => {
+                if (value) {
+                    this.$nextTick(() => this.updatePosition());
+                }
+            });
+        },
+
+        updatePosition() {
+            const toggle = this.$refs.toggle;
+            const dropdown = this.$refs.dropdown;
+            if (!toggle || !dropdown) return;
+            
+            const r = toggle.getBoundingClientRect();
+            
+            // Measure dimensions
+            const wasHidden = dropdown.style.display === 'none' || getComputedStyle(dropdown).display === 'none';
+            if (wasHidden) dropdown.style.setProperty('display', 'block', 'important');
+            const dropH = dropdown.offsetHeight || 280;
+            if (wasHidden) dropdown.style.removeProperty('display');
+            
+            const gap = 4;
+            // Check available space below
+            const spaceBelow = window.innerHeight - r.bottom;
+            if (spaceBelow < dropH + gap && r.top > dropH + gap) {
+                this.placement = 'top';
+                this.top = 'auto';
+                this.bottom = window.innerHeight - r.top + gap;
+            } else {
+                this.placement = 'bottom';
+                this.top = r.bottom + gap;
+                this.bottom = 'auto';
+            }
+            
+            this.left = r.left;
+            this.width = r.width;
+        },
+        
         get filteredOptions() {
             if (!this.searchQuery) return this.options;
             return this.options.filter(opt => opt.label.toLowerCase().includes(this.searchQuery.toLowerCase()));

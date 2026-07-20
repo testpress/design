@@ -26,7 +26,9 @@
         selectedValue: '', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
 
@@ -56,9 +58,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     py-2 sm:py-2.5 px-3 pe-9">
              
             <!-- Multi Select Tags -->
@@ -99,13 +102,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -114,23 +119,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -147,9 +161,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -181,7 +200,9 @@
         selectedValue: '', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="country2" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -215,9 +236,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     py-2 sm:py-2.5 px-3 pe-9">
              
             <!-- Multi Select Tags -->
@@ -258,13 +280,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -273,23 +297,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -306,9 +339,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -340,7 +378,9 @@
         selectedValue: 'JP', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="country3" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -374,9 +414,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     py-2 sm:py-2.5 px-3 pe-9">
              
             <!-- Multi Select Tags -->
@@ -417,13 +458,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -432,23 +475,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -465,9 +517,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -499,7 +556,9 @@
         selectedValue: '', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="country4" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -533,9 +592,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     py-2 sm:py-2.5 px-3 pe-9">
              
             <!-- Multi Select Tags -->
@@ -576,13 +636,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -591,23 +653,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -624,9 +695,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -658,7 +734,9 @@
         selectedValue: 'US', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="country5" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -692,9 +770,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click=""
+        <div x-ref="toggle"
+             @click=""
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer opacity-50 pointer-events-none bg-gray-50 dark:bg-neutral-800
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     py-2 sm:py-2.5 px-3 pe-9">
              
             <!-- Multi Select Tags -->
@@ -735,13 +814,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -750,23 +831,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -783,9 +873,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -817,7 +912,9 @@
         selectedValue: '', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="country6" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -851,7 +948,8 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
                     border-red-500 dark:border-red-500 focus-within:border-red-500 dark:focus-within:border-red-500 focus-within:ring-red-500 dark:focus-within:ring-red-500
                     py-2 sm:py-2.5 px-3 pe-9">
@@ -894,13 +992,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -909,23 +1009,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -942,9 +1051,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -979,7 +1093,9 @@
         selectedValue: 'US,UK', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="countries" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -1013,9 +1129,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     ps-1 pe-9 min-h-[42px] flex-wrap">
              
             <!-- Multi Select Tags -->
@@ -1056,13 +1173,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -1071,23 +1190,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -1104,9 +1232,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -1140,7 +1273,9 @@
         selectedValue: '', 
         options: [{&quot;label&quot;:&quot;United States&quot;,&quot;value&quot;:&quot;US&quot;},{&quot;label&quot;:&quot;United Kingdom&quot;,&quot;value&quot;:&quot;UK&quot;},{&quot;label&quot;:&quot;Canada&quot;,&quot;value&quot;:&quot;CA&quot;},{&quot;label&quot;:&quot;Australia&quot;,&quot;value&quot;:&quot;AU&quot;},{&quot;label&quot;:&quot;Germany&quot;,&quot;value&quot;:&quot;DE&quot;},{&quot;label&quot;:&quot;France&quot;,&quot;value&quot;:&quot;FR&quot;},{&quot;label&quot;:&quot;Japan&quot;,&quot;value&quot;:&quot;JP&quot;},{&quot;label&quot;:&quot;Brazil&quot;,&quot;value&quot;:&quot;BR&quot;},{&quot;label&quot;:&quot;India&quot;,&quot;value&quot;:&quot;IN&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="countries_search" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -1174,9 +1309,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     ps-1 pe-9 min-h-[42px] flex-wrap">
              
             <!-- Multi Select Tags -->
@@ -1217,13 +1353,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -1232,23 +1370,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -1265,9 +1412,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -1300,7 +1452,9 @@
         selectedValue: '1', 
         options: [{&quot;label&quot;:&quot;Christina&quot;,&quot;value&quot;:&quot;1&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1531927557220-a9e23c1e4794?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;Christina&#39;&gt;&quot;},{&quot;label&quot;:&quot;David&quot;,&quot;value&quot;:&quot;2&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;David&#39;&gt;&quot;},{&quot;label&quot;:&quot;Alex&quot;,&quot;value&quot;:&quot;3&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;Alex&#39;&gt;&quot;},{&quot;label&quot;:&quot;Samia&quot;,&quot;value&quot;:&quot;4&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;Samia&#39;&gt;&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="user_single" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -1324,9 +1478,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     py-2 sm:py-2.5 px-3 pe-9">
              
             <!-- Multi Select Tags -->
@@ -1367,13 +1522,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -1382,23 +1539,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -1415,9 +1581,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
@@ -1450,7 +1621,9 @@
         selectedValue: '1,4', 
         options: [{&quot;label&quot;:&quot;Christina&quot;,&quot;value&quot;:&quot;1&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1531927557220-a9e23c1e4794?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;Christina&#39;&gt;&quot;},{&quot;label&quot;:&quot;David&quot;,&quot;value&quot;:&quot;2&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;David&#39;&gt;&quot;},{&quot;label&quot;:&quot;Alex&quot;,&quot;value&quot;:&quot;3&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;Alex&#39;&gt;&quot;},{&quot;label&quot;:&quot;Samia&quot;,&quot;value&quot;:&quot;4&quot;,&quot;icon&quot;:&quot;&lt;img src=&#39;https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?auto=format&amp;fit=facearea&amp;facepad=2&amp;w=300&amp;h=300&amp;q=80&#39; alt=&#39;Samia&#39;&gt;&quot;}] 
      })"
-     @click.outside="open = false">
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
 
     
     <label for="team" class="block text-sm font-medium text-gray-800 dark:text-white">
@@ -1474,9 +1647,10 @@
         </select>
 
         <!-- Custom Select Toggle -->
-        <div @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
+        <div x-ref="toggle"
+             @click="open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() })"
              class="relative flex items-center w-full bg-white dark:bg-neutral-800 border rounded-lg text-sm text-gray-800 dark:text-white focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer hover:bg-gray-50 dark:hover:bg-neutral-700
-                    border-gray-200 dark:border-neutral-700 focus-within:border-blue-700 dark:focus-within:border-blue-600 focus-within:ring-blue-700 dark:focus-within:ring-blue-600
+                    border-gray-200 dark:border-neutral-700 focus-within:border-primary-700 dark:focus-within:border-primary-600 focus-within:ring-primary-700 dark:focus-within:ring-primary-600
                     ps-1 pe-9 min-h-[42px] flex-wrap">
              
             <!-- Multi Select Tags -->
@@ -1517,13 +1691,15 @@
 
         <!-- Dropdown Menu -->
         <div x-show="open" x-cloak 
+             x-ref="dropdown"
              x-transition:enter="transition ease-out duration-100"
              x-transition:enter-start="opacity-0 scale-95"
              x-transition:enter-end="opacity-100 scale-100"
              x-transition:leave="transition ease-in duration-75"
              x-transition:leave-start="opacity-100 scale-100"
              x-transition:leave-end="opacity-0 scale-95"
-             class="absolute z-50 w-full mt-2 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-hidden overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
              
             <!-- Search Input -->
             <template x-if="searchable">
@@ -1532,23 +1708,32 @@
 <div class="w-full">
   
 
-  <div class="relative w-full">
+  <div class="relative w-full" x-data="{ inputValue: '' }">
     
-      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
-        <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
-      </div>
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
     
+    
+    
+    
+      
+    
+
     <input type="text" 
            id="select_search" 
            name="select_search"
-           class="py-2 sm:py-2.5 px-3 ps-9 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-blue-700 dark:focus:border-blue-600 focus:z-10 focus:ring-blue-700 dark:focus:ring-blue-600 disabled:opacity-50 disabled:pointer-events-none  !bg-transparent"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  !bg-transparent"
            placeholder="Search..."
-           
            
            
            x-model="searchQuery"
            x-ref="searchInput"
            @click.stop>
+           
+    
   </div>
   
   
@@ -1565,9 +1750,14 @@
                         <template x-if="opt.icon">
                             <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
                         </template>
-                        <span x-text="opt.label"></span>
+                        <div class="flex flex-col">
+                            <span x-text="opt.label"></span>
+                            <template x-if="opt.description">
+                                <span class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5" x-text="opt.description"></span>
+                            </template>
+                        </div>
                     </div>
-                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-blue-600 dark:text-blue-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
                 </div>
             </template>
             
