@@ -17,6 +17,9 @@ module.exports = {
       fontFamily: {
         sans: ['Inter var', ...defaultTheme.fontFamily.sans],
       },
+      minHeight: {
+        '100': '25rem',
+      },
       colors: {
         primary: {
           50: 'rgb(var(--color-primary-50) / <alpha-value>)',
