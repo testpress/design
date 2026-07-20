@@ -1,0 +1,223 @@
+{% from "../../../ui-system/components/drawer.html" import drawer %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/select.html" import select %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+
+<div x-data="{
+    folderId: null,
+    folderName: '',
+    folderPath: '',
+    visibility: 'restricted',
+    hasChanges: false,
+    staffToRemove: null,
+    staff: [
+        { id: 1, name: 'Sarah Johnson', email: 'sarah.j@example.com', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80', role: 'editor' },
+        { id: 2, name: 'Michael Chen', email: 'michael.c@example.com', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80', role: 'viewer' }
+    ],
+    availableStaff: [
+        { id: 1, name: 'Sarah Johnson', email: 'sarah.j@example.com', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80' },
+        { id: 2, name: 'Michael Chen', email: 'michael.c@example.com', avatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80' },
+        { id: 3, name: 'Ravi Kumar', email: 'ravi.k@example.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80' },
+        { id: 4, name: 'Priya Sharma', email: 'priya.s@example.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80' },
+        { id: 5, name: 'Arun Kumar', email: 'arun.k@example.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80' }
+    ],
+    init() {
+        this.$watch('visibility', () => this.hasChanges = true);
+    }
+}" @open-drawer-folder-permissions.window="
+    folderId = $event.detail.folderId;
+    folderName = $event.detail.folderName || 'Folder';
+    folderPath = folderName;
+    visibility = 'restricted';
+    hasChanges = false;
+">
+
+{% call drawer(
+    id="folder-permissions", 
+    title="Permissions", 
+    subtitle="<span x-text='folderPath'></span>", 
+    placement="right", 
+    size="lg", 
+    extra_classes="bg-gray-50 dark:bg-neutral-900 flex flex-col"
+) %}
+
+<div class="flex-1 overflow-y-auto bg-gray-50 dark:bg-neutral-900/50 relative">
+  <div class="p-6 space-y-6">
+    
+    <!-- Visibility Section -->
+    <div class="bg-white rounded-xl border border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-200 dark:border-neutral-700">
+        <h4 class="font-semibold text-gray-800 dark:text-neutral-200">Visibility</h4>
+      </div>
+      <div class="p-5 grid sm:grid-cols-2 gap-4">
+        <!-- Public Radio -->
+        {{ radio(
+            name="visibility",
+            value="public",
+            label="Public",
+            description="Accessible to all staff members.",
+            x_model="visibility",
+            variant="card"
+        ) }}
+    
+        <!-- Restricted Radio -->
+        {{ radio(
+            name="visibility",
+            value="restricted",
+            label="Restricted",
+            description="Accessible only to selected staff members.",
+            x_model="visibility",
+            variant="card"
+        ) }}
+      </div>
+    </div>
+
+    <!-- Staff with Access Section -->
+    <div x-show="visibility === 'restricted'" x-collapse class="bg-white rounded-xl border border-gray-200 dark:bg-neutral-800 dark:border-neutral-700 shadow-sm overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-200 dark:border-neutral-700 sm:flex sm:items-center sm:justify-between gap-4">
+        <div>
+          <h4 class="font-semibold text-gray-800 dark:text-neutral-200">Staff with access</h4>
+        </div>
+      </div>
+      <div class="p-5">
+        
+        <!-- Add Staff Search -->
+        <div class="mb-5 relative" x-data="{ 
+          search: '', 
+          open: false,
+          bottom: 0,
+          left: 0,
+          width: 0,
+          _scrollHandler: null,
+          init() {
+            this.$watch('open', value => {
+              if (value) {
+                this.$nextTick(() => this.updatePosition());
+                this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+                window.addEventListener('scroll', this._scrollHandler, true);
+                window.addEventListener('resize', this._scrollHandler, true);
+              } else if (this._scrollHandler) {
+                window.removeEventListener('scroll', this._scrollHandler, true);
+                window.removeEventListener('resize', this._scrollHandler, true);
+              }
+            });
+          },
+          updatePosition() {
+            if (!this.$refs.searchInput) return;
+            const r = this.$refs.searchInput.getBoundingClientRect();
+            this.width = r.width;
+            this.left = r.left;
+            this.bottom = window.innerHeight - r.top + 8;
+          }
+        }" @click.outside="open = false">
+          <div class="relative">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+              <i data-lucide="search" class="size-4 text-gray-400"></i>
+            </div>
+            <input 
+              x-ref="searchInput"
+              type="text" 
+              x-model="search" 
+              @focus="open = true" 
+              class="block w-full rounded-lg border-gray-200 px-3 py-2.5 pl-10 text-sm focus:border-primary-500 focus:ring-primary-500 disabled:pointer-events-none disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-neutral-600" 
+              placeholder="Search and add staff..."
+            >
+          </div>
+          
+          <!-- Dropdown Results -->
+          <div x-show="open" 
+               x-transition.opacity
+               class="fixed z-[9999] bg-white border border-gray-200 rounded-xl shadow-xl dark:bg-neutral-800 dark:border-neutral-700 max-h-64 overflow-y-auto"
+               x-bind:style="`bottom: ${bottom}px; left: ${left}px; width: ${width}px;`"
+               style="display: none;">
+            <template x-for="member in availableStaff.filter(s => !staff.find(x => x.id === s.id) && (s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase())))" :key="member.id">
+              <button type="button" 
+                      @click.stop.prevent="staff.push({ ...member, role: 'viewer' }); hasChanges = true; search = ''; $refs.searchInput.focus(); $nextTick(() => lucide.createIcons()); updatePosition()" 
+                      class="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-hidden dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50 transition-colors first:rounded-t-xl last:rounded-b-xl">
+                <img :src="member.avatar" alt="Avatar" class="size-8 rounded-full">
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-gray-800 dark:text-neutral-200 truncate" x-text="member.name"></p>
+                  <p class="text-xs text-gray-500 dark:text-neutral-500 truncate" x-text="member.email"></p>
+                </div>
+              </button>
+            </template>
+            <!-- Empty state when no matches -->
+            <div x-show="availableStaff.filter(s => !staff.find(x => x.id === s.id) && (s.name.toLowerCase().includes(search.toLowerCase()) || s.email.toLowerCase().includes(search.toLowerCase()))).length === 0" class="p-4 text-center text-sm text-gray-500 dark:text-neutral-400">
+              No staff members found.
+            </div>
+          </div>
+        </div>
+        
+        <div x-show="staff.length === 0">
+          {{ empty_state(
+              title="No staff members have access yet",
+              description="Add staff members to give them access to this folder.",
+              icon="users",
+              compact=true,
+              wrap_card=false
+          ) }}
+        </div>
+    
+        <!-- Staff List -->
+        <div x-show="staff.length > 0">
+          <div>
+            <template x-for="(member, index) in staff" :key="member.id">
+            <div class="flex flex-col" :class="index > 0 ? 'mt-2' : ''">
+              <div class="flex items-center justify-between py-2">
+                <div class="flex items-center gap-3">
+                  <img :src="member.avatar" alt="Avatar" class="size-8 rounded-full">
+                  <div>
+                    <a href="#" class="text-sm font-medium text-gray-800 hover:text-primary-600 hover:underline dark:text-neutral-200 dark:hover:text-primary-500 transition-colors" x-text="member.name"></a>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2">
+                   <!-- Role Dropdown inline -->
+                   {% set role_trigger %}
+                     <button type="button" class="inline-flex items-center gap-x-1 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-neutral-300 dark:hover:text-neutral-100 focus:outline-hidden rounded-md px-2 py-1.5 hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors">
+                       <span x-text="member.role === 'admin' ? 'Admin' : (member.role === 'editor' ? 'Editor' : 'Viewer')"></span>
+                       <i data-lucide="chevron-down" class="size-4 text-gray-500"></i>
+                     </button>
+                   {% endset %}
+                   
+                   {{ dropdown(
+                       trigger=role_trigger,
+                       placement="bottom-end",
+                       width="large",
+                       items=[
+                           { label: "Viewer", description: "Can view and use materials, but can't make changes.", x_on: "@click=\"member.role = 'viewer'; open = false\"" },
+                           { label: "Editor", description: "Can upload, edit, move, and delete materials within this folder.", x_on: "@click=\"member.role = 'editor'; open = false\"" },
+                           { label: "Admin", description: "Can manage folder access, delete this folder, and perform all editor actions.", x_on: "@click=\"member.role = 'admin'; open = false\"" }
+                       ]
+                   ) }}
+                   
+                   <button type="button" @click.stop.prevent="staff = staff.filter(s => s.id !== member.id); hasChanges = true" class="ml-2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-md focus:outline-hidden dark:text-neutral-500 dark:hover:text-neutral-300 dark:hover:bg-neutral-800 transition-colors" title="Remove Access">
+                     <i data-lucide="x" class="shrink-0 size-4"></i>
+                   </button>
+                </div>
+              </div>
+            </div>
+            </template>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="p-4 border-t border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 flex justify-end gap-3 shrink-0">
+    {{ button(text="Cancel", variant="secondary", extra_attrs="@click=\"open = false\"") }}
+    {{ button(text="Save Changes", variant="primary", extra_attrs=":disabled=\"!hasChanges\"", extra_classes="disabled:opacity-50 disabled:cursor-not-allowed") }}
+</div>
+
+{% endcall %}
+
+
+
+</div>
