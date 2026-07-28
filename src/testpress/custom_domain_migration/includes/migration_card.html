@@ -1,0 +1,235 @@
+{% from "../../../ui-system/components/alert.html" import alert %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% set x_data %}
+{
+  state: 'start', // 'start', 'validating', 'dns_required', 'ready', 'switching', 'completed', 'failed'
+  targetDomain: '',
+  currentDomain: 'abc.testpress.in',
+  
+  errorMsg: '',
+
+  startValidation() {
+    if (!this.targetDomain) {
+      this.targetDomain = 'learn.example.com';
+    }
+    this.state = 'validating';
+    setTimeout(() => {
+      this.state = 'ready';
+    }, 4000);
+  },
+  
+  revalidate() {
+    this.state = 'validating';
+    setTimeout(() => {
+      this.state = 'ready';
+    }, 2500);
+  },
+  
+  switchDomain() {
+    this.state = 'switching';
+    setTimeout(() => {
+      this.state = 'completed';
+    }, 2500);
+  },
+
+  simulateFailure() {
+    this.state = 'validating';
+    setTimeout(() => {
+      this.errorMsg = 'Domain could not be resolved against Testpress infrastructure.';
+      this.state = 'failed';
+    }, 2500);
+  },
+  
+  cancelMigration() {
+    this.state = 'start';
+    this.targetDomain = '';
+    this.errorMsg = '';
+  }
+}
+{% endset %}
+
+<div class="bg-white rounded-lg shadow-sm p-6 border border-gray-200" x-data="{{ x_data | escape }}">
+  
+  <!-- Start State (Centered Empty State) -->
+  <div x-show="state === 'start'" class="py-8 flex flex-col justify-center items-center text-center">
+    <h2 class="text-lg font-medium text-gray-800">Start Custom Domain Migration</h2>
+    <p class="mt-1 text-sm text-gray-500 max-w-sm mx-auto mb-6">
+      Migrate this institute to a new custom domain. The system will automatically verify DNS, generate SSL, and check application readiness.
+    </p>
+    
+    <form @submit.prevent="startValidation" class="w-full max-w-sm mx-auto space-y-4">
+      <div class="text-left">
+        <input id="domain" x-model="targetDomain" type="text"
+            class="rounded-md shadow-sm py-2 px-3 block w-full border border-gray-200 sm:text-sm placeholder:text-gray-400 focus:border-emerald-500 focus:ring-emerald-500"
+            placeholder="eg: learn.example.com" autofocus>
+      </div>
+      <div class="flex flex-col gap-3">
+        <button type="submit"
+          class="w-full inline-flex justify-center rounded-md border border-transparent bg-emerald-600 py-2.5 px-4 text-sm font-medium text-white shadow-sm hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+          Start Validation
+        </button>
+        <button type="button" @click="simulateFailure" class="text-xs text-gray-400 hover:underline hover:text-gray-600">Simulate Failure Flow</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Dashboard View (Migration In Progress) -->
+  <div x-show="state !== 'start' && state !== 'completed'" x-cloak class="space-y-6">
+    
+    <!-- Page Header -->
+    <div>
+      <h2 class="text-lg font-medium text-gray-800" x-text="
+        state === 'failed' ? 'Migration Failed' :
+        state === 'ready' || state === 'switching' ? 'Ready to Switch' :
+        'Migration in Progress'
+      "></h2>
+      <p class="mt-1 text-sm" :class="state === 'failed' ? 'text-red-600' : 'text-gray-500'" x-html="
+        state === 'failed' ? errorMsg :
+        state === 'ready' || state === 'switching' ? 'Validation completed successfully. The new custom domain is ready to become the active domain.' :
+        'We\'re configuring and validating the new custom domain. This usually takes 1&ndash;3 minutes.'
+      "></p>
+    </div>
+
+    <!-- Migration Status Checklist (Validating/Ready) -->
+    <div class="space-y-4">
+      <ul class="space-y-4">
+        <!-- DNS Verification -->
+        <li class="flex items-center gap-3">
+          <div class="flex-shrink-0 size-5 flex items-center justify-center">
+            <svg x-show="state === 'validating'" class="animate-spin size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            <svg x-show="state === 'ready' || state === 'switching'" class="size-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            <svg x-show="state === 'failed'" class="size-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+          </div>
+          <span class="text-sm font-medium" :class="state === 'failed' ? 'text-red-700' : 'text-gray-700'">DNS Verification</span>
+        </li>
+
+        <!-- SSL Certificate -->
+        <li class="flex items-center gap-3">
+          <div class="flex-shrink-0 size-5 flex items-center justify-center">
+            <span x-show="state === 'validating' || state === 'failed'" class="size-1.5 bg-gray-300 rounded-full"></span>
+            <svg x-show="state === 'ready' || state === 'switching'" class="size-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          </div>
+          <span class="text-sm font-medium text-gray-700" :class="state === 'validating' || state === 'failed' ? 'text-gray-400' : 'text-gray-700'">SSL Certificate</span>
+        </li>
+
+        <!-- Application Readiness -->
+        <li class="flex items-center gap-3">
+          <div class="flex-shrink-0 size-5 flex items-center justify-center">
+            <span x-show="state === 'validating' || state === 'failed'" class="size-1.5 bg-gray-300 rounded-full"></span>
+            <svg x-show="state === 'ready' || state === 'switching'" class="size-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+          </div>
+          <span class="text-sm font-medium text-gray-700" :class="state === 'validating' || state === 'failed' ? 'text-gray-400' : 'text-gray-700'">Application Readiness</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Domain Information Cards (Grid) -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="border border-gray-200 rounded-lg p-4">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Current Domain</div>
+        <div class="text-base text-gray-900 font-medium" x-text="currentDomain"></div>
+      </div>
+      <div class="border border-gray-200 rounded-lg p-4">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Target Domain</div>
+        <div class="text-base text-gray-900 font-medium flex items-center gap-2">
+          <span x-text="targetDomain"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard Actions -->
+    <div class="flex justify-end gap-3 pt-2">
+      <div x-show="state !== 'switching'">
+        <button @click="cancelMigration" type="button" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none disabled:opacity-50">
+          Cancel Migration
+        </button>
+      </div>
+      <div x-show="state === 'failed'" x-cloak>
+        {{ button(
+          text="Retry Validation",
+          variant="primary",
+          extra_attrs="@click=\"startValidation\""
+        ) }}
+      </div>
+      <div x-show="state === 'ready' || state === 'switching'" x-cloak>
+        {{ button(
+          text="Switch Domain",
+          variant="primary",
+          extra_attrs="@click=\"switchDomain\" :disabled=\"state === 'switching'\" x-html=\"state === 'switching' ? '<svg class=\\'animate-spin size-4 text-white inline mr-2\\' xmlns=\\'http://www.w3.org/2000/svg\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\'><circle class=\\'opacity-25\\' cx=\\'12\\' cy=\\'12\\' r=\\'10\\' stroke=\\'currentColor\\' stroke-width=\\'4\\'></circle><path class=\\'opacity-75\\' fill=\\'currentColor\\' d=\\'M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z\\'></path></svg>Switching Domain...' : 'Switch Domain'\""
+        ) }}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Active Domain View (Completed State) -->
+  <div x-show="state === 'completed'" x-cloak class="space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-medium text-gray-800">Active Custom Domain</h2>
+        <p class="text-sm text-gray-500">Your site is currently using this custom domain</p>
+      </div>
+      
+      {% set delete_trigger %}
+        {{ button(
+          text="Delete",
+          variant="secondary",
+          icon="trash-2",
+          extra_classes="text-red-600 hover:text-red-700 hover:bg-red-50 focus:border-red-200"
+        ) }}
+      {% endset %}
+
+      {% call modal(
+        id="delete-domain-modal",
+        title="Remove Custom Domain",
+        variant="danger",
+        trigger=delete_trigger,
+        confirm_text="Remove Domain",
+        confirm_attrs='@click="cancelMigration"'
+      ) %}
+        <div class="space-y-3 pt-2">
+          <p>Are you sure you want to delete <strong x-text="targetDomain"></strong> as your custom domain?</p>
+          <p>Once deleted, users will only be able to access the site via <strong x-text="currentDomain"></strong>.</p>
+        </div>
+      {% endcall %}
+    </div>
+
+    <div class="bg-gray-50 p-4 rounded-md border border-gray-200">
+      <div class="flex items-center gap-4">
+        <div class="flex-1">
+          <div class="text-sm text-gray-500">Domain</div>
+          <div class="text-base font-medium text-gray-900" x-text="targetDomain"></div>
+        </div>
+        <div class="flex-1">
+          <div class="text-sm text-gray-500">Status</div>
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span class="text-base font-medium text-gray-900">Active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-emerald-50 p-4 rounded-md border border-emerald-100">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-emerald-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-emerald-800">Domain Active</h3>
+          <div class="mt-2 text-sm text-emerald-700">
+            <p>Your site is now accessible via your custom domain. All traffic will be redirected to your custom domain.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Preline Clipboard Script -->
+<script src="https://preline.co/assets/vendor/clipboard/dist/clipboard.min.js"></script>
+<script src="https://preline.co/assets/js/hs-copy-clipboard-helper.js"></script>
