@@ -20,6 +20,7 @@ module.exports = config => {
     config.addPassthroughCopy("css/videojs-tps.css");
     config.addPassthroughCopy("css/chapter-plugin.min.css");
     config.addPassthroughCopy("js/settings.js");
+    config.addPassthroughCopy("js/countries.js");
     config.addPassthroughCopy("js/video.js");
     config.addPassthroughCopy("js/videojs-hls-quality-selector.js");
     config.addPassthroughCopy("js/videojs-sprite-thumbnails.js");
