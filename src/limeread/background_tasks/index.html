@@ -15,8 +15,9 @@ tags: limeread
 
 {# Define the data list #}{% block title %}Background Tasks{% endblock %}
 
+{% block main_content %} space-y-5 mx-auto max-w-[85rem] p-4 sm:p-6 lg:p-8 {% endblock %}
 {% block content %}
-<div class="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="{ ...backgroundTasksData() }">
+<div class="space-y-5" x-data="{ ...backgroundTasksData() }">
   
   {{ page_header(
       title="Background Tasks",
@@ -92,7 +93,8 @@ tags: limeread
       search_placeholder="Search background tasks...",
       filters=filters_html,
       table_header=thead_html,
-      pagination=true
+      pagination=true,
+      divide_y=false
   ) %}
 
   {% for task in limeread_background_tasks %}
@@ -193,7 +195,9 @@ tags: limeread
     {% endset %}
 
     <template x-if="true">
-      <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/50 cursor-pointer border-t border-gray-200 dark:border-neutral-700" @click="toggleRow({{ task.id }})">
+      <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/50 cursor-pointer border-t border-gray-200 dark:border-neutral-700 transition-colors" 
+          :class="expandedRow === {{ task.id }} ? 'bg-gray-50 dark:bg-neutral-800/50' : 'bg-white dark:bg-transparent'"
+          @click="toggleRow({{ task.id }})">
         {{ table_td(content=title_html) }}
         {{ table_td(content=status_html) }}
         {{ table_td(content=result_html) }}
@@ -204,138 +208,70 @@ tags: limeread
 
     {# Expanded ROW #}
     <tr x-show="expandedRow === {{ task.id }}" x-collapse x-cloak>
-      <td colspan="5" class="p-0 border-b border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800/30">
-        <div class="p-6 lg:p-8">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 mb-6">
-            <!-- Task Details -->
-            <div>
-              <h4 class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-4">TASK DETAILS</h4>
-              <div class="border-y border-gray-200 dark:border-neutral-700 py-4 space-y-3">
-                <dl class="flex flex-col sm:flex-row gap-1">
-                  <dt class="min-w-40 text-sm font-medium text-gray-500 dark:text-neutral-400">Triggered By</dt>
-                  <dd class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ task.triggered_by }}</dd>
-                </dl>
-                <dl class="flex flex-col sm:flex-row gap-1">
-                  <dt class="min-w-40 text-sm font-medium text-gray-500 dark:text-neutral-400">Created</dt>
-                  <dd class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ task.created_at }}</dd>
-                </dl>
-                {% if task.started_at %}
-                <dl class="flex flex-col sm:flex-row gap-1">
-                  <dt class="min-w-40 text-sm font-medium text-gray-500 dark:text-neutral-400">Started</dt>
-                  <dd class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ task.started_at }}</dd>
-                </dl>
-                {% endif %}
-                {% if task.completed_at %}
-                <dl class="flex flex-col sm:flex-row gap-1">
-                  <dt class="min-w-40 text-sm font-medium text-gray-500 dark:text-neutral-400">Completed</dt>
-                  <dd class="text-sm font-medium text-gray-800 dark:text-neutral-200">
-                    {{ task.completed_at }}
-                    {% if task.duration %}
-                      <span class="text-xs text-gray-500 dark:text-neutral-400 ml-1">(Duration: {{ task.duration }})</span>
-                    {% endif %}
-                  </dd>
-                </dl>
-                {% endif %}
-                <dl class="flex flex-col sm:flex-row gap-1">
-                  <dt class="min-w-40 text-sm font-medium text-gray-500 dark:text-neutral-400">Status</dt>
-                  <dd class="text-sm font-medium text-gray-800 dark:text-neutral-200 capitalize">
-                    {% if task.status == 'QUEUED' %}Queued
-                    {% elif task.status == 'RUNNING' %}Running
-                    {% elif task.status == 'COMPLETED' %}Completed
-                    {% elif task.status == 'COMPLETED_WITH_WARNINGS' %}Completed with Warnings
-                    {% elif task.status == 'FAILED' %}Failed
-                    {% endif %}
-                  </dd>
-                </dl>
-                <dl class="flex flex-col sm:flex-row gap-1">
-                  <dt class="min-w-40 text-sm font-medium text-gray-500 dark:text-neutral-400">Operation</dt>
-                  <dd class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ task.task_type_display }}</dd>
-                </dl>
+      <td colspan="5" class="p-0 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+        <div class="p-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 {% if task.alert_details or task.error_details %}mb-6{% endif %}">
+            
+            <!-- Metadata -->
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="user" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">By</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.triggered_by }}</p>
               </div>
             </div>
             
-            <!-- Right Column -->
-            <div>
-              {% if task.stats and task.status != 'QUEUED' %}
-                <h4 class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-4">SUMMARY</h4>
-                <div class="space-y-3">
-                  <dl class="flex flex-col sm:flex-row gap-1">
-                    <dt class="min-w-40">
-                      <span class="block text-sm text-gray-500 dark:text-neutral-400">Total</span>
-                    </dt>
-                    <dd>
-                      <span class="inline-flex items-center text-sm text-gray-800 dark:text-neutral-200 font-medium">
-                        {{ task.stats.total.toLocaleString() }}
-                      </span>
-                    </dd>
-                  </dl>
-
-                  {% set stat_lbl = "Processed" %}
-                  {% set stat_col = "text-primary-600 dark:text-primary-500" %}
-                  {% if task.status == 'COMPLETED' or task.status == 'COMPLETED_WITH_WARNINGS' %}
-                    {% set stat_col = "text-green-600 dark:text-green-500" %}
-                    {% if task.task_type == 'BULK_USER_ASSIGN' %}{% set stat_lbl = "Assigned" %}
-                    {% elif task.task_type == 'BULK_USER_CREATE' %}{% set stat_lbl = "Created" %}
-                    {% elif task.task_type == 'BULK_USER_UNASSIGN' %}{% set stat_lbl = "Unassigned" %}
-                    {% else %}{% set stat_lbl = "Processed" %}{% endif %}
-                  {% endif %}
-                  <dl class="flex flex-col sm:flex-row gap-1">
-                    <dt class="min-w-40">
-                      <span class="block text-sm text-gray-500 dark:text-neutral-400">{{ stat_lbl }}</span>
-                    </dt>
-                    <dd>
-                      <span class="inline-flex items-center text-sm font-medium {{ stat_col }}">
-                        {{ task.stats.processed.toLocaleString() }}
-                      </span>
-                    </dd>
-                  </dl>
-
-                  {% if task.status == 'RUNNING' %}
-                  <dl class="flex flex-col sm:flex-row gap-1">
-                    <dt class="min-w-40">
-                      <span class="block text-sm text-gray-500 dark:text-neutral-400">Remaining</span>
-                    </dt>
-                    <dd>
-                      <span class="inline-flex items-center text-sm font-medium text-gray-500 dark:text-neutral-400">
-                        {{ (task.stats.total - task.stats.processed).toLocaleString() }}
-                      </span>
-                    </dd>
-                  </dl>
-                  {% else %}
-                  {% set stat_col = "text-orange-600 dark:text-orange-500" %}
-                  {% if task.stats.failed == 0 %}{% set stat_col = "text-gray-400 dark:text-neutral-500" %}{% endif %}
-                  {% set stat_lbl = "Skipped" %}
-                  {% if task.task_type == 'BULK_USER_CREATE' %}{% set stat_lbl = "Failed" %}{% endif %}
-                  <dl class="flex flex-col sm:flex-row gap-1">
-                    <dt class="min-w-40">
-                      <span class="block text-sm text-gray-500 dark:text-neutral-400">{{ stat_lbl }}</span>
-                    </dt>
-                    <dd>
-                      <span class="inline-flex items-center text-sm font-medium {{ stat_col }}">
-                        {{ task.stats.failed.toLocaleString() }}
-                      </span>
-                    </dd>
-                  </dl>
-                  {% endif %}
-                </div>
-              {% endif %}
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="calendar-plus" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Added on</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.created_at }}</p>
+              </div>
             </div>
-          </div>
-          
-          {% if task.alert_details %}
-          <div class="mt-4">
-            {{ alert(title=task.alert_details.title, description=task.alert_details.description, variant=task.alert_details.variant) }}
-            {% if task.alert_details.retryable %}
-              <div class="mt-4">{{ button(text="Retry Task", icon="refresh-cw", size="sm", variant="primary") }}</div>
+            
+            {% if task.started_at %}
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="play-circle" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Started</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.started_at }}</p>
+              </div>
+            </div>
+            {% endif %}
+            
+            {% if task.completed_at %}
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="check-circle-2" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Completed</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.completed_at }}</p>
+              </div>
+            </div>
+            {% endif %}
+
+            {% if task.duration %}
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="clock" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Duration</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.duration }}</p>
+              </div>
+            </div>
+            {% endif %}
+
+            {% if task.alert_details and task.status == 'QUEUED' %}
+            <div class="col-span-full md:col-span-2 lg:col-span-2 xl:col-span-3 self-center">
+              {{ alert(title=task.alert_details.title, description=task.alert_details.description, variant=task.alert_details.variant) }}
+            </div>
             {% endif %}
           </div>
-          {% endif %}
-
-          {% if task.error_details %}
+          
+          {% if task.errors or task.error_details or (task.alert_details and task.status != 'QUEUED') %}
           <div class="mt-8">
-            <div class="flex justify-between items-end mb-3">
-              <h4 class="text-sm font-semibold text-gray-800 dark:text-white">{{ task.error_details.title }} ({{ task.error_details.total_errors }})</h4>
-              {% if task.error_details.download_url %}
+            {% if task.errors %}
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-white">Skipped Users ({{ task.stats.failed }})</h4>
+              {% if task.stats.failed > 5 and task.download_url %}
               {{ button(text="Download Error Report", icon="download", size="sm", variant="outline", extra_classes="bg-white") }}
               {% endif %}
             </div>
@@ -343,26 +279,36 @@ tags: limeread
               <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700 text-sm">
                 <thead class="bg-gray-50 dark:bg-neutral-800/50">
                   <tr>
-                    {% for c in task.error_details.headers %}
-                    <th class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase">{{ c }}</th>
-                    {% endfor %}
+                    <th class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase">Identifier</th>
+                    <th class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase">Reason</th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
-                  {% for item in task.error_details.items %}
+                  {% for item in task.errors %}
+                  {% if loop.index <= 5 %}
                   <tr>
                     <td class="px-4 py-2 text-sm text-gray-800 dark:text-neutral-200">{{ item.identifier }}</td>
                     <td class="px-4 py-2 text-sm text-orange-600 dark:text-orange-500">{{ item.reason }}</td>
                   </tr>
+                  {% endif %}
                   {% endfor %}
-                  {% if task.error_details.total_errors > task.error_details.items | length %}
+                  {% if task.stats.failed > 5 %}
                   <tr>
-                    <td class="px-4 py-2 text-gray-500 dark:text-neutral-400 italic" colspan="{{ task.error_details.headers | length }}">+ {{ task.error_details.total_errors - (task.error_details.items | length) }} more rows... (Download report to see all)</td>
+                    <td colspan="2" class="px-4 py-3 text-sm text-gray-500 dark:text-neutral-400 text-center bg-gray-50/50 dark:bg-neutral-800/20">
+                      + {{ task.stats.failed - 5 }} more skipped users. Download the error report to view the full list.
+                    </td>
                   </tr>
                   {% endif %}
                 </tbody>
               </table>
             </div>
+            {% elif task.error_details or task.alert_details %}
+            {{ alert(
+                title=task.alert_details.title if task.alert_details else "System Error",
+                description=task.error_details or task.alert_details.description,
+                variant="danger"
+            ) }}
+            {% endif %}
           </div>
           {% endif %}
         </div>
