@@ -1,0 +1,198 @@
+<script>
+  function onoStoreDetailPage() {
+    // Hard-coded product data (copied from ONO products list) – no JSON import
+    const product = {
+      id: 1,
+      name: "Fire Safety Certification",
+      price: "₹2,000",
+      anchor_price: "₹3,000",
+      certificate_validity_label: "Certificate valid for 365 days",
+      image:
+        "https://images.unsplash.com/photo-1766862769365-64368bf24df0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080",
+      short_description:
+        "Comprehensive fire safety training program for industrial workers.",
+      curriculum: [
+        {
+          title: "Fire Safety Basics",
+          subtitle: "Introduction to fire safety protocols and emergency procedures",
+          duration: "2 hours",
+        },
+        {
+          title: "Fire Equipment Handling",
+          subtitle: "Proper use of fire extinguishers and safety equipment",
+          duration: "3 hours",
+        },
+        {
+          title: "Emergency Evacuation",
+          subtitle: "Evacuation procedures and emergency response",
+          duration: "2 hours",
+        },
+      ],
+      contents: 18,
+    };
+
+    // Hard-coded ONO workers (copied from ono_users data) – simplified for this page
+    const workers = [
+      {
+        id: 1,
+        name: "Rajesh Kumar",
+        image_url:
+          "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=faces",
+        aadhaar_number: "123456789012",
+        work_permit_number: null,
+        phone: "+91 98765 43210",
+        email: "rajesh@example.com",
+        enrolled_cohorts: [
+          { name: "Construction Safety - Dec 2025", status: "completed" },
+        ],
+        date_added: "15 Jan 2025",
+      },
+      {
+        id: 2,
+        name: "Priya Sharma",
+        image_url:
+          "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&crop=faces",
+        aadhaar_number: null,
+        work_permit_number: "WP-2024-001234",
+        phone: "+91 98765 43211",
+        email: null,
+        enrolled_cohorts: [],
+        date_added: "14 Jan 2025",
+      },
+      {
+        id: 3,
+        name: "Amit Patel",
+        image_url:
+          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=faces",
+        aadhaar_number: "234567890123",
+        work_permit_number: null,
+        phone: "+91 98765 43212",
+        email: "amit@example.com",
+        enrolled_cohorts: [],
+        date_added: "13 Jan 2025",
+      },
+      {
+        id: 4,
+        name: "Sunita Devi",
+        image_url:
+          "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=faces",
+        aadhaar_number: "345678901234",
+        work_permit_number: null,
+        phone: "+91 98765 43213",
+        email: "sunita@example.com",
+        enrolled_cohorts: [
+          { name: "Construction Safety - Dec 2025", status: "completed" },
+        ],
+        date_added: "12 Jan 2025",
+      },
+      {
+        id: 5,
+        name: "Vikram Singh",
+        image_url:
+          "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=faces",
+        aadhaar_number: null,
+        work_permit_number: "WP-2024-002345",
+        phone: "+91 98765 43214",
+        email: null,
+        enrolled_cohorts: [
+          { name: "Fire Safety Training - Jan 2026", status: "pending" },
+        ],
+        date_added: "11 Jan 2025",
+      },
+    ];
+
+    const mappedWorkers = workers.map((u) => {
+      const idDisplay = u.aadhaar_number
+        ? `XXXX-XXXX-${u.aadhaar_number.slice(-4)}`
+        : u.work_permit_number || "N/A";
+
+      const initials = u.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase();
+
+      return {
+        ...u,
+        id_display: idDisplay,
+        initials,
+      };
+    });
+
+    const numericPrice = parseInt(product.price.replace(/[^0-9]/g, ""), 10) || 0;
+
+    return {
+      product,
+
+      users: mappedWorkers,
+      filters: {
+        search: "",
+      },
+
+      selectedWorkers: [],
+
+      get selectedWorkersIds() {
+        return this.selectedWorkers.map((u) => u.id);
+      },
+
+      get filteredUsers() {
+        const q = this.filters.search.trim().toLowerCase();
+        if (!q) return this.users;
+
+        return this.users.filter((u) => {
+          return (
+            u.name.toLowerCase().includes(q) ||
+            (u.aadhaar_number && u.aadhaar_number.includes(q)) ||
+            (u.work_permit_number &&
+              u.work_permit_number.toLowerCase().includes(q)) ||
+            (u.phone && u.phone.toLowerCase().includes(q)) ||
+            (u.email && u.email.toLowerCase().includes(q))
+          );
+        });
+      },
+
+      toggleWorker(user) {
+        const exists = this.selectedWorkers.find((u) => u.id === user.id);
+        if (exists) {
+          this.selectedWorkers = this.selectedWorkers.filter(
+            (u) => u.id !== user.id,
+          );
+        } else {
+          this.selectedWorkers = [...this.selectedWorkers, user];
+        }
+      },
+
+      toggleSelectAll(checked) {
+        if (checked) {
+          this.selectedWorkers = [...this.filteredUsers];
+        } else {
+          this.selectedWorkers = [];
+        }
+      },
+
+      form: {
+        cohort_name: "",
+        description: "",
+      },
+
+      get totalAmount() {
+        return this.selectedWorkers.length * numericPrice;
+      },
+
+      get totalAmountDisplay() {
+        return `₹${this.totalAmount.toLocaleString("en-IN")}`;
+      },
+
+      get canSubmit() {
+        return (
+          this.selectedWorkers.length > 0 &&
+          this.form.cohort_name.trim().length > 0
+        );
+      },
+
+      removeSelectedUser(id) {
+        this.selectedWorkers = this.selectedWorkers.filter((u) => u.id !== id);
+      },
+    };
+  }
+</script>
