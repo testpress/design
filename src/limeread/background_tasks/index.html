@@ -1,0 +1,342 @@
+---
+design_view: "Background Tasks"
+permalink: limeread/background_tasks/
+tags: limeread
+---
+{% extends "../layouts/admin_base.html" %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../ui-system/components/badge.html" import badge %}
+{% from "../../ui-system/components/alert.html" import alert %}
+{% from "../../ui-system/components/select.html" import select %}
+{% from "../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+
+{# Define the data list #}{% block title %}Background Tasks{% endblock %}
+
+{% block main_content %} space-y-5 mx-auto max-w-[85rem] p-4 sm:p-6 lg:p-8 {% endblock %}
+{% block content %}
+<div class="space-y-5" x-data="{ ...backgroundTasksData() }">
+  
+  {{ page_header(
+      title="Background Tasks",
+      description="Monitor background operations, review results, and investigate failures."
+  ) }}
+
+  {# Toolbar Filters #}
+  {% set filters_html %}
+    <div class="flex items-center gap-2">
+      <div>
+        {% set status_trigger %}
+          <button type="button" class="py-1.5 sm:py-2 px-2.5 inline-flex items-center gap-x-1.5 text-sm sm:text-xs font-medium rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-white shadow-2xs hover:bg-gray-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:focus:bg-neutral-700" aria-haspopup="menu" :aria-expanded="open.toString()">
+            All status
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        {% endset %}
+        {{ dropdown(
+            trigger=status_trigger,
+            items=[
+              {label: 'All status'},
+              {label: 'Queued'},
+              {label: 'Running'},
+              {label: 'Completed'},
+              {label: 'Completed with Warnings'},
+              {label: 'Failed'}
+            ]
+        ) }}
+      </div>
+      <div>
+        {% set type_trigger %}
+          <button type="button" class="py-1.5 sm:py-2 px-2.5 inline-flex items-center gap-x-1.5 text-sm sm:text-xs font-medium rounded-lg bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-white shadow-2xs hover:bg-gray-50 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:focus:bg-neutral-700" aria-haspopup="menu" :aria-expanded="open.toString()">
+            All type
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+        {% endset %}
+        {{ dropdown(
+            trigger=type_trigger,
+            items=[
+              {label: 'All type'},
+              {label: 'Bulk User Assign'},
+              {label: 'Bulk User Create'},
+              {label: 'Bulk User Unassign'}
+            ]
+        ) }}
+      </div>
+      <div class="flex-shrink-0">
+        {{ date_picker(
+            placeholder="Filter by Date",
+            range=true,
+            button_trigger=true,
+            show_footer_actions=true,
+            cancel_action=true,
+            dropdown_align="right",
+            padding_class="py-1.5 sm:py-2 px-2.5",
+            extra_classes="text-sm sm:text-xs font-medium shadow-2xs"
+        ) }}
+      </div>
+    </div>
+  {% endset %}
+  
+  {# Table Header #}
+  {% set thead_html %}
+    {{ table_th(text="Task Details") }}
+    {{ table_th(text="Status") }}
+    {{ table_th(text="Summary") }}
+    {{ table_th(text="Completion Time") }}
+    <th scope="col" class="px-5 py-2.5 text-end"></th>
+  {% endset %}
+
+  {# The Table #}
+  {% call table(
+      search_enabled=true,
+      search_placeholder="Search background tasks...",
+      filters=filters_html,
+      table_header=thead_html,
+      pagination=true,
+      divide_y=false
+  ) %}
+
+  {% for task in limeread_background_tasks %}
+    
+    {# 1. Title/Type Cell #}
+    {% set title_html %}
+      <div>
+        <div class="font-medium text-gray-800 dark:text-neutral-200">
+          <a href="javascript:;" @click.stop="drawerOpen = true" class="hover:text-primary-600 transition-colors">
+            {{ task.title }}
+          </a>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">{{ task.task_type_display }}</div>
+      </div>
+    {% endset %}
+
+    {# 2. Status Badge Cell #}
+    {% set status_html %}
+      {% if task.status == 'QUEUED' %}
+        {{ badge(text="Queued", variant="gray", icon="clock") }}
+      {% elif task.status == 'RUNNING' %}
+        {{ badge(text="Running", variant="info", icon="refresh-cw") }}
+      {% elif task.status == 'COMPLETED' %}
+        {{ badge(text="Completed", variant="success", icon="check-circle-2") }}
+      {% elif task.status == 'COMPLETED_WITH_WARNINGS' %}
+        {{ badge(text="Completed with Warnings", variant="warning", icon="alert-triangle") }}
+      {% elif task.status == 'FAILED' %}
+        {{ badge(text="Failed", variant="danger", icon="x-circle") }}
+      {% endif %}
+    {% endset %}
+
+    {# 3. Result Summary Cell #}
+    {% set result_html %}
+      {% if task.status == 'QUEUED' %}
+        {% set act_lbl = "users to process" %}
+        {% if task.task_type == 'BULK_USER_ASSIGN' %}{% set act_lbl = "users to assign" %}
+        {% elif task.task_type == 'BULK_USER_CREATE' %}{% set act_lbl = "users to create" %}
+        {% elif task.task_type == 'BULK_USER_UNASSIGN' %}{% set act_lbl = "users to unassign" %}{% endif %}
+        <span class="text-sm text-gray-500 dark:text-neutral-400">
+          <span class="font-medium text-gray-800 dark:text-neutral-200">{{ task.stats.total.toLocaleString() if task.stats else 0 }}</span> {{ act_lbl }}
+        </span>
+      {% elif task.status == 'RUNNING' %}
+        {% set pct = 0 %}
+        {% if task.stats.total > 0 %}
+          {% set pct = ((task.stats.processed / task.stats.total) * 100) | round %}
+        {% endif %}
+        <div class="flex flex-col gap-1.5 w-48">
+          <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden dark:bg-neutral-700">
+            <div class="flex flex-col justify-center rounded-full overflow-hidden bg-primary-600 text-xs text-white text-center whitespace-nowrap transition-all duration-500 dark:bg-primary-500" style="width: {{ pct }}%"></div>
+          </div>
+          <div class="text-[11px] text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+            <span class="font-medium text-gray-800 dark:text-neutral-200">{{ task.stats.processed.toLocaleString() }}</span>
+            / {{ task.stats.total.toLocaleString() }} processed
+          </div>
+        </div>
+      {% elif task.status == 'COMPLETED' %}
+        <div class="text-sm">
+          <span class="text-gray-800 dark:text-neutral-200 font-medium">{{ task.stats.processed.toLocaleString() }}</span>
+          <span class="text-gray-500 dark:text-neutral-400">
+            {% if task.task_type == 'BULK_USER_ASSIGN' %}assigned
+            {% elif task.task_type == 'BULK_USER_CREATE' %}created
+            {% elif task.task_type == 'BULK_USER_UNASSIGN' %}unassigned
+            {% else %}processed{% endif %}
+          </span>
+        </div>
+      {% elif task.status == 'COMPLETED_WITH_WARNINGS' %}
+        <div class="text-sm">
+          <span class="text-gray-800 dark:text-neutral-200 font-medium">{{ task.stats.processed.toLocaleString() }}</span>
+          <span class="text-gray-500 dark:text-neutral-400">
+            {% if task.task_type == 'BULK_USER_ASSIGN' %}assigned,
+            {% elif task.task_type == 'BULK_USER_CREATE' %}created,
+            {% elif task.task_type == 'BULK_USER_UNASSIGN' %}unassigned,
+            {% else %}processed,{% endif %}
+          </span>
+          <span class="text-orange-600 dark:text-orange-500 font-medium">{{ task.stats.failed.toLocaleString() }}</span>
+          <span class="text-gray-500 dark:text-neutral-400">
+            {% if task.task_type == 'BULK_USER_CREATE' %}failed
+            {% else %}skipped{% endif %}
+          </span>
+        </div>
+      {% elif task.status == 'FAILED' %}
+        <span class="text-sm text-red-600 dark:text-red-500 font-medium">{{ task.alert_details.title | default("System Error") }}</span>
+      {% endif %}
+    {% endset %}
+
+    {# 4. Completion Time Cell #}
+    {% set time_html %}
+      <span class="text-sm text-gray-800 dark:text-neutral-200">
+        {% if task.completed_at %}{{ task.completed_at }}{% else %}-{% endif %}
+      </span>
+    {% endset %}
+
+    {# 5. Chevron Cell #}
+    {% set chevron_html %}
+      <div class="flex justify-end">
+        <i data-lucide="chevron-down" class="size-4 text-gray-500 transition-transform" :class="expandedRow === {{ task.id }} ? 'rotate-180' : ''"></i>
+      </div>
+    {% endset %}
+
+    <template x-if="true">
+      <tr class="hover:bg-gray-50 dark:hover:bg-neutral-800/50 cursor-pointer border-t border-gray-200 dark:border-neutral-700 transition-colors" 
+          :class="expandedRow === {{ task.id }} ? 'bg-gray-50 dark:bg-neutral-800/50' : 'bg-white dark:bg-transparent'"
+          @click="toggleRow({{ task.id }})">
+        {{ table_td(content=title_html) }}
+        {{ table_td(content=status_html) }}
+        {{ table_td(content=result_html) }}
+        {{ table_td(content=time_html) }}
+        {{ table_td(content=chevron_html) }}
+      </tr>
+    </template>
+
+    {# Expanded ROW #}
+    <tr x-show="expandedRow === {{ task.id }}" x-collapse x-cloak>
+      <td colspan="5" class="p-0 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+        <div class="p-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 {% if task.alert_details or task.error_details %}mb-6{% endif %}">
+            
+            <!-- Metadata -->
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="user" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">By</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.triggered_by }}</p>
+              </div>
+            </div>
+            
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="calendar-plus" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Added on</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.created_at }}</p>
+              </div>
+            </div>
+            
+            {% if task.started_at %}
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="play-circle" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Started</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.started_at }}</p>
+              </div>
+            </div>
+            {% endif %}
+            
+            {% if task.completed_at %}
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="check-circle-2" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Completed</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.completed_at }}</p>
+              </div>
+            </div>
+            {% endif %}
+
+            {% if task.duration %}
+            <div class="flex items-start gap-x-3">
+              <i data-lucide="clock" class="shrink-0 size-5 mt-0.5 text-gray-400 dark:text-neutral-500"></i>
+              <div class="grow min-w-0">
+                <span class="block mb-1 text-xs font-medium text-gray-500 dark:text-neutral-500">Duration</span>
+                <p class="text-sm text-gray-800 dark:text-neutral-200">{{ task.duration }}</p>
+              </div>
+            </div>
+            {% endif %}
+
+            {% if task.alert_details and task.status == 'QUEUED' %}
+            <div class="col-span-full md:col-span-2 lg:col-span-2 xl:col-span-3 self-center">
+              {{ alert(title=task.alert_details.title, description=task.alert_details.description, variant=task.alert_details.variant) }}
+            </div>
+            {% endif %}
+          </div>
+          
+          {% if task.errors or task.error_details or (task.alert_details and task.status != 'QUEUED') %}
+          <div class="mt-8">
+            {% if task.errors %}
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-white">Skipped Users ({{ task.stats.failed }})</h4>
+              {% if task.stats.failed > 5 and task.download_url %}
+              {{ button(text="Download Error Report", icon="download", size="sm", variant="outline", extra_classes="bg-white") }}
+              {% endif %}
+            </div>
+            <div class="bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden shadow-2xs">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700 text-sm">
+                <thead class="bg-gray-50 dark:bg-neutral-800/50">
+                  <tr>
+                    <th class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase">Identifier</th>
+                    <th class="px-4 py-2 text-start text-xs font-medium text-gray-500 uppercase">Reason</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700">
+                  {% for item in task.errors %}
+                  {% if loop.index <= 5 %}
+                  <tr>
+                    <td class="px-4 py-2 text-sm text-gray-800 dark:text-neutral-200">{{ item.identifier }}</td>
+                    <td class="px-4 py-2 text-sm text-orange-600 dark:text-orange-500">{{ item.reason }}</td>
+                  </tr>
+                  {% endif %}
+                  {% endfor %}
+                  {% if task.stats.failed > 5 %}
+                  <tr>
+                    <td colspan="2" class="px-4 py-3 text-sm text-gray-500 dark:text-neutral-400 text-center bg-gray-50/50 dark:bg-neutral-800/20">
+                      + {{ task.stats.failed - 5 }} more skipped users. Download the error report to view the full list.
+                    </td>
+                  </tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+            {% elif task.error_details or task.alert_details %}
+            {{ alert(
+                title=task.alert_details.title if task.alert_details else "System Error",
+                description=task.error_details or task.alert_details.description,
+                variant="danger"
+            ) }}
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </td>
+    </tr>
+  {% endfor %}
+
+  {% endcall %}
+</div>
+{% endblock content %}
+
+{% block extra_scripts %}
+{% include "../../ui-system/scripts/select_script.html" %}
+{% include "../../ui-system/scripts/date_picker_script.html" %}
+<script>
+  document.addEventListener('alpine:init', () => {
+    window.backgroundTasksData = function() {
+      return {
+        expandedRow: null,
+        toggleRow(id) {
+          if (this.expandedRow === id) {
+            this.expandedRow = null;
+          } else {
+            this.expandedRow = id;
+          }
+        }
+      }
+    }
+  });
+</script>
+{% endblock %}
