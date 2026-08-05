@@ -1,0 +1,334 @@
+<style>
+  @media (max-width: 767px) {
+    #hs-pro-irhch {
+      overflow-x: auto;
+      overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #hs-pro-irhch .apexcharts-canvas {
+      min-width: 100% !important;
+    }
+
+    #hs-pro-irhch .apexcharts-heatmap-rect {
+      shape-rendering: geometricPrecision;
+    }
+
+    #hs-pro-irhch svg {
+      overflow: visible;
+    }
+  }
+</style>
+<script>
+  window.addEventListener('load', () => {
+    (function () {
+      const currentYear = new Date().getFullYear();
+      const yearStart = new Date(currentYear, 0, 1);
+      yearStart.setHours(0, 0, 0, 0);
+      const yearEnd = new Date(currentYear, 11, 31);
+      yearEnd.setHours(0, 0, 0, 0);
+
+      const monthNamesShort = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthNamesFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+      const HEATMAP_COLORS = {
+        NONE: '#ffffff',
+        LOW: '#bbf7d0',
+        MEDIUM: '#4ade80',
+        HIGH: '#16a34a'
+      };
+
+      const weeks = [];
+      const weekDates = [];
+      const weekMonths = [];
+
+      const getWeekStartDate = (date) => {
+        const dayOfWeek = date.getDay();
+        const weekStart = new Date(date);
+        weekStart.setDate(weekStart.getDate() - dayOfWeek);
+        return weekStart;
+      };
+
+      const getWeekEndDate = (weekStart) => {
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        return weekEnd;
+      };
+
+      const determineMonthToShow = (weekStart, weekEnd, weekStartYear, weekStartMonth) => {
+        if (weekStartYear < currentYear && weekStartMonth === 11 && weekEnd >= yearStart) {
+          return 0;
+        }
+        if (weekStartYear === currentYear) {
+          return weekStartMonth;
+        }
+        if (weekStartYear > currentYear && weekStart <= yearEnd) {
+          return 11;
+        }
+        return -1;
+      };
+
+      let weekStartDate = getWeekStartDate(yearStart);
+      const weekEndDate = getWeekEndDate(new Date(yearEnd));
+      let lastDisplayedMonth = -1;
+      let weekIndex = 0;
+
+      while (weekStartDate <= weekEndDate && weekIndex < 53) {
+        const weekStart = new Date(weekStartDate);
+        const weekStartMonth = weekStart.getMonth();
+        const weekStartYear = weekStart.getFullYear();
+        const weekEnd = getWeekEndDate(weekStart);
+        const weekOverlapsYear = weekEnd >= yearStart && weekStart <= yearEnd;
+
+        if (weekOverlapsYear) {
+          const monthToShow = determineMonthToShow(weekStart, weekEnd, weekStartYear, weekStartMonth);
+
+          if (monthToShow !== -1 && monthToShow !== lastDisplayedMonth) {
+            weeks.push(monthNamesShort[monthToShow]);
+            lastDisplayedMonth = monthToShow;
+          } else {
+            weeks.push('');
+          }
+
+          const tooltipMonth = monthToShow !== -1 ? monthToShow : weekStartMonth;
+          weekMonths.push(monthNamesShort[tooltipMonth]);
+          weekDates.push(new Date(weekStart));
+        }
+
+        weekStartDate.setDate(weekStartDate.getDate() + 7);
+        weekIndex++;
+      }
+
+      const totalWeeks = weeks.length;
+      const daysOfWeek = ['Sat', 'Fri', 'Thu', 'Wed', 'Tue', 'Mon', 'Sun'];
+
+      const generateAttendanceData = (dayIndex) => {
+        const dayOffset = 6 - dayIndex;
+
+        return Array.from({ length: totalWeeks }, (_, weekIndex) => {
+          const weekStartDate = weekDates[weekIndex];
+          const cellDate = new Date(weekStartDate);
+          cellDate.setDate(cellDate.getDate() + dayOffset);
+
+          if (cellDate.getFullYear() !== currentYear) {
+            return 0;
+          }
+
+          return Math.floor(Math.random() * 5);
+        });
+      };
+
+      const series = daysOfWeek.map((day, dayIndex) => ({
+        name: day,
+        data: generateAttendanceData(dayIndex)
+      }));
+
+      const MOBILE_BREAKPOINT = 768;
+      const MOBILE_HEIGHT_MULTIPLIER = 1.3;
+      const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+      const numberOfRows = daysOfWeek.length;
+
+      const chartConfig = {
+        desktop: {
+          cellSize: 18,
+          gapWidth: 5,
+          fontSize: '11px',
+          yAxisLabelPadding: 80,
+          chartPadding: 20,
+          radius: 3
+        },
+        mobile: {
+          cellSize: 11,
+          gapWidth: 3,
+          fontSize: '10px',
+          yAxisLabelPadding: 55,
+          chartPadding: 15,
+          radius: 2.5
+        }
+      };
+
+      const config = isMobile ? chartConfig.mobile : chartConfig.desktop;
+      const { cellSize, gapWidth, fontSize, yAxisLabelPadding, chartPadding, radius } = config;
+
+      const calculateChartDimensions = () => {
+        const width = totalWeeks * cellSize + (totalWeeks - 1) * gapWidth + yAxisLabelPadding;
+        const baseHeight = numberOfRows * cellSize + (numberOfRows - 1) * gapWidth + chartPadding;
+        const height = isMobile ? baseHeight * MOBILE_HEIGHT_MULTIPLIER : baseHeight;
+        return { width, height };
+      };
+
+      const { width: chartWidth, height: chartHeight } = calculateChartDimensions();
+
+      const getOrdinalSuffix = (number) => {
+        const suffixes = ['th', 'st', 'nd', 'rd'];
+        const value = number % 100;
+        return number + (suffixes[(value - 20) % 10] || suffixes[value] || suffixes[0]);
+      };
+
+      const getTooltipBackgroundColor = (value) => {
+        switch (value) {
+          case 1: return HEATMAP_COLORS.LOW;
+          case 2:
+          case 3: return HEATMAP_COLORS.MEDIUM;
+          case 4: return HEATMAP_COLORS.HIGH;
+          default: return HEATMAP_COLORS.NONE;
+        }
+      };
+
+      const formatTooltipDate = (date) => {
+        const monthName = monthNamesFull[date.getMonth()];
+        const day = getOrdinalSuffix(date.getDate());
+        return `${monthName} ${day}`;
+      };
+
+      const buildTooltip = (props, mode) => {
+        const { dataPointIndex, seriesIndex, series } = props;
+        const visitCount = series[seriesIndex][dataPointIndex];
+        const weekStartDate = weekDates[dataPointIndex];
+        const cellDate = new Date(weekStartDate);
+        const dayOffset = 6 - seriesIndex;
+        cellDate.setDate(cellDate.getDate() + dayOffset);
+
+        if (cellDate.getFullYear() !== currentYear) {
+          return '';
+        }
+
+        const dateLabel = formatTooltipDate(cellDate);
+        const originalSeriesName = props.ctx.opts.series[seriesIndex].name;
+
+        try {
+          props.ctx.opts.series[seriesIndex].name = '';
+
+          return buildHeatmapTooltip(props, {
+            mode,
+            wrapperExtClasses: 'min-w-28',
+            valuePrefix: '',
+            divider: '',
+            valuePostfix: ` visit${visitCount === 1 ? '' : 's'} on ${dateLabel}`,
+            markerExtClasses: '!rounded-full',
+            markerStyles: `background: ${getTooltipBackgroundColor(visitCount)}`
+          });
+        } finally {
+          props.ctx.opts.series[seriesIndex].name = originalSeriesName;
+        }
+      };
+
+      const colorScaleRanges = [
+        { from: 0, to: 0, color: HEATMAP_COLORS.NONE, foreColor: '#171717', name: 'Low' },
+        { from: 1, to: 1, color: HEATMAP_COLORS.LOW, foreColor: '#ffffff', name: 'Low' },
+        { from: 2, to: 3, color: HEATMAP_COLORS.MEDIUM, foreColor: '#ffffff', name: 'Medium' },
+        { from: 4, to: 4, color: HEATMAP_COLORS.HIGH, foreColor: '#ffffff', name: 'High' }
+      ];
+
+      buildChart('#hs-pro-irhch', (mode) => ({
+        chart: {
+          type: 'heatmap',
+          height: chartHeight,
+          ...(isMobile && { width: chartWidth }),
+          toolbar: { show: false },
+          ...(isMobile && {
+            animations: { enabled: false }
+          })
+        },
+        dataLabels: {
+          enabled: false,
+        },
+        stroke: {
+          width: gapWidth,
+          colors: ['#ffffff']
+        },
+        plotOptions: {
+          heatmap: {
+            shadeIntensity: 0,
+            radius: radius,
+            useFillColorAsStroke: false,
+            colorScale: {
+              ranges: colorScaleRanges
+            }
+          }
+        },
+        series: series,
+        xaxis: {
+          categories: weeks,
+          labels: {
+            style: {
+              fontSize: fontSize,
+              fontFamily: 'Inter, ui-sans-serif'
+            },
+            rotate: 0,
+            formatter: (value) => value || '',
+            showDuplicates: false,
+            hideOverlappingLabels: true
+          },
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          tooltip: {
+            enabled: false
+          },
+        },
+        yaxis: {
+          categories: daysOfWeek,
+          labels: {
+            style: {
+              fontSize: fontSize,
+              fontFamily: 'Inter, ui-sans-serif'
+            }
+          }
+        },
+        grid: {
+          show: false,
+        },
+        legend: {
+          show: false
+        },
+        tooltip: {
+          custom: (props) => buildTooltip(props, mode)
+        },
+      }), {
+        grid: {
+          show: false,
+          borderColor: 'transparent'
+        },
+        stroke: {
+          colors: ['#ffffff']
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e'
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a8a29e'
+            }
+          }
+        }
+      }, {
+        grid: {
+          show: false,
+          borderColor: 'transparent'
+        },
+        stroke: {
+          colors: ['#262626']
+        },
+        xaxis: {
+          labels: {
+            style: {
+              colors: 'oklch(.708 0 0)'
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: 'oklch(.708 0 0)'
+            }
+          }
+        }
+      });
+    })();
+  });
+</script>
