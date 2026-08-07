@@ -667,12 +667,24 @@
 <script>
   function scoreConfigData() {
     return {
+      isImporting: false,
       scoringMethod: 'Raw Score',
-      scoreMappings: [],
+      scoreMappings: [{ input: '0', rwMod1: '200', rwMod2: '200', mathMod1: '200', mathMod2: '200' }],
       previewRwMod1: '27',
       previewRwMod2: '27',
       previewMathMod1: '22',
       previewMathMod2: '22',
+
+      startImport() {
+        this.$dispatch('close-modal-import-spreadsheet');
+        this.isImporting = true;
+        // Simulate background task finishing after 5 seconds
+        setTimeout(() => {
+          this.isImporting = false;
+          alert("✅ Import completed successfully.");
+        }, 5000);
+      },
+
       init() {
         this.updateData();
         this.$watch('scoringMethod', (val) => {
@@ -698,7 +710,7 @@
             });
           }
         } else {
-          for(let i = 0; i <= maxRaw; i++) {
+          for(let i = 0; i <= 27; i += 3) {
             let rw = (Math.round((100 + (i / 27) * 300) / 10) * 10).toString();
             let m = i <= 22 ? (Math.round((100 + (i / 22) * 300) / 10) * 10).toString() : '';
             arr.push({ 
@@ -715,21 +727,102 @@
       updateData() {
         this.scoreMappings = this.generateData(27);
       },
+      getScoreForInput(val, moduleKey) {
+        if (!val) return '-';
+        let numVal = parseInt(val);
+        let applicableMap = null;
+        for (let m of this.scoreMappings) {
+          if (numVal >= parseInt(m.input)) {
+            applicableMap = m;
+          } else {
+            break;
+          }
+        }
+        return applicableMap && applicableMap[moduleKey] ? applicableMap[moduleKey] : '-';
+      },
+      deleteMapping(index) {
+        if (index === 0) return;
+        this.scoreMappings.splice(index, 1);
+      },
+      insertMapping(index, position) {
+        let insertIndex = position === 'above' ? index : index + 1;
+        let prevIndex = insertIndex - 1;
+        let nextIndex = insertIndex;
+        
+        let prevRaw = this.scoreMappings[prevIndex] ? parseInt(this.scoreMappings[prevIndex].input) : null;
+        let nextRaw = this.scoreMappings[nextIndex] ? parseInt(this.scoreMappings[nextIndex].input) : null;
+        
+        let placeholder = '';
+        if (prevRaw !== null && nextRaw !== null) {
+          if (nextRaw - prevRaw <= 1) {
+             alert("Cannot insert a threshold here, no available values in this range.");
+             return;
+          }
+          let min = prevRaw + 1;
+          let max = nextRaw - 1;
+          placeholder = min === max ? min.toString() : `${min}-${max}`;
+        } else if (prevRaw !== null) {
+          placeholder = (prevRaw + 1).toString() + '+';
+        } else if (nextRaw !== null) {
+           if (nextRaw === 0) {
+             alert("Cannot insert below 0.");
+             return;
+           }
+           let min = 0;
+           let max = nextRaw - 1;
+           placeholder = min === max ? min.toString() : `${min}-${max}`;
+        }
+
+        this.scoreMappings.splice(insertIndex, 0, {
+          input: '',
+          placeholder: placeholder,
+          isNew: true,
+          rwMod1: '',
+          rwMod2: '',
+          mathMod1: '',
+          mathMod2: ''
+        });
+
+        setTimeout(() => {
+          if (window.HSStaticMethods) {
+            window.HSStaticMethods.autoInit();
+          }
+        }, 100);
+      },
+      validateInput(index) {
+        let valStr = this.scoreMappings[index].input;
+        if (!valStr) {
+          this.scoreMappings[index].input = this.scoreMappings[index]._oldValue || '';
+          return;
+        }
+        let val = parseInt(valStr);
+        let prev = parseInt(this.scoreMappings[index - 1].input);
+        let next = this.scoreMappings[index + 1] ? parseInt(this.scoreMappings[index + 1].input) : null;
+        
+        if (isNaN(val)) {
+          this.scoreMappings[index].input = this.scoreMappings[index]._oldValue || '';
+          return;
+        }
+
+        if (val <= prev || (next !== null && val >= next)) {
+          let maxStr = next !== null ? (next - 1).toString() : 'infinity';
+          alert(`Value must be between ${prev + 1} and ${maxStr}.`);
+          this.scoreMappings[index].input = this.scoreMappings[index]._oldValue || '';
+        } else {
+          this.scoreMappings[index]._oldValue = val.toString();
+        }
+      },
       get previewRwMod1Result() {
-        let map = this.scoreMappings.find(m => m.input === this.previewRwMod1.toString());
-        return map && map.rwMod1 ? map.rwMod1 : '-';
+        return this.getScoreForInput(this.previewRwMod1, 'rwMod1');
       },
       get previewRwMod2Result() {
-        let map = this.scoreMappings.find(m => m.input === this.previewRwMod2.toString());
-        return map && map.rwMod2 ? map.rwMod2 : '-';
+        return this.getScoreForInput(this.previewRwMod2, 'rwMod2');
       },
       get previewMathMod1Result() {
-        let map = this.scoreMappings.find(m => m.input === this.previewMathMod1.toString());
-        return map && map.mathMod1 ? map.mathMod1 : '-';
+        return this.getScoreForInput(this.previewMathMod1, 'mathMod1');
       },
       get previewMathMod2Result() {
-        let map = this.scoreMappings.find(m => m.input === this.previewMathMod2.toString());
-        return map && map.mathMod2 ? map.mathMod2 : '-';
+        return this.getScoreForInput(this.previewMathMod2, 'mathMod2');
       },
       get previewTotal() {
         let rw1 = parseInt(this.previewRwMod1Result) || 0;
@@ -767,9 +860,17 @@
     }
   }
 </script>
-<div class="max-w-5xl mx-auto sm:px-6 lg:px-8 py-10 space-y-6" x-data="scoreConfigData()">
+<div class="max-w-5xl mx-auto sm:px-6 lg:px-8 py-10 space-y-6" x-data="scoreConfigData()" @modal-confirmed-import-spreadsheet.window="startImport()">
     
     
+    
+    
+
+    
+
+    
+
+
 
 
 
@@ -793,6 +894,7 @@
   
   <div class="flex items-center gap-2">
     
+  
   
 
 
@@ -1041,7 +1143,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-4893">
+         aria-describedby="tooltip-5961">
       
                   <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none" aria-label="Cancel upload">
                     <i data-lucide="pause" class="shrink-0 size-4"></i>
@@ -1053,7 +1155,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-4893"
+         id="tooltip-5961"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1146,7 +1248,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-4760">
+         aria-describedby="tooltip-7732">
       
                     <button type="button" @click.stop="replaceIndex = index; $refs.fileInput.click()" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Replace file">
                       <i data-lucide="refresh-cw" class="shrink-0 size-4"></i>
@@ -1158,7 +1260,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-4760"
+         id="tooltip-7732"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1246,7 +1348,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-2589">
+         aria-describedby="tooltip-7959">
       
                     <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Delete file">
                       <i data-lucide="trash-2" class="shrink-0 size-4"></i>
@@ -1258,7 +1360,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-2589"
+         id="tooltip-7959"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1380,11 +1482,86 @@
 </div>
 
 
+
   </div>
   
 </div>
 
 
+
+    <div x-show="isImporting" x-cloak>
+      
+
+  
+  
+  
+
+  
+  
+
+  
+  
+
+  
+  
+
+  
+  
+
+  
+  
+
+  <div  
+       class="bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-lg dark:bg-yellow-500/20 dark:border-yellow-900 dark:text-yellow-500 p-4  relative transition-opacity duration-300" 
+       role="alert" 
+       tabindex="-1"
+       aria-labelledby="-label"
+       >
+    
+    <div class="flex">
+      
+      
+      
+        <div class="shrink-0">
+          
+            <i data-lucide="loader" class="shrink-0 size-4 mt-0.5"></i>
+          
+        </div>
+      
+      
+      
+      <div class="ms-3 flex-1">
+        
+          <h3  class=" text-sm font-semibold">
+            Import in progress
+          </h3>
+        
+        
+        
+        
+        
+        
+          <div class="text-sm mt-2  opacity-90">
+            
+        <p class="mt-1">
+          This configuration is being updated. Editing is temporarily disabled.
+          <a href="#" class="font-medium underline hover:opacity-80 ms-1">
+            View Background Task &rarr;
+          </a>
+        </p>
+      
+          </div>
+        
+      </div>
+
+      
+      
+      
+    </div>
+  </div>
+
+
+    </div>
 
     <div class="flex flex-col bg-white border border-gray-200 overflow-hidden rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
           <!-- Header -->
@@ -1452,6 +1629,9 @@
                         <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
                           Math (Module 2)
                         </th>
+                        <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+                          <span class="sr-only">Actions</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
@@ -1459,7 +1639,40 @@
                         <tr>
                           <td class="size-px whitespace-nowrap">
                             <div class="py-2 px-3 sm:px-5">
-                              <span class="block py-1.5 sm:py-2 px-3 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="mapping.input"></span>
+                              <template x-if="index !== 0">
+                                
+<div class="w-full">
+  
+
+  <div class="relative w-full" x-data="{ inputValue: '' }">
+    
+    
+    
+    
+      
+    
+
+    <input type="text" 
+           id="" 
+           name=""
+           class="py-1.5 sm:py-2 px-3 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none   w-20 focus:!border-emerald-500 focus:!ring-emerald-500"
+           placeholder=""
+           
+           
+           x-model="mapping.input"
+           
+           x-bind:placeholder='mapping.placeholder || ""' @focus='mapping._oldValue = mapping.input' @input='mapping.input = mapping.input.replace(/[^0-9]/g, "")' @change='validateInput(index)' x-bind:disabled='isImporting'>
+           
+    
+  </div>
+  
+  
+</div>
+
+                              </template>
+                              <template x-if="index === 0">
+                                <span class="block py-1.5 sm:py-2 px-3 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="mapping.input"></span>
+                              </template>
                             </div>
                           </td>
                           <td class="size-px whitespace-nowrap">
@@ -1485,7 +1698,7 @@
            
            x-model="mapping.rwMod1"
            
-           >
+           x-bind:disabled="isImporting">
            
     
   </div>
@@ -1518,7 +1731,7 @@
            
            x-model="mapping.rwMod2"
            
-           >
+           x-bind:disabled="isImporting">
            
     
   </div>
@@ -1551,7 +1764,7 @@
            
            x-model="mapping.mathMod1"
            
-           >
+           x-bind:disabled="isImporting">
            
     
   </div>
@@ -1584,12 +1797,136 @@
            
            x-model="mapping.mathMod2"
            
-           >
+           x-bind:disabled="isImporting">
            
     
   </div>
   
   
+</div>
+
+                            </div>
+                          </td>
+                          <td class="size-px whitespace-nowrap">
+                            <div class="py-2 px-3 sm:px-5 flex justify-end" x-show="!isImporting">
+                              
+
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            if (rect.right < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.left = rect.right - menuWidth;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.left = 'auto';
+              this.right = window.innerWidth - rect.right;
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      <button type="button" class="size-9.5 lg:size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 " aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    
+  </div>
+
+  <!-- Dropdown Menu -->
+  <div x-show="open" 
+       x-ref="menu"
+       x-cloak
+       @click.outside="open = false"
+       x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-40 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+                                <button x-show="index !== 0" @click="insertMapping(index, 'above')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800">
+                                  <i data-lucide="arrow-up-to-line" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
+                                  Insert Above
+                                </button>
+                                <button @click="insertMapping(index, 'below')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800">
+                                  <i data-lucide="arrow-down-to-line" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
+                                  Insert Below
+                                </button>
+                                <div x-show="index !== 0" class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                                <button x-show="index !== 0" @click="deleteMapping(index)" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 focus:outline-hidden focus:bg-red-600/10">
+                                  <i data-lucide="trash-2" class="shrink-0 size-4 text-red-500 dark:text-red-500"></i>
+                                  Delete
+                                </button>
+                              
+      
+  </div>
 </div>
 
                             </div>
@@ -1839,6 +2176,199 @@
             </div>
           </div>
         </div>
+
+    <!-- Render Modal at Root Level -->
+    
+      
+
+
+
+<div x-data="{ 
+       open: false,
+       toggle() { this.open = !this.open; },
+       init() {
+         this.$watch('open', value => {
+           if (value) {
+             document.body.classList.add('overflow-hidden');
+             this.$nextTick(() => {
+               if (this.$refs.closeBtn) this.$refs.closeBtn.focus();
+               if (window.lucide) { window.lucide.createIcons(); }
+             });
+           } else {
+             document.body.classList.remove('overflow-hidden');
+           }
+         });
+       }
+     }"
+     @open-modal-delete-configuration.window="open = true"
+     @close-modal-delete-configuration.window="open = false"
+     class="inline-block">
+
+  
+  
+
+  
+  <div x-show="open"
+       x-cloak
+       class="fixed inset-0 z-[10000] overflow-y-auto"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="modal-title-delete-configuration">
+    
+    
+    <div x-show="open"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @click="open = false"
+         class="fixed inset-0 bg-neutral-900/50 dark:bg-neutral-900/80 backdrop-blur-sm"></div>
+
+    
+    <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+      
+      
+      <div x-show="open"
+           x-transition:enter="transition ease-out duration-300"
+           x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+           x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+           x-transition:leave="transition ease-in duration-200"
+           x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+           x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+           @keydown.escape.window="open = false"
+           class="relative overflow-hidden rounded-xl bg-white dark:bg-neutral-800 text-start shadow-xl sm:my-8 w-full sm:max-w-lg border border-gray-200 dark:border-neutral-700 flex flex-col max-h-[90vh]">
+        
+        
+        <div class="py-2.5 px-4 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700">
+          <div>
+            <h2 id="modal-title-delete-configuration" class="font-semibold text-gray-800 dark:text-neutral-200 text-sm sm:text-base">
+              Delete Configuration
+            </h2>
+            
+          </div>
+          <button x-ref="closeBtn" type="button" @click="open = false" class="size-8 shrink-0 flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-50 dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700" aria-label="Close">
+            <span class="sr-only">Close</span>
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        
+        <div class="overflow-y-auto p-5 flex-1 min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 text-sm text-gray-700 dark:text-neutral-300">
+          
+        <!-- Modal body -->
+        <div class="py-2 flex items-start gap-x-4">
+          <div class="shrink-0 flex justify-center items-center size-10 rounded-full bg-red-100 dark:bg-red-500/20">
+            <i data-lucide="triangle-alert" class="size-5 text-red-600 dark:text-red-500"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-800 dark:text-neutral-200">
+              This will permanently delete the scaled score configuration and all associated mappings. Exams using this configuration may no longer show scaled score to students. This action cannot be undone.
+            </p>
+          </div>
+        </div>
+      
+        </div>
+
+        
+        
+          <div class="p-4 flex justify-end gap-x-2">
+            
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"   @click="open = false">
+  
+
+    
+    
+
+    Cancel
+
+    
+
+  
+    </button>
+  
+
+
+            
+            
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-red-500 border border-transparent text-white hover:bg-red-600 focus:bg-red-600 dark:focus:ring-offset-neutral-800"   @click="$dispatch('modal-confirmed-delete-configuration'); open = false" >
+  
+
+    
+    
+
+    Delete Configuration
+
+    
+
+  
+    </button>
+  
+
+
+            
+          </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    <!-- Floating Save/Cancel Bar -->
+    <div class="fixed bottom-0 start-1/2 -translate-x-1/2 p-6 z-[100] w-full max-w-[400px]" x-show="!isImporting" x-transition>
+      <div class="py-2 px-6 bg-gray-900 rounded-full shadow-md dark:bg-neutral-950">
+        <div class="flex justify-between items-center">
+          
+          <!-- Left side -->
+          <div class="inline-flex items-center">
+            <span class="text-red-500 font-medium text-sm hover:underline focus:outline-hidden focus:underline cursor-pointer" @click="$dispatch('open-modal-delete-configuration')">Delete</span>
+          </div>
+
+          <!-- Right side -->
+          <div class="inline-flex items-center gap-x-3">
+            <a class="text-gray-300 font-medium text-sm hover:underline focus:outline-hidden focus:underline dark:text-neutral-400" href="#">Cancel</a>
+            <div class="w-px h-4 bg-gray-700 dark:bg-neutral-700"></div>
+            <a class="text-emerald-400 font-medium text-sm hover:underline focus:outline-hidden focus:underline dark:text-emerald-500" href="#">Save changes</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Floating Save/Cancel Bar -->
+
 </div>
 <script>
     document.addEventListener('alpine:init', () => {
