@@ -1,0 +1,295 @@
+{% from "../../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../../ui-system/components/popover.html" import popover %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/pagination.html" import pagination %}
+{% from "../../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/select.html" import select %}
+{% from "../../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+
+{% set header_content %}
+  {{ table_th(text="Student") }}
+  {{ table_th(text="Product") }}
+  {{ table_th(text="Attention reason") }}
+  {{ table_th(text="Owner") }}
+  {{ table_th(text="Last activity") }}
+  <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400"><span class="sr-only">Action</span></th>
+{% endset %}
+
+<div class="mt-8" x-data="{
+    // Mock loading state variables if needed for future interactive updates
+    isLoading: false,
+    isEmpty: false,
+    isError: false,
+    searchInput: ''
+}">
+
+  {% set table_actions %}
+    <div class="flex items-center gap-x-2">
+      {{ dropdown(
+        trigger=button(text="Sort", variant="secondary", icon="arrow-down-up", size="sm"),
+        placement="bottom-end",
+        width="medium",
+        items=[
+          { "label": "Most recent", "icon": "clock", "attrs": "class='bg-gray-50 dark:bg-neutral-800'" },
+          { "label": "Oldest", "icon": "history" },
+          { "label": "Highest urgency", "icon": "arrow-up" },
+          { "label": "Lowest urgency", "icon": "arrow-down" },
+          { "label": "Recently updated", "icon": "refresh-cw" }
+        ]
+      ) }}
+      {{ button(text="Filter", variant="secondary", icon="filter", size="sm", extra_attrs="@click=\"$dispatch('open-drawer-attention-filter')\"") }}
+    </div>
+  {% endset %}
+  
+  {% set pagination_html %}
+    {{ pagination(items=[1, 2, 3, '...', 8], current=1, show_go_to=true) }}
+  {% endset %}
+
+  {% call table(
+    search_enabled=true,
+    search_placeholder="Search students or products...",
+    search_x_model="searchInput",
+    filters=table_actions,
+    pagination=pagination_html,
+    table_header=header_content,
+    hoverable=false,
+    padded=true,
+    table_container_classes=""
+  ) %}
+    
+    <template x-if="isLoading">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <div class="animate-spin inline-block size-6 border-[3px] border-current border-t-transparent text-primary-600 rounded-full dark:text-primary-500" role="status" aria-label="loading">
+              <span class="sr-only">Loading...</span>
+            </div>
+            <p class="mt-4 text-sm text-gray-600 dark:text-neutral-400">Loading opportunities...</p>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+    <template x-if="isError">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <i data-lucide="alert-triangle" class="size-8 text-red-500 mb-3"></i>
+            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">We couldn't load opportunities right now.</p>
+            <button type="button" class="mt-4 py-1.5 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">
+              Try again
+            </button>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+    <template x-if="isEmpty">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <i data-lucide="inbox" class="size-8 text-gray-400 mb-3"></i>
+            <p class="text-sm text-gray-600 dark:text-neutral-400">No opportunities need your attention right now.</p>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+      {% for item in attention_items %}
+        {% if item.state != "Converted" and item.state != "Closed" %}
+        <tr class="transition-colors" x-show="!isLoading && !isEmpty && !isError">
+          {# Student #}
+          {% call table_td() %}
+            <div class="flex items-center gap-x-3">
+              <img class="inline-block size-8 rounded-full object-cover" src="{{ item.avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
+              <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors truncate max-w-[200px]">{{ item.student_name }}</a>
+            </div>
+          {% endcall %}
+
+          {# Product #}
+          {% call table_td() %}
+            <a href="#" class="text-sm text-gray-600 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-neutral-200 hover:underline transition-colors truncate max-w-[250px] block" title="{{ item.product_name }}">{{ item.product_name }}</a>
+          {% endcall %}
+
+          {# Reason #}
+          {% call table_td(class="max-w-[250px] xl:max-w-[320px]") %}
+            <div class="text-sm text-gray-600 dark:text-neutral-400 whitespace-normal line-clamp-2" title="{{ item.attention_reason }}">
+              {{ item.attention_reason }}
+            </div>
+          {% endcall %}
+
+
+          {# Owner #}
+          {% call table_td() %}
+            {% if item.owner == "Unassigned" %}
+              <span class="text-xs font-medium text-gray-500 dark:text-neutral-400 border border-gray-200 dark:border-neutral-700 border-dashed rounded-md px-1.5 py-0.5 inline-flex items-center bg-gray-50 dark:bg-neutral-800">
+                Unassigned
+              </span>
+            {% else %}
+              <div class="flex items-center gap-x-3">
+                <img class="inline-block size-8 rounded-full object-cover" src="{{ item.owner_avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
+                <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors">{{ item.owner }}</a>
+              </div>
+            {% endif %}
+          {% endcall %}
+
+          {# Last activity #}
+          {% call table_td() %}
+            <span class="text-sm text-gray-500 dark:text-neutral-400 whitespace-nowrap">{{ item.last_activity }}</span>
+          {% endcall %}
+
+          {# Action #}
+          {% call table_td(class="text-end") %}
+            <div class="flex items-center justify-end gap-x-2">
+
+              {% if item.owner == "Unassigned" %}
+                {{ button(text="Claim", variant="primary", size="sm") }}
+                {% call dropdown(trigger="ellipsis-horizontal", placement="bottom-end", width="medium") %}
+                  <a href="#" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <i data-lucide="external-link" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Open in new tab
+                  </a>
+                  
+                  {% set assign_owner_trigger %}
+                    <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                      <i data-lucide="user-plus" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Assign owner
+                    </button>
+                  {% endset %}
+                  
+                  {% set assign_owner_content %}
+                    <div class="p-4" x-data="{ selectedOwner: '' }" @change="selectedOwner = $event.target.value">
+                      <h3 class="font-medium text-sm text-gray-800 dark:text-neutral-200 mb-3">Assign Owner</h3>
+                      {{ select(name="assign_owner_select", placeholder="Select owner...", options=[{"value": "arun_kumar", "label": "Dr. Arun Kumar", "icon": "<img src='https://randomuser.me/api/portraits/men/46.jpg' alt=''>"}, {"value": "priya_sharma", "label": "Priya Sharma", "icon": "<img src='https://randomuser.me/api/portraits/women/44.jpg' alt=''>"}, {"value": "anil_desai", "label": "Anil Desai", "icon": "<img src='https://randomuser.me/api/portraits/men/15.jpg' alt=''>"}, {"value": "karthik", "label": "Karthik", "icon": "<img src='https://randomuser.me/api/portraits/men/82.jpg' alt=''>"}], search=true, multiple=false) }}
+                      <div class="mt-4 flex justify-end gap-x-2">
+                        {{ button(text="Cancel", variant="secondary", size="sm", extra_attrs="@click=\"active = false; $dispatch('close-dropdown')\"") }}
+                        {{ button(text="Assign", variant="primary", size="sm", extra_attrs="@click=\"active = false\" :disabled=\"!selectedOwner\"") }}
+                      </div>
+                    </div>
+                  {% endset %}
+                  <div class="w-full block">
+                    {{ popover(trigger=assign_owner_trigger, content=assign_owner_content, placement="left", trigger_type="click", trigger_class="!block w-full") }}
+                  </div>
+
+                  {% set schedule_followup_trigger %}
+                    <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                      <i data-lucide="calendar-clock" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Schedule follow-up
+                    </button>
+                  {% endset %}
+                  
+                  {% set schedule_followup_content %}
+                    <div class="p-4" x-data="{ selectedDate: '' }">
+                      <div class="mb-4">
+                        <h3 class="font-medium text-sm text-gray-800 dark:text-neutral-200">Schedule follow-up</h3>
+                        <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">Pick when you want this Opportunity to come back for attention.</p>
+                      </div>
+                      <div class="space-y-4">
+                        <div @change="selectedDate = $event.target.value">
+                          {{ date_picker(name="followup_date_1", label="Schedule at", placeholder="Select date & time", datetime=true) }}
+                        </div>
+                        {{ textarea(name="followup_notes_1", label="Notes", placeholder="Optional", rows="2") }}
+                      </div>
+                      <div class="mt-4 flex justify-end gap-x-2">
+                        {{ button(text="Cancel", variant="secondary", size="sm", extra_attrs="@click=\"active = false; $dispatch('close-dropdown')\"") }}
+                        {{ button(text="Schedule", variant="primary", size="sm", extra_attrs="@click=\"active = false\" :disabled=\"!selectedDate\"") }}
+                      </div>
+                    </div>
+                  {% endset %}
+                  <div class="w-full block">
+                    {{ popover(trigger=schedule_followup_trigger, content=schedule_followup_content, placement="left", trigger_type="click", trigger_class="!block w-full", width="w-80") }}
+                  </div>
+                  <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('open-modal-close-opp-{{ loop.index }}')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 dark:hover:bg-red-600/10">
+                    <i data-lucide="x-circle" class="shrink-0 size-4 text-red-500"></i> Close opportunity
+                  </button>
+                {% endcall %}
+              {% else %}
+                {{ button(text="Open", variant="secondary", size="sm") }}
+                {% call dropdown(trigger="ellipsis-horizontal", placement="bottom-end", width="medium") %}
+                  <a href="#" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <i data-lucide="external-link" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Open in new tab
+                  </a>
+                  
+                  {% set reassign_owner_trigger %}
+                    <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                      <i data-lucide="users" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Reassign owner
+                    </button>
+                  {% endset %}
+                  
+                  {% set reassign_owner_content %}
+                    <div class="p-4" x-data="{ selectedOwner: '' }" @change="selectedOwner = $event.target.value">
+                      <h3 class="font-medium text-sm text-gray-800 dark:text-neutral-200 mb-3">Reassign Owner</h3>
+                      {{ select(name="reassign_owner_select", placeholder="Select owner...", options=[{"value": "arun_kumar", "label": "Dr. Arun Kumar", "icon": "<img src='https://randomuser.me/api/portraits/men/46.jpg' alt=''>"}, {"value": "priya_sharma", "label": "Priya Sharma", "icon": "<img src='https://randomuser.me/api/portraits/women/44.jpg' alt=''>"}, {"value": "anil_desai", "label": "Anil Desai", "icon": "<img src='https://randomuser.me/api/portraits/men/15.jpg' alt=''>"}, {"value": "karthik", "label": "Karthik", "icon": "<img src='https://randomuser.me/api/portraits/men/82.jpg' alt=''>"}], search=true, multiple=false) }}
+                      <div class="mt-4 flex justify-end gap-x-2">
+                        {{ button(text="Cancel", variant="secondary", size="sm", extra_attrs="@click=\"active = false; $dispatch('close-dropdown')\"") }}
+                        {{ button(text="Assign", variant="primary", size="sm", extra_attrs="@click=\"active = false\" :disabled=\"!selectedOwner\"") }}
+                      </div>
+                    </div>
+                  {% endset %}
+                  <div class="w-full block">
+                    {{ popover(trigger=reassign_owner_trigger, content=reassign_owner_content, placement="left", trigger_type="click", trigger_class="!block w-full") }}
+                  </div>
+
+                  {% set schedule_followup_trigger %}
+                    <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                      <i data-lucide="calendar-clock" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Schedule follow-up
+                    </button>
+                  {% endset %}
+                  
+                  {% set schedule_followup_content %}
+                    <div class="p-4" x-data="{ selectedDate: '' }">
+                      <div class="mb-4">
+                        <h3 class="font-medium text-sm text-gray-800 dark:text-neutral-200">Schedule follow-up</h3>
+                        <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">Pick when you want this Opportunity to come back for attention.</p>
+                      </div>
+                      <div class="space-y-4">
+                        <div @change="selectedDate = $event.target.value">
+                          {{ date_picker(name="followup_date_2", label="Schedule at", placeholder="Select date & time", datetime=true) }}
+                        </div>
+                        {{ textarea(name="followup_notes_2", label="Notes", placeholder="Optional", rows="2") }}
+                      </div>
+                      <div class="mt-4 flex justify-end gap-x-2">
+                        {{ button(text="Cancel", variant="secondary", size="sm", extra_attrs="@click=\"active = false; $dispatch('close-dropdown')\"") }}
+                        {{ button(text="Schedule", variant="primary", size="sm", extra_attrs="@click=\"active = false\" :disabled=\"!selectedDate\"") }}
+                      </div>
+                    </div>
+                  {% endset %}
+                  <div class="w-full block">
+                    {{ popover(trigger=schedule_followup_trigger, content=schedule_followup_content, placement="left", trigger_type="click", trigger_class="!block w-full", width="w-80") }}
+                  </div>
+                  <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('open-modal-close-opp-{{ loop.index }}')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 dark:hover:bg-red-600/10">
+                    <i data-lucide="x-circle" class="shrink-0 size-4 text-red-500"></i> Close opportunity
+                  </button>
+                {% endcall %}
+              {% endif %}
+
+            <div x-data="{ closeReason: '' }" class="inline-block">
+              {% call modal(
+                id="close-opp-" ~ loop.index,
+                title="Close opportunity",
+                size="md",
+                variant="danger",
+                confirm_text="Close opportunity",
+                confirm_attrs=":disabled=\"!closeReason\""
+              ) %}
+                <p class="text-sm text-gray-800 dark:text-neutral-200 mb-4 font-medium">Why are you closing this opportunity?</p>
+                <div class="space-y-3">
+                  {{ radio(name="close_reason_" ~ loop.index, label="Not interested", value="not_interested", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Purchased elsewhere", value="purchased_elsewhere", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Not a good fit", value="not_good_fit", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Could not reach student", value="could_not_reach", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Duplicate opportunity", value="duplicate", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Other", value="other", x_model="closeReason") }}
+                </div>
+              {% endcall %}
+            </div>
+            </div>
+          {% endcall %}
+        </tr>
+        {% endif %}
+      {% endfor %}
+  {% endcall %}
+</div>
