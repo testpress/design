@@ -91,36 +91,10 @@ tags: testpress
       },
       insertMapping(index, position) {
         let insertIndex = position === 'above' ? index : index + 1;
-        let prevIndex = insertIndex - 1;
-        let nextIndex = insertIndex;
         
-        let prevRaw = this.scoreMappings[prevIndex] ? parseInt(this.scoreMappings[prevIndex].input) : null;
-        let nextRaw = this.scoreMappings[nextIndex] ? parseInt(this.scoreMappings[nextIndex].input) : null;
-        
-        let placeholder = '';
-        if (prevRaw !== null && nextRaw !== null) {
-          if (nextRaw - prevRaw <= 1) {
-             alert("Cannot insert a threshold here, no available values in this range.");
-             return;
-          }
-          let min = prevRaw + 1;
-          let max = nextRaw - 1;
-          placeholder = min === max ? min.toString() : `${min}-${max}`;
-        } else if (prevRaw !== null) {
-          placeholder = (prevRaw + 1).toString() + '+';
-        } else if (nextRaw !== null) {
-           if (nextRaw === 0) {
-             alert("Cannot insert below 0.");
-             return;
-           }
-           let min = 0;
-           let max = nextRaw - 1;
-           placeholder = min === max ? min.toString() : `${min}-${max}`;
-        }
-
         this.scoreMappings.splice(insertIndex, 0, {
           input: '',
-          placeholder: placeholder,
+          placeholder: 'Enter cutoff',
           isNew: true,
           rwMod1: '',
           rwMod2: '',
@@ -156,6 +130,32 @@ tags: testpress
         } else {
           this.scoreMappings[index]._oldValue = val.toString();
         }
+      },
+      getRangeMax(index) {
+        let currentInputStr = this.scoreMappings[index].input;
+        if (!currentInputStr) return '';
+        
+        let currentVal = parseInt(currentInputStr);
+        if (isNaN(currentVal)) return '';
+
+        let nextVal = null;
+        for (let i = index + 1; i < this.scoreMappings.length; i++) {
+          let nextInputStr = this.scoreMappings[i].input;
+          if (nextInputStr) {
+            let parsed = parseInt(nextInputStr);
+            if (!isNaN(parsed)) {
+              nextVal = parsed;
+              break;
+            }
+          }
+        }
+        
+        if (nextVal !== null) {
+          return `– &nbsp;&nbsp;${nextVal - 1}`;
+        }
+        
+        let max = this.scoringMethod === 'Percentage' ? 100 : 27;
+        return `– &nbsp;&nbsp;${max}`;
       },
       get previewRwMod1Result() {
         return this.getScoreForInput(this.previewRwMod1, 'rwMod1');
@@ -329,7 +329,7 @@ tags: testpress
                     <thead class="bg-gray-100 dark:bg-neutral-700">
                       <tr>
                         <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">
-                          <span x-text="scoringMethod === 'Raw Score' ? 'Raw Score' : 'Percentage'"></span>
+                          <span x-text="scoringMethod === 'Raw Score' ? 'Raw Score Range' : 'Percentage Range'"></span>
                         </th>
                         <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
                           R&amp;W (Module 1)
@@ -352,13 +352,11 @@ tags: testpress
                       <template x-for="(mapping, index) in scoreMappings" :key="index">
                         <tr>
                           <td class="size-px whitespace-nowrap">
-                            <div class="py-2 px-3 sm:px-5">
-                              <template x-if="index !== 0">
-                                {{ input("", x_model="mapping.input", extra_classes="w-20 focus:!border-emerald-500 focus:!ring-emerald-500", extra_attrs="x-bind:placeholder='mapping.placeholder || \"\"' @focus='mapping._oldValue = mapping.input' @input='mapping.input = mapping.input.replace(/[^0-9]/g, \"\")' @change='validateInput(index)' x-bind:disabled='isImporting'", padding_class="py-1.5 sm:py-2") }}
-                              </template>
-                              <template x-if="index === 0">
-                                <span class="block py-1.5 sm:py-2 px-3 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="mapping.input"></span>
-                              </template>
+                            <div class="py-2 px-3 sm:px-5 flex items-center gap-x-3">
+                              <div class="w-16">
+                                {{ input("", x_model="mapping.input", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500 text-center px-1", extra_attrs="placeholder='Min' @focus='mapping._oldValue = mapping.input' @input='mapping.input = mapping.input.replace(/[^0-9]/g, \"\")' @change='validateInput(index)' x-bind:disabled='isImporting'", padding_class="py-1.5 sm:py-2") }}
+                              </div>
+                              <span class="text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap" x-html="getRangeMax(index)"></span>
                             </div>
                           </td>
                           <td class="size-px whitespace-nowrap">
@@ -404,6 +402,20 @@ tags: testpress
                       </template>
                     </tbody>
                   </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Info Alert -->
+            <div class="mt-4 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-sm text-gray-600 dark:text-neutral-300 rounded-lg p-4" role="alert">
+              <div class="flex items-center">
+                <div class="shrink-0">
+                  <i data-lucide="info" class="shrink-0 size-4"></i>
+                </div>
+                <div class="flex-1 md:flex md:justify-between ms-2">
+                  <p class="text-sm">
+                    Ranges are calculated automatically. You only need to enter the starting raw-score cutoff for each mapping.
+                  </p>
                 </div>
               </div>
             </div>
