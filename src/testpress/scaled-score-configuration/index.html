@@ -1,0 +1,576 @@
+---
+title: Scaled Score Configuration
+slug: scaled-score-configuration
+tags: testpress
+---
+{% extends "layouts/admin_base.html" %}
+{% from "src/ui-system/components/card.html" import card %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock body_class %}
+{% block content %}
+<script>
+  function scoreConfigData() {
+    return {
+      isEmpty: new URLSearchParams(window.location.search).get('status') === 'empty',
+      isImporting: false,
+      scoringMethod: 'Raw Score',
+      scoreMappings: [{ input: '0', rwMod1: '200', rwMod2: '200', mathMod1: '200', mathMod2: '200' }],
+      previewRwMod1: '27',
+      previewRwMod2: '27',
+      previewMathMod1: '22',
+      previewMathMod2: '22',
+
+      startImport() {
+        this.$dispatch('close-modal-import-spreadsheet');
+        this.isImporting = true;
+        // Simulate background task finishing after 5 seconds
+        setTimeout(() => {
+          this.isImporting = false;
+          alert("✅ Import completed successfully.");
+        }, 5000);
+      },
+
+      init() {
+        this.updateData();
+        this.$watch('scoringMethod', (val) => {
+          this.previewRwMod1 = val === 'Percentage' ? '100' : '27';
+          this.previewRwMod2 = val === 'Percentage' ? '100' : '27';
+          this.previewMathMod1 = val === 'Percentage' ? '100' : '22';
+          this.previewMathMod2 = val === 'Percentage' ? '100' : '22';
+          this.updateData();
+        });
+      },
+      generateData(maxRaw) {
+        let arr = [];
+        if (this.scoringMethod === 'Percentage') {
+          for(let i = 0; i <= 100; i += 10) {
+            let rw = (Math.round((100 + (i / 100) * 300) / 10) * 10).toString();
+            let m = (Math.round((100 + (i / 100) * 300) / 10) * 10).toString();
+            arr.push({ 
+              input: i.toString(), 
+              rwMod1: rw, 
+              rwMod2: rw,
+              mathMod1: m,
+              mathMod2: m
+            });
+          }
+        } else {
+          for(let i = 0; i <= 27; i += 3) {
+            let rw = (Math.round((100 + (i / 27) * 300) / 10) * 10).toString();
+            let m = i <= 22 ? (Math.round((100 + (i / 22) * 300) / 10) * 10).toString() : '';
+            arr.push({ 
+              input: i.toString(), 
+              rwMod1: rw, 
+              rwMod2: rw,
+              mathMod1: m,
+              mathMod2: m
+            });
+          }
+        }
+        return arr;
+      },
+      updateData() {
+        this.scoreMappings = this.generateData(27);
+      },
+      getScoreForInput(val, moduleKey) {
+        if (!val) return '-';
+        let numVal = parseInt(val);
+        let applicableMap = null;
+        for (let m of this.scoreMappings) {
+          if (numVal >= parseInt(m.input)) {
+            applicableMap = m;
+          } else {
+            break;
+          }
+        }
+        return applicableMap && applicableMap[moduleKey] ? applicableMap[moduleKey] : '-';
+      },
+      deleteMapping(index) {
+        if (index === 0) return;
+        this.scoreMappings.splice(index, 1);
+      },
+      insertMapping(index, position) {
+        let insertIndex = position === 'above' ? index : index + 1;
+        
+        this.scoreMappings.splice(insertIndex, 0, {
+          input: '',
+          placeholder: 'Enter cutoff',
+          isNew: true,
+          rwMod1: '',
+          rwMod2: '',
+          mathMod1: '',
+          mathMod2: ''
+        });
+
+        setTimeout(() => {
+          if (window.HSStaticMethods) {
+            window.HSStaticMethods.autoInit();
+          }
+        }, 100);
+      },
+      validateInput(index) {
+        let valStr = this.scoreMappings[index].input;
+        if (!valStr) {
+          this.scoreMappings[index].input = this.scoreMappings[index]._oldValue || '';
+          return;
+        }
+        let val = parseInt(valStr);
+        let prev = parseInt(this.scoreMappings[index - 1].input);
+        let next = this.scoreMappings[index + 1] ? parseInt(this.scoreMappings[index + 1].input) : null;
+        
+        if (isNaN(val)) {
+          this.scoreMappings[index].input = this.scoreMappings[index]._oldValue || '';
+          return;
+        }
+
+        if (val <= prev || (next !== null && val >= next)) {
+          let maxStr = next !== null ? (next - 1).toString() : 'infinity';
+          alert(`Value must be between ${prev + 1} and ${maxStr}.`);
+          this.scoreMappings[index].input = this.scoreMappings[index]._oldValue || '';
+        } else {
+          this.scoreMappings[index]._oldValue = val.toString();
+        }
+      },
+      getRangeMax(index) {
+        let currentInputStr = this.scoreMappings[index].input;
+        if (!currentInputStr) return '';
+        
+        let currentVal = parseInt(currentInputStr);
+        if (isNaN(currentVal)) return '';
+
+        let nextVal = null;
+        for (let i = index + 1; i < this.scoreMappings.length; i++) {
+          let nextInputStr = this.scoreMappings[i].input;
+          if (nextInputStr) {
+            let parsed = parseInt(nextInputStr);
+            if (!isNaN(parsed)) {
+              nextVal = parsed;
+              break;
+            }
+          }
+        }
+        
+        if (nextVal !== null) {
+          return `– &nbsp;&nbsp;${nextVal - 1}`;
+        }
+        
+        let max = this.scoringMethod === 'Percentage' ? 100 : 27;
+        return `– &nbsp;&nbsp;${max}`;
+      },
+      get previewRwMod1Result() {
+        return this.getScoreForInput(this.previewRwMod1, 'rwMod1');
+      },
+      get previewRwMod2Result() {
+        return this.getScoreForInput(this.previewRwMod2, 'rwMod2');
+      },
+      get previewMathMod1Result() {
+        return this.getScoreForInput(this.previewMathMod1, 'mathMod1');
+      },
+      get previewMathMod2Result() {
+        return this.getScoreForInput(this.previewMathMod2, 'mathMod2');
+      },
+      get previewTotal() {
+        let rw1 = parseInt(this.previewRwMod1Result) || 0;
+        let rw2 = parseInt(this.previewRwMod2Result) || 0;
+        let m1 = parseInt(this.previewMathMod1Result) || 0;
+        let m2 = parseInt(this.previewMathMod2Result) || 0;
+        if (!rw1 && !rw2 && !m1 && !m2) return '-';
+        return rw1 + rw2 + m1 + m2;
+      },
+      downloadTemplate() {
+        let headers = [this.scoringMethod === 'Raw Score' ? 'Raw Score' : 'Percentage', 'R&W (Module 1)', 'R&W (Module 2)', 'Math (Module 1)', 'Math (Module 2)'];
+        let csvContent = headers.join(',') + '\n';
+        
+        this.scoreMappings.forEach(row => {
+          let cols = [
+            row.input,
+            row.rwMod1 || '',
+            row.rwMod2 || '',
+            row.mathMod1 || '',
+            row.mathMod2 || ''
+          ];
+          csvContent += cols.join(',') + '\n';
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'scaled_score_template.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    }
+  }
+</script>
+<div class="max-w-5xl mx-auto sm:px-6 lg:px-8 py-10 space-y-6" x-data="scoreConfigData()" @modal-confirmed-import-spreadsheet.window="startImport()">
+    {% from "../../ui-system/components/input.html" import input %}
+    {% from "../../ui-system/components/dropdown.html" import dropdown %}
+    {% from "../../ui-system/components/modal.html" import modal %}
+    {% from "../../ui-system/components/alert.html" import alert %}
+    {% from "../../ui-system/components/empty-state.html" import empty_state %}
+    {% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+
+    {% set delete_modal %}
+      {% call modal(
+        id="delete-configuration",
+        title="Delete Configuration",
+        confirm_text="Delete Configuration",
+        cancel_text="Cancel",
+        variant="danger"
+      ) %}
+        <!-- Modal body -->
+        <div class="py-2 flex items-start gap-x-4">
+          <div class="shrink-0 flex justify-center items-center size-10 rounded-full bg-red-100 dark:bg-red-500/20">
+            <i data-lucide="triangle-alert" class="size-5 text-red-600 dark:text-red-500"></i>
+          </div>
+          <div>
+            <p class="text-sm text-gray-800 dark:text-neutral-200">
+              This will permanently delete the scaled score configuration and all associated mappings. Exams using this configuration may no longer show scaled score to students. This action cannot be undone.
+            </p>
+          </div>
+        </div>
+      {% endcall %}
+    {% endset %}
+
+    <div class="space-y-2">
+      {{ breadcrumb(options={
+        items: [
+          { label: 'Exams', href: '#' },
+          { label: 'Digital SAT Practice Test 1', href: '#' },
+          { label: 'Scaled Score Configuration' }
+        ]
+      }) }}
+      {% include "./includes/header.html" %}
+    </div>
+
+    <div x-show="isEmpty" x-cloak>
+      {{ empty_state(
+          title="No Scaled Score Configuration",
+          description="Create a scaled score configuration manually or import an existing mapping spreadsheet.",
+          icon="chart-column",
+          primary_action_text="Create Configuration",
+          primary_action_href="#",
+          primary_action_attrs='@click.prevent="window.location.href = window.location.pathname"',
+          secondary_action_text="Import Spreadsheet",
+          secondary_action_href="#",
+          secondary_action_attrs='@click.prevent="$dispatch(\'open-modal-import-spreadsheet\')"'
+      ) }}
+    </div>
+
+    <div x-show="!isEmpty" class="space-y-6" x-cloak>
+    <div x-show="isImporting" x-cloak>
+      {% call alert(
+        variant="warning",
+        style="soft",
+        title="Import in progress",
+        icon="loader"
+      ) %}
+        <p class="mt-1">
+          This configuration is being updated. Editing is temporarily disabled.
+          <a href="#" class="font-medium underline hover:opacity-80 ms-1">
+            View Background Task &rarr;
+          </a>
+        </p>
+      {% endcall %}
+    </div>
+
+    <div class="flex flex-col bg-white border border-gray-200 overflow-hidden rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
+          <!-- Header -->
+          <div class="py-3 px-5 flex justify-between items-center gap-x-5 border-b border-gray-200 dark:border-neutral-700">
+            <h2 class="inline-block font-medium text-gray-800 dark:text-neutral-200">
+              Configuration
+            </h2>
+          </div>
+          <!-- End Header -->
+
+          <!-- Body -->
+          <div class="p-5 space-y-6">
+            <div class="space-y-3">
+              <div class="grid lg:grid-cols-2 gap-3 lg:gap-5">
+                <!-- Checkbox -->
+                <label for="method-raw-score" class="py-3 px-4 flex text-sm bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 rounded-xl cursor-pointer ring-1 ring-gray-200 dark:ring-neutral-700 has-[:checked]:ring-2 has-[:checked]:ring-emerald-600 transition-shadow">
+                  <input type="radio" id="method-raw-score" x-model="scoringMethod" class="shrink-0 mt-0.5 bg-transparent border-gray-200 dark:border-neutral-700 text-emerald-600 rounded-full focus:ring-0 focus:ring-offset-0 checked:bg-emerald-600 checked:border-emerald-600" value="Raw Score" name="scoring_method">
+                  <span class="grow px-4 space-y-1">
+                    <span class="block font-medium">
+                      Raw Score
+                    </span>
+                    <span class="block text-sm/6 text-gray-500 dark:text-neutral-400">
+                      Convert scaled scores using the student's number of correct answers.
+                    </span>
+                  </span>
+                </label>
+                <!-- End Checkbox -->
+                
+                <!-- Checkbox -->
+              <label for="method-percentage" class="py-3 px-4 flex text-sm bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 rounded-xl cursor-pointer ring-1 ring-gray-200 dark:ring-neutral-700 has-[:checked]:ring-2 has-[:checked]:ring-emerald-600 transition-shadow">
+                <input type="radio" id="method-percentage" x-model="scoringMethod" class="shrink-0 mt-0.5 bg-transparent border-gray-200 dark:border-neutral-700 text-emerald-600 rounded-full focus:ring-0 focus:ring-offset-0 checked:bg-emerald-600 checked:border-emerald-600" value="Percentage" name="scoring_method">
+                <span class="grow px-4 space-y-1">
+                  <span class="block font-medium">
+                    Percentage
+                  </span>
+                  <span class="block text-sm/6 text-gray-500 dark:text-neutral-400">
+                    Convert scaled scores using the percentage of correct answers.
+                  </span>
+                </span>
+              </label>
+              <!-- End Checkbox -->
+            </div>
+          </div>
+
+          <div>
+            <!-- Custom Unified Table -->
+            <div class="flex flex-col bg-white dark:bg-neutral-800 border sm:border border-gray-200 dark:border-neutral-700 shadow-none sm:rounded-lg overflow-hidden">
+              <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                <div class="min-w-full inline-block align-middle">
+                  <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700 border-t border-gray-200 dark:border-neutral-700">
+                    <thead class="bg-gray-100 dark:bg-neutral-700">
+                      <tr>
+                        <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">
+                          <span x-text="scoringMethod === 'Raw Score' ? 'Raw Score Range' : 'Percentage Range'"></span>
+                        </th>
+                        <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+                          R&amp;W (Module 1)
+                        </th>
+                        <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+                          R&amp;W (Module 2)
+                        </th>
+                        <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+                          Math (Module 1)
+                        </th>
+                        <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+                          Math (Module 2)
+                        </th>
+                        <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+                          <span class="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+                      <template x-for="(mapping, index) in scoreMappings" :key="index">
+                        <tr>
+                          <td class="size-px whitespace-nowrap">
+                            <div class="py-2 px-3 sm:px-5 flex items-center gap-x-3">
+                              <div class="w-16">
+                                {{ input("", x_model="mapping.input", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500 text-center px-1", extra_attrs="placeholder='Min' @focus='mapping._oldValue = mapping.input' @input='mapping.input = mapping.input.replace(/[^0-9]/g, \"\")' @change='validateInput(index)' x-bind:disabled='isImporting'", padding_class="py-1.5 sm:py-2") }}
+                              </div>
+                              <span class="text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap" x-html="getRangeMax(index)"></span>
+                            </div>
+                          </td>
+                          <td class="size-px whitespace-nowrap">
+                            <div class="py-2 px-3 sm:px-5">
+                              {{ input("", x_model="mapping.rwMod1", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", extra_attrs='x-bind:disabled="isImporting"', padding_class="py-1.5 sm:py-2") }}
+                            </div>
+                          </td>
+                          <td class="size-px whitespace-nowrap">
+                            <div class="py-2 px-3 sm:px-5">
+                              {{ input("", x_model="mapping.rwMod2", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", extra_attrs='x-bind:disabled="isImporting"', padding_class="py-1.5 sm:py-2") }}
+                            </div>
+                          </td>
+                          <td class="size-px whitespace-nowrap">
+                            <div class="py-2 px-3 sm:px-5">
+                              {{ input("", x_model="mapping.mathMod1", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", extra_attrs='x-bind:disabled="isImporting"', padding_class="py-1.5 sm:py-2") }}
+                            </div>
+                          </td>
+                          <td class="size-px whitespace-nowrap">
+                            <div class="py-2 px-3 sm:px-5">
+                              {{ input("", x_model="mapping.mathMod2", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", extra_attrs='x-bind:disabled="isImporting"', padding_class="py-1.5 sm:py-2") }}
+                            </div>
+                          </td>
+                          <td class="size-px whitespace-nowrap">
+                            <div class="py-2 px-3 sm:px-5 flex justify-end" x-show="!isImporting">
+                              {% call dropdown(trigger="ellipsis-vertical", placement="bottom-end") %}
+                                <button x-show="index !== 0" @click="insertMapping(index, 'above')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800">
+                                  <i data-lucide="arrow-up-to-line" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
+                                  Insert Above
+                                </button>
+                                <button @click="insertMapping(index, 'below')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800">
+                                  <i data-lucide="arrow-down-to-line" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
+                                  Insert Below
+                                </button>
+                                <div x-show="index !== 0" class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                                <button x-show="index !== 0" @click="deleteMapping(index)" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 focus:outline-hidden focus:bg-red-600/10">
+                                  <i data-lucide="trash-2" class="shrink-0 size-4 text-red-500 dark:text-red-500"></i>
+                                  Delete
+                                </button>
+                              {% endcall %}
+                            </div>
+                          </td>
+                        </tr>
+                      </template>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Info Alert -->
+            <div class="mt-4 bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-sm text-gray-600 dark:text-neutral-300 rounded-lg p-4" role="alert">
+              <div class="flex items-center">
+                <div class="shrink-0">
+                  <i data-lucide="info" class="shrink-0 size-4"></i>
+                </div>
+                <div class="flex-1 md:flex md:justify-between ms-2">
+                  <p class="text-sm">
+                    Ranges are calculated automatically. You only need to enter the starting raw-score cutoff for each mapping.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          </div>
+          <!-- End Body -->
+        </div>
+
+        <!-- Preview Section -->
+        <div class="flex flex-col bg-white border border-gray-200 overflow-hidden rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
+          <div class="py-4 px-5 border-b border-gray-200 dark:border-neutral-700">
+            <h2 class="font-medium text-gray-800 dark:text-neutral-200">
+              Test this saved conversion
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+              Enter a hypothetical student's raw score for every score group to verify the saved configuration using the same logic as a real exam attempt.
+            </p>
+          </div>
+          <div class="border-t border-gray-200 dark:border-neutral-700">
+            <div class="min-w-full inline-block align-middle">
+              <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                <thead class="bg-gray-100 dark:bg-neutral-700">
+                  <tr>
+                    <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">
+                      Module
+                    </th>
+                    <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">
+                      <span x-text="scoringMethod === 'Raw Score' ? 'Raw Score' : 'Percentage'"></span>
+                    </th>
+                    <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">
+                      Scaled Score
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+                  <!-- R&W Mod 1 -->
+                  <tr>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-normal text-gray-800 dark:text-neutral-200">R&amp;W (Module 1)</span>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <div class="w-24">
+                          {{ input("", x_model="previewRwMod1", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", padding_class="py-1.5 sm:py-2") }}
+                        </div>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="previewRwMod1Result">-</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- R&W Mod 2 -->
+                  <tr>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-normal text-gray-800 dark:text-neutral-200">R&amp;W (Module 2)</span>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <div class="w-24">
+                          {{ input("", x_model="previewRwMod2", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", padding_class="py-1.5 sm:py-2") }}
+                        </div>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="previewRwMod2Result">-</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- Math Mod 1 -->
+                  <tr>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-normal text-gray-800 dark:text-neutral-200">Math (Module 1)</span>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <div class="w-24">
+                          {{ input("", x_model="previewMathMod1", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", padding_class="py-1.5 sm:py-2") }}
+                        </div>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="previewMathMod1Result">-</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- Math Mod 2 -->
+                  <tr>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-normal text-gray-800 dark:text-neutral-200">Math (Module 2)</span>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <div class="w-24">
+                          {{ input("", x_model="previewMathMod2", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", padding_class="py-1.5 sm:py-2") }}
+                        </div>
+                      </div>
+                    </td>
+                    <td class="size-px whitespace-nowrap">
+                      <div class="py-2 px-3 sm:px-5">
+                        <span class="block py-1.5 sm:py-2 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="previewMathMod2Result">-</span>
+                      </div>
+                    </td>
+                  </tr>
+                  <!-- Total Score Row replaced by tfoot -->
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td class="hidden sm:table-cell"></td>
+                    <th scope="row" class="pt-4 pb-4 px-3 sm:px-5 text-start text-sm font-medium text-gray-800 dark:text-neutral-200">Total Score</th>
+                    <td class="pt-4 pb-4 px-3 sm:px-5 text-start text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="previewTotal">-</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+    <!-- Render Modal at Root Level -->
+    {{ delete_modal | safe }}
+
+    <!-- Floating Save/Cancel Bar -->
+    <div class="fixed bottom-0 start-1/2 -translate-x-1/2 p-6 z-[100] w-full max-w-[400px]" x-show="!isImporting" x-transition>
+      <div class="py-2 px-6 bg-gray-900 rounded-full shadow-md dark:bg-neutral-950">
+        <div class="flex justify-between items-center">
+          
+          <!-- Left side -->
+          <div class="inline-flex items-center">
+            <span class="text-red-500 font-medium text-sm hover:underline focus:outline-hidden focus:underline cursor-pointer" @click="$dispatch('open-modal-delete-configuration')">Delete</span>
+          </div>
+
+          <!-- Right side -->
+          <div class="inline-flex items-center gap-x-3">
+            <a class="text-gray-300 font-medium text-sm hover:underline focus:outline-hidden focus:underline dark:text-neutral-400" href="#">Cancel</a>
+            <div class="w-px h-4 bg-gray-700 dark:bg-neutral-700"></div>
+            <a class="text-emerald-400 font-medium text-sm hover:underline focus:outline-hidden focus:underline dark:text-emerald-500" href="#">Save changes</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- End Floating Save/Cancel Bar -->
+    </div>
+
+</div>
+{% include "src/ui-system/scripts/upload_script.html" %}
+{% endblock %}
