@@ -185,7 +185,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-2785">
+         aria-describedby="tooltip-7898">
       
           <button type="button" @click="$dispatch('open-drawer-student-chat-drawer')" class="relative shrink-0 h-8 w-8 inline-flex justify-center items-center border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:bg-gray-100 dark:focus:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none" aria-label="Messages">
             <i data-lucide="message-circle" class="shrink-0 size-4"></i>
@@ -203,7 +203,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-2785"
+         id="tooltip-7898"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1249,7 +1249,34 @@
         <!-- Body & Footer (caller handles overflow and sticky elements) -->
         <div class="flex flex-col flex-1 overflow-hidden">
             
-      <div class="flex-1 flex flex-col h-full bg-white dark:bg-neutral-900" x-data="{ isChatActive: false, question: '', product: '', showProductError: false, showQuestionError: false }" x-init="$watch('isChatActive', val => { if (val) $nextTick(() => $refs.chatInput && $refs.chatInput.focus()) })">
+      <div class="flex-1 flex flex-col h-full bg-white dark:bg-neutral-900" x-data="{ 
+          question: '', 
+          product: '', 
+          showProductError: false, 
+          showQuestionError: false,
+          messages: [],
+          lastProductContext: '',
+          sendMessage() {
+              this.showProductError = !this.product;
+              this.showQuestionError = !this.question.trim();
+              if (this.showProductError || this.showQuestionError) return;
+              
+              if (this.product !== this.lastProductContext) {
+                  this.messages.push({ type: 'context', product: this.product });
+                  this.lastProductContext = this.product;
+              }
+              
+              this.messages.push({ type: 'message', text: this.question.trim(), time: 'Just now' });
+              
+              this.question = '';
+              if (this.$refs.chatInput) this.$refs.chatInput.value = '';
+              
+              this.$nextTick(() => {
+                  const container = this.$refs.chatBody;
+                  if (container) container.scrollTop = container.scrollHeight;
+              });
+          }
+      }">
         <style>
             .has-error [x-ref="toggle"],
             .has-error textarea {
@@ -1261,17 +1288,68 @@
                 --tw-ring-color: #ef4444 !important;
             }
         </style>
-        <!-- Enquiry Form -->
-        <div class="p-4 flex-1 overflow-y-auto flex flex-col items-center justify-center" x-show="!isChatActive" x-transition>
-          <div class="w-full max-w-sm space-y-6">
-            <div class="text-center">
-                <h4 class="text-lg font-semibold text-gray-800 dark:text-neutral-200">Start a purchase enquiry</h4>
-                <p class="text-sm text-gray-500 dark:text-neutral-400 mt-1">Choose a product and tell us how we can help. We'll reply here as soon as we can.</p>
-            </div>
 
-            <div class="space-y-4 text-left">
-                <div @change="product = $event.target.value; showProductError = false" :class="{'has-error': showProductError}">
-                    
+        <!-- Chat View -->
+        <div class="flex-1 flex flex-col h-full">
+          
+          <!-- Chat Body -->
+          <div x-ref="chatBody" class="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+            <div class="p-4 sm:p-6 h-full flex flex-col">
+              
+              <!-- Empty state (Initial) -->
+              <div x-show="messages.length === 0" class="flex-1 flex flex-col items-center justify-center text-center px-4">
+                <div class="inline-flex items-center justify-center size-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mb-4">
+                    <svg class="size-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <h4 class="text-gray-800 dark:text-neutral-200 font-medium">Start a purchase enquiry</h4>
+                <p class="text-sm text-gray-500 dark:text-neutral-400 mt-1 max-w-xs">Select a product below and send us your question. We'll reply here as soon as we can.</p>
+              </div>
+
+              <!-- Chat Messages -->
+              <ul x-show="messages.length > 0" class="space-y-5 flex-1">
+                <template x-for="(msg, index) in messages" :key="index">
+                    <div class="space-y-5">
+                        <template x-if="msg.type === 'context'">
+                          <!-- System Event: Context -->
+                          <div class="flex flex-col items-center justify-center my-4 text-center">
+                            <p class="text-xs font-medium text-gray-500 dark:text-neutral-400 flex items-center gap-x-1.5 justify-center">
+                              <svg class="size-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Purchase Enquiry
+                            </p>
+                            <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5" x-text="msg.product"></p>
+                          </div>
+                        </template>
+                        
+                        <template x-if="msg.type === 'message'">
+                          <!-- Student Message -->
+                          <li class="max-w-md ms-auto text-end flex justify-end gap-x-2">
+                            <div>
+                              <div class="space-y-1">
+                                <div class="group flex justify-end gap-x-2" style="word-break: break-word;">
+                                  <div class="order-2 text-start bg-primary-100 dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                                    <div class="text-sm text-gray-800 dark:text-neutral-200">
+                                      <span x-text="msg.text" style="white-space: pre-wrap;"></span>
+                                      <span>
+                                        <span class="ms-1 text-[11px] text-end text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </li>
+                        </template>
+                    </div>
+                </template>
+              </ul>
+            </div>
+          </div>
+          <!-- End Chat Body -->
+
+          <!-- Chat Footer Input -->
+          <footer class="bg-white dark:bg-neutral-800 rounded-none flex flex-col">
+            <div class="px-4 py-3 transition-colors">
+              <div @change="product = $event.target.value; showProductError = false" :class="{'has-error': showProductError}">
+                  
 
 
 <div class="space-y-2" 
@@ -1285,13 +1363,6 @@
      @scroll.window.capture.passive="if(open) updatePosition()"
      @resize.window.passive="if(open) updatePosition()">
 
-    
-    <div class="flex justify-between items-center">
-        <label for="product" class="block text-sm font-medium text-gray-800 dark:text-white">
-            Product<span class="text-red-500 ml-1">*</span>
-        </label>
-        
-    </div>
     
 
     <div class="relative">
@@ -1334,7 +1405,7 @@
                         </div>
                     </template>
                     <!-- Placeholder (Multiple) -->
-                    <div x-show="selected.length === 0" class="text-gray-500 dark:text-neutral-400 px-2 my-1" x-text="'Select a product'"></div>
+                    <div x-show="selected.length === 0" class="text-gray-500 dark:text-neutral-400 px-2 my-1" x-text="'Select a product to inquire about'"></div>
                 </div>
             </template>
 
@@ -1346,7 +1417,7 @@
                         <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="singleSelectedOption.icon"></div>
                     </template>
                     <span x-show="singleSelectedLabel" x-text="singleSelectedLabel"></span>
-                    <span x-show="!singleSelectedLabel" class="text-gray-500 dark:text-neutral-400" x-text="'Select a product'"></span>
+                    <span x-show="!singleSelectedLabel" class="text-gray-500 dark:text-neutral-400" x-text="'Select a product to inquire about'"></span>
                 </div>
             </template>
 
@@ -1443,127 +1514,14 @@
     
 </div>
 
-                    <p x-show="showProductError" x-cloak class="mt-1.5 text-xs text-red-500">Please select a product.</p>
-                </div>
-                
-                <div :class="{'has-error': showQuestionError}">
-                  
-<div class="w-full">
-  
-    <label for="question" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
-      Question <span class="text-red-500">*</span>
-    </label>
-  
-
-  <div class="relative w-full">
-    <textarea id="question" 
-              name="question"
-              rows="4"
-              class="py-2 px-3 sm:py-3 sm:px-4 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500  "
-              placeholder="What would you like to know?"
-              required
-              
-              x-model="question"
-              
-              @input='showQuestionError = false'></textarea>
-  </div>
-  
-  
-</div>
-
-                  <p x-show="showQuestionError" x-cloak class="mt-1.5 text-xs text-red-500">Please enter a question.</p>
-                </div>
-            </div>
-            
-            <div class="flex justify-center pt-2">
-                
-
-  
-  
-  
-
-  
-  
-
-  
-
-  
-  
-
-  
-    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:bg-primary-700 dark:focus:ring-offset-neutral-800"   @click="showProductError = !product; showQuestionError = !question.trim(); if (!showProductError && !showQuestionError) { isChatActive = true; }">
-  
-
-    
-    
-
-    Send enquiry
-
-    
-
-  
-    </button>
-  
-
-
-            </div>
-          </div>
-        </div>
-
-        <!-- Chat View -->
-        <div class="flex-1 flex flex-col h-full" x-show="isChatActive" x-cloak x-transition>
-          
-          <!-- Chat Body -->
-          <div class="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-            <div class="pt-2 pb-5 px-4">
-              <div class="relative">
-                
-                <!-- Time -->
-                <div class="sticky top-0 inset-x-0 z-8 max-w-lg mx-auto text-center">
-                  <span class="py-0.5 px-1.5 bg-gray-100 dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 rounded-full">Today</span>
-                </div>
-
-                <div class="w-full space-y-5 mt-4">
-                  
-                  <!-- System Event: Context -->
-                  <div class="flex flex-col items-center justify-center my-4 text-center">
-                    <p class="text-xs font-medium text-gray-500 dark:text-neutral-400 flex items-center gap-x-1.5 justify-center">
-                      <i data-lucide="info" class="size-3.5 text-gray-400"></i> Purchase Enquiry
-                    </p>
-                    <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5" x-text="product"></p>
-                  </div>
-
-                  <!-- Student Message (The Question) -->
-                  <div class="max-w-md ms-auto text-end flex justify-end gap-x-2">
-                    <div>
-                      <p class="mb-1.5 pe-2.5 text-xs text-gray-400 dark:text-neutral-500">You</p>
-                      <div class="space-y-1">
-                        <div class="group flex justify-end gap-x-2" style="word-break: break-word;">
-                          <div class="order-2 text-start bg-primary-100 dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
-                            <div class="text-sm text-gray-800 dark:text-neutral-200">
-                              <span x-text="question || 'I would like to know more about this product.'"></span>
-                              <span>
-                                <span class="ms-1 text-[11px] text-end text-gray-400 dark:text-neutral-500 italic">Just now</span>
-                                <svg class="inline-block shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
+                  <p x-show="showProductError" x-cloak class="mt-1 text-xs text-red-500">Please select a product.</p>
               </div>
             </div>
-          </div>
-          <!-- End Chat Body -->
 
-          <!-- Chat Footer Input -->
-          <footer class="bg-white dark:bg-neutral-800 rounded-none border-t border-gray-200 dark:border-neutral-700">
-            <div class="pb-2 ps-2 pt-2 transition-colors">
+            <div class="pb-2 ps-2 pt-2 transition-colors border-t border-gray-200 dark:border-neutral-700">
               <label for="student-chat-input" class="sr-only">Message</label>
-              <textarea id="student-chat-input" x-ref="chatInput" class="max-h-36 pt-2 pb-2 ps-2 pe-4 block w-full bg-transparent border-transparent rounded-0 text-sm leading-4 resize-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-none focus:border-transparent focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500" placeholder="Type your message..." rows="1" data-hs-textarea-auto-height='{"defaultHeight": 40}'></textarea>
+              <textarea id="student-chat-input" x-ref="chatInput" autofocus @open-drawer-student-chat-drawer.window="setTimeout(() => $el.focus(), 100)" x-model="question" @input="showQuestionError = false" :class="{'has-error': showQuestionError}" class="max-h-36 pt-2 pb-2 ps-2 pe-4 block w-full bg-transparent border-transparent rounded-0 text-sm leading-4 resize-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-none focus:border-transparent focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500" placeholder="Ask your question..." rows="1" data-hs-textarea-auto-height='{"defaultHeight": 40}'></textarea>
+              <p x-show="showQuestionError" x-cloak class="ms-2 mt-1 text-xs text-red-500">Please enter a question.</p>
               
               <div class="pe-4 flex justify-between items-center gap-x-1 mt-2">
                 <div class="flex items-center gap-x-1">
@@ -1592,7 +1550,7 @@
   
 
   
-    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-xs bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:bg-primary-700 dark:focus:ring-offset-neutral-800"   >
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-xs bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:bg-primary-700 dark:focus:ring-offset-neutral-800"   @click="sendMessage()" :disabled="!product || !question.trim()">
   
 
     
