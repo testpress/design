@@ -1,6 +1,6 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 
-<script id="chart-dates-data" type="application/json">["2023-01-01", "2023-01-02", "2023-01-03", "2023-01-04", "2023-01-05"]</script>
+<script id="chart-dates-data" type="application/json">["2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01"]</script>
 <script id="chart-wasted-hours-data" type="application/json">[12, 15, 14, 18, 10]</script>
 
 <script>
@@ -17,35 +17,22 @@
       console.warn("Could not parse dynamic chart data");
     }
 
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('status') === 'empty') {
-      chartData = chartDates.map(() => 0);
+    const clearFilterBadge = document.getElementById('clear-filter-badge');
+    const clearFilterText = document.getElementById('clear-filter-text');
+    const rows = document.querySelectorAll('.anomaly-row');
+    const activeTab = document.getElementById('active-anomalies-tab');
+    const resolvedTab = document.getElementById('historical-orphans-tab');
 
-      const kpiAnomalies = document.getElementById('kpi-anomalies');
-      if (kpiAnomalies) {
-        kpiAnomalies.textContent = '-';
-        kpiAnomalies.className = 'text-gray-500 dark:text-neutral-500';
+    // 1 & 4. Reset logic
+    const resetTableAndBadge = () => {
+      rows.forEach(row => row.style.display = '');
+      if (clearFilterBadge) {
+        clearFilterBadge.classList.add('hidden');
+        clearFilterBadge.style.display = '';
       }
+    };
 
-      const kpiHours = document.getElementById('kpi-hours');
-      if (kpiHours) {
-        kpiHours.textContent = '-';
-        kpiHours.className = 'text-gray-500 dark:text-neutral-500';
-      }
-
-      const leaderboard = document.getElementById('leaderboard-list');
-      const leaderboardEmptyState = document.getElementById('leaderboard-empty-state-template');
-      if (leaderboard && leaderboardEmptyState) {
-        leaderboard.innerHTML = leaderboardEmptyState.innerHTML;
-      }
-
-      const anomaliesTable = document.getElementById('anomalies-table-container');
-      const tableEmptyState = document.getElementById('table-empty-state-template');
-      if (anomaliesTable && tableEmptyState) {
-        anomaliesTable.innerHTML = tableEmptyState.innerHTML;
-      }
-    }
-
+    // 2. Chart Click (Filter by Date)
     const chartDom = document.getElementById('hs-single-area-chart');
     if (chartDom) {
       const myChart = echarts.init(chartDom);
@@ -142,8 +129,88 @@
 
       myChart.setOption(option);
       
+      myChart.getZr().on('click', function(params) {
+        const pointInPixel = [params.offsetX, params.offsetY];
+        if (myChart.containPixel('grid', pointInPixel)) {
+          const xIndex = Math.round(myChart.convertFromPixel({seriesIndex: 0}, pointInPixel)[0]);
+          const dateClicked = chartDates[xIndex];
+          if (dateClicked) {
+            let filterText = dateClicked;
+            const parts = dateClicked.split('-');
+            if (parts.length === 3) {
+              filterText = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            if (clearFilterText) {
+              clearFilterText.textContent = `Clear Chart Filter (${filterText})`;
+            }
+            if (clearFilterBadge) {
+              clearFilterBadge.classList.remove('hidden');
+              clearFilterBadge.style.display = 'inline-flex';
+            }
+            rows.forEach(row => {
+              row.style.display = row.getAttribute('data-date') === dateClicked ? '' : 'none';
+            });
+          }
+        }
+      });
+      
       window.addEventListener('resize', function() {
         myChart.resize();
+      });
+    }
+
+    // 3. Leaderboard Click (Filter by Org)
+    document.querySelectorAll('.org-filter-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const orgName = e.target.getAttribute('data-filter-org');
+        if (orgName) {
+          if (clearFilterText) {
+            clearFilterText.textContent = `Clear Filter (${orgName})`;
+          }
+          if (clearFilterBadge) {
+            clearFilterBadge.classList.remove('hidden');
+            clearFilterBadge.style.display = 'inline-flex';
+          }
+          rows.forEach(row => {
+            row.style.display = row.getAttribute('data-org') === orgName ? '' : 'none';
+          });
+        }
+      });
+    });
+
+    // 4. Tab Toggle & Clear Filters
+    if (clearFilterBadge) {
+      const clearBtn = clearFilterBadge.querySelector('a');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          resetTableAndBadge();
+        });
+      }
+    }
+
+    const activeClass = "py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-hidden focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none";
+    const inactiveClass = "py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent text-gray-500 hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800";
+
+    const updateTabs = (clickedTab, otherTab) => {
+      if (clickedTab && otherTab) {
+        clickedTab.className = activeClass;
+        otherTab.className = inactiveClass;
+      }
+    };
+
+    if (activeTab) {
+      activeTab.addEventListener('click', (e) => {
+        e.preventDefault();
+        updateTabs(activeTab, resolvedTab);
+      });
+    }
+
+    if (resolvedTab) {
+      resolvedTab.addEventListener('click', (e) => {
+        e.preventDefault();
+        updateTabs(resolvedTab, activeTab);
       });
     }
 
