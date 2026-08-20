@@ -1,201 +1,174 @@
-# Sales Queue UI
+# Sales Queue
 
-import pypandoc
+## Primary Purpose
 
-content = r"""# Testpress Signals — V1 Sales Queue UI Product Design Specification
+The **Sales Queue** is the salesperson's daily working screen for quickly identifying **which student Opportunities need attention and what they should work on next**.
 
-## 1. Product Purpose
+It solves the problem of salespeople having to manually search through students and Opportunities to decide where to spend their time.
 
-### What is the Sales Queue?
+The screen should help the salesperson:
 
-The **Sales Queue** is the salesperson's daily working screen for identifying and acting on student purchase Opportunities.
+* Identify Opportunities requiring action now
+* Complete today's committed follow-ups
+* Discover valuable unclaimed Opportunities worth taking
+* Keep track of upcoming follow-ups
+* See a compact view of their results and recently closed Opportunities
 
-It should immediately answer:
+The experience should minimize friction between:
 
+> **Purchase interest → sales action → conversion**
 
-1. **What needs my attention now?**
-2. **Why does it need my attention?**
-3. **What should I do next?**
-4. **What valuable Opportunity should I claim next?**
+---
 
-The system should prioritize the work automatically so the salesperson does not need to manually browse students, sort large datasets, or create filters.
+# Core User Intent
 
-The core workflow is:
+A salesperson visiting this screen may want to:
 
-> **Student purchase interest → Opportunity surfaced → salesperson acts → chat/follow-up → purchase**
+* Know **what needs my attention right now**
+* Complete **follow-ups due today**
+* Find **valuable unclaimed Opportunities to claim**
+* Check **what follow-ups are coming later**
+* Quickly see **my results and recently closed Opportunities**
 
-The Sales Queue is **not**:
+The screen should naturally guide the salesperson from the most immediate work toward less urgent information.
+
+---
+
+# 1. High-Level UX Philosophy
+
+This screen should NOT feel like:
 
 * A CRM database
-* A reporting dashboard
 * A generic student list
-* A complete chat inbox
+* A reporting dashboard
+* A full chat inbox
+* A large activity feed
 * A support-ticket queue
+* A place where the salesperson has to manually figure out what matters
 
-It is the salesperson's **daily work queue**.
+It SHOULD feel like:
 
+* Focused
+* Action-oriented
+* Prioritized
+* Easy to scan
+* Financially aware
+* Calm and efficient
+
+The experience should prioritize:
+
+* **Immediate action over browsing**
+* **Clear reasons over unexplained scores**
+* **Opportunity value and purchase interest where relevant**
+* **The next action the salesperson should take**
+* **Today before later**
 
 ---
 
-# 2. V1 User
+# 2. Primary Layout Expectations
 
-V1 is designed for the **Salesperson** role.
+When the salesperson opens Sales Queue, they should immediately understand **what requires their attention now**.
 
-The salesperson's job is to work purchase Opportunities, communicate with students, follow up, and convert eligible Opportunities into purchases.
+The most important information should appear first.
 
-Manager, admin, and management-reporting experiences are outside this page.
+### Suggested High-Level Layout
 
+**Top**
+
+* Sales Queue
+* Short page description
+* Search students or products
+
+**Primary Work**
+
+* Needs your attention
+* Follow-ups due today
+* High-value opportunities
+* Upcoming follow-ups
+
+**Supporting Information**
+
+* My Results
+* Recently closed
+
+The highest emphasis should go to **Needs your attention**, because it represents meaningful events requiring action now.
 
 ---
 
-# 3. Core Mental Model
+# 3. Needs Your Attention
 
-## Opportunity
+Users should instantly understand:
 
-An **Opportunity** represents a specific student + product purchase opportunity.
+> **“What changed that requires my response?”**
+
+This is the most important working section on the page.
+
+## Expected Information
+
+For each relevant Opportunity:
+
+* Student
+* Product
+* Product value
+* Meaningful event
+* When the event happened, when relevant
+* Short context
+* What the salesperson should do next
+* Primary action
+
+Examples of meaningful events:
+
+* Student replied
+* Payment failed
+* Checkout was abandoned
 
 Example:
 
-> Priya Sharma → NEET Premium → ₹50,000
-
-The Opportunity is the **primary sales-work unit shown in the UI**.
-
-It communicates:
-
-* Who the student is
-* Which product they may buy
-* Product value
-* Why the Opportunity exists
-* What should happen next
-
-## Student ownership
-
-Ownership is ultimately at the **student/conversation level**.
-
-When a salesperson claims an Opportunity, they become responsible for that student and the student's active Opportunities.
-
-This does **not** mean the Sales Queue should become student-based.
-
-The UI should remain Opportunity-focused because the salesperson is deciding:
-
-> **Which sales opportunity should I work?**
-
-The ownership consequence can be explained during Claim.
-
-### Example
-
-Priya has:
-
-* NEET Premium — ₹50,000
-* UPSC Foundation — ₹30,000
-
-Sales Queue can surface:
-
-> **Priya Sharma**\nNEET Premium · ₹50,000\nCheckout started\nPotential incentive: ₹500\n**[Claim]**
-
-When Claim is selected:
-
-> **Claim Priya Sharma?**\nYou'll become responsible for this student and their active Opportunities.
+> **Arjun Kumar**
+> JEE Test Series · ₹15,000
 >
-> NEET Premium · ₹50,000\nUPSC Foundation · ₹30,000
+> Student replied
+> “Can I get a discount?”
 >
-> **[Claim student]**
+> **Next: Reply to student**
+>
+> **Chat**
 
-This keeps the UI consistent while making the ownership rule clear.
+## UX Expectations
 
+Prioritize based primarily on **action urgency and response time**, not simply Opportunity value.
 
----
+A lower-value Opportunity can be more important than a high-value one if the student is actively waiting for a response.
 
-# 4. What the Sales Queue Must Answer
+The section should:
 
-The page should guide the salesperson through these questions:
+* Surface meaningful actionable events
+* Avoid showing every minor student activity
+* Make the reason for appearing in the section obvious
+* Make the next action clear
+* Avoid requiring the salesperson to open the Opportunity just to understand what happened
 
-### 1. What must I handle now?
+Do not automatically treat these as attention-worthy:
 
-**Follow-ups due today** and **Needs your attention**
-
-### 2. What valuable work can I take next?
-
-**High-value opportunities**
-
-### 3. What recently changed?
-
-**Recent activity**
-
-### 4. What is scheduled for later?
-
-**Upcoming follow-ups**
-
-### 5. What have I achieved?
-
-**My Results summary**
-
+* Single product views
+* Ordinary page visits
+* Every normal chat message
 
 ---
 
-# 5. Page Header
-
-## Heading
-
-# Sales Queue
-
-## Subtext
-
-> **Students showing purchase interest and needing your attention.**
-
-The description should be short enough for a first-time user to understand the page without requiring prior knowledge of Signals.
-
-## Search
-
-Placeholder:
-
-> **Search students or products**
-
-Search is for finding something specific.
-
-It is not the primary mechanism for discovering work.
-
-
----
-
-# 6. Page Layout
-
-Recommended order:
-
-
-1. **Follow-ups due today**
-2. **Needs your attention**
-3. **High-value opportunities**
-4. **Recent activity**
-5. **Upcoming follow-ups**
-6. **My Results**
-
-The first three sections are the primary working queue.
-
-The last three provide supporting awareness.
-
-
----
-
-# 7. Follow-ups Due Today
+# 4. Follow-ups Due Today
 
 ## Purpose
 
-Show commitments the salesperson has already made that are due today.
+Show commitments the salesperson has already made that need to be completed today.
 
-Core question:
+The key question is:
 
-> **What follow-ups do I need to handle today?**
+> **“What follow-ups do I need to handle today?”**
 
-This section comes first because the salesperson has already committed to doing this work.
+## Expected Information
 
-## Membership
-
-An Opportunity appears here when its scheduled follow-up becomes due.
-
-## Card information
-
-Show:
+Each Opportunity should communicate:
 
 * Student
 * Product
@@ -203,162 +176,52 @@ Show:
 * Follow-up due time
 * Short reason/context
 * Next action
-* Primary CTA
+* Primary action
 
 Example:
 
-> **Rahul Kumar**\nUPSC Foundation · ₹20,000
+> **Rahul Kumar**
+> UPSC Foundation · ₹20,000
 >
-> **Follow-up due · 10:00 AM**
+> Follow-up due · 10:00 AM
 >
 > Student asked about pricing yesterday.
 >
 > **Next: Continue conversation**
 >
-> **[Chat]**
+> **Chat**
 
-## Ranking
+## Expected Behavior
 
 Rank primarily by:
-
 
 1. Overdue
 2. Due soon
 3. Later today
 
-Do not make product value the primary ranking factor here.
+The section should not be ranked primarily by product value.
 
-A ₹5,000 follow-up that is due now is still a commitment that needs to be handled.
+A lower-value follow-up that is due now is still a commitment the salesperson needs to handle.
 
-## UX principle
+## Expected Feeling
 
-> **See → understand → act.**
-
-Do not show the full conversation or full activity history here.
-
+> **“I know exactly which commitments I need to complete today.”**
 
 ---
 
-# 8. Needs Your Attention
+# 5. High-Value Opportunities
 
 ## Purpose
 
-Show active Opportunities where a meaningful event has happened and the salesperson may need to act now.
+Help the salesperson discover **valuable unclaimed Opportunities that show meaningful purchase interest**.
 
-Core question:
+The key question is:
 
-> **What changed that requires my response?**
+> **“What valuable Opportunity should I claim next?”**
 
-## Primary ranking logic
+## Expected Information
 
-This section is primarily **action/response-time based**, not money based.
-
-The important question is:
-
-> **How strongly does this event require the salesperson to act now?**
-
-Useful inputs may include:
-
-* How recently the event occurred
-* Event type
-* Whether the student is waiting for a response
-* Follow-up timing
-* Purchase context
-
-Opportunity value may influence ranking, but **value does not define membership** in this section.
-
-## Examples
-
-### Student replied
-
-> **Arjun Kumar**\nJEE Test Series · ₹15,000
->
-> 💬 **Student replied 5 min ago**
->
-> “Can I get a discount?”
->
-> **Next: Reply to student**
->
-> **[Chat]**
-
-### Payment failed
-
-> **Meena Sharma**\nNEET Premium · ₹25,000
->
-> ⚠️ **Payment failed 10 min ago**
->
-> **Next: Contact student**
->
-> **[Chat]**
-
-### Checkout abandoned
-
-> **Karthik**\nUPSC Foundation · ₹20,000
->
-> 🛒 **Checkout abandoned 20 min ago**
->
-> **Next: Chat with student**
->
-> **[Chat]**
-
-## What should not automatically appear here?
-
-Do not surface every low-value activity.
-
-For example:
-
-* Single product view
-* Ordinary page visit
-* Every normal chat message
-
-These may contribute to an Opportunity's purchase-interest evidence but do not necessarily mean:
-
-> **The salesperson needs to act now.**
-
-## Important distinction
-
-A ₹5,000 Opportunity where the student replied two minutes ago can belong here.
-
-A ₹100,000 Opportunity with strong purchase interest but no new actionable event may belong in **High-value opportunities** instead.
-
-
----
-
-# 9. High-Value Opportunities
-
-## Purpose
-
-Surface **unclaimed Opportunities that are financially worthwhile and show meaningful purchase interest**.
-
-Core question:
-
-> **What valuable Opportunity should I claim next?**
-
-## Primary ranking logic
-
-This section is driven mainly by:
-
-* Product value
-* Purchase interest
-* Strength of relevant Signals
-* Potential incentive
-* Unclaimed ownership state
-
-The system should rank the Opportunities automatically.
-
-The salesperson should not need to manually filter:
-
-> ₹20K+
-
-or:
-
-> High intent
-
-to find worthwhile work.
-
-## Card information
-
-Show:
+Each Opportunity should show:
 
 * Student
 * Product
@@ -370,266 +233,291 @@ Show:
 
 Example:
 
-> **Priya Sharma**\nNEET Premium · **₹50,000**
->
-> 🔥 **Strong purchase interest**
->
-> Viewed 4× · Checkout started
->
-> **Potential incentive: ₹500**
->
-> **[Claim]**
-
-Another:
-
-> **Rahul Kumar**\nUPSC Foundation · **₹20,000**
+> **Priya Sharma**
+> NEET Premium · ₹50,000
 >
 > Strong purchase interest
 >
-> Viewed 6× in 3 days
+> Viewed 4× · Checkout started
 >
-> **Potential incentive: ₹200**
+> Potential incentive: ₹500
 >
-> **[Claim]**
+> **Claim**
 
-## Do not show unexplained scores
+## Expected Behavior
 
-Do not show:
+Rank automatically using signals such as:
+
+* Product value
+* Purchase interest
+* Relevant Signals
+* Potential incentive
+* Unclaimed state
+
+Do not require the salesperson to manually identify high-value Opportunities.
+
+Do not show unexplained scores such as:
 
 > Intent: 87/100
 
-Instead show concrete evidence:
+Instead show understandable evidence:
 
 > Viewed 4× · Checkout started
 
-The salesperson should understand:
+The salesperson should be able to understand:
 
-> **This is worth taking.**
+> **“This is worth taking.”**
 
-
----
-
-# 10. Claim Behavior
-
-The Sales Queue remains Opportunity-focused, but Claim has a student-level ownership consequence.
-
-## Before claim
-
-The card shows:
-
-> **[Claim]**
-
-## Claim confirmation
-
-Where needed:
-
-> **Claim Priya Sharma?**
->
-> You'll become responsible for this student and their active Opportunities.
->
-> NEET Premium · ₹50,000\nUPSC Foundation · ₹30,000
->
-> **[Claim student]**
-
-## After claim
-
-The salesperson becomes the owner of the student's active Opportunities.
-
-The UI can show:
-
-> **Owner: You**
-
-This prevents the salesperson from mistakenly believing they only own the one product Opportunity they clicked.
-
+Only **unclaimed Opportunities** belong here.
 
 ---
 
-# 11. Recent Activity
-
-## Purpose
-
-Provide lightweight awareness of meaningful changes in the salesperson's sales work.
-
-Core question:
-
-> **What has changed recently?**
-
-This is not another work queue.
-
-## Show
-
-Examples:
-
-> **2 min ago**\nRahul Kumar replied · UPSC Foundation · ₹20,000
-
-> **15 min ago**\nFollow-up due · Priya Sharma · NEET Premium
-
-> **1 hr ago**\nYou claimed Arjun Kumar · JEE Test Series
-
-> **Yesterday**\nOpportunity won · Meena · ₹20,000\nIncentive earned: ₹200
-
-## Do not show
-
-* Every chat message
-* Every product view
-* Every page visit
-* Raw student activity
-* Detailed activity by other salespeople
-
-Clicking an activity should open the relevant Opportunity.
-
-The Sales Queue provides a compact activity view; the complete history belongs to Opportunity Detail.
-
-
----
-
-# 12. Upcoming Follow-ups
+# 6. Upcoming Follow-ups
 
 ## Purpose
 
 Show future commitments without allowing them to compete with today's work.
 
-Core question:
+The key question is:
 
-> **What have I scheduled for later?**
+> **“What have I scheduled for later?”**
 
-## Default state
+## Expected Information
 
-Collapsed:
-
-> **Upcoming follow-ups · 8 ▸**
-
-## Expanded information
-
-Show:
+When expanded:
 
 * Student
 * Product
 * Scheduled date/time
 * Opportunity value
 
-## Behavior
+## Expected Behavior
 
-Future follow-ups should stay out of the main attention queue until their scheduled time.
-
-When the scheduled time arrives, the Opportunity moves into:
-
-> **Follow-ups due today**
-
-The desired feeling is:
-
-> “I know those are scheduled. I don't need to worry about them right now.”
-
-
----
-
-# 13. My Results Summary
-
-## Purpose
-
-Provide a compact reminder of recent results without turning Sales Queue into an analytics dashboard.
-
-Core question:
-
-> **What have I converted and earned?**
+Keep this section secondary and collapsed by default.
 
 Example:
 
-> ### This week
+> **Upcoming follow-ups · 8 ▸**
+
+Future follow-ups should remain here until their scheduled time.
+
+Once due, they move into:
+
+> **Follow-ups due today**
+
+## Expected Feeling
+
+> **“I know they're scheduled, so I don't need to worry about them right now.”**
+
+---
+
+# 7. My Results
+
+## Purpose
+
+Provide a compact view of the salesperson's current results without turning Sales Queue into an analytics dashboard.
+
+The key question is:
+
+> **“What have I converted and earned?”**
+
+## Expected Information
+
+Show three key results:
+
+* **Won**
+* **Sales**
+* **Incentive**
+
+Example:
+
+> **This week**
 >
-> **8 Won** · **₹1,42,000 Purchase value** · **₹1,420 Incentive earned**
+> **8 Won** · **₹1,42,000 Sales** · **₹1,420 Incentive**
 >
 > **View my results →**
 
-Keep this visually secondary.
+## Expected Behavior
 
-Detailed results belong on **My Results**.
+The three metrics should be easy to scan together.
 
-Do not add large charts or extensive analytics to Sales Queue.
+Detailed performance information belongs on the dedicated **My Results** page.
 
+Do not introduce large charts or extensive analytics here.
 
----
+## Expected Feeling
 
-# 14. Opportunity Lifecycle
-
-The core lifecycle remains:
-
-> **Unclaimed → Active → Won / Lost**
-
-### Unclaimed
-
-Available to claim.
-
-### Active
-
-Owned and being worked.
-
-### Won
-
-Automatically recorded when the student purchases the relevant product.
-
-### Lost
-
-Manually closed when the Opportunity will not convert.
-
-Do not create separate lifecycle statuses for:
-
-* Student replied
-* Follow-up
-* Awaiting student
-* Discount requested
-* Payment failed
-
-These are context, events, or actions — not separate core Opportunity lifecycle stages.
-
+> **“I can quickly see how I'm doing.”**
 
 ---
 
-# 15. Actions
+# 8. Recently Closed
 
-## Primary actions
+## Purpose
 
-### Unclaimed
+Provide a compact view of the salesperson's recently closed Opportunities and their outcomes.
 
-> **Claim**
+The key question is:
 
-### Student replied
+> **“What Opportunities recently finished, and what was the outcome?”**
 
-> **Chat**
+This is supporting information, not another work queue.
 
-### Follow-up due
+## Expected Information
 
-> **Chat**
+Show:
 
-### Active Opportunity
+* Student
+* Product
+* Opportunity value
+* Won/Lost outcome
 
-> **Chat**
+Example:
 
-The primary CTA should communicate what the salesperson should do now.
+> ✓ **Rahul Kumar**
+> UPSC Foundation · ₹20,000
+>
+> × **Priya Sharma**
+> NEET Premium · ₹25,000
+>
+> ✓ **Karthik R**
+> JEE Test Series · ₹15,000
 
-## Secondary actions
+Use a clear outcome icon.
 
-* View Opportunity
-* Search
-* Expand Upcoming Follow-ups
-* View My Results
+Do not repeat **Won** or **Lost** as text if the visual treatment already makes the outcome unambiguous.
 
-## Contextual actions
+Do not show time in the compact card.
 
-* Follow up
-* Close
-* Offer approved discount
+## Expected Behavior
 
-Do not show every possible action on every card.
+Show only the salesperson's own recently closed Opportunities.
 
+Keep the section compact, around 4–5 items.
+
+A **View all** action can lead to the broader closed-opportunity/results view.
+
+Won Opportunities are particularly useful because a student purchase can automatically close an Opportunity, meaning the salesperson may not have manually closed it.
+
+## Expected Feeling
+
+> **“I can quickly see the outcomes of the Opportunities I was working on.”**
 
 ---
 
-# 16. Search
+# 9. State Expectations
 
-Search is for finding something specific.
+## Needs Your Attention — No Items
 
-Users may search:
+**Purpose**
+
+Communicate that there are currently no actionable events.
+
+**Expected Information**
+
+> **Nothing needs your attention right now**
+>
+> New actionable activity will appear here.
+
+**Primary Action**
+
+No action is required.
+
+**Expected Feeling**
+
+Positive and calm — not like an error.
+
+---
+
+## Follow-ups Due Today — No Items
+
+**Purpose**
+
+Confirm that there are no commitments requiring action today.
+
+**Expected Information**
+
+> **No follow-ups due today**
+>
+> You're all caught up.
+
+**Primary Action**
+
+No action required.
+
+**Expected Feeling**
+
+Reassured.
+
+---
+
+## High-Value Opportunities — No Items
+
+**Purpose**
+
+Communicate that there are currently no unclaimed valuable Opportunities.
+
+**Expected Information**
+
+> **No unclaimed Opportunities right now**
+>
+> New purchase opportunities will appear here when available.
+
+**Primary Action**
+
+No forced action.
+
+**Expected Feeling**
+
+Clear and informative.
+
+---
+
+## Recently Closed — No Items
+
+**Purpose**
+
+Handle the case where the salesperson has not yet closed any Opportunities.
+
+**Expected Information**
+
+> **No recently closed Opportunities**
+>
+> Your latest Won and Lost Opportunities will appear here.
+
+**Primary Action**
+
+No forced action.
+
+**Expected Feeling**
+
+Neutral and informative.
+
+---
+
+## First-Time Salesperson
+
+**Purpose**
+
+Explain what the Sales Queue will contain before meaningful Opportunities exist.
+
+**Expected Information**
+
+> **Your sales queue is ready**
+>
+> Purchase opportunities will appear here when students show meaningful buying interest.
+
+**Expected Action**
+
+No forced action.
+
+---
+
+# 10. Search Expectations
+
+Search is relevant because the salesperson may occasionally need to find a specific student or product.
+
+## Users may search for:
 
 * Student name
 * Product name
@@ -641,127 +529,106 @@ Examples:
 
 > `UPSC Foundation`
 
-Search results should show matching Opportunities.
+## Expected Behavior
 
-## No results
+Search should help users **find something specific**.
 
-> **No Opportunities found**
->
-> Try another student or product.
-
-Search should never replace automatic prioritization.
+It should not become the primary way to discover sales work.
 
 The salesperson should not need to search:
 
-> “high-value opportunities”
+> `high-value opportunities`
 
-because those should already be surfaced.
-
-
----
-
-# 17. Filtering
-
-Do not place a primary filter row such as:
-
-> All | New | Active | Won | Lost | High | Medium | Low
-
-The system should organize and rank the salesperson's work automatically.
-
-If filtering is required later for a specific operational need, it should remain secondary.
-
+because valuable unclaimed Opportunities should already be surfaced automatically.
 
 ---
 
-# 18. States
+# 11. Actions Expectations
 
-## Normal populated state
+## Primary Actions
 
-The queue contains relevant Opportunities across:
+The primary action depends on the Opportunity context:
 
-* Follow-ups due
-* Needs your attention
-* High-value opportunities
-* Recent activity
+### Needs your attention
 
-The salesperson should immediately understand what to do.
+**Chat**
 
+### Follow-up due
 
----
+**Chat**
 
-## No follow-ups due
+### High-value unclaimed Opportunity
 
-> **No follow-ups due today**
->
-> You're all caught up.
+**Claim**
 
-Keep the rest of the queue visible.
+## Secondary Actions
 
+* View Opportunity
+* View My Results
+* View all recently closed Opportunities
+* Expand Upcoming Follow-ups
 
----
+## Contextual Actions
 
-## Nothing needs attention
+* Follow up
+* Close
+* Offer approved discount
 
-> **Nothing needs your attention right now**
->
-> New actionable activity will appear here.
-
-
----
-
-## No high-value/unclaimed Opportunities
-
-> **No unclaimed Opportunities right now**
->
-> New purchase opportunities will appear here when available.
-
+Actions should always communicate **what the salesperson should do next**, rather than exposing every possible operation.
 
 ---
 
-## No recent activity
+# 12. Empty State Expectations
 
-> **No recent sales activity**
->
-> Your meaningful sales activity will appear here.
+The empty states should feel like part of the normal workflow, not failures.
 
-
----
-
-## First-time salesperson
+### First-time
 
 > **Your sales queue is ready**
 >
 > Purchase opportunities will appear here when students show meaningful buying interest.
 
+### Nothing needs attention
 
----
-
-## No current work
-
-> **You're all caught up**
+> **Nothing needs your attention right now**
 >
-> No Opportunities need your attention right now.
+> New actionable activity will appear here.
 
-This should feel positive rather than like an error.
+### No follow-ups
 
+> **No follow-ups due today**
+>
+> You're all caught up.
+
+### No high-value opportunities
+
+> **No unclaimed Opportunities right now**
+>
+> New purchase opportunities will appear here when available.
+
+### No recently closed
+
+> **No recently closed Opportunities**
+>
+> Your latest Won and Lost Opportunities will appear here.
+
+Avoid unnecessary CTAs that force the salesperson to manually browse or filter.
 
 ---
 
-# 19. Loading and Error States
+# 13. Error State Expectations
 
-## Loading
+## Loading failure
 
-Use lightweight skeleton/loading states appropriate to the sections.
-
-Do not show a blank page.
-
-## Queue loading failure
+Explain that the Sales Queue could not be loaded.
 
 > **We couldn't load your sales queue.**
 >
 > Please try again.
 
-**[Try again]**
+Primary action:
+
+**Try again**
 
 ## Claim failure
 
@@ -769,7 +636,9 @@ Do not show a blank page.
 >
 > It may have already been claimed by someone else.
 
-## Follow-up scheduling failure
+The user should understand that the Opportunity may have changed before they acted.
+
+## Follow-up failure
 
 > **Couldn't schedule the follow-up.**
 >
@@ -777,38 +646,34 @@ Do not show a blank page.
 
 ## Stale Opportunity
 
-If an Opportunity changes while the salesperson is viewing the queue, refresh its state rather than allowing an invalid action.
+If an Opportunity changes while the salesperson is viewing it, the screen should reflect the latest state rather than allowing an invalid action.
 
-Errors should explain:
+The general principle is:
 
-> **What happened + what the salesperson can do next.**
-
+> **Explain what happened + what the salesperson can do next.**
 
 ---
 
-# 20. Responsive Behavior
+# 14. Responsive Expectations
 
 ## Desktop
 
-Optimize for scanning multiple Opportunities quickly.
+Optimize for quickly scanning and prioritizing multiple Opportunities.
 
-The hierarchy remains:
+The hierarchy should remain:
 
-
-1. Follow-ups due
-2. Needs attention
+1. Needs your attention
+2. Follow-ups due today
 3. High-value opportunities
-4. Recent activity
-5. Upcoming follow-ups
-6. My Results
-
-Avoid dense CRM-style tables.
+4. Upcoming follow-ups
+5. My Results
+6. Recently closed
 
 ## Tablet
 
-Maintain the same hierarchy with narrower/stacked sections.
+Maintain the same priority order while allowing sections to become more compact or stacked.
 
-The salesperson should still see:
+The salesperson should still understand:
 
 * Who
 * Product
@@ -818,29 +683,26 @@ The salesperson should still see:
 
 ## Mobile
 
-Use a single-column working queue.
+Use a single-column working experience.
 
-Keep visible:
+Keep the most important information visible:
 
 * Student
 * Product
 * Value
 * Reason
 * Next action
-* Primary CTA
+* Primary action
 
-Upcoming follow-ups remain collapsed.
+Upcoming follow-ups remain secondary.
 
-Recent activity remains secondary.
-
-Avoid horizontal scrolling.
-
+Recently closed remains secondary.
 
 ---
 
-# 21. UX Personality
+# 15. UX Personality
 
-The Sales Queue should feel:
+The screen should feel:
 
 * Focused
 * Smart
@@ -850,7 +712,7 @@ The Sales Queue should feel:
 * Efficient
 * Trustworthy
 
-It should not feel:
+NOT:
 
 * Administrative
 * Overwhelming
@@ -860,16 +722,15 @@ It should not feel:
 * Like a data dump
 * Overly analytical
 
-The salesperson should open it and feel:
+The salesperson should open the page and immediately feel:
 
 > **“I know what I should work on.”**
 
-
 ---
 
-# 22. Final Layout
+# Suggested Layout Structure
 
-## Header
+### Top
 
 **Sales Queue**
 
@@ -877,187 +738,43 @@ Students showing purchase interest and needing your attention.
 
 **Search students or products**
 
+### Primary Work
 
----
+**Needs your attention**
 
-## Primary work
+Immediate actionable Opportunities.
 
-### Follow-ups due today
+**Follow-ups due today**
 
-Committed work that must be handled today.
+Today's commitments.
 
+**High-value opportunities**
 
----
+Valuable unclaimed Opportunities.
 
-### Needs your attention
-
-Meaningful events that require a response or action now.
-
-
----
-
-### High-value opportunities
-
-Unclaimed Opportunities ranked by value and purchase interest.
-
-
----
-
-## Supporting awareness
-
-### Recent activity
-
-Meaningful changes in the salesperson's sales work.
-
-
----
-
-### Upcoming follow-ups · 8 ▸
+**Upcoming follow-ups**
 
 Future commitments, collapsed until needed.
 
+### Supporting Information
+
+**My Results**
+
+Won · Sales · Incentive.
+
+**Recently closed**
+
+Recent closed Opportunities and outcomes.
 
 ---
 
-## Supporting results
+# Most Important Jobs This Screen Must Solve
 
-### This week
-
-Won · Purchase value · Incentive earned
-
-**View my results →**
-
-
----
-
-# 23. Section Logic Summary
-
-| Section | Primary question | Main driver | UI unit |
-|---------|------------------|-------------|---------|
-| **Follow-ups due today** | What did I promise to do today? | Due time    | Opportunity |
-| **Needs your attention** | What needs my response now? | Action/response urgency | Opportunity |
-| **High-value opportunities** | What should I claim next? | Value + purchase interest | Opportunity |
-| **Recent activity** | What changed recently? | Meaningful events | Opportunity/event |
-| **Upcoming follow-ups** | What is scheduled later? | Scheduled time | Opportunity |
-| **My Results** | What did I convert/earn? | Outcomes    | Result  |
-
-
----
-
-# 24. Important Product Rule
-
-### Do not confuse the ranking logic between sections.
-
-**Needs your attention is not the "most expensive opportunities" section.**
-
-It is primarily about:
-
-> **Time-sensitive action and response.**
-
-**High-value opportunities is not the "most urgent" section.**
-
-It is primarily about:
-
-> **Financial value + meaningful purchase interest.**
-
-**Follow-ups due today is not the "highest priority" section.**
-
-It is about:
-
-> **Commitments that are due today.**
-
-This separation prevents the three sections from becoming duplicates.
-
-
----
-
-# 25. Core Card Pattern
-
-Every actionable Opportunity card should answer:
-
-> **Who? What? Why? Value? What next?**
-
-Example:
-
-> **Priya Sharma**\nNEET Premium · **₹50,000**
->
-> 🔥 Strong purchase interest\nCheckout started · Viewed 4×
->
-> Potential incentive: **₹500**
->
-> **Next: Claim**
->
-> **[Claim]**
-
-For an active Opportunity:
-
-> **Arjun Kumar**\nJEE Test Series · **₹15,000**
->
-> 💬 Student replied 5 min ago “Can I get a discount?”
->
-> **Next: Reply to student**
->
-> **[Chat]**
-
-The card should not require the salesperson to open the Opportunity just to understand what they should do.
-
-
----
-
-# 26. What This Page Should Not Become
-
-V1 Sales Queue should not become:
-
-* Full HubSpot-style CRM
-* Support-ticket system
-* Generic chat inbox
-* Student directory
-* Analytics dashboard
-* Complex sales pipeline
-* Manual lead-scoring interface
-* Full activity feed
-* Discount-management system
-
-The page exists to answer:
-
-> **“What sales work should I do now, and what should I take next?”**
-
-
----
-
-# 27. Most Important Jobs
-
-The Sales Queue must:
-
-
- 1. Tell the salesperson what needs attention today.
- 2. Explain why an Opportunity needs attention.
- 3. Distinguish **action urgency** from **financial value**.
- 4. Surface valuable unclaimed Opportunities automatically.
- 5. Make the next sales action obvious.
- 6. Keep future commitments out of today's work.
- 7. Provide lightweight awareness of meaningful changes.
- 8. Let the salesperson find a specific student or product when necessary.
- 9. Keep Opportunity lifecycle simple.
-10. Keep the UI consistently Opportunity-focused.
-11. Make the student-level ownership consequence of Claim clear.
-12. Help the salesperson move from purchase interest to sales action and ultimately conversion.
-
-
----
-
-# 28. Final Mental Model
-
-The salesperson should be able to open Sales Queue and think:
-
-> **Follow-ups due today**\n“These are my commitments.”
->
-> **Needs your attention**\n“These students need me to respond now.”
->
-> **High-value opportunities**\n“These are the valuable opportunities I can take next.”
->
-> **Recent activity**\n“This is what changed.”
->
-> **Upcoming follow-ups**\n“These are already scheduled; I can deal with them later.”
->
-> **My Results**\n“This is what I've converted and earned.”
+1. Help the salesperson immediately identify **what needs attention now**.
+2. Help the salesperson understand **why an Opportunity needs attention**.
+3. Help the salesperson complete **follow-ups due today**.
+4. Help the salesperson discover **valuable unclaimed Opportunities**.
+5. Make the **next action** clear.
+6. Keep **future follow-ups** separate from today's work.
+7. Give the salesperson a quick view of **their results**.
+8. Give lightweight visibility into **recently closed Opportunities**.
