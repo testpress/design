@@ -1,0 +1,144 @@
+{% from "src/ui-system/components/popover.html" import popover %}
+{% from "src/ui-system/components/button.html" import button %}
+{% from "src/ui-system/components/modal.html" import modal %}
+{% from "src/ui-system/components/empty-state.html" import empty_state %}
+<!-- Card -->
+<div class="flex flex-col  bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xs rounded-xl overflow-hidden" x-data="{ status: new URLSearchParams(window.location.search).get('status') }">
+  <!-- Header -->
+  <div class="flex gap-3 px-5 pt-5 pb-3">
+    <div class="mt-1 flex shrink-0 items-center justify-center size-9 rounded-md bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+    <i data-lucide="circle-dollar-sign" class="shrink-0 size-4" stroke-width="1.5"></i>
+    </div>
+
+    <div class="grow">
+      <h2 class="font-medium text-sm sm:text-base text-gray-800 dark:text-neutral-200">
+        High-value opportunities
+      </h2>
+
+      <!-- List -->
+          <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">
+           Students showing strong purchase interest.
+          </p>
+      <!-- End List -->
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div x-show="status === 'empty'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="No unclaimed Opportunities right now",
+      description="New purchase opportunities will appear here when available.",
+      icon="sparkles",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Empty State -->
+
+  <!-- Onboarding State -->
+  <div x-show="status === 'onboarding'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="Valuable opportunities will appear here",
+      description="Unclaimed opportunities showing strong purchase interest will be surfaced here.",
+      icon="sparkles",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Onboarding State -->
+
+  <!-- Data State -->
+  <div x-show="status !== 'empty' && status !== 'onboarding'" class="flex flex-col flex-grow">
+    <ul role="list" class="overflow-hidden">
+      {% for item in high_value_opportunities %}
+      <li class="relative flex flex-col sm:flex-row sm:items-center gap-y-3 sm:gap-y-0 sm:gap-x-6 px-5 py-4">
+        <!-- Left: Student Info -->
+        <div class="flex min-w-0 w-full sm:w-auto sm:flex-1 items-center gap-x-3 sm:pr-4">
+          <img src="{{ item.student.avatar }}" alt="{{ item.student.name }}" class="size-10 flex-none rounded-full object-cover">
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+              {{ item.student.name }}
+            </p>
+            <p class="text-xs text-gray-500 dark:text-neutral-400 truncate">
+              {{ item.product }} · {{ item.price }}
+            </p>
+          </div>
+        </div>
+        
+        <!-- Right Side on Desktop / Bottom Row on Mobile -->
+        <div class="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-x-4 pl-[52px] sm:pl-0">
+          <!-- Center: Signals & Incentive -->
+          <div class="flex-1 sm:flex-none min-w-0 flex flex-col items-start sm:items-end justify-center">
+            <div class="flex items-center text-xs text-gray-600 dark:text-neutral-400">
+              <span class="truncate">{{ item.signal.evidence[0] }}</span>
+              {% if item.signal.evidence[1] %}
+                <span class="mx-1 shrink-0">·</span>
+                <span class="truncate">{{ item.signal.evidence[1] }}</span>
+              {% endif %}
+              {% if item.signal.message %}
+                {% set popover_trigger %}
+                  <button type="button" class="ml-1.5 focus:outline-none flex items-center shrink-0">
+                    <svg class="shrink-0 size-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300 transition-colors" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                  </button>
+                {% endset %}
+                {% set popover_content %}
+                  <div class="p-3 text-xs text-gray-600 dark:text-neutral-300 break-words whitespace-normal leading-relaxed text-left shadow-sm">
+                    "{{ item.signal.message }}"
+                  </div>
+                {% endset %}
+                {{ popover(trigger=popover_trigger, content=popover_content, trigger_type='hover', placement='top', width='w-[280px] sm:w-80', trigger_class="relative z-10") }}
+              {% endif %}
+            </div>
+            <p class="mt-1 text-[11px] text-gray-500 dark:text-neutral-500 text-left sm:text-right">
+              Potential incentive {{ item.incentive }}
+            </p>
+          </div>
+
+          <!-- Right: Claim -->
+          <div class="flex-none shrink-0 relative z-10">
+            {% set claim_btn %}
+              {{ button(text="Claim", size="sm", variant="primary") }}
+            {% endset %}
+            
+            {% call modal(
+              id="claim-modal-" ~ loop.index,
+              title="Claim this opportunity?",
+              trigger=claim_btn,
+              confirm_text="Claim",
+              cancel_text="Cancel",
+              variant="primary"
+            ) %}
+              <div class="flex items-center gap-x-3 mb-4">
+                <img src="{{ item.student.avatar }}" alt="{{ item.student.name }}" class="size-10 flex-none rounded-full object-cover">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {{ item.student.name }}
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-neutral-400 truncate">
+                    {{ item.product }} · {{ item.price }}
+                  </p>
+                </div>
+              </div>
+              <blockquote class="border-s-4 border-gray-200 dark:border-neutral-700 pl-3 sm:pl-4">
+                <p class="text-sm text-gray-600 dark:text-neutral-400">
+                  You’ll become responsible for <span class="font-medium text-gray-800 dark:text-neutral-200">{{ item.student.name }}</span> and their active opportunities.
+                </p>
+              </blockquote>
+            {% endcall %}
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <!-- Footer -->
+    <div class="flex justify-center mt-auto border-t border-gray-200 dark:border-neutral-700">
+      <a class="group p-3 px-5 flex items-center justify-center text-sm font-medium text-primary-600 dark:text-primary-500 rounded-b-lg hover:text-primary-700 dark:hover:text-primary-600 focus:outline-none focus:decoration-2 focus:underline focus:text-primary-700 dark:focus:text-primary-600 transition-colors" href="#">
+        + 4 more
+        <i data-lucide="arrow-right" class="shrink-0 size-4 ml-1 transition-transform group-hover:translate-x-1"></i>
+      </a>
+    </div>
+    <!-- End Footer -->
+  </div>
+  <!-- End Data State -->
+</div>
