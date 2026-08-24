@@ -1,0 +1,253 @@
+{% from "../../../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../../../ui-system/components/popover.html" import popover %}
+{% from "../../../../ui-system/components/button.html" import button %}
+{% from "../../../../ui-system/components/pagination.html" import pagination %}
+{% from "../../../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../../ui-system/components/select.html" import select %}
+{% from "../../../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../../ui-system/components/modal.html" import modal %}
+{% from "../../../../ui-system/components/radio.html" import radio %}
+
+{% set header_content %}
+  {{ table_th(text="Student") }}
+  {{ table_th(text="Product") }}
+  {{ table_th(text="Latest activity") }}
+  {{ table_th(text="Follow-up") }}
+  <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400"><span class="sr-only">Action</span></th>
+{% endset %}
+
+<div class="mt-8" x-data="{
+    // Mock loading state variables if needed for future interactive updates
+    isLoading: false,
+    isEmpty: false,
+    isError: false,
+    searchInput: ''
+}">
+
+  {% set table_actions %}
+    <div class="flex items-center gap-x-2">
+      {{ dropdown(
+        trigger=button(text="Sort", variant="secondary", icon="arrow-down-up", size="sm"),
+        placement="bottom-end",
+        width="medium",
+        items=[
+          { "label": "Most recent", "icon": "clock", "attrs": "class='bg-gray-50 dark:bg-neutral-800'" },
+          { "label": "Oldest", "icon": "history" },
+          { "label": "Highest urgency", "icon": "arrow-up" },
+          { "label": "Lowest urgency", "icon": "arrow-down" },
+          { "label": "Recently updated", "icon": "refresh-cw" }
+        ]
+      ) }}
+      {{ button(text="Filter", variant="secondary", icon="filter", size="sm", extra_attrs="@click=\"$dispatch('open-drawer-attention-filter')\"") }}
+    </div>
+  {% endset %}
+  
+  {% set pagination_html %}
+    {{ pagination(items=[1, 2, 3, '...', 8], current=1, show_go_to=true) }}
+  {% endset %}
+
+  {% call table(
+    search_enabled=true,
+    search_placeholder="Search students or products...",
+    search_x_model="searchInput",
+    filters=table_actions,
+    pagination=pagination_html,
+    table_header=header_content,
+    hoverable=false,
+    padded=true,
+    table_container_classes=""
+  ) %}
+    
+    <template x-if="isLoading">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <div class="animate-spin inline-block size-6 border-[3px] border-current border-t-transparent text-primary-600 rounded-full dark:text-primary-500" role="status" aria-label="loading">
+              <span class="sr-only">Loading...</span>
+            </div>
+            <p class="mt-4 text-sm text-gray-600 dark:text-neutral-400">Loading opportunities...</p>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+    <template x-if="isError">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <i data-lucide="alert-triangle" class="size-8 text-red-500 mb-3"></i>
+            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">We couldn't load opportunities right now.</p>
+            <button type="button" class="mt-4 py-1.5 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">
+              Try again
+            </button>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+    <template x-if="isEmpty">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <i data-lucide="inbox" class="size-8 text-gray-400 mb-3"></i>
+            <p class="text-sm text-gray-600 dark:text-neutral-400">No opportunities need your attention right now.</p>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+      {% for item in opportunities %}
+        {% if item.state != "Converted" and item.state != "Closed" %}
+        <tr class="transition-colors" 
+            x-show="(!isLoading && !isEmpty && !isError) && (
+              activeFilter === 'All' || 
+              (activeFilter === 'Needs attention' && '{{ item.priority }}' === 'High') || 
+              (activeFilter === 'Follow-ups due today' && '{{ item.follow_up }}'.includes('Today')) || 
+              (activeFilter === 'Upcoming follow-ups' && '{{ item.follow_up }}' !== '—' && !'{{ item.follow_up }}'.includes('Today'))
+            )">
+          {# Student #}
+          {% call table_td() %}
+            <div class="flex items-center gap-x-3">
+              <img class="inline-block size-8 rounded-full object-cover" src="{{ item.avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
+              <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors whitespace-nowrap">{{ item.student_name }}</a>
+            </div>
+          {% endcall %}
+
+          {# Product #}
+          {% call table_td() %}
+            <a href="#" class="text-sm text-gray-600 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-neutral-200 hover:underline transition-colors whitespace-nowrap block" title="{{ item.product }}">{{ item.product }}</a>
+          {% endcall %}
+
+          {# Latest activity #}
+          {% call table_td(class="min-w-[200px] xl:min-w-[250px]") %}
+            <div class="text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap flex items-center gap-x-1.5">
+              <span>{{ item.latest_activity }} &middot; {{ item.activity_time }}</span>
+              {% if item.timeline %}
+                {% set timeline_trigger %}
+                  <button type="button" class="inline-flex shrink-0 justify-center items-center text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-400 dark:focus:text-neutral-400">
+                    <i data-lucide="info" class="shrink-0 size-3.5"></i>
+                  </button>
+                {% endset %}
+                {% set timeline_content %}
+                  <div class="p-4 w-72 max-h-96 overflow-y-auto text-left">
+                    <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-4">Opportunity timeline</h3>
+                    {% for group in item.timeline %}
+                      <div class="mb-4 last:mb-0">
+                        <h4 class="text-xs font-medium text-gray-500 dark:text-neutral-400 mb-3 uppercase tracking-wider">{{ group.dateGroup }}</h4>
+                        <div class="space-y-4">
+                          {% for event in group.events %}
+                            <div class="flex gap-x-3">
+                              <!-- Icon -->
+                              <div class="relative after:absolute after:top-7 after:bottom-[-1rem] after:start-3.5 after:w-px after:-translate-x-[0.5px] after:bg-gray-200 dark:after:bg-neutral-700 overflow-visible">
+                                <div class="relative z-10 size-7 flex justify-center items-center bg-gray-50 dark:bg-neutral-800 rounded-full border border-gray-200 dark:border-neutral-700 text-gray-500 dark:text-neutral-400">
+                                  <i data-lucide="{{ event.icon }}" class="shrink-0 size-3.5"></i>
+                                </div>
+                              </div>
+                              <!-- End Icon -->
+                              <!-- Right Content -->
+                              <div class="grow pt-0.5 pb-2">
+                                <h5 class="flex gap-x-1.5 text-sm font-medium text-gray-800 dark:text-white whitespace-normal">
+                                  {{ event.signal }}
+                                </h5>
+                                {% if event.comment %}
+                                  <p class="mt-1 text-sm text-gray-600 dark:text-neutral-400 italic whitespace-normal line-clamp-2" title="{{ event.comment }}">"{{ event.comment }}"</p>
+                                {% endif %}
+                                <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400 whitespace-normal">
+                                  {{ event.time }}
+                                </p>
+                              </div>
+                              <!-- End Right Content -->
+                            </div>
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endset %}
+                {{ popover(trigger=timeline_trigger, content=timeline_content, trigger_type="click", placement="right", trigger_class="inline-flex", width="!w-72") }}
+              {% endif %}
+            </div>
+          {% endcall %}
+
+          {# Follow-up #}
+          {% call table_td() %}
+            <span class="text-sm text-gray-500 dark:text-neutral-400 whitespace-nowrap">{{ item.follow_up }}</span>
+          {% endcall %}
+
+
+          {# Action #}
+          {% call table_td(class="text-end") %}
+            <div class="flex items-center justify-end gap-x-2">
+
+                <div class="flex justify-end items-center -space-x-px">
+                  <button type="button" class="py-2 px-3 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-s-lg rounded-e-none border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                    Chat
+                  </button>
+                  {% set dropdown_trigger %}
+                    <div class="relative inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white shadow-2xs hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800">
+                      <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-800" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                        <i data-lucide="more-vertical" class="pointer-events-none shrink-0 size-3.5 text-gray-500 dark:text-neutral-400"></i>
+                      </button>
+                    </div>
+                  {% endset %}
+                  {% call dropdown(trigger=dropdown_trigger, placement="bottom-end", width="medium") %}
+                  {% set schedule_followup_trigger %}
+                    <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                      <i data-lucide="calendar-clock" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Schedule follow-up
+                    </button>
+                  {% endset %}
+                  
+                  {% set schedule_followup_content %}
+                    <div class="p-4" x-data="{ selectedDate: '' }">
+                      <div class="mb-4">
+                        <h3 class="font-medium text-sm text-gray-800 dark:text-neutral-200">Schedule follow-up</h3>
+                        <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">Pick when you want this Opportunity to come back for attention.</p>
+                      </div>
+                      <div @change="selectedDate = $event.target.value">
+                        {{ date_picker(name="followup_date_2", label="Schedule at", placeholder="Select date & time", datetime=true) }}
+                      </div>
+                      <div class="mt-4 flex justify-end gap-x-2">
+                        {{ button(text="Cancel", variant="secondary", size="sm", extra_attrs="@click=\"active = false; $dispatch('close-dropdown')\"") }}
+                        {{ button(text="Schedule", variant="primary", size="sm", extra_attrs="@click=\"active = false\" :disabled=\"!selectedDate\"") }}
+                      </div>
+                    </div>
+                  {% endset %}
+                  <div class="w-full block">
+                    {{ popover(trigger=schedule_followup_trigger, content=schedule_followup_content, placement="left", trigger_type="click", trigger_class="!block w-full", width="w-80") }}
+                  </div>
+                  <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('open-modal-close-opp-{{ loop.index }}')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 dark:hover:bg-red-600/10">
+                    <i data-lucide="x-circle" class="shrink-0 size-4 text-red-500"></i> Close opportunity
+                  </button>
+                {% endcall %}
+                </div>
+
+            <div x-data="{ closeReason: '' }" class="inline-block">
+              {% call modal(
+                id="close-opp-" ~ loop.index,
+                title="Close opportunity",
+                size="md",
+                variant="danger",
+                confirm_text="Close opportunity",
+                confirm_attrs=":disabled=\"!closeReason\""
+              ) %}
+                <p class="text-sm text-gray-800 dark:text-neutral-200 mb-4 font-medium">Why are you closing this opportunity?</p>
+                <div class="space-y-3">
+                  {{ radio(name="close_reason_" ~ loop.index, label="Not interested", value="not_interested", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Purchased elsewhere", value="purchased_elsewhere", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Not a good fit", value="not_good_fit", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Could not reach student", value="could_not_reach", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Duplicate opportunity", value="duplicate", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Other", value="other", x_model="closeReason") }}
+                </div>
+              {% endcall %}
+            </div>
+            </div>
+          {% endcall %}
+        </tr>
+        {% endif %}
+      {% endfor %}
+  {% endcall %}
+</div>
