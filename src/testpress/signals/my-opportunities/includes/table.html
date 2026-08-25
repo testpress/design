@@ -12,9 +12,9 @@
 {% from "../../../../ui-system/components/radio.html" import radio %}
 
 {% set header_content %}
-  {{ table_th(text="Student") }}
-  {{ table_th(text="Product") }}
+  {{ table_th(text="Opportunity") }}
   {{ table_th(text="Latest activity") }}
+  {{ table_th(text="Signal") }}
   {{ table_th(text="Follow-up") }}
   <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400"><span class="sr-only">Action</span></th>
 {% endset %}
@@ -36,6 +36,7 @@
         items=[
           { "label": "Most recent", "icon": "clock", "attrs": "class='bg-gray-50 dark:bg-neutral-800'" },
           { "label": "Oldest", "icon": "history" },
+          { "label": "High purchase interest", "icon": "flame" },
           { "label": "High price product", "icon": "arrow-up" },
           { "label": "Low price product", "icon": "arrow-down" }
         ]
@@ -103,96 +104,119 @@
         <tr class="transition-colors" 
             x-show="(!isLoading && !isEmpty && !isError) && (
               activeFilter === 'All' || 
-              (activeFilter === 'Needs attention' && '{{ item.priority }}' === 'High') || 
+              (activeFilter === 'Needs attention' && '{{ item.priority }}' === 'High' && '{{ item.latest_activity }}' !== 'You replied' && !{{ 'true' if item.your_reply else 'false' }}) || 
               (activeFilter === 'Follow-ups due today' && '{{ item.follow_up }}'.includes('Today')) || 
               (activeFilter === 'Upcoming follow-ups' && '{{ item.follow_up }}' !== '—' && !'{{ item.follow_up }}'.includes('Today'))
             )">
-          {# Student #}
+
+          {# Opportunity #}
           {% call table_td() %}
             <div class="flex items-center gap-x-3">
-              <img class="inline-block size-8 rounded-full object-cover" src="{{ item.avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
-              <a href="#" class="block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors whitespace-nowrap">{{ item.student_name }}</a>
+              <span class="relative size-9 shrink-0 bg-gray-100 dark:bg-neutral-800 rounded-full">
+                <img class="absolute inset-0 size-full object-cover rounded-full" src="{{ item.avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
+              </span>
+              <div class="grow">
+                <a class="font-medium text-sm text-gray-800 dark:text-neutral-200 underline-offset-2 hover:underline hover:decoration-2 hover:text-primary-600 dark:hover:text-primary-500 focus:outline-hidden focus:underline focus:decoration-2 focus:text-primary-600" href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}">
+                  {{ item.student_name }}
+                </a>
+                <ul class="flex flex-wrap items-center whitespace-nowrap gap-1.5 mt-0.5">
+                  <li class="inline-flex items-center text-xs text-gray-500 dark:text-neutral-400">
+                    <a class="text-xs text-gray-500 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-neutral-200 hover:underline focus:outline-hidden focus:underline" href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}">
+                      {{ item.product | replace(" - ", " · ") }}
+                    </a>
+                  </li>
+                </ul>
+              </div>
             </div>
           {% endcall %}
 
-          {# Product #}
-          {% call table_td() %}
-            <a href="#" class="text-sm text-gray-600 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-neutral-200 hover:underline transition-colors whitespace-nowrap block" title="{{ item.product }}">{{ item.product }}</a>
+          {# Latest activity #}
+          {% call table_td(class="max-w-[320px] !whitespace-normal") %}
+            <div class="flex flex-col min-w-0">
+              <div class="text-sm font-normal text-gray-800 dark:text-neutral-200">
+                {% set display_activity = item.latest_activity %}
+                {% if item.your_reply %}
+                  {% set display_activity = 'You replied' %}
+                {% elif item.student_reply %}
+                  {% set display_activity = 'Student replied' %}
+                {% elif display_activity | lower == 'student replied' %}
+                  {% set display_activity = 'Student replied' %}
+                {% elif display_activity | lower == 'pre-purchase enquiry' %}
+                  {% set display_activity = 'Asked about purchase' %}
+                {% elif display_activity | lower == 'meeting scheduled' %}
+                  {% set display_activity = 'Follow-up scheduled' %}
+                {% elif 'view' in display_activity | lower or 'pricing' in display_activity | lower %}
+                  {% set display_activity = 'Repeated product interest' %}
+                {% endif %}
+                <span>{{ display_activity }} &middot; {{ item.activity_time }}</span>
+              </div>
+              {% if display_activity == 'Follow-up scheduled' and item.follow_up_reason %}
+                {% set text_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.follow_up_reason }}”</span>{% endset %}
+                {{ tooltip(trigger=text_trigger, content=item.follow_up_reason, placement="bottom") }}
+              {% elif item.your_reply %}
+                {% set text_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.your_reply }}”</span>{% endset %}
+                {{ tooltip(trigger=text_trigger, content=item.your_reply, placement="bottom") }}
+              {% elif item.student_reply %}
+                {% set text_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.student_reply }}”</span>{% endset %}
+                {{ tooltip(trigger=text_trigger, content=item.student_reply, placement="bottom") }}
+              {% endif %}
+            </div>
           {% endcall %}
 
-          {# Latest activity #}
-          {% call table_td(class="min-w-[200px] xl:min-w-[250px]") %}
-            <div class="text-sm text-gray-600 dark:text-neutral-400 whitespace-nowrap flex items-center gap-x-1.5">
-              <span>{{ item.latest_activity }} &middot; {{ item.activity_time }}</span>
-              {% if item.timeline %}
-                {% set timeline_trigger %}
-                  <button type="button" class="inline-flex shrink-0 justify-center items-center text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-400 dark:focus:text-neutral-400">
-                    <i data-lucide="info" class="shrink-0 size-3.5"></i>
-                  </button>
-                {% endset %}
-                {% set timeline_content %}
-                  <div class="p-4 w-72 max-h-96 overflow-y-auto text-left">
-                    <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-4">Opportunity timeline</h3>
-                    {% for group in item.timeline %}
-                      <div class="mb-4 last:mb-0">
-                        <h4 class="text-xs font-medium text-gray-500 dark:text-neutral-400 mb-3 uppercase tracking-wider">{{ group.dateGroup }}</h4>
-                        <div class="space-y-4">
-                          {% for event in group.events %}
-                            <div class="flex gap-x-3">
-                              <!-- Icon -->
-                              <div class="relative after:absolute after:top-7 after:bottom-[-1rem] after:start-3.5 after:w-px after:-translate-x-[0.5px] after:bg-gray-200 dark:after:bg-neutral-700 overflow-visible">
-                                <div class="relative z-10 size-7 flex justify-center items-center bg-gray-50 dark:bg-neutral-800 rounded-full border border-gray-200 dark:border-neutral-700 text-gray-500 dark:text-neutral-400">
-                                  <i data-lucide="{{ get_icon(event.signal) }}" class="shrink-0 size-3.5"></i>
-                                </div>
-                              </div>
-                              <!-- End Icon -->
-                              <!-- Right Content -->
-                              <div class="grow pt-0.5 pb-2">
-                                <h5 class="flex gap-x-1.5 text-sm font-medium text-gray-800 dark:text-white whitespace-normal">
-                                  {{ event.signal }}
-                                </h5>
-                                {% if event.comment %}
-                                  <p class="mt-1 text-sm text-gray-600 dark:text-neutral-400 italic whitespace-normal line-clamp-2" title="{{ event.comment }}">"{{ event.comment }}"</p>
-                                {% endif %}
-                                <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400 whitespace-normal">
-                                  {{ event.time }}
-                                </p>
-                              </div>
-                              <!-- End Right Content -->
-                            </div>
-                          {% endfor %}
-                        </div>
-                      </div>
-                    {% endfor %}
-                  </div>
-                {% endset %}
-                {{ popover(trigger=timeline_trigger, content=timeline_content, trigger_type="click", placement="right", trigger_class="inline-flex", width="!w-72") }}
+          {# Signal #}
+          {% call table_td() %}
+            {% set sig = item | getStrongestSignal %}
+            <div class="flex items-center gap-x-2">
+              {% if sig == "Payment failed" %}
+                <span class="size-2 inline-block rounded-full bg-red-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Payment failed</span>
+              {% elif sig == "Checkout abandoned" %}
+                <span class="size-2 inline-block rounded-full bg-amber-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Checkout abandoned</span>
+              {% elif sig == "Pre-purchase enquiry" %}
+                <span class="size-2 inline-block rounded-full bg-blue-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Pre-purchase enquiry</span>
+              {% else %}
+                <span class="size-2 inline-block rounded-full bg-emerald-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Repeated product interest</span>
               {% endif %}
             </div>
           {% endcall %}
 
           {# Follow-up #}
-          {% call table_td() %}
-            <span class="text-sm text-gray-500 dark:text-neutral-400 whitespace-nowrap">{{ item.follow_up }}</span>
+          {% call table_td(class="max-w-[240px] !whitespace-normal") %}
+            <div class="flex flex-col min-w-0">
+              {% if item.follow_up == '—' %}
+                <span class="text-sm text-gray-400 dark:text-neutral-500">—</span>
+              {% else %}
+                <span class="text-sm text-gray-800 dark:text-neutral-200">{{ item.follow_up }}</span>
+                {% if item.follow_up_reason %}
+                  {% set reason_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">{{ item.follow_up_reason }}</span>{% endset %}
+                  {{ tooltip(trigger=reason_trigger, content=item.follow_up_reason, placement="bottom") }}
+                {% endif %}
+              {% endif %}
+            </div>
           {% endcall %}
-
 
           {# Action #}
           {% call table_td(class="text-end") %}
-            <div class="flex items-center justify-end gap-x-2">
-
-                <div class="flex justify-end items-center -space-x-px">
-                  <a href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}" class="py-2 px-3 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-s-lg rounded-e-none border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-                    View
-                  </a>
-                  {% set dropdown_trigger %}
-                    <div class="relative inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white shadow-2xs hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800">
-                      <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-800" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
-                        <i data-lucide="more-vertical" class="pointer-events-none shrink-0 size-3.5 text-gray-500 dark:text-neutral-400"></i>
-                      </button>
-                    </div>
-                  {% endset %}
-                  {% call dropdown(trigger=dropdown_trigger, placement="bottom-end", width="medium") %}
+            <div class="inline-flex justify-end items-center -space-x-px">
+              <a href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}" class="h-8 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-s-lg rounded-e-none border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                View
+              </a>
+              
+              {% set dropdown_trigger %}
+                <div class="relative h-8 inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:hover:bg-neutral-700">
+                  <button type="button" class="h-full w-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                    <svg class="pointer-events-none shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="1"></circle>
+                      <circle cx="12" cy="5" r="1"></circle>
+                      <circle cx="12" cy="19" r="1"></circle>
+                    </svg>
+                  </button>
+                </div>
+              {% endset %}
+              {% call dropdown(trigger=dropdown_trigger, placement="bottom-end", width="medium") %}
                   {% if item.follow_up == '—' %}
                   {% set schedule_followup_trigger %}
                     <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
@@ -218,6 +242,11 @@
                   <div class="w-full block">
                     {{ popover(trigger=schedule_followup_trigger, content=schedule_followup_content, placement="left", trigger_type="click", trigger_class="!block w-full", width="w-80") }}
                   </div>
+                  <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                  {% else %}
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('toast', { title: 'Follow-up completed · {{ item.student_name }}', description: '{% if item.follow_up_reason %}{{ item.follow_up_reason | replace(r/\x27/g, &apos;\\&apos;&apos;) | replace(r/\x22/g, &apos;\\&quot;&apos;) }}{% endif %}', actionLabel: 'Undo', variant: 'success', duration: 5000, showProgress: true })" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <i data-lucide="check-circle" class="shrink-0 size-4 text-emerald-500"></i> Complete follow-up
+                  </button>
                   <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
                   {% endif %}
                   <button type="button" @click="$dispatch('close-dropdown'); $dispatch('open-modal-close-opp-{{ loop.index }}')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 dark:hover:bg-red-600/10">
