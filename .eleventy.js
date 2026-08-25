@@ -69,6 +69,33 @@ module.exports = config => {
         if (!Array.isArray(items)) return [];
         return items.filter(item => item.job_id === jobId);
     });
+    config.addFilter("filterByStates", function(items, states) {
+        if (!Array.isArray(items)) return [];
+        return items.filter(item => states.includes(item.state));
+    });
+    config.addFilter("filterByHighValue", function(items) {
+        if (!Array.isArray(items)) return [];
+        return items.filter(item => {
+            const timelineStr = JSON.stringify(item.timeline).toLowerCase();
+            return timelineStr.includes("payment failed") || timelineStr.includes("abandoned");
+        });
+    });
+    config.addFilter("filterByFollowUpToday", function(items) {
+        if (!Array.isArray(items)) return [];
+        return items.filter(item => item.follow_up && item.follow_up !== "—" && item.follow_up.includes('Today'));
+    });
+    config.addFilter("filterByFollowUpUpcoming", function(items) {
+        if (!Array.isArray(items)) return [];
+        return items.filter(item => item.follow_up && item.follow_up !== "—" && !item.follow_up.includes('Today'));
+    });
+    config.addFilter("limit", function(array, limit) {
+        if (!Array.isArray(array)) return [];
+        return array.slice(0, limit);
+    });
+    config.addFilter("split", function(str, separator) {
+        if (typeof str !== "string") return [];
+        return str.split(separator);
+    });
     config.addPassthroughCopy({ "src/testpress/api": "api" });
     config.addPassthroughCopy("css/simba.css");
     config.addPassthroughCopy("css/odinhire.css");

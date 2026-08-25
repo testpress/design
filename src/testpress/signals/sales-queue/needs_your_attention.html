@@ -48,17 +48,18 @@
   <!-- Data State -->
   <div x-show="status !== 'empty' && status !== 'onboarding'" class="flex flex-col flex-grow">
     <ul role="list" class="overflow-hidden">
-      {% for item in needs_your_attention %}
+      {% set attention_items = my_opportunities | filterByStates(['awaiting-your-response', 'no-conversation-yet']) %}
+      {% for item in attention_items | limit(5) %}
       <li class="relative flex justify-between items-center gap-x-6 px-5 py-4 hover:bg-gray-50 dark:hover:bg-neutral-700/40 transition-colors">
         <div class="flex min-w-0 gap-x-4 w-full">
-          <img src="{{ item.student.avatar }}" alt="{{ item.student.name }}" class="size-10 flex-none rounded-full object-cover">
+          <img src="{{ item.avatar }}" alt="{{ item.student_name }}" class="size-10 flex-none rounded-full object-cover">
           <div class="min-w-0 flex-1 space-y-1">
             <div class="text-sm font-medium text-gray-900 dark:text-white flex items-center min-w-0">
-              <a href="{{ '/signals/opportunity-detail/' ~ item.state ~ '/' | url }}" class="truncate min-w-0">
+              <a href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}" class="truncate min-w-0">
                 <span class="absolute inset-x-0 -top-px bottom-0"></span>
-                {{ item.student.name }} <span class="font-normal text-gray-500 dark:text-neutral-400">{{ item.event }}</span>
+                {{ item.student_name }} <span class="font-normal text-gray-500 dark:text-neutral-400">{{ item.latest_activity | lower }} {{ item.activity_time }}</span>
               </a>
-              {% if item.message %}
+              {% if item.student_reply %}
                 {% set popover_trigger %}
                   <button type="button" class="ml-1.5 focus:outline-none flex items-center">
                     <svg class="shrink-0 size-3.5 text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300 transition-colors" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
@@ -66,16 +67,14 @@
                 {% endset %}
                 {% set popover_content %}
                   <div class="p-3 text-xs text-gray-600 dark:text-neutral-300 break-words whitespace-normal leading-relaxed">
-                    "{{ item.message }}"
+                    "{{ item.student_reply }}"
                   </div>
                 {% endset %}
                 {{ popover(trigger=popover_trigger, content=popover_content, trigger_type='hover', placement='top', width='w-[280px] sm:w-80', trigger_class="relative z-10") }}
               {% endif %}
             </div>
             <div class="flex items-center text-xs text-gray-500 dark:text-neutral-400 min-w-0">
-              <span class="truncate">{{ item.product }}</span>
-              <span class="mx-1 shrink-0">·</span>
-              <span class="shrink-0">{{ item.price }}</span>
+              <span class="truncate">{{ item.product | replace(" - ", " · ") }}</span>
             </div>
           </div>
         </div>
@@ -86,7 +85,11 @@
     <!-- Footer -->
     <div class="text-center mt-auto border-t border-gray-200 dark:border-neutral-700">
       <a class="group p-3 flex justify-center items-center text-sm  text-primary-600 dark:text-primary-500 rounded-b-lg hover:text-primary-700 dark:hover:text-primary-600 focus:outline-none focus:decoration-2 focus:underline focus:text-primary-700 dark:focus:text-primary-600 transition-colors" href="{{ '/signals/my-opportunities/?filter=Needs+attention' | url }}">
-        + 6 more
+        {% if attention_items | length > 5 %}
+          + {{ (attention_items | length) - 5 }} more
+        {% else %}
+          See all
+        {% endif %}
         <i data-lucide="arrow-right" class="shrink-0 size-4 ml-1 transition-transform group-hover:translate-x-1"></i>
       </a>
     </div>
