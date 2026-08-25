@@ -14,6 +14,7 @@
 {% set header_content %}
   {{ table_th(text="Opportunity") }}
   {{ table_th(text="Latest activity") }}
+  {{ table_th(text="Signal") }}
   <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400"><span class="sr-only">Action</span></th>
 {% endset %}
 
@@ -28,7 +29,7 @@
   {% set table_actions %}
     <div class="flex items-center gap-x-2">
       {{ dropdown(
-        trigger=button(text="Sort", variant="secondary", icon="arrow-down-up", size="sm"),
+        trigger=button(text="Highest purchase interest", variant="secondary", icon="arrow-down-up", size="sm"),
         placement="bottom-end",
         width="medium",
         items=[
@@ -98,7 +99,7 @@
       </tr>
     </template>
 
-      {% for item in unclaimed_opportunities %}
+      {% for item in unclaimed_opportunities | sortByHighPurchaseInterest %}
         {% if item.state != "Converted" and item.state != "Closed" %}
         <tr class="transition-colors" 
             x-show="(!isLoading && !isEmpty && !isError) && (
@@ -131,13 +132,7 @@
             <div class="flex flex-col min-w-0">
               <div class="text-sm font-normal text-gray-800 dark:text-neutral-200">
                 {% set display_activity = item.latest_activity %}
-                {% if item.your_reply %}
-                  {% set display_activity = 'You replied' %}
-                {% elif item.student_reply %}
-                  {% set display_activity = 'Student replied' %}
-                {% elif display_activity | lower == 'student replied' %}
-                  {% set display_activity = 'Student replied' %}
-                {% elif display_activity | lower == 'pre-purchase enquiry' %}
+                {% if item.student_reply or display_activity | lower == 'student replied' or display_activity | lower == 'pre-purchase enquiry' %}
                   {% set display_activity = 'Asked about purchase' %}
                 {% elif display_activity | lower == 'meeting scheduled' %}
                   {% set display_activity = 'Follow-up scheduled' %}
@@ -147,33 +142,58 @@
                 <span>{{ display_activity }} &middot; {{ item.activity_time }}</span>
               </div>
               {% if display_activity == 'Follow-up scheduled' and item.follow_up_reason %}
-              <div class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate" title="{{ item.follow_up_reason }}">
-                “{{ item.follow_up_reason }}”
-              </div>
-              {% elif item.your_reply %}
-              <div class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate" title="{{ item.your_reply }}">
-                “{{ item.your_reply }}”
-              </div>
+                {% set reason_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.follow_up_reason }}”</span>{% endset %}
+                {{ tooltip(trigger=reason_trigger, content=item.follow_up_reason, placement="bottom") }}
               {% elif item.student_reply %}
-              <div class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate" title="{{ item.student_reply }}">
-                “{{ item.student_reply }}”
-              </div>
+                {% set reply_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.student_reply }}”</span>{% endset %}
+                {{ tooltip(trigger=reply_trigger, content=item.student_reply, placement="bottom") }}
               {% endif %}
             </div>
           {% endcall %}
 
-
-
+          {# Signal #}
+          {% call table_td() %}
+            {% set sig = item | getStrongestSignal %}
+            <div class="flex items-center gap-x-2">
+              {% if sig == "Payment failed" %}
+                <span class="size-2 inline-block rounded-full bg-red-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Payment failed</span>
+              {% elif sig == "Checkout abandoned" %}
+                <span class="size-2 inline-block rounded-full bg-amber-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Checkout abandoned</span>
+              {% elif sig == "Pre-purchase enquiry" %}
+                <span class="size-2 inline-block rounded-full bg-blue-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Pre-purchase enquiry</span>
+              {% else %}
+                <span class="size-2 inline-block rounded-full bg-emerald-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Repeated product interest</span>
+              {% endif %}
+            </div>
+          {% endcall %}
 
           {# Action #}
           {% call table_td(class="text-end") %}
-            <div class="inline-flex items-center justify-end gap-x-2">
-
-                <div class="flex justify-end items-center">
-                  <button type="button" @click="$dispatch('open-modal-claim-opp-{{ loop.index }}')" class="h-8 px-3 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-transparent bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:ring-2 focus:ring-primary-500">
-                    Claim
+            <div class="inline-flex justify-end items-center -space-x-px">
+              <button type="button" @click="$dispatch('open-modal-claim-opp-{{ loop.index }}')" class="h-8 px-3 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-s-lg rounded-e-none border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                Claim
+              </button>
+              
+              {% set dropdown_trigger %}
+                <div class="relative h-8 inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:hover:bg-neutral-700">
+                  <button type="button" class="h-full w-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                    <svg class="pointer-events-none shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="1"></circle>
+                      <circle cx="12" cy="5" r="1"></circle>
+                      <circle cx="12" cy="19" r="1"></circle>
+                    </svg>
                   </button>
                 </div>
+              {% endset %}
+              
+              {% set dropdown_items = [
+                { "label": "View details", "url": '/signals/unclaimed-opportunities/' ~ item.id ~ '/' | url, "icon": "eye" }
+              ] %}
+              {{ dropdown(trigger=dropdown_trigger, items=dropdown_items, placement="bottom-end", width="medium") }}
 
                 <div class="inline-block">
                   {% call modal(

@@ -140,6 +140,38 @@ module.exports = config => {
         if (!Array.isArray(array)) return [];
         return array.slice(0, limit);
     });
+    config.addFilter("sortByHighPurchaseInterest", function(items) {
+        if (!Array.isArray(items)) return [];
+
+        const signalPriority = (item) => {
+            const latestAct = (item.latest_activity || "").toLowerCase();
+            const yourReply = item.your_reply || "";
+            if (latestAct.includes("payment failed")) return 0;
+            if (latestAct.includes("abandoned") || latestAct.includes("checkout")) return 1;
+            if (latestAct.includes("pre-purchase") || latestAct.includes("enquiry") || item.student_reply) return 2;
+            if (latestAct.includes("viewed") || latestAct.includes("pricing")) return 3;
+            if (latestAct.includes("replied") || yourReply) return 4;
+            if (latestAct.includes("meeting") || latestAct.includes("follow-up")) return 5;
+            return 6;
+        };
+
+        const extractPrice = (product) => {
+            const match = (product || "").match(/₹(\d+(?:\.\d+)?)(k|l)?/i);
+            if (!match) return 0;
+            let val = parseFloat(match[1]);
+            if (match[2] && match[2].toLowerCase() === 'k') val *= 1000;
+            if (match[2] && match[2].toLowerCase() === 'l') val *= 100000;
+            return val;
+        };
+
+        return [...items].sort((a, b) => {
+            const pa = signalPriority(a), pb = signalPriority(b);
+            if (pa !== pb) return pa - pb;
+            const priceA = extractPrice(a.product), priceB = extractPrice(b.product);
+            if (priceB !== priceA) return priceB - priceA;
+            return 0;
+        });
+    });
     config.addFilter("split", function(str, separator) {
         if (typeof str !== "string") return [];
         return str.split(separator);
