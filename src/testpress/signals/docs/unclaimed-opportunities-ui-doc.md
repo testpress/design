@@ -788,4 +788,4 @@ Pagination / additional results.
 11. **Handle race conditions where another salesperson claims the Opportunity first.**
 12. **Keep the list focused on active, unclaimed Opportunities rather than turning it into a generic lead database.**
 
-**That is the real purpose of the Unclaimed Opportunities.**
+**That is the real purpose of the Unclaimed Opportunitiess.**
