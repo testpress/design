@@ -1,0 +1,286 @@
+{% from "../../../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../../../ui-system/components/popover.html" import popover %}
+{% from "../../_includes/icon_macro.njk" import get_icon %}
+{% from "../../../../ui-system/components/button.html" import button %}
+{% from "../../../../ui-system/components/pagination.html" import pagination %}
+{% from "../../../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../../ui-system/components/select.html" import select %}
+{% from "../../../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../../ui-system/components/modal.html" import modal %}
+{% from "../../../../ui-system/components/radio.html" import radio %}
+
+{% set header_content %}
+  {{ table_th(text="Opportunity") }}
+  {{ table_th(text="Latest activity") }}
+  {{ table_th(text="Signal") }}
+  {{ table_th(text="Follow-up") }}
+  <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400"><span class="sr-only">Action</span></th>
+{% endset %}
+
+<div class="mt-8" x-data="{
+    // Mock loading state variables if needed for future interactive updates
+    isLoading: false,
+    isEmpty: false,
+    isError: false,
+    searchInput: ''
+}">
+
+  {% set table_actions %}
+    <div class="flex items-center gap-x-2">
+      <div x-show="activeFilter === 'All' || activeFilter === 'Needs attention'">
+        {{ dropdown(
+          trigger=button(text="Most recent", variant="secondary", icon="arrow-down-up", size="sm"),
+          placement="bottom-end",
+          width="medium",
+          items=[
+            { "label": "Most recent", "icon": "clock", "attrs": "class='bg-gray-50 dark:bg-neutral-800'" },
+            { "label": "Oldest", "icon": "history" },
+            { "label": "High purchase interest", "icon": "flame" },
+            { "label": "High price product", "icon": "arrow-up" },
+            { "label": "Low price product", "icon": "arrow-down" }
+          ]
+        ) }}
+      </div>
+      {{ button(text="Filter", variant="secondary", icon="filter", size="sm", extra_attrs="@click=\"$dispatch('open-drawer-attention-filter')\"") }}
+    </div>
+  {% endset %}
+  
+  {% set pagination_html %}
+    {{ pagination(items=[1, 2, 3, '...', 8], current=1, show_go_to=true) }}
+  {% endset %}
+
+  {% call table(
+    search_enabled=true,
+    search_placeholder="Search students or products...",
+    search_x_model="searchInput",
+    filters=table_actions,
+    pagination=pagination_html,
+    table_header=header_content,
+    hoverable=false,
+    padded=true,
+    table_container_classes=""
+  ) %}
+    
+    <template x-if="isLoading">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <div class="animate-spin inline-block size-6 border-[3px] border-current border-t-transparent text-primary-600 rounded-full dark:text-primary-500" role="status" aria-label="loading">
+              <span class="sr-only">Loading...</span>
+            </div>
+            <p class="mt-4 text-sm text-gray-600 dark:text-neutral-400">Loading opportunities...</p>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+    <template x-if="isError">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <i data-lucide="alert-triangle" class="size-8 text-red-500 mb-3"></i>
+            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">We couldn't load opportunities right now.</p>
+            <button type="button" class="mt-4 py-1.5 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">
+              Try again
+            </button>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+    <template x-if="isEmpty">
+      <tr>
+        <td colspan="9" class="px-5 py-24 text-center">
+          <div class="flex flex-col items-center justify-center">
+            <i data-lucide="inbox" class="size-8 text-gray-400 mb-3"></i>
+            <p class="text-sm text-gray-600 dark:text-neutral-400">No opportunities need your attention right now.</p>
+          </div>
+        </td>
+      </tr>
+    </template>
+
+      {% for item in my_opportunities | sortByHighPurchaseInterest %}
+        {% if item.state != "Converted" and item.state != "Closed" %}
+        <tr class="transition-colors" 
+            x-show="(!isLoading && !isEmpty && !isError) && (
+              activeFilter === 'All' || 
+              (activeFilter === 'Needs attention' && ('{{ item.state }}' === 'awaiting-your-response' || '{{ item.state }}' === 'no-conversation-yet')) || 
+              (activeFilter === 'Follow-ups due today' && '{{ item.follow_up }}' !== '—' && '{{ item.follow_up }}'.includes('Today')) || 
+              (activeFilter === 'Upcoming follow-ups' && '{{ item.follow_up }}' !== '—' && !'{{ item.follow_up }}'.includes('Today'))
+            )">
+
+          {# Opportunity #}
+          {% call table_td() %}
+            <div class="flex items-center gap-x-3">
+              <span class="relative size-9 shrink-0 bg-gray-100 dark:bg-neutral-800 rounded-full">
+                <img class="absolute inset-0 size-full object-cover rounded-full" src="{{ item.avatar | default('https://static.testpress.in/static/img/default_small_image.png', true) }}" alt="Avatar">
+              </span>
+              <div class="grow">
+                <a class="font-medium text-sm text-gray-800 dark:text-neutral-200 underline-offset-2 hover:underline hover:decoration-2 hover:text-primary-600 dark:hover:text-primary-500 focus:outline-hidden focus:underline focus:decoration-2 focus:text-primary-600" href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}">
+                  {{ item.student_name }}
+                </a>
+                <ul class="flex flex-wrap items-center whitespace-nowrap gap-1.5 mt-0.5">
+                  <li class="inline-flex items-center text-xs text-gray-500 dark:text-neutral-400">
+                    <a class="text-xs text-gray-500 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-neutral-200 hover:underline focus:outline-hidden focus:underline" href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}">
+                      {{ item.product | replace(" - ", " · ") }}
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          {% endcall %}
+
+          {# Latest activity #}
+          {% call table_td(class="max-w-[320px] !whitespace-normal") %}
+            <div class="flex flex-col min-w-0">
+              <div class="text-sm font-normal text-gray-800 dark:text-neutral-200">
+                {% set display_activity = item.latest_activity %}
+                {% if item.your_reply %}
+                  {% set display_activity = 'You replied' %}
+                {% elif item.student_reply %}
+                  {% set display_activity = 'Student replied' %}
+                {% elif display_activity | lower == 'student replied' %}
+                  {% set display_activity = 'Student replied' %}
+                {% elif display_activity | lower == 'pre-purchase enquiry' %}
+                  {% set display_activity = 'Asked about purchase' %}
+                {% elif display_activity | lower == 'meeting scheduled' %}
+                  {% set display_activity = 'Follow-up scheduled' %}
+                {% elif 'view' in display_activity | lower or 'pricing' in display_activity | lower %}
+                  {% set display_activity = 'Repeated product interest' %}
+                {% endif %}
+                <span>{{ display_activity }} &middot; {{ item.activity_time }}</span>
+              </div>
+              {% if display_activity == 'Follow-up scheduled' and item.follow_up_reason %}
+                {% set text_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.follow_up_reason }}”</span>{% endset %}
+                {{ tooltip(trigger=text_trigger, content=item.follow_up_reason, placement="bottom") }}
+              {% elif item.your_reply %}
+                {% set text_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.your_reply }}”</span>{% endset %}
+                {{ tooltip(trigger=text_trigger, content=item.your_reply, placement="bottom") }}
+              {% elif item.student_reply %}
+                {% set text_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">“{{ item.student_reply }}”</span>{% endset %}
+                {{ tooltip(trigger=text_trigger, content=item.student_reply, placement="bottom") }}
+              {% endif %}
+            </div>
+          {% endcall %}
+
+          {# Signal #}
+          {% call table_td() %}
+            {% set sig = item | getStrongestSignal %}
+            <div class="flex items-center gap-x-2">
+              {% if sig == "Payment failed" %}
+                <span class="size-2 inline-block rounded-full bg-red-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Payment failed</span>
+              {% elif sig == "Checkout abandoned" %}
+                <span class="size-2 inline-block rounded-full bg-amber-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Checkout abandoned</span>
+              {% elif sig == "Pre-purchase enquiry" %}
+                <span class="size-2 inline-block rounded-full bg-blue-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Pre-purchase enquiry</span>
+              {% else %}
+                <span class="size-2 inline-block rounded-full bg-emerald-500"></span>
+                <span class="text-sm text-gray-800 dark:text-neutral-200">Repeated product interest</span>
+              {% endif %}
+            </div>
+          {% endcall %}
+
+          {# Follow-up #}
+          {% call table_td(class="max-w-[240px] !whitespace-normal") %}
+            <div class="flex flex-col min-w-0">
+              {% if item.follow_up == '—' %}
+                <span class="text-sm text-gray-400 dark:text-neutral-500">—</span>
+              {% else %}
+                <span class="text-sm text-gray-800 dark:text-neutral-200">{{ item.follow_up }}</span>
+                {% if item.follow_up_reason %}
+                  {% set reason_trigger %}<span class="text-xs text-gray-500 dark:text-neutral-500 mt-0.5 truncate max-w-[240px] block">{{ item.follow_up_reason }}</span>{% endset %}
+                  {{ tooltip(trigger=reason_trigger, content=item.follow_up_reason, placement="bottom") }}
+                {% endif %}
+              {% endif %}
+            </div>
+          {% endcall %}
+
+          {# Action #}
+          {% call table_td(class="text-end") %}
+            <div class="inline-flex justify-end items-center -space-x-px">
+              <a href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}" class="h-8 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-s-lg rounded-e-none border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                View
+              </a>
+              
+              {% set dropdown_trigger %}
+                <div class="relative h-8 inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:hover:bg-neutral-700">
+                  <button type="button" class="h-full w-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                    <svg class="pointer-events-none shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="1"></circle>
+                      <circle cx="12" cy="5" r="1"></circle>
+                      <circle cx="12" cy="19" r="1"></circle>
+                    </svg>
+                  </button>
+                </div>
+              {% endset %}
+              {% call dropdown(trigger=dropdown_trigger, placement="bottom-end", width="medium") %}
+                  {% if item.follow_up == '—' %}
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('open-modal-schedule-followup-{{ loop.index }}')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <i data-lucide="calendar-clock" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Schedule follow-up
+                  </button>
+                  <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                  {% else %}
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('toast', { title: 'Follow-up completed · {{ item.student_name }}', description: '{% if item.follow_up_reason %}{{ item.follow_up_reason | replace(r/\x27/g, &apos;\\&apos;&apos;) | replace(r/\x22/g, &apos;\\&quot;&apos;) }}{% endif %}', actionLabel: 'Undo', variant: 'success', duration: 5000, showProgress: true })" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <i data-lucide="check-circle" class="shrink-0 size-4 text-emerald-500"></i> Complete follow-up
+                  </button>
+                  <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                  {% endif %}
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('open-modal-close-opp-{{ loop.index }}')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 dark:hover:bg-red-600/10">
+                    <i data-lucide="x-circle" class="shrink-0 size-4 text-red-500"></i> Close opportunity
+                  </button>
+                {% endcall %}
+                </div>
+
+            {% if item.follow_up == '—' %}
+            <div x-data="{ selectedDate: '', reason: '' }" class="inline-block">
+              {% call modal(
+                id="schedule-followup-" ~ loop.index,
+                title="Schedule a follow-up",
+                size="md",
+                variant="primary",
+                confirm_text="Schedule",
+                confirm_attrs=":disabled=\"!selectedDate\""
+              ) %}
+                <p class="text-sm text-gray-500 dark:text-neutral-400 mb-4 whitespace-normal text-start">Set a future date to reconnect with the student. The opportunity will remain active and automatically return to your attention when the follow-up is due.</p>
+                <div class="space-y-4">
+                  <div @change="selectedDate = $event.target.value">
+                    {{ date_picker(name="followup_date_" ~ loop.index, label="Schedule at", placeholder="Select date & time", datetime=true) }}
+                  </div>
+                  {{ textarea(name="reason_" ~ loop.index, label="Reason (Optional)", placeholder="e.g. Waiting for salary day", x_model="reason") }}
+                </div>
+              {% endcall %}
+            </div>
+            {% endif %}
+
+            <div x-data="{ closeReason: '' }" class="inline-block">
+              {% call modal(
+                id="close-opp-" ~ loop.index,
+                title="Close opportunity",
+                size="md",
+                variant="danger",
+                confirm_text="Close opportunity",
+                confirm_attrs=":disabled=\"!closeReason\""
+              ) %}
+                <p class="text-sm text-gray-800 dark:text-neutral-200 mb-4 font-medium">Why are you closing this opportunity?</p>
+                <div class="space-y-3">
+                  {{ radio(name="close_reason_" ~ loop.index, label="Not interested", value="not_interested", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Purchased elsewhere", value="purchased_elsewhere", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Not a good fit", value="not_good_fit", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Could not reach student", value="could_not_reach", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Duplicate opportunity", value="duplicate", x_model="closeReason") }}
+                  {{ radio(name="close_reason_" ~ loop.index, label="Other", value="other", x_model="closeReason") }}
+                </div>
+              {% endcall %}
+            </div>
+            </div>
+          {% endcall %}
+        </tr>
+        {% endif %}
+      {% endfor %}
+  {% endcall %}
+</div>
