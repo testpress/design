@@ -77,11 +77,12 @@ module.exports = config => {
         if (!Array.isArray(items)) return [];
 
         const signalPriority = (item) => {
+            const timelineStr = JSON.stringify(item.timeline || {}).toLowerCase();
             const t = (item.latest_activity || "").toLowerCase();
-            if (t.includes("payment failed")) return 0;
-            if (t.includes("abandoned")) return 1;
-            if (t.includes("pre-purchase enquiry") || t.includes("product enquiry") || t.includes("enquiry")) return 2;
-            if (t.includes("viewed")) return 3;
+            if (t.includes("payment failed") || timelineStr.includes("payment failed")) return 0;
+            if (t.includes("abandoned") || timelineStr.includes("abandoned") || timelineStr.includes("checkout started")) return 1;
+            if (t.includes("pre-purchase") || t.includes("product enquiry") || t.includes("enquiry") || timelineStr.includes("pre-purchase") || timelineStr.includes("enquiry")) return 2;
+            if (t.includes("viewed") || timelineStr.includes("viewed") || timelineStr.includes("pricing")) return 3;
             return 4;
         };
 
@@ -150,12 +151,13 @@ module.exports = config => {
         if (!Array.isArray(items)) return [];
 
         const signalPriority = (item) => {
+            const timelineStr = JSON.stringify(item.timeline || {}).toLowerCase();
             const latestAct = (item.latest_activity || "").toLowerCase();
             const yourReply = item.your_reply || "";
-            if (latestAct.includes("payment failed")) return 0;
-            if (latestAct.includes("abandoned") || latestAct.includes("checkout")) return 1;
-            if (latestAct.includes("pre-purchase") || latestAct.includes("enquiry") || item.student_reply) return 2;
-            if (latestAct.includes("viewed") || latestAct.includes("pricing")) return 3;
+            if (latestAct.includes("payment failed") || timelineStr.includes("payment failed")) return 0;
+            if (latestAct.includes("abandoned") || latestAct.includes("checkout") || timelineStr.includes("abandoned") || timelineStr.includes("checkout started")) return 1;
+            if (latestAct.includes("pre-purchase") || latestAct.includes("enquiry") || timelineStr.includes("pre-purchase") || timelineStr.includes("enquiry") || item.student_reply) return 2;
+            if (latestAct.includes("viewed") || latestAct.includes("pricing") || timelineStr.includes("viewed") || timelineStr.includes("pricing")) return 3;
             if (latestAct.includes("replied") || yourReply) return 4;
             if (latestAct.includes("meeting") || latestAct.includes("follow-up")) return 5;
             return 6;
