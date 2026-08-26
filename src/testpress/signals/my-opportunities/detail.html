@@ -7,7 +7,638 @@ pagination:
 permalink: "/signals/my-opportunities/{{ item.id }}/"
 view: false
 ---
-{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50{% endblock %}
 {% extends "layouts/admin_base.html" %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+{% from "../../../ui-system/components/select.html" import select %}
+{% from "../../../ui-system/components/alert.html" import alert %}
 
-{% block content %}{% endblock %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock %}
+
+{% block content %}
+<div
+  x-data="{
+    composerMode: 'message',
+    composerProduct: 'GATE CS Pack',
+    followUpScheduled: true,
+    showFollowUpActions: false,
+    obstacle: 'Price concern',
+    showObstacleEdit: false,
+    newObstacle: 'Price concern'
+  }"
+  class="h-screen flex flex-col"
+>
+
+  {# ─── Top Header Bar ─────────────────────────────────────────────────────── #}
+  <div class="shrink-0 bg-white dark:bg-neutral-800 border-b border-gray-200 dark:border-neutral-700 px-4 sm:px-6 py-3">
+    <div class="max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
+
+      {# Left: Breadcrumb + Student identity #}
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="/signals/my-opportunities/" class="shrink-0 flex items-center justify-center size-8 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700 text-gray-500 dark:text-neutral-400 transition-colors">
+          <i data-lucide="arrow-left" class="size-4"></i>
+        </a>
+        <div class="shrink-0 relative size-9">
+          <img src="https://randomuser.me/api/portraits/men/10.jpg" alt="Rahul Kumar" class="size-9 rounded-full object-cover">
+          <span class="absolute bottom-0 right-0 size-2.5 rounded-full bg-amber-400 ring-2 ring-white dark:ring-neutral-800"></span>
+        </div>
+        <div class="min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <h1 class="text-sm font-semibold text-gray-900 dark:text-white truncate">Rahul Kumar</h1>
+            {# State badge #}
+            <span class="inline-flex items-center gap-x-1 text-[11px] font-medium py-0.5 px-2 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+              <span class="size-1.5 rounded-full bg-amber-500 inline-block"></span>
+              Follow-up due today
+            </span>
+          </div>
+          <p class="text-xs text-gray-500 dark:text-neutral-400 truncate">GATE CS Pack · ₹30,000 &nbsp;·&nbsp; rahul.kumar@example.com</p>
+        </div>
+      </div>
+
+      {# Right: Primary actions #}
+      <div class="flex items-center gap-2 shrink-0">
+        {# Schedule follow-up or Mark Complete based on state #}
+        <template x-if="!followUpScheduled">
+          <button
+            type="button"
+            @click="$dispatch('open-modal-schedule-followup')"
+            class="inline-flex items-center gap-x-1.5 py-1.5 px-3 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <i data-lucide="calendar-clock" class="size-3.5 text-gray-400"></i>
+            Schedule follow-up
+          </button>
+        </template>
+        <template x-if="followUpScheduled">
+          <button
+            type="button"
+            @click="showFollowUpActions = !showFollowUpActions"
+            :class="showFollowUpActions ? 'bg-amber-50 border-amber-300 text-amber-700 dark:bg-amber-500/10 dark:border-amber-600 dark:text-amber-400' : 'bg-white border-gray-200 text-gray-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300'"
+            class="inline-flex items-center gap-x-1.5 py-1.5 px-3 text-xs font-medium rounded-lg border hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors"
+          >
+            <i data-lucide="calendar-check" class="size-3.5"></i>
+            Follow-up: Today, 10:00 AM
+            <i data-lucide="chevron-down" class="size-3" :class="showFollowUpActions ? 'rotate-180' : ''" style="transition: transform 0.2s"></i>
+          </button>
+        </template>
+
+        <button
+          type="button"
+          @click="$dispatch('open-modal-close-opp')"
+          class="inline-flex items-center gap-x-1.5 py-1.5 px-3 text-xs font-medium rounded-lg border border-red-200 bg-white text-red-600 hover:bg-red-50 dark:bg-neutral-800 dark:border-red-700/50 dark:text-red-400 dark:hover:bg-red-500/10 transition-colors"
+        >
+          <i data-lucide="x-circle" class="size-3.5"></i>
+          Close
+        </button>
+
+        {# Reply Now - primary CTA #}
+        <a
+          href="#chat-composer"
+          class="inline-flex items-center gap-x-1.5 py-1.5 px-3.5 text-xs font-semibold rounded-lg bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-400 transition-colors shadow-sm"
+        >
+          <i data-lucide="message-circle" class="size-3.5"></i>
+          Reply Now
+        </a>
+
+        {# Overflow #}
+        {% set overflow_trigger %}
+          <button type="button" class="size-8 inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700 transition-colors">
+            <i data-lucide="more-horizontal" class="size-4"></i>
+          </button>
+        {% endset %}
+        {% call dropdown(trigger=overflow_trigger, placement="bottom-end", width="medium") %}
+          <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+            <i data-lucide="users" class="shrink-0 size-4 text-gray-400"></i> Add collaborator
+          </button>
+          <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+            <i data-lucide="arrow-right-left" class="shrink-0 size-4 text-gray-400"></i> Transfer ownership
+          </button>
+          <div class="my-1 border-t border-gray-200 dark:border-neutral-700"></div>
+          <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] text-start text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-800">
+            <i data-lucide="ban" class="shrink-0 size-4"></i> Mark as invalid
+          </button>
+        {% endcall %}
+      </div>
+
+    </div>
+
+    {# Follow-up action strip – shown when expanded #}
+    <div x-show="followUpScheduled && showFollowUpActions" x-collapse x-cloak class="max-w-screen-2xl mx-auto">
+      <div class="mt-3 flex items-center gap-2 py-2 px-3 bg-amber-50 dark:bg-amber-500/10 rounded-lg border border-amber-200 dark:border-amber-600/30">
+        <i data-lucide="calendar-clock" class="shrink-0 size-4 text-amber-600 dark:text-amber-400"></i>
+        <p class="text-xs text-amber-800 dark:text-amber-300 flex-1">
+          <span class="font-medium">Today, 10:00 AM</span> &mdash; Asked about payment options
+        </p>
+        <div class="flex items-center gap-1.5">
+          <button type="button" @click="$dispatch('open-modal-reschedule-followup')" class="text-xs font-medium text-amber-700 dark:text-amber-400 hover:underline px-2 py-0.5 rounded hover:bg-amber-100 dark:hover:bg-amber-500/20">Reschedule</button>
+          <span class="text-amber-400">·</span>
+          <button type="button" class="text-xs font-medium text-gray-500 dark:text-neutral-400 hover:underline px-2 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-neutral-700">Cancel</button>
+          <span class="text-amber-400">·</span>
+          <button
+            type="button"
+            @click="followUpScheduled = false; showFollowUpActions = false; $dispatch('toast', { title: 'Follow-up marked complete', variant: 'success', duration: 3000 })"
+            class="text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline px-2 py-0.5 rounded hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+          >
+            Mark complete ✓
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {# ─── End Top Header Bar ─────────────────────────────────────────────────── #}
+
+
+  {# ─── Main Two-Column Body ───────────────────────────────────────────────── #}
+  <div class="flex-1 overflow-hidden flex max-w-screen-2xl mx-auto w-full">
+
+    {# LEFT COLUMN: Context panels #}
+    <div class="w-full lg:w-[55%] xl:w-[58%] overflow-y-auto p-4 sm:p-5 space-y-4">
+
+      {# ── 1. Signal Card ────────────────────────────────────────────────────── #}
+      <div class="bg-white dark:bg-neutral-800 rounded-xl border-l-4 border-amber-400 border border-gray-200 dark:border-neutral-700 shadow-xs overflow-hidden">
+        <div class="p-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2 mb-1">
+                <span class="inline-flex items-center gap-1 text-[11px] font-semibold py-0.5 px-2 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                  <i data-lucide="shopping-cart" class="size-3"></i>
+                  Checkout abandoned
+                </span>
+                <span class="text-[11px] text-gray-400 dark:text-neutral-500">Primary signal</span>
+              </div>
+              <p class="text-sm text-gray-800 dark:text-neutral-200 font-medium">
+                Started checkout but didn't complete it &mdash; 2 days ago
+              </p>
+              <p class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">
+                Also viewed pricing 3 times, then started checkout. Student replied with questions.
+              </p>
+            </div>
+            <span class="text-xs text-gray-400 dark:text-neutral-500 shrink-0 mt-0.5">2 days ago</span>
+          </div>
+
+          {# Signal timeline #}
+          <div class="mt-4 space-y-0">
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-neutral-500 mb-2">Activity timeline</p>
+            <div class="relative">
+              {# Timeline items #}
+              <div class="flex flex-col gap-0">
+
+                <div class="flex gap-3 pb-3">
+                  <div class="flex flex-col items-center">
+                    <div class="size-2 rounded-full bg-gray-800 dark:bg-neutral-200 mt-1.5 shrink-0"></div>
+                    <div class="w-px flex-1 bg-gray-200 dark:bg-neutral-700 mt-1"></div>
+                  </div>
+                  <div class="pb-1">
+                    <p class="text-xs text-gray-700 dark:text-neutral-300 font-medium">Viewed pricing 3 times</p>
+                    <p class="text-[11px] text-gray-400 dark:text-neutral-500">Yesterday · 10:00 AM</p>
+                  </div>
+                </div>
+
+                <div class="flex gap-3 pb-3">
+                  <div class="flex flex-col items-center">
+                    <div class="size-2 rounded-full bg-gray-800 dark:bg-neutral-200 mt-1.5 shrink-0"></div>
+                    <div class="w-px flex-1 bg-gray-200 dark:bg-neutral-700 mt-1"></div>
+                  </div>
+                  <div class="pb-1">
+                    <p class="text-xs text-gray-700 dark:text-neutral-300 font-medium">Checkout started</p>
+                    <p class="text-[11px] text-gray-400 dark:text-neutral-500">Yesterday · 10:15 AM</p>
+                  </div>
+                </div>
+
+                <div class="flex gap-3 pb-3">
+                  <div class="flex flex-col items-center">
+                    <div class="size-2 rounded-full bg-amber-500 mt-1.5 shrink-0"></div>
+                    <div class="w-px flex-1 bg-gray-200 dark:bg-neutral-700 mt-1"></div>
+                  </div>
+                  <div class="pb-1">
+                    <p class="text-xs text-gray-700 dark:text-neutral-300 font-medium">Checkout abandoned</p>
+                    <p class="text-[11px] text-gray-400 dark:text-neutral-500">Yesterday · 8:00 PM &nbsp;<span class="text-amber-500 font-medium">· Primary signal</span></p>
+                  </div>
+                </div>
+
+                <div class="flex gap-3 pb-3">
+                  <div class="flex flex-col items-center">
+                    <div class="size-2 rounded-full bg-primary-500 mt-1.5 shrink-0"></div>
+                    <div class="w-px flex-1 bg-gray-200 dark:bg-neutral-700 mt-1"></div>
+                  </div>
+                  <div class="pb-1">
+                    <p class="text-xs text-gray-700 dark:text-neutral-300 font-medium">Student sent a message</p>
+                    <p class="text-[11px] text-gray-400 dark:text-neutral-500">Yesterday · 8:05 PM</p>
+                  </div>
+                </div>
+
+                <div class="flex gap-3">
+                  <div class="flex flex-col items-center">
+                    <div class="size-2 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>
+                  </div>
+                  <div>
+                    <p class="text-xs text-gray-500 dark:text-neutral-400">Follow-up scheduled</p>
+                    <p class="text-[11px] text-gray-400 dark:text-neutral-500">Today · 10:00 AM</p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {# ── End Signal Card ───────────────────────────────────────────────────── #}
+
+
+      {# ── 2. Purchase obstacle ──────────────────────────────────────────────── #}
+      <div class="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 shadow-xs p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="triangle-alert" class="size-4 text-gray-400 dark:text-neutral-500 shrink-0"></i>
+            <span class="text-xs font-medium text-gray-500 dark:text-neutral-400">Apparent obstacle</span>
+          </div>
+          <button @click="showObstacleEdit = !showObstacleEdit" type="button" class="text-xs text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300 flex items-center gap-1 transition-colors">
+            <i data-lucide="pencil" class="size-3"></i> Edit
+          </button>
+        </div>
+
+        <div x-show="!showObstacleEdit" class="mt-2 flex items-center gap-2">
+          <span class="inline-flex items-center gap-1.5 text-xs font-medium py-1 px-2.5 rounded-full bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-400">
+            <i data-lucide="indian-rupee" class="size-3"></i>
+            <span x-text="obstacle">Price concern</span>
+          </span>
+          <span class="text-xs text-gray-400 dark:text-neutral-500">Recorded 2 days ago by Priya Sharma</span>
+        </div>
+
+        <div x-show="showObstacleEdit" x-collapse x-cloak class="mt-3">
+          <div class="flex items-center gap-2">
+            <select x-model="newObstacle" class="flex-1 py-1.5 px-3 text-sm border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary-500">
+              <option>Needs information</option>
+              <option>Payment problem</option>
+              <option selected>Price concern</option>
+              <option>Parent approval</option>
+              <option>Comparing products</option>
+              <option>Timing</option>
+              <option>Unknown</option>
+            </select>
+            <button @click="obstacle = newObstacle; showObstacleEdit = false; $dispatch('toast', { title: 'Obstacle updated', variant: 'success', duration: 2000 })" type="button" class="py-1.5 px-3 text-xs font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors">Save</button>
+            <button @click="showObstacleEdit = false" type="button" class="py-1.5 px-3 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors">Cancel</button>
+          </div>
+        </div>
+      </div>
+      {# ── End Purchase obstacle ─────────────────────────────────────────────── #}
+
+
+      {# ── 3. Product + other opportunities ─────────────────────────────────── #}
+      <div class="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 shadow-xs p-4">
+        <div class="flex items-start justify-between gap-3 mb-3">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-neutral-500 mb-1">This opportunity</p>
+            <p class="text-sm font-semibold text-gray-800 dark:text-neutral-200">GATE CS Pack</p>
+            <p class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5">₹30,000 &nbsp;·&nbsp; Opened 3 days ago</p>
+          </div>
+          <a href="#" class="shrink-0 inline-flex items-center gap-1 text-xs text-primary-600 dark:text-primary-400 hover:underline mt-1">
+            View product <i data-lucide="external-link" class="size-3"></i>
+          </a>
+        </div>
+        <div class="pt-3 border-t border-gray-100 dark:border-neutral-700/50">
+          <p class="text-[11px] font-medium text-gray-400 dark:text-neutral-500 mb-2">Other active opportunities for Rahul</p>
+          <div class="flex flex-wrap gap-1.5">
+            <a href="#" class="inline-flex items-center gap-1 text-xs py-0.5 px-2.5 rounded-full border border-gray-200 dark:border-neutral-700 text-gray-600 dark:text-neutral-300 hover:border-primary-300 hover:text-primary-600 dark:hover:border-primary-600 dark:hover:text-primary-400 transition-colors bg-white dark:bg-neutral-800">
+              JEE Advanced Test Series
+            </a>
+            <a href="#" class="inline-flex items-center gap-1 text-xs py-0.5 px-2.5 rounded-full border border-gray-200 dark:border-neutral-700 text-gray-600 dark:text-neutral-300 hover:border-primary-300 hover:text-primary-600 dark:hover:border-primary-600 dark:hover:text-primary-400 transition-colors bg-white dark:bg-neutral-800">
+              NEET Crash Course
+            </a>
+          </div>
+        </div>
+      </div>
+      {# ── End Product ───────────────────────────────────────────────────────── #}
+
+
+      {# ── 4. Activity log ───────────────────────────────────────────────────── #}
+      <div class="bg-white dark:bg-neutral-800 rounded-xl border border-gray-200 dark:border-neutral-700 shadow-xs overflow-hidden">
+        <div class="px-4 pt-4 pb-2 flex items-center justify-between">
+          <p class="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-neutral-500">Activity log</p>
+        </div>
+        <div class="px-4 pb-4 space-y-0">
+
+          <div class="flex gap-3 py-2.5 border-b border-gray-50 dark:border-neutral-700/40">
+            <div class="shrink-0 size-7 flex items-center justify-center rounded-full bg-gray-100 dark:bg-neutral-700 mt-0.5">
+              <i data-lucide="target" class="size-3.5 text-gray-500 dark:text-neutral-400"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-700 dark:text-neutral-300">Opportunity created for <span class="font-medium">GATE CS Pack</span></p>
+              <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5">System &nbsp;·&nbsp; 3 days ago, 5:40 PM</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 py-2.5 border-b border-gray-50 dark:border-neutral-700/40">
+            <div class="shrink-0 size-7 flex items-center justify-center rounded-full bg-primary-50 dark:bg-primary-500/10 mt-0.5">
+              <i data-lucide="user-check" class="size-3.5 text-primary-600 dark:text-primary-400"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-700 dark:text-neutral-300"><span class="font-medium">Priya Sharma</span> claimed ownership</p>
+              <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5">3 days ago, 5:41 PM</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 py-2.5 border-b border-gray-50 dark:border-neutral-700/40">
+            <div class="shrink-0 size-7 flex items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10 mt-0.5">
+              <i data-lucide="send" class="size-3.5 text-emerald-600 dark:text-emerald-400"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-700 dark:text-neutral-300"><span class="font-medium">Priya Sharma</span> sent a message about GATE CS Pack</p>
+              <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5">3 days ago, 5:42 PM</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 py-2.5 border-b border-gray-50 dark:border-neutral-700/40">
+            <div class="shrink-0 size-7 flex items-center justify-center rounded-full bg-blue-50 dark:bg-blue-500/10 mt-0.5">
+              <i data-lucide="message-square" class="size-3.5 text-blue-600 dark:text-blue-400"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-700 dark:text-neutral-300">Student replied</p>
+              <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5">2 days ago</p>
+            </div>
+          </div>
+
+          <div class="flex gap-3 py-2.5">
+            <div class="shrink-0 size-7 flex items-center justify-center rounded-full bg-amber-50 dark:bg-amber-500/10 mt-0.5">
+              <i data-lucide="calendar-clock" class="size-3.5 text-amber-600 dark:text-amber-400"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-700 dark:text-neutral-300"><span class="font-medium">Karthik</span> scheduled a follow-up</p>
+              <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5">Today, 10:00 AM &nbsp;·&nbsp; "Asked about payment options"</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      {# ── End Activity log ──────────────────────────────────────────────────── #}
+
+    </div>
+    {# End Left Column #}
+
+
+    {# RIGHT COLUMN: Persistent Chat #}
+    <div class="hidden lg:flex lg:w-[45%] xl:w-[42%] flex-col border-l border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800/50">
+
+      {# Chat Header #}
+      <div class="shrink-0 px-4 py-3 border-b border-gray-200 dark:border-neutral-700 flex items-center justify-between gap-3 bg-white dark:bg-neutral-800">
+        <div class="flex items-center gap-2.5">
+          <img src="https://randomuser.me/api/portraits/men/10.jpg" alt="Rahul Kumar" class="size-7 rounded-full object-cover">
+          <div>
+            <p class="text-xs font-semibold text-gray-800 dark:text-neutral-200">Rahul Kumar</p>
+            <p class="text-[11px] text-gray-400 dark:text-neutral-500">Persistent sales conversation</p>
+          </div>
+        </div>
+        <span class="inline-flex items-center gap-1 text-[11px] font-medium py-0.5 px-2 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+          <span class="size-1.5 rounded-full bg-amber-400 inline-block animate-pulse"></span>
+          Awaiting your response
+        </span>
+      </div>
+
+      {# Message Thread #}
+      <div class="flex-1 overflow-y-auto p-4 space-y-3" id="chat-thread">
+
+        {# System: Opportunity created #}
+        <div class="flex justify-center">
+          <span class="inline-flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-neutral-500 bg-gray-100 dark:bg-neutral-700/60 py-0.5 px-2.5 rounded-full">
+            <i data-lucide="target" class="size-3"></i>
+            Opportunity created for GATE CS Pack &nbsp;·&nbsp; 3 days ago, 5:40 PM
+          </span>
+        </div>
+
+        {# System: Ownership #}
+        <div class="flex justify-center">
+          <span class="inline-flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-neutral-500 bg-gray-100 dark:bg-neutral-700/60 py-0.5 px-2.5 rounded-full">
+            <i data-lucide="user-check" class="size-3"></i>
+            Priya Sharma claimed ownership &nbsp;·&nbsp; 3 days ago
+          </span>
+        </div>
+
+        {# Staff message #}
+        <div class="flex gap-2 justify-end">
+          <div class="max-w-[78%]">
+            <div class="bg-primary-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm leading-relaxed shadow-xs">
+              Hi Rahul, I noticed you were looking at the GATE CS Pack. Can I help you with anything?
+            </div>
+            <div class="flex items-center justify-end gap-1.5 mt-1">
+              <p class="text-[10px] text-gray-400 dark:text-neutral-500">Priya Sharma &nbsp;·&nbsp; 3 days ago, 5:42 PM</p>
+              <i data-lucide="check-check" class="size-3 text-primary-400 dark:text-primary-500"></i>
+            </div>
+          </div>
+          <img src="https://randomuser.me/api/portraits/women/44.jpg" class="size-7 rounded-full object-cover self-end shrink-0">
+        </div>
+
+        {# Student message #}
+        <div class="flex gap-2">
+          <img src="https://randomuser.me/api/portraits/men/10.jpg" class="size-7 rounded-full object-cover self-end shrink-0">
+          <div class="max-w-[78%]">
+            <div class="bg-gray-100 dark:bg-neutral-700 text-gray-800 dark:text-neutral-200 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed">
+              Yes, I wanted to know more about the course.
+            </div>
+            <p class="text-[10px] text-gray-400 dark:text-neutral-500 mt-1 ms-1">3 days ago, 5:47 PM</p>
+          </div>
+        </div>
+
+        {# Staff #}
+        <div class="flex gap-2 justify-end">
+          <div class="max-w-[78%]">
+            <div class="bg-primary-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm leading-relaxed shadow-xs">
+              Sure! What would you like to know?
+            </div>
+            <div class="flex items-center justify-end gap-1.5 mt-1">
+              <p class="text-[10px] text-gray-400 dark:text-neutral-500">Priya Sharma &nbsp;·&nbsp; 3 days ago, 5:49 PM</p>
+              <i data-lucide="check-check" class="size-3 text-primary-400"></i>
+            </div>
+          </div>
+          <img src="https://randomuser.me/api/portraits/women/44.jpg" class="size-7 rounded-full object-cover self-end shrink-0">
+        </div>
+
+        {# Student #}
+        <div class="flex gap-2">
+          <img src="https://randomuser.me/api/portraits/men/10.jpg" class="size-7 rounded-full object-cover self-end shrink-0">
+          <div class="max-w-[78%]">
+            <div class="bg-gray-100 dark:bg-neutral-700 text-gray-800 dark:text-neutral-200 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed">
+              What is the course fee?
+            </div>
+            <p class="text-[10px] text-gray-400 dark:text-neutral-500 mt-1 ms-1">3 days ago, 5:52 PM</p>
+          </div>
+        </div>
+
+        {# Staff #}
+        <div class="flex gap-2 justify-end">
+          <div class="max-w-[78%]">
+            <div class="bg-primary-600 text-white rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-sm leading-relaxed shadow-xs">
+              The fee for the GATE CS Pack is ₹30,000. It covers all the major topics with daily mock tests. Let me know if you need help with the enrollment!
+            </div>
+            <div class="flex items-center justify-end gap-1.5 mt-1">
+              <p class="text-[10px] text-gray-400 dark:text-neutral-500">Priya Sharma &nbsp;·&nbsp; 3 days ago, 6:00 PM</p>
+              <i data-lucide="check-check" class="size-3 text-primary-400"></i>
+            </div>
+          </div>
+          <img src="https://randomuser.me/api/portraits/women/44.jpg" class="size-7 rounded-full object-cover self-end shrink-0">
+        </div>
+
+        {# Student long reply #}
+        <div class="flex gap-2">
+          <img src="https://randomuser.me/api/portraits/men/10.jpg" class="size-7 rounded-full object-cover self-end shrink-0">
+          <div class="max-w-[78%]">
+            <div class="bg-gray-100 dark:bg-neutral-700 text-gray-800 dark:text-neutral-200 rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-sm leading-relaxed">
+              Thanks for the info, let me think about it. I have been looking at a lot of options and I am not sure which one fits my schedule better since I am working full time and preparing for the exam on weekends.
+            </div>
+            <p class="text-[10px] text-gray-400 dark:text-neutral-500 mt-1 ms-1">2 days ago</p>
+          </div>
+        </div>
+
+        {# System: Follow-up #}
+        <div class="flex justify-center">
+          <span class="inline-flex items-center gap-1.5 text-[11px] text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 py-0.5 px-2.5 rounded-full border border-amber-200 dark:border-amber-600/30">
+            <i data-lucide="calendar-clock" class="size-3"></i>
+            Follow-up scheduled &nbsp;·&nbsp; Today, 10:00 AM
+          </span>
+        </div>
+
+        {# Spacer so last message not hidden behind composer #}
+        <div class="h-2"></div>
+      </div>
+      {# End Message Thread #}
+
+
+      {# ── Composer ──────────────────────────────────────────────────────────── #}
+      <div class="shrink-0 border-t border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" id="chat-composer">
+
+        {# Product context selector #}
+        <div class="px-4 pt-3 pb-1 flex items-center gap-2">
+          <span class="text-[11px] text-gray-400 dark:text-neutral-500">Responding about:</span>
+          <div class="flex items-center gap-1 flex-wrap">
+            <button @click="composerProduct = 'GATE CS Pack'" type="button"
+              :class="composerProduct === 'GATE CS Pack' ? 'bg-primary-100 border-primary-300 text-primary-700 dark:bg-primary-500/15 dark:border-primary-600 dark:text-primary-400' : 'bg-white border-gray-200 text-gray-600 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-300 hover:border-gray-300'"
+              class="text-[11px] font-medium py-0.5 px-2 rounded-full border transition-colors">
+              GATE CS Pack
+            </button>
+            <button @click="composerProduct = 'JEE Advanced Test Series'" type="button"
+              :class="composerProduct === 'JEE Advanced Test Series' ? 'bg-primary-100 border-primary-300 text-primary-700 dark:bg-primary-500/15 dark:border-primary-600 dark:text-primary-400' : 'bg-white border-gray-200 text-gray-600 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-300 hover:border-gray-300'"
+              class="text-[11px] font-medium py-0.5 px-2 rounded-full border transition-colors">
+              JEE Advanced
+            </button>
+            <button @click="composerProduct = 'General'" type="button"
+              :class="composerProduct === 'General' ? 'bg-gray-100 border-gray-400 text-gray-700 dark:bg-neutral-600 dark:border-neutral-500 dark:text-neutral-200' : 'bg-white border-gray-200 text-gray-400 dark:bg-neutral-700 dark:border-neutral-600 dark:text-neutral-400 hover:border-gray-300'"
+              class="text-[11px] font-medium py-0.5 px-2 rounded-full border transition-colors">
+              No product
+            </button>
+          </div>
+        </div>
+
+        {# Mode toggle: Message / Note #}
+        <div class="px-4 pb-1.5 flex items-center gap-3">
+          <button @click="composerMode = 'message'" type="button"
+            :class="composerMode === 'message' ? 'text-gray-800 dark:text-neutral-200 font-semibold after:w-full' : 'text-gray-400 dark:text-neutral-500 after:w-0'"
+            class="text-[11px] pb-0.5 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:bg-gray-800 dark:after:bg-neutral-200 after:transition-all transition-colors">
+            Message
+          </button>
+          <button @click="composerMode = 'note'" type="button"
+            :class="composerMode === 'note' ? 'text-amber-700 dark:text-amber-400 font-semibold after:w-full' : 'text-gray-400 dark:text-neutral-500 after:w-0'"
+            class="text-[11px] pb-0.5 relative after:absolute after:bottom-0 after:left-0 after:h-0.5 after:bg-amber-500 after:transition-all transition-colors">
+            <i data-lucide="lock" class="size-2.5 inline mr-0.5"></i> Internal note
+          </button>
+        </div>
+
+        {# Textarea #}
+        <div class="px-4 pb-3">
+          <div :class="composerMode === 'note' ? 'border-amber-300 dark:border-amber-600/50 bg-amber-50/50 dark:bg-amber-500/5' : 'border-gray-200 dark:border-neutral-700'"
+            class="relative rounded-xl border transition-colors">
+            <textarea
+              rows="2"
+              :placeholder="composerMode === 'message' ? 'Write a message to Rahul...' : 'Add an internal note (only visible to staff)...'"
+              class="block w-full resize-none bg-transparent px-3.5 pt-3 pb-10 text-sm text-gray-800 dark:text-neutral-200 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:outline-none"
+            ></textarea>
+            <div class="absolute bottom-0 inset-x-0 px-3 pb-2.5 flex items-center justify-between">
+              <div class="flex items-center gap-1">
+                <button type="button" class="size-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors">
+                  <i data-lucide="paperclip" class="size-3.5"></i>
+                </button>
+                <button type="button" class="size-6 inline-flex items-center justify-center rounded-md text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors">
+                  <i data-lucide="smile" class="size-3.5"></i>
+                </button>
+                {# Send offer button #}
+                <button type="button" class="inline-flex items-center gap-1 text-[11px] font-medium py-0.5 px-2 rounded-md text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors border border-emerald-200 dark:border-emerald-700/40">
+                  <i data-lucide="tag" class="size-3"></i> Send offer
+                </button>
+              </div>
+              <button
+                type="button"
+                :class="composerMode === 'note' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-primary-600 hover:bg-primary-700'"
+                class="inline-flex items-center gap-1.5 py-1.5 px-3.5 text-xs font-semibold rounded-lg text-white transition-colors shadow-xs"
+              >
+                <span x-text="composerMode === 'note' ? 'Add note' : 'Send'"></span>
+                <i data-lucide="send" class="size-3.5"></i>
+              </button>
+            </div>
+          </div>
+          <p x-show="composerProduct === 'General'" class="text-[10px] text-gray-400 dark:text-neutral-500 mt-1.5 ms-1">
+            <i data-lucide="info" class="size-2.5 inline mr-0.5"></i> Messages sent without a product won't count as intervention for any opportunity.
+          </p>
+        </div>
+      </div>
+      {# ── End Composer ──────────────────────────────────────────────────────── #}
+
+    </div>
+    {# End Right Column #}
+
+  </div>
+  {# End Two-Column Body #}
+
+
+  {# ── Modals ────────────────────────────────────────────────────────────────── #}
+
+  {# Schedule Follow-up #}
+  <div x-data="{ selectedDate: '', reason: '' }" class="inline">
+    {% call modal(id="schedule-followup", title="Schedule a follow-up", size="md", variant="primary", confirm_text="Schedule follow-up", confirm_attrs=":disabled=\"!selectedDate\"") %}
+      <p class="text-sm text-gray-500 dark:text-neutral-400 mb-4">Set a future date to reconnect with Rahul. The opportunity will remain active and return to your attention when due.</p>
+      <div class="space-y-4">
+        <div @change="selectedDate = $event.target.value">
+          {{ date_picker(name="followup_date", label="Follow-up date & time", placeholder="Select date & time", datetime=true) }}
+        </div>
+        {{ textarea(name="followup_reason", label="Reason (Optional)", placeholder="e.g. Waiting for salary day, needs to check with parents", x_model="reason") }}
+      </div>
+    {% endcall %}
+  </div>
+
+  {# Reschedule Follow-up #}
+  <div x-data="{ selectedDate: '', reason: '' }" class="inline">
+    {% call modal(id="reschedule-followup", title="Reschedule follow-up", size="md", variant="primary", confirm_text="Update follow-up") %}
+      <p class="text-sm text-gray-500 dark:text-neutral-400 mb-4">Update the follow-up date and reason for Rahul Kumar.</p>
+      <div class="space-y-4">
+        <div @change="selectedDate = $event.target.value">
+          {{ date_picker(name="reschedule_date", label="New follow-up date & time", placeholder="Select date & time", datetime=true) }}
+        </div>
+        {{ textarea(name="reschedule_reason", label="Reason", placeholder="e.g. Moved to next week", x_model="reason") }}
+      </div>
+    {% endcall %}
+  </div>
+
+  {# Close Opportunity #}
+  <div x-data="{ closeReason: '' }" class="inline">
+    {% call modal(id="close-opp", title="Close opportunity", size="md", variant="danger", confirm_text="Close opportunity", confirm_attrs=":disabled=\"!closeReason\"") %}
+      <p class="text-sm text-gray-800 dark:text-neutral-200 mb-4 font-medium">Why are you closing this opportunity?</p>
+      <div class="space-y-2.5">
+        {{ radio(name="close_reason", label="Not interested", value="not_interested", x_model="closeReason") }}
+        {{ radio(name="close_reason", label="Too expensive", value="too_expensive", x_model="closeReason") }}
+        {{ radio(name="close_reason", label="Chose another provider", value="chose_another", x_model="closeReason") }}
+        {{ radio(name="close_reason", label="Product not suitable", value="not_suitable", x_model="closeReason") }}
+        {{ radio(name="close_reason", label="Could not reach student", value="could_not_reach", x_model="closeReason") }}
+        {{ radio(name="close_reason", label="Will purchase in a later intake", value="later_intake", x_model="closeReason") }}
+        {{ radio(name="close_reason", label="Other", value="other", x_model="closeReason") }}
+      </div>
+    {% endcall %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block script %}
+  {% include "../../../ui-system/scripts/select_script.html" %}
+  {% include "../../../ui-system/scripts/date_picker_script.html" %}
+{% endblock script %}
