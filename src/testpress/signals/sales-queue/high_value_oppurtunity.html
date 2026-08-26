@@ -1,0 +1,124 @@
+{% from "src/ui-system/components/popover.html" import popover %}
+{% from "src/ui-system/components/button.html" import button %}
+{% from "src/ui-system/components/modal.html" import modal %}
+{% from "src/ui-system/components/empty-state.html" import empty_state %}
+<!-- Card -->
+<div class="flex flex-col  bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xs rounded-xl overflow-hidden" x-data="{ status: new URLSearchParams(window.location.search).get('status') }">
+  <!-- Header -->
+  <div class="flex gap-3 px-5 pt-5 pb-3">
+    <div class="grow">
+      <h2 class="font-medium text-sm sm:text-base text-gray-800 dark:text-neutral-200">
+        Highest purchase interest
+      </h2>
+
+      <!-- List -->
+          <p class="text-sm text-gray-500 dark:text-neutral-400 mt-1">
+            Top opportunities sorted by engagement and urgency.
+          </p>
+      <!-- End List -->
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div x-show="status === 'empty'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="No unclaimed Opportunities right now",
+      description="New purchase opportunities will appear here when available.",
+      icon="sparkles",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Empty State -->
+
+  <!-- Onboarding State -->
+  <div x-show="status === 'onboarding'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="Valuable opportunities will appear here",
+      description="Unclaimed opportunities showing strong purchase interest will be surfaced here.",
+      icon="sparkles",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Onboarding State -->
+
+  <!-- Data State -->
+  <div x-show="status !== 'empty' && status !== 'onboarding'" class="flex flex-col flex-grow">
+    <ul role="list" class="overflow-hidden">
+      {% set high_value_items = unclaimed_opportunities | filterByHighValue %}
+      {% for item in high_value_items | limit(5) %}
+      <li class="relative flex gap-x-3 px-5 py-4 hover:bg-gray-50 dark:hover:bg-neutral-700/40 transition-colors">
+
+        <!-- Left: Avatar -->
+        <div class="shrink-0">
+          <img src="{{ item.avatar }}" alt="{{ item.student_name }}" class="size-10 rounded-full object-cover">
+        </div>
+
+        <!-- Center: Content -->
+        <div class="min-w-0 flex-1">
+          <div class="text-sm">
+            <span class="font-semibold text-gray-900 dark:text-white">{{ item.student_name }}</span>
+            {% set sig = item.latest_activity | lower %}
+            {% if sig == 'pre-purchase enquiry' or sig == 'product enquiry' %}{% set sig = 'asked about purchase' %}{% endif %}
+            {% if item.student_reply %}{% set sig = 'asked about purchase' %}{% endif %}
+            <span class="text-gray-500 dark:text-neutral-400"> · {{ sig }} {{ item.activity_time }}</span>
+          </div>
+
+          {% if item.student_reply %}
+          <div class="mt-1 text-sm text-gray-700 dark:text-neutral-300">
+            <p class="line-clamp-1">"{{ item.student_reply }}"</p>
+          </div>
+          {% endif %}
+
+          <div class="mt-1.5 text-xs font-medium text-gray-500 dark:text-neutral-400">
+            {{ item.product | replace(" - ", " · ") }}
+          </div>
+        </div>
+
+        <!-- Right: Claim button -->
+        <div class="flex-none shrink-0 self-center">
+          {% set claim_btn %}
+            {{ button(text="Claim", size="sm", variant="primary") }}
+          {% endset %}
+          {% call modal(
+            id="claim-modal-" ~ loop.index,
+            title="Claim this opportunity?",
+            trigger=claim_btn,
+            confirm_text="Claim",
+            cancel_text="Cancel",
+            variant="primary"
+          ) %}
+            <div class="flex items-center gap-x-3 mb-4">
+              <img src="{{ item.avatar }}" alt="{{ item.student_name }}" class="size-10 flex-none rounded-full object-cover">
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ item.student_name }}</p>
+                <p class="text-xs text-gray-500 dark:text-neutral-400 truncate">{{ item.product }}</p>
+              </div>
+            </div>
+            <blockquote class="border-s-4 border-gray-200 dark:border-neutral-700 pl-3 sm:pl-4">
+              <p class="text-sm text-gray-600 dark:text-neutral-400">
+                You'll become responsible for <span class="font-medium text-gray-800 dark:text-neutral-200">{{ item.student_name }}</span> and their active opportunities.
+              </p>
+            </blockquote>
+          {% endcall %}
+        </div>
+
+      </li>
+      {% endfor %}
+    </ul>
+
+    <!-- Footer -->
+    <div class="text-center mt-auto border-t border-gray-200 dark:border-neutral-700">
+      <a class="group p-3 flex justify-center items-center text-sm  text-primary-600 dark:text-primary-500 rounded-b-lg hover:text-primary-700 dark:hover:text-primary-600 focus:outline-none focus:decoration-2 focus:underline focus:text-primary-700 dark:focus:text-primary-600 transition-colors" href="{{ '/signals/unclaimed-opportunities/' | url }}">
+        {% if high_value_items | length > 5 %}
+          + {{ (high_value_items | length) - 5 }} more
+        {% else %}
+          See all
+        {% endif %}
+        <i data-lucide="arrow-right" class="shrink-0 size-4 ml-1 transition-transform group-hover:translate-x-1"></i>
+      </a>
+    </div>
+  </div>
+  <!-- End Data State -->
+</div>
