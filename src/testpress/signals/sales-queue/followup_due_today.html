@@ -1,0 +1,101 @@
+{% from "src/ui-system/components/badge.html" import badge %}
+{% from "src/ui-system/components/empty-state.html" import empty_state %}
+<!-- Card -->
+<div class="flex flex-col h-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xs rounded-xl overflow-hidden" x-data="{ status: new URLSearchParams(window.location.search).get('status') }">
+  <!-- Header -->
+  <div class="flex gap-3 px-5 pt-5 pb-3">
+    <div class="grow flex justify-between items-start">
+      <div>
+        <h2 class="font-medium text-sm sm:text-base text-gray-800 dark:text-neutral-200">
+          Follow-ups due today
+        </h2>
+        <p class="text-sm text-gray-500 dark:text-neutral-400 mt-0.5">
+          Students you promised to follow up with today.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div x-show="status === 'empty'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="No follow-ups due today",
+      description="You're all caught up.",
+      icon="calendar-check",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Empty State -->
+
+  <!-- Onboarding State -->
+  <div x-show="status === 'onboarding'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="Your follow-ups will appear here",
+      description="Scheduled follow-ups will appear here when they're due.",
+      icon="calendar-check",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Onboarding State -->
+
+  <!-- Data State -->
+  <div x-show="status !== 'empty' && status !== 'onboarding'" class="flex flex-col flex-grow">
+    <ul role="list" class="overflow-hidden">
+      {% set followup_today = my_opportunities | filterByFollowUpToday %}
+      {% for item in followup_today | limit(5) %}
+      <li class="relative flex justify-between items-center gap-x-6 px-5 py-4 hover:bg-gray-50 dark:hover:bg-neutral-700/40 transition-colors cursor-pointer group">
+        <!-- Clickable link covering the row -->
+        <a href="{{ '/signals/my-opportunities/' ~ item.id ~ '/' | url }}" class="absolute inset-0 z-10"><span class="sr-only">View {{ item.student_name }}</span></a>
+        
+        <div class="flex min-w-0 gap-x-4 w-full items-start relative z-0">
+          <!-- Left Side (Time only — "Today" is already implied) -->
+          <div class="flex-none w-[72px] space-y-0.5">
+            {% set parts = item.follow_up | split(", ") %}
+            {% if parts[0] == "Today" %}
+              <div class="text-xs font-medium text-gray-900 dark:text-white">{{ parts[1] if parts | length > 1 else parts[0] }}</div>
+            {% else %}
+              <div class="text-xs font-medium text-gray-900 dark:text-white">{{ parts[0] }}</div>
+              {% if parts | length > 1 %}
+                <div class="text-[11px] text-gray-500 dark:text-neutral-500">{{ parts[1] }}</div>
+              {% endif %}
+            {% endif %}
+          </div>
+
+          <!-- Right Side (User Info) -->
+          <div class="flex min-w-0 gap-x-4 flex-1 items-start border-l border-gray-200 dark:border-neutral-700 pl-5">
+            <img src="{{ item.avatar }}" alt="{{ item.student_name }}" class="size-10 flex-none rounded-full object-cover self-start">
+            <div class="min-w-0 flex-1 space-y-1">
+              <div class="text-sm font-medium text-gray-900 dark:text-white flex items-center min-w-0">
+                 <span class="truncate min-w-0">{{ item.student_name }}</span>
+              </div>
+              <div class="flex items-center text-xs text-gray-500 dark:text-neutral-400 min-w-0">
+                <span class="truncate">{{ item.product | replace(" - ", " · ") }}</span>
+              </div>
+              {% if item.follow_up_reason %}
+              <div class="flex items-center text-sm text-gray-700 dark:text-neutral-300 min-w-0">
+                <span class="truncate">{{ item.follow_up_reason }}</span>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    
+    <!-- Footer -->
+    <div class="flex justify-center mt-auto border-t border-gray-200 dark:border-neutral-700">
+      <a class="group p-3 px-5 flex items-center justify-center text-sm font-medium text-primary-600 dark:text-primary-500 rounded-b-lg hover:text-primary-700 dark:hover:text-primary-600 focus:outline-none focus:decoration-2 focus:underline focus:text-primary-700 dark:focus:text-primary-600 transition-colors" href="{{ '/signals/my-opportunities/?filter=Follow-ups+due+today' | url }}">
+        {% if followup_today | length > 5 %}
+          + {{ (followup_today | length) - 5 }} more
+        {% else %}
+          See all
+        {% endif %}
+        <i data-lucide="arrow-right" class="shrink-0 size-4 ml-1 transition-transform group-hover:translate-x-1"></i>
+      </a>
+    </div><!-- End Footer -->
+  </div><!-- End Data State -->
+</div>
+<!-- End Card -->

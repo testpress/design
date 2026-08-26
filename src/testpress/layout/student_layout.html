@@ -1,4 +1,9 @@
 {% extends "./base.html" %}
+{% from "../../ui-system/components/drawer.html" import drawer %}
+{% from "../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../ui-system/components/select.html" import select %}
+{% from "../../ui-system/components/textarea.html" import textarea %}
+{% from "../../ui-system/components/button.html" import button %}
 
 
 {% block content %}
@@ -12,5 +17,159 @@
       </div>
     </main>
     {% include "./global_search_modal.html"%}
+
+    <!-- Drawer for Chat -->
+    {% call drawer(id="student-chat-drawer", placement="right", size="md", title="Chat with us") %}
+      <div class="flex-1 flex flex-col h-full bg-white dark:bg-neutral-900" x-data="{ 
+          question: '', 
+          product: '', 
+          showProductError: false, 
+          showQuestionError: false,
+          messages: [],
+          lastProductContext: '',
+          sendMessage() {
+              this.showProductError = !this.product;
+              this.showQuestionError = !this.question.trim();
+              if (this.showProductError || this.showQuestionError) return;
+              
+              if (this.product !== this.lastProductContext) {
+                  this.messages.push({ type: 'context', product: this.product });
+                  this.lastProductContext = this.product;
+              }
+              
+              this.messages.push({ type: 'message', text: this.question.trim(), time: 'Just now' });
+              
+              this.question = '';
+              if (this.$refs.chatInput) this.$refs.chatInput.value = '';
+              
+              this.$nextTick(() => {
+                  const container = this.$refs.chatBody;
+                  if (container) container.scrollTop = container.scrollHeight;
+              });
+          }
+      }"
+      @set-chat-product.window="
+        product = $event.detail;
+        showProductError = false;
+        const sel = $el.querySelector('select[name=product]');
+        if(sel && sel.closest('[x-data]')) {
+           sel.closest('[x-data]').dispatchEvent(new CustomEvent('set-selected-values', { detail: product }));
+        }
+        setTimeout(() => { if($refs.chatInput) $refs.chatInput.focus() }, 150);
+      ">
+        <style>
+            .has-error [x-ref="toggle"],
+            .has-error textarea {
+                border-color: #ef4444 !important;
+            }
+            .has-error [x-ref="toggle"]:focus-within,
+            .has-error textarea:focus {
+                border-color: #ef4444 !important;
+                --tw-ring-color: #ef4444 !important;
+            }
+        </style>
+
+        <!-- Chat View -->
+        <div class="flex-1 flex flex-col h-full">
+          
+          <!-- Chat Body -->
+          <div x-ref="chatBody" class="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+            <div class="p-4 sm:p-6 h-full flex flex-col">
+              
+              <!-- Empty state (Initial) -->
+              <div x-show="messages.length === 0" class="flex-1 flex flex-col items-center justify-center text-center px-4">
+                <div class="inline-flex items-center justify-center size-12 rounded-full bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 mb-4">
+                    <svg class="size-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <h4 class="text-gray-800 dark:text-neutral-200 font-medium">Have a question about a product?</h4>
+                <p class="text-sm text-gray-500 dark:text-neutral-400 mt-1 max-w-xs">Select a product and ask us anything about it. We'll reply here as soon as we can.</p>
+              </div>
+
+              <!-- Chat Messages -->
+              <ul x-show="messages.length > 0" class="space-y-5 flex-1">
+                <template x-for="(msg, index) in messages" :key="index">
+                    <div class="space-y-5">
+                        <template x-if="msg.type === 'context'">
+                          <!-- System Event: Context -->
+                          <div class="flex flex-col items-center justify-center my-4 text-center">
+                            <p class="text-xs font-medium text-gray-500 dark:text-neutral-400 flex items-center gap-x-1.5 justify-center">
+                              <svg class="size-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg> Purchase Enquiry
+                            </p>
+                            <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5" x-text="msg.product"></p>
+                          </div>
+                        </template>
+                        
+                        <template x-if="msg.type === 'message'">
+                          <!-- Student Message -->
+                          <li class="max-w-md ms-auto text-end flex justify-end gap-x-2">
+                            <div>
+                              <div class="space-y-1">
+                                <div class="group flex justify-end gap-x-2" style="word-break: break-word;">
+                                  <div class="order-2 text-start bg-primary-100 dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                                    <div class="text-sm text-gray-800 dark:text-neutral-200">
+                                      <span x-text="msg.text" style="white-space: pre-wrap;"></span>
+                                      <span>
+                                        <span class="ms-1 text-[11px] text-end text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </li>
+                        </template>
+                    </div>
+                </template>
+              </ul>
+            </div>
+          </div>
+          <!-- End Chat Body -->
+
+          <!-- Chat Footer Input -->
+          <footer class="bg-white dark:bg-neutral-800 rounded-none flex flex-col">
+            <div class="px-4 py-3 transition-colors">
+              <div @change="product = $event.target.value; showProductError = false; setTimeout(() => { if($refs.chatInput) $refs.chatInput.focus() }, 150)" :class="{'has-error': showProductError}">
+                  {{ select(
+                      label="Ask about",
+                      name="product",
+                      placeholder="Select a product",
+                      required=false,
+                      search=true,
+                      options=[
+                          {label: "THIRD MBBS students Ophthal Course", value: "THIRD MBBS students Ophthal Course"},
+                          {label: "NEET PG 2024 Comprehensive Batch", value: "NEET PG 2024 Comprehensive Batch"},
+                          {label: "FMGE Test Series Pro", value: "FMGE Test Series Pro"},
+                          {label: "UPSC CSE Prelims Crash Course", value: "UPSC CSE Prelims Crash Course"},
+                          {label: "General Anatomy Foundation Program", value: "General Anatomy Foundation Program"}
+                      ]
+                  ) }}
+                  <p x-show="showProductError" x-cloak class="mt-1 text-xs text-red-500">Please select a product.</p>
+              </div>
+            </div>
+
+            <div class="pb-2 ps-2 pt-2 transition-colors border-t border-gray-200 dark:border-neutral-700">
+              <label for="student-chat-input" class="sr-only">Message</label>
+              <textarea :disabled="!product" id="student-chat-input" x-ref="chatInput" autofocus @open-drawer-student-chat-drawer.window="setTimeout(() => $el.focus(), 100)" x-model="question" @input="showQuestionError = false" :class="{'has-error': showQuestionError}" class="max-h-36 pt-2 pb-2 ps-2 pe-4 block w-full bg-transparent border-transparent rounded-0 text-sm leading-4 resize-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-none focus:border-transparent focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500" :placeholder="product ? 'Ask a question about this product...' : 'Select a product to ask a question...'" rows="1" data-hs-textarea-auto-height='{"defaultHeight": 40}'></textarea>
+              <p x-show="showQuestionError" x-cloak class="ms-2 mt-1 text-xs text-red-500">Please enter a question.</p>
+              
+              <div class="pe-4 flex justify-between items-center gap-x-1 mt-2">
+                <div class="flex items-center gap-x-1">
+                  <button type="button" class="flex justify-center items-center gap-x-1.5 size-8 text-sm text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-700">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span class="sr-only">Attach file</span>
+                  </button>
+                </div>
+                <div class="flex items-center gap-x-1">
+                  {{ button(text="Send", variant="primary", size="sm", icon="send", icon_position="right", extra_attrs="@click=\"sendMessage()\" :disabled=\"!product || !question.trim()\"") }}
+                </div>
+              </div>
+            </div>
+          </footer>
+        </div>
+      </div>
+    {% endcall %}
+
+    <!-- Scripts -->
+    {% include "../../ui-system/scripts/select_script.html" %}
   </body>
 {% endblock content %}
