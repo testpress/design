@@ -218,30 +218,9 @@
               {% endset %}
               {% call dropdown(trigger=dropdown_trigger, placement="bottom-end", width="medium") %}
                   {% if item.follow_up == '—' %}
-                  {% set schedule_followup_trigger %}
-                    <button type="button" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
-                      <i data-lucide="calendar-clock" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Schedule follow-up
-                    </button>
-                  {% endset %}
-                  
-                  {% set schedule_followup_content %}
-                    <div class="p-4" x-data="{ selectedDate: '' }">
-                      <div class="mb-4">
-                        <h3 class="font-medium text-sm text-gray-800 dark:text-neutral-200">Schedule follow-up</h3>
-                        <p class="text-xs text-gray-500 dark:text-neutral-400 mt-1">Pick when you want this Opportunity to come back for attention.</p>
-                      </div>
-                      <div @change="selectedDate = $event.target.value">
-                        {{ date_picker(name="followup_date_2", label="Schedule at", placeholder="Select date & time", datetime=true) }}
-                      </div>
-                      <div class="mt-4 flex justify-end gap-x-2">
-                        {{ button(text="Cancel", variant="secondary", size="sm", extra_attrs="@click=\"active = false; $dispatch('close-dropdown')\"") }}
-                        {{ button(text="Schedule", variant="primary", size="sm", extra_attrs="@click=\"active = false\" :disabled=\"!selectedDate\"") }}
-                      </div>
-                    </div>
-                  {% endset %}
-                  <div class="w-full block">
-                    {{ popover(trigger=schedule_followup_trigger, content=schedule_followup_content, placement="left", trigger_type="click", trigger_class="!block w-full", width="w-80") }}
-                  </div>
+                  <button type="button" @click="$dispatch('close-dropdown'); $dispatch('open-modal-schedule-followup-{{ loop.index }}')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <i data-lucide="calendar-clock" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i> Schedule follow-up
+                  </button>
                   <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
                   {% else %}
                   <button type="button" @click="$dispatch('close-dropdown'); $dispatch('toast', { title: 'Follow-up completed · {{ item.student_name }}', description: '{% if item.follow_up_reason %}{{ item.follow_up_reason | replace(r/\x27/g, &apos;\\&apos;&apos;) | replace(r/\x22/g, &apos;\\&quot;&apos;) }}{% endif %}', actionLabel: 'Undo', variant: 'success', duration: 5000, showProgress: true })" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
@@ -254,6 +233,27 @@
                   </button>
                 {% endcall %}
                 </div>
+
+            {% if item.follow_up == '—' %}
+            <div x-data="{ selectedDate: '', reason: '' }" class="inline-block">
+              {% call modal(
+                id="schedule-followup-" ~ loop.index,
+                title="Schedule a follow-up",
+                size="md",
+                variant="primary",
+                confirm_text="Schedule",
+                confirm_attrs=":disabled=\"!selectedDate\""
+              ) %}
+                <p class="text-sm text-gray-800 dark:text-neutral-200 mb-4 font-medium">Set a future date to reconnect with the student. The opportunity will remain active and automatically return to your attention when the follow-up is due.</p>
+                <div class="space-y-4">
+                  <div @change="selectedDate = $event.target.value">
+                    {{ date_picker(name="followup_date_" ~ loop.index, label="Schedule at", placeholder="Select date & time", datetime=true) }}
+                  </div>
+                  {{ textarea(name="reason_" ~ loop.index, label="Reason (Optional)", placeholder="e.g. Waiting for salary day", x_model="reason") }}
+                </div>
+              {% endcall %}
+            </div>
+            {% endif %}
 
             <div x-data="{ closeReason: '' }" class="inline-block">
               {% call modal(
