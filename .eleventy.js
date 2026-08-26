@@ -128,6 +128,12 @@ module.exports = config => {
         }
         return "Repeated product interest";
     });
+    
+    config.addFilter("filterByActive", function(items) {
+        if (!Array.isArray(items)) return [];
+        return items.filter(item => item.state !== 'Converted' && item.state !== 'Closed');
+    });
+
     config.addFilter("filterByFollowUpToday", function(items) {
         if (!Array.isArray(items)) return [];
         return items.filter(item => item.follow_up && item.follow_up !== "—" && item.follow_up.includes('Today'));
