@@ -1,0 +1,414 @@
+---
+title: Admin
+view:   
+tags: testpress
+permalink: "/messages_v2/admin/"
+date: 2020-01-01
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+{% from "../../ui-system/components/modal.html" import modal %}
+{% from "../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../ui-system/components/textarea.html" import textarea %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../ui-system/components/radio.html" import radio %}
+<div class="max-w-7xl mx-auto w-full h-[calc(100vh-64px)] lg:px-8 lg:py-8"
+  x-data="{
+    showChatList: true,
+    activeChatId: 1,
+    selectedFilter: 'all',
+    init() {
+      this.$nextTick(() => {
+        document.getElementById('chat-textarea-' + this.activeChatId)?.focus();
+      });
+    },
+    handleSendOffer(detail) {
+      const discountMap = {
+        '3': { percent: '3% off', original: '₹3,299', discounted: '₹3,200', valid: 'Valid for 24 hours' },
+        '5': { percent: '5% off', original: '₹3,299', discounted: '₹3,134', valid: 'Valid for 4 hours' },
+        '10': { percent: '10% off', original: '₹3,299', discounted: '₹2,969', valid: 'Valid for 2 hours' }
+      };
+      const offer = discountMap[detail.offerId] || discountMap['3'];
+      
+      const chat = this.chats.find(c => c.id === this.activeChatId);
+      if(chat) {
+        chat.messages.push({
+          id: Date.now(),
+          from: 'staff',
+          isOffer: true,
+          product: detail.product,
+          offerDetails: offer,
+          text: `I've activated a special offer for you. It will automatically apply at checkout.`,
+          time: 'Just now',
+          author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' }
+        });
+        
+        this.$nextTick(() => {
+          const container = document.getElementById('chat-scroll-container');
+          if (container) container.scrollTop = container.scrollHeight;
+        });
+      }
+    },
+    chats: [
+      {
+        id: 1,
+        name: 'Rahul Kumar',
+        avatar: 'https://images.unsplash.com/photo-1601935111741-ae98b2b230b0?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=320&h=320&q=80',
+        initials: null,
+        avatarColor: null,
+        online: true,
+        lastSeen: 'Online',
+        lastMessage: 'Yes! The recording has been uploaded.',
+        lastTime: '1m',
+        unread: 0,
+        sentByStaff: true,
+        followupDue: false,
+        messages: [
+          { id: 1, from: 'student', text: 'Hi, is there an EMI option for this? Also when does the next batch start?', time: '11:27', product: { name: 'BrahMos (All SSC Exams - 2027)', price: '₹3,299', url: 'https://learn.siddhiprep.com/products/ssc_2027_course/', thumbnail: 'https://d2yj96qm4w0va1.cloudfront.net/institute/siddhiprep/product_images/17/96de8af09eb04e0db08245eee9c12809.png' } },
+          { id: 2, from: 'staff', text: 'Hi Rahul! Yes, we have 3 and 6 month EMI options. The next batch starts October 5th.', time: '12:44', author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 3, from: 'staff', text: 'You can enroll now and get early bird access to study material!', time: '12:45', author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } }
+        ]
+      },
+      {
+        id: 2,
+        name: 'Divya M',
+        avatar: null,
+        initials: 'D',
+        avatarColor: 'bg-indigo-500',
+        online: false,
+        lastSeen: 'Last seen 5 mins ago',
+        lastMessage: 'Will tomorrow\'s class be rescheduled?',
+        lastTime: '14m',
+        unread: 3,
+        sentByStaff: false,
+        followupDue: false,
+        messages: [
+          { id: 1, from: 'student', text: 'Does this cover full Biology? I need NEET 2025 level depth.', time: '09:10', product: { name: 'NEET Crash Course 2025', price: '₹3,299', url: '#', thumbnail: 'https://images.unsplash.com/photo-1532012197267-da84d127e765?w=400&h=200&fit=crop&q=80' } },
+          { id: 2, from: 'staff', text: 'Yes Divya, it covers all 97 chapters of Biology including Botany and Zoology.', time: '09:35', author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 3, from: 'staff', text: 'Divya Menon seems highly interested but is comparing options. Will follow up tomorrow with a discount code if no action taken.', time: '11:45 AM', isNote: true, author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 4, from: 'student', text: 'Will tomorrow\'s class be rescheduled?', time: '10:14' }
+        ]
+      },
+      {
+        id: 3,
+        name: 'Aravind S',
+        avatar: 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=320&h=320&q=80',
+        initials: null,
+        avatarColor: null,
+        online: false,
+        lastSeen: 'Last seen 2h ago',
+        lastMessage: 'Thank you, I will check it out.',
+        lastTime: '2h',
+        unread: 0,
+        sentByStaff: true,
+        followupDue: true,
+        followupTime: 'Tomorrow 10:00 AM',
+        messages: [
+          { id: 1, from: 'student', text: 'Is there an EMI option available for the UPSC Foundation course?', time: '08:00' },
+          { id: 2, from: 'staff', text: 'Yes Aravind! We have 3-month and 6-month EMI options. I\'ll send you the details.', time: '08:15', author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 3, from: 'student', text: 'Thank you, I will check it out.', time: '08:20' }
+        ]
+      },
+      {
+        id: 4,
+        name: 'Priya Sharma',
+        avatar: null,
+        initials: 'P',
+        avatarColor: 'bg-rose-500',
+        online: true,
+        lastSeen: 'Online',
+        lastMessage: 'I have a question about the test series.',
+        lastTime: '32m',
+        unread: 1,
+        sentByStaff: false,
+        followupDue: false,
+        messages: [
+          { id: 1, from: 'student', text: 'I purchased this but I cannot see it in my dashboard. Please help!', time: '13:00', product: { name: 'NEET Full Test Series 2025', price: '₹1,499', url: '#', thumbnail: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400&h=200&fit=crop&q=80' } },
+          { id: 2, from: 'staff', text: 'Hi Priya! Please try logging out and back in. If it still doesn\'t show, let us know.', time: '13:10', author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 3, from: 'student', text: 'I have a question about the test series.', time: '13:42' }
+        ]
+      },
+      {
+        id: 5,
+        name: 'Kiran Reddy',
+        avatar: null,
+        initials: 'K',
+        avatarColor: 'bg-amber-500',
+        online: false,
+        lastSeen: 'Last seen yesterday',
+        lastMessage: 'My payment failed during checkout.',
+        lastTime: '1d',
+        unread: 2,
+        sentByStaff: false,
+        followupDue: true,
+        messages: [
+          { id: 1, from: 'student', text: 'Hi, I was trying to enroll in the SSC course and my payment failed.', time: 'Yesterday' },
+          { id: 2, from: 'student', text: 'My payment failed during checkout.', time: 'Yesterday' }
+        ]
+      },
+      {
+        id: 6,
+        name: 'Meena Iyer',
+        avatar: 'https://images.unsplash.com/photo-1530577197743-7adf14294584?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=320&h=320&q=80',
+        initials: null,
+        avatarColor: null,
+        online: true,
+        lastSeen: 'Online',
+        lastMessage: 'Is the offer still valid?',
+        lastTime: '3d',
+        unread: 0,
+        sentByStaff: false,
+        followupDue: false,
+        messages: [
+          { id: 1, from: 'staff', text: 'Hi Meena! We have a special 10% offer on the NEET Crash Course valid until Sunday.', time: '3d ago', author: { name: 'Karthik', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 2, from: 'student', text: 'Is the offer still valid?', time: '3d ago' }
+        ]
+      }
+    ],
+    get activeChat() {
+      return this.chats.find(c => c.id === this.activeChatId) || this.chats[0];
+    },
+    get filteredChats() {
+      if (this.selectedFilter === 'unread') return this.chats.filter(c => c.unread > 0);
+      if (this.selectedFilter === 'followup') return this.chats.filter(c => c.followupDue);
+      return this.chats;
+    }
+  }"
+>
+  <div class="flex size-full overflow-hidden lg:border lg:border-gray-200 dark:lg:border-neutral-700 lg:rounded-xl bg-white dark:bg-neutral-800 lg:shadow-sm">
+      <div class="h-full flex-none" :class="showChatList ? 'w-full lg:w-auto lg:block' : 'hidden lg:block lg:w-auto'">
+        {% include "./includes/aside.html" %}
+      </div>
+      <div class="h-full flex-1 min-w-0 flex flex-col" :class="showChatList ? 'hidden lg:flex' : 'flex'">
+        {% include "./includes/chat_detail.html" %}
+      </div>
+  </div>
+
+  <div @modal-confirmed-schedule-followup.window="activeChat.followupDue = true; activeChat.followupTime = document.getElementById('followup-date').value || 'Tomorrow 10:00 AM'">
+    {% call modal(
+        id="schedule-followup",
+        title="Schedule a follow-up",
+        confirm_text="Schedule",
+        show_cancel=false,
+        confirm_classes="bg-emerald-500 text-white hover:bg-emerald-600 focus:bg-emerald-600 border-transparent text-sm font-medium rounded-lg px-4 py-2"
+    ) %}
+      <div class="space-y-4">
+        <div>
+          {{ date_picker(id="followup-date", label="Schedule at", required=true, placeholder="Select date & time", datetime=true) }}
+        </div>
+        <div>
+          {{ textarea(id="followup-reason", label="Reason (Optional)", placeholder="Why are you following up?", rows="3") }}
+        </div>
+      </div>
+    {% endcall %}
+  </div>
+
+  <!-- View Followup Modal -->
+  <div>
+    {% call modal(
+        id="view-followup",
+        title="Next Follow-up",
+        confirm_text="",
+        show_cancel=false
+    ) %}
+      <div class="flex gap-x-4">
+        <!-- Icon -->
+        <div class="shrink-0 size-12 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-xl flex items-center justify-center">
+          <svg class="size-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
+            <line x1="16" x2="16" y1="2" y2="6"/>
+            <line x1="8" x2="8" y1="2" y2="6"/>
+            <line x1="3" x2="21" y1="10" y2="10"/>
+            <path d="M10 16l2 2 4-4"/>
+          </svg>
+        </div>
+        <!-- Content -->
+        <div class="grow pt-0.5">
+          <h3 class="text-base font-semibold text-gray-800 dark:text-neutral-200" x-text="activeChat.followupTime || 'Tomorrow 10:00 AM'"></h3>
+          <p class="text-sm text-gray-500 dark:text-neutral-500 mt-1">Asked about group discount for batch enrollment</p>
+          
+          <!-- Actions -->
+          <div class="mt-5 flex items-center justify-end gap-x-2">
+            <button type="button" @click="activeChat.followupDue = false; activeChat.followupTime = null; $dispatch('close-modal-view-followup')" class="inline-flex items-center gap-x-1.5 py-2 px-3 rounded-lg text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-hidden focus:bg-emerald-700 transition-colors">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Mark as completed
+            </button>
+            
+            {{ dropdown(
+              trigger='<button type="button" class="size-[38px] inline-flex justify-center items-center gap-x-2 rounded-lg border border-gray-200 bg-white text-gray-800 hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700 transition-colors"><svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>',
+              items=[
+                { label: 'Reschedule', x_on: '@click="$dispatch(\'close-modal-view-followup\'); setTimeout(() => $dispatch(\'open-modal-schedule-followup\'), 300)"' },
+                { label: 'Cancel followup', variant: 'danger', x_on: '@click="activeChat.followupDue = false; activeChat.followupTime = null; $dispatch(\'close-modal-view-followup\')"' }
+              ],
+              placement="bottom-end",
+              width="small"
+            ) }}
+          </div>
+        </div>
+      </div>
+    {% endcall %}
+  </div>
+
+  <!-- Send Offer Modal -->
+  <div @modal-confirmed-send-offer.window="handleSendOffer({ product: selectedProduct, offerId: selectedOffer })" x-data="{ selectedProduct: null, searchQuery: '', selectedOffer: '3' }">
+    {% call modal(
+        id="send-offer",
+        title="Send an offer",
+        confirm_text="Send to student",
+        cancel_text="Cancel",
+        confirm_classes="bg-emerald-600 text-white hover:bg-emerald-700 focus:bg-emerald-700 border-transparent text-sm font-medium rounded-lg px-4 py-2",
+        confirm_attrs='x-show="selectedProduct"'
+    ) %}
+      <div>
+        
+        <!-- Step 1: Select Product -->
+        <div x-show="!selectedProduct" x-transition.opacity>
+          <p class="text-sm text-gray-500 dark:text-neutral-400 mb-4">Choose a product to see the available offers.</p>
+          <div class="relative mb-4">
+            <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3.5">
+              <svg class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
+            <input type="text" x-model="searchQuery" class="py-2.5 ps-10 pe-4 block w-full bg-white dark:bg-neutral-900 border-gray-200 dark:border-neutral-700 rounded-lg text-sm focus:border-primary-500 focus:ring-primary-500 disabled:opacity-50 disabled:pointer-events-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500" placeholder="Search products...">
+          </div>
+
+          <ul role="list" class="space-y-1 max-h-60 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 pr-1 pb-2">
+            <!-- List Item 1 -->
+            <li>
+              <button type="button" @click="selectedProduct = {name: 'Advanced Machine Learning', price: '₹3,299 &middot; 3 offers available', thumbnail: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=320&h=180&q=80'}" class="w-full text-left flex gap-x-4 px-3 py-2 hover:bg-gray-50 dark:hover:bg-neutral-800/50 rounded-xl focus:outline-hidden group transition-colors">
+                <div class="shrink-0 w-20 aspect-video bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                  <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=320&h=180&q=80" alt="Course Thumbnail">
+                </div>
+                <div class="grow flex flex-col justify-center">
+                  <span class="line-clamp-1 text-sm/6 font-medium text-gray-800 dark:text-neutral-200 group-hover:text-primary-600 dark:group-hover:text-primary-500 transition-colors">Advanced Machine Learning</span>
+                  <p class="line-clamp-1 text-xs/5 text-gray-500 dark:text-neutral-400">₹3,299 &middot; 3 offers available</p>
+                </div>
+              </button>
+            </li>
+            <!-- List Item 2 -->
+            <li>
+              <button type="button" @click="selectedProduct = {name: 'Data Structures & Algorithms', price: '₹1,999 &middot; 2 offers available', thumbnail: 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?ixlib=rb-4.0.3&auto=format&fit=crop&w=320&h=180&q=80'}" class="w-full text-left flex gap-x-4 px-3 py-2 hover:bg-gray-50 dark:hover:bg-neutral-800/50 rounded-xl focus:outline-hidden group transition-colors">
+                <div class="shrink-0 w-20 aspect-video bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                  <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1516116216624-53e697fedbea?ixlib=rb-4.0.3&auto=format&fit=crop&w=320&h=180&q=80" alt="Course Thumbnail">
+                </div>
+                <div class="grow flex flex-col justify-center">
+                  <span class="line-clamp-1 text-sm/6 font-medium text-gray-800 dark:text-neutral-200 group-hover:text-primary-600 dark:group-hover:text-primary-500 transition-colors">Data Structures &amp; Algorithms</span>
+                  <p class="line-clamp-1 text-xs/5 text-gray-500 dark:text-neutral-400">₹1,999 &middot; 2 offers available</p>
+                </div>
+              </button>
+            </li>
+            <!-- List Item 3 -->
+            <li>
+              <button type="button" @click="selectedProduct = {name: 'System Design Interview', price: '₹4,499 &middot; 1 offer available', thumbnail: 'https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=320&h=180&fit=crop&q=80'}" class="w-full text-left flex gap-x-4 px-3 py-2 hover:bg-gray-50 dark:hover:bg-neutral-800/50 rounded-xl focus:outline-hidden group transition-colors">
+                <div class="shrink-0 w-20 aspect-video flex justify-center items-center bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                  <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?w=320&h=180&fit=crop&q=80" alt="Course Thumbnail">
+                </div>
+                <div class="grow flex flex-col justify-center">
+                  <span class="line-clamp-1 text-sm/6 font-medium text-gray-800 dark:text-neutral-200 group-hover:text-primary-600 dark:group-hover:text-primary-500 transition-colors">System Design Interview</span>
+                  <p class="line-clamp-1 text-xs/5 text-gray-500 dark:text-neutral-400">₹4,499 &middot; 1 offer available</p>
+                </div>
+              </button>
+            </li>
+            <!-- List Item 4 -->
+            <li>
+              <button type="button" @click="selectedProduct = {name: 'React Performance Tuning', price: '₹2,199 &middot; 3 offers available', thumbnail: 'https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=320&h=180&fit=crop&q=80'}" class="w-full text-left flex gap-x-4 px-3 py-2 hover:bg-gray-50 dark:hover:bg-neutral-800/50 rounded-xl focus:outline-hidden group transition-colors">
+                <div class="shrink-0 w-20 aspect-video bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                  <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=320&h=180&fit=crop&q=80" alt="Course Thumbnail">
+                </div>
+                <div class="grow flex flex-col justify-center">
+                  <span class="line-clamp-1 text-sm/6 font-medium text-gray-800 dark:text-neutral-200 group-hover:text-primary-600 dark:group-hover:text-primary-500 transition-colors">React Performance Tuning</span>
+                  <p class="line-clamp-1 text-xs/5 text-gray-500 dark:text-neutral-400">₹2,199 &middot; 3 offers available</p>
+                </div>
+              </button>
+            </li>
+            <!-- List Item 5 -->
+            <li>
+              <button type="button" @click="selectedProduct = {name: 'SSC Foundation Batch', price: '₹6,499 &middot; No offers available', thumbnail: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=320&h=180&fit=crop&q=80'}" class="w-full text-left flex gap-x-4 px-3 py-2 hover:bg-gray-50 dark:hover:bg-neutral-800/50 rounded-xl focus:outline-hidden group transition-colors">
+                <div class="shrink-0 w-20 aspect-video bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                  <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=320&h=180&fit=crop&q=80" alt="Course Thumbnail">
+                </div>
+                <div class="grow flex flex-col justify-center">
+                  <span class="line-clamp-1 text-sm/6 font-medium text-gray-800 dark:text-neutral-200 group-hover:text-primary-600 dark:group-hover:text-primary-500 transition-colors">SSC Foundation Batch</span>
+                  <p class="line-clamp-1 text-xs/5 text-gray-500 dark:text-neutral-400">₹6,499 &middot; No offers available</p>
+                </div>
+              </button>
+            </li>
+            <!-- List Item 6 -->
+            <li>
+              <button type="button" @click="selectedProduct = {name: 'NEET Physics Crash Course', price: '₹1,499 &middot; 2 offers available', thumbnail: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=320&h=180&fit=crop&q=80'}" class="w-full text-left flex gap-x-4 px-3 py-2 hover:bg-gray-50 dark:hover:bg-neutral-800/50 rounded-xl focus:outline-hidden group transition-colors">
+                <div class="shrink-0 w-20 aspect-video bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                  <img class="w-full h-full object-cover" src="https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=320&h=180&fit=crop&q=80" alt="Course Thumbnail">
+                </div>
+                <div class="grow flex flex-col justify-center">
+                  <span class="line-clamp-1 text-sm/6 font-medium text-gray-800 dark:text-neutral-200 group-hover:text-primary-600 dark:group-hover:text-primary-500 transition-colors">NEET Physics Crash Course</span>
+                  <p class="line-clamp-1 text-xs/5 text-gray-500 dark:text-neutral-400">₹1,499 &middot; 2 offers available</p>
+                </div>
+              </button>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Step 2: Selected Product & Offers -->
+        <div x-show="selectedProduct" style="display: none;" class="space-y-6" x-transition.opacity>
+          <!-- Selected Product Display -->
+          <div>
+            <div class="flex items-center gap-x-4">
+              <div class="shrink-0 w-20 aspect-video bg-gray-100 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                <img class="w-full h-full object-cover" :src="selectedProduct?.thumbnail" alt="Product Thumbnail">
+              </div>
+              <div class="grow flex flex-col justify-center">
+                <div class="flex items-center justify-between">
+                  <span class="line-clamp-1 text-sm/6 font-medium text-gray-800 dark:text-neutral-200" x-text="selectedProduct?.name"></span>
+                  <button type="button" @click="selectedProduct = null" class="shrink-0 text-sm font-medium text-emerald-600 hover:text-emerald-700 dark:text-emerald-500 dark:hover:text-emerald-400 focus:outline-hidden">Change</button>
+                </div>
+                <p class="line-clamp-1 text-xs/5 text-gray-500 dark:text-neutral-400" x-text="selectedProduct?.price"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Available Offers -->
+          <div>
+            <h4 class="text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">Available Offers</h4>
+            <div class="space-y-3">
+              {{ radio(
+                name="offer_selection",
+                id="offer_3",
+                value="3",
+                label='3% off &middot; <span class="line-through text-gray-400 dark:text-neutral-500 font-normal mx-1">₹3,299</span> ₹3,200',
+                description="Valid for 24 hours",
+                checked=true,
+                variant="card",
+                x_model="selectedOffer"
+              ) }}
+              {{ radio(
+                name="offer_selection",
+                id="offer_5",
+                value="5",
+                label='5% off &middot; <span class="line-through text-gray-400 dark:text-neutral-500 font-normal mx-1">₹3,299</span> ₹3,134',
+                description="Valid for 4 hours",
+                variant="card",
+                x_model="selectedOffer"
+              ) }}
+              {{ radio(
+                name="offer_selection",
+                id="offer_10",
+                value="10",
+                label='10% off &middot; <span class="line-through text-gray-400 dark:text-neutral-500 font-normal mx-1">₹3,299</span> ₹2,969',
+                description="Valid for 2 hours",
+                variant="card",
+                x_model="selectedOffer"
+              ) }}
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    {% endcall %}
+  </div>
+</div>
+
+{% include "../../ui-system/scripts/date_picker_script.html" %}
+{% endblock content %}
