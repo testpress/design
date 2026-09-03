@@ -46,15 +46,15 @@
           <!-- End Header -->
 
           <!-- Search -->
-          <div class="relative border-b border-gray-200 dark:border-neutral-700" x-data="{ searchQuery: '' }">
+          <div class="relative border-b border-gray-200 dark:border-neutral-700">
             <div class="absolute inset-y-0 left-0 flex items-center pointer-events-none z-20 pl-5">
               <svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             </div>
-            <input type="text" x-model="searchQuery" id="messages-search-input"
+            <input type="text" x-model="sidebarSearchQuery" id="messages-search-input"
               class="py-1.5 px-12 block w-full bg-white dark:bg-neutral-800 border-0 rounded-0 text-sm md:text-[13px] text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-hidden focus:ring-0 disabled:opacity-50 disabled:pointer-events-none"
-              placeholder="Search conversations...">
-            <div class="absolute inset-y-0 right-0 flex items-center z-20 pr-4" x-show="searchQuery.length > 0" style="display: none;">
-              <button type="button" @click="searchQuery = ''"
+              placeholder="Search or start a conversation...">
+            <div class="absolute inset-y-0 right-0 flex items-center z-20 pr-4" x-show="sidebarSearchQuery.length > 0" style="display: none;">
+              <button type="button" @click="sidebarSearchQuery = ''"
                 class="inline-flex shrink-0 justify-center items-center size-6 rounded-full text-gray-500 dark:text-neutral-400 hover:text-gray-800 dark:hover:text-neutral-200 focus:outline-hidden" aria-label="Clear">
                 <span class="sr-only">Clear</span>
                 <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
@@ -89,65 +89,149 @@
 
           <!-- Chat List -->
           <div class="h-full overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-            <div role="list">
-              <template x-for="chat in filteredChats" :key="chat.id">
-                <div
-                  class="relative cursor-pointer bg-white dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 transition-colors"
-                  :class="activeChatId === chat.id ? 'bg-gray-100 dark:bg-neutral-700' : ''"
-                  @click="activeChatId = chat.id; showChatList = false; $nextTick(() => { document.getElementById('chat-textarea-' + chat.id)?.focus() })"
-                  role="button"
-                  :aria-selected="activeChatId === chat.id">
-                  <div class="py-4 px-5 flex items-center gap-x-3">
-                    <!-- Avatar -->
-                    <div class="shrink-0">
-                      <div class="relative size-8">
-                        <template x-if="chat.avatar">
-                          <img class="shrink-0 size-8 rounded-full" :src="chat.avatar" :alt="chat.name">
-                        </template>
-                        <span x-show="!chat.avatar"
-                          class="flex shrink-0 justify-center items-center size-8 text-xs font-medium uppercase text-white rounded-full"
-                          :class="getAvatarColor(chat.id)"
-                          x-text="chat.initials ? chat.initials.charAt(0) : ''">
-                        </span>
-                        <!-- Online dot -->
-                        <span x-show="chat.online" class="absolute bottom-0 right-0 block size-2 rounded-full ring-2 ring-gray-100 dark:ring-neutral-800 bg-green-500"></span>
-                      </div>
-                    </div>
-                    <!-- End Avatar -->
-
-                    <!-- Info -->
-                    <div class="grow truncate">
-                      <div class="flex justify-between items-center gap-x-1">
-                        <p class="truncate font-medium text-[13px] text-gray-800 dark:text-neutral-200" x-text="chat.name"></p>
-                        <div class="flex items-center gap-x-1 shrink-0">
-                          <!-- Read check if last sent by staff -->
-                          <template x-if="chat.sentByStaff">
-                            <svg class="inline-block shrink-0 size-3.5 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+            
+            <!-- Default View (No Search) -->
+            <template x-if="sidebarSearchQuery.trim() === ''">
+              <div role="list">
+                <template x-for="chat in filteredChats" :key="chat.id">
+                  <div
+                    class="relative cursor-pointer bg-white dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 transition-colors"
+                    :class="activeChatId === chat.id ? 'bg-gray-100 dark:bg-neutral-700' : ''"
+                    @click="activeChatId = chat.id; showChatList = false; $nextTick(() => { document.getElementById('chat-textarea-' + chat.id)?.focus() })"
+                    role="button"
+                    :aria-selected="activeChatId === chat.id">
+                    <div class="py-4 px-5 flex items-center gap-x-3">
+                      <!-- Avatar -->
+                      <div class="shrink-0">
+                        <div class="relative size-8">
+                          <template x-if="chat.avatar">
+                            <img class="shrink-0 size-8 rounded-full" :src="chat.avatar" :alt="chat.name">
                           </template>
-                          <span class="uppercase text-[10px] text-gray-400 dark:text-neutral-500" x-text="chat.lastTime"></span>
+                          <span x-show="!chat.avatar"
+                            class="flex shrink-0 justify-center items-center size-8 text-xs font-medium uppercase text-white rounded-full"
+                            :class="getAvatarColor(chat.id)"
+                            x-text="chat.initials ? chat.initials.charAt(0) : ''">
+                          </span>
+                          <!-- Online dot -->
+                          <span x-show="chat.online" class="absolute bottom-0 right-0 block size-2 rounded-full ring-2 ring-gray-100 dark:ring-neutral-800 bg-green-500"></span>
                         </div>
                       </div>
-                      <div class="truncate mr-5 mt-0.5">
-                        <template x-if="chat.unread > 0">
-                          <p class="truncate font-semibold text-gray-800 dark:text-neutral-200 text-xs" x-text="chat.lastMessage"></p>
-                        </template>
-                        <template x-if="chat.unread === 0">
-                          <p class="truncate text-gray-500 dark:text-neutral-400 text-xs" x-text="chat.lastMessage"></p>
-                        </template>
+                      <!-- End Avatar -->
+  
+                      <!-- Info -->
+                      <div class="grow truncate">
+                        <div class="flex justify-between items-center gap-x-1">
+                          <p class="truncate font-medium text-[13px] text-gray-800 dark:text-neutral-200" x-text="chat.name"></p>
+                          <div class="flex items-center gap-x-1 shrink-0">
+                            <!-- Read check if last sent by staff -->
+                            <template x-if="chat.sentByStaff">
+                              <svg class="inline-block shrink-0 size-3.5 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+                            </template>
+                            <span class="uppercase text-[10px] text-gray-400 dark:text-neutral-500" x-text="chat.lastTime"></span>
+                          </div>
+                        </div>
+                        <div class="truncate mr-5 mt-0.5">
+                          <template x-if="chat.unread > 0">
+                            <p class="truncate font-semibold text-gray-800 dark:text-neutral-200 text-xs" x-text="chat.lastMessage"></p>
+                          </template>
+                          <template x-if="chat.unread === 0">
+                            <p class="truncate text-gray-500 dark:text-neutral-400 text-xs" x-text="chat.lastMessage"></p>
+                          </template>
+                        </div>
                       </div>
+                      <!-- End Info -->
                     </div>
-                    <!-- End Info -->
+  
+                    <!-- Unread Badge -->
+                    <template x-if="chat.unread > 0 && activeChatId !== chat.id">
+                      <div class="absolute bottom-3.5 right-2.5">
+                        <span class="relative min-w-[1.125rem] min-h-[1.125rem] inline-flex justify-center items-center text-[10px] bg-primary-600 dark:bg-primary-500 text-white rounded-full px-1" x-text="chat.unread"></span>
+                      </div>
+                    </template>
                   </div>
+                </template>
+              </div>
+            </template>
 
-                  <!-- Unread Badge -->
-                  <template x-if="chat.unread > 0 && activeChatId !== chat.id">
-                    <div class="absolute bottom-3.5 right-2.5">
-                      <span class="relative min-w-[1.125rem] min-h-[1.125rem] inline-flex justify-center items-center text-[10px] bg-primary-600 dark:bg-primary-500 text-white rounded-full px-1" x-text="chat.unread"></span>
+            <!-- Search View -->
+            <template x-if="sidebarSearchQuery.trim() !== ''">
+              <div>
+                <!-- Empty State -->
+                <template x-if="sidebarSearchChats.length === 0 && sidebarSearchStudents.length === 0">
+                  <div class="p-5 flex flex-col justify-center items-center text-center mt-10">
+                    <svg class="w-32 mx-auto mb-4" width="178" height="90" viewBox="0 0 178 90" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="27" y="50.5" width="124" height="39" rx="7.5" fill="currentColor" class="fill-white dark:fill-neutral-800 opacity-30"/><rect x="27" y="50.5" width="124" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-100 dark:stroke-neutral-800 opacity-30"/><rect x="34.5" y="58" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600 opacity-30"/><rect x="66.5" y="61" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600 opacity-30"/><rect x="66.5" y="73" width="77" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600 opacity-30"/><rect x="19.5" y="28.5" width="139" height="39" rx="7.5" fill="currentColor" class="fill-white dark:fill-neutral-800"/><rect x="19.5" y="28.5" width="139" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-100 dark:stroke-neutral-800"/><rect x="27" y="36" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600"/><rect x="59" y="39" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600"/><rect x="59" y="51" width="92" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600"/><g filter="url(#filter-empty-search-1)"><rect x="12" y="6" width="154" height="40" rx="8" fill="currentColor" class="fill-white dark:fill-neutral-800" shape-rendering="crispEdges"/><rect x="12.5" y="6.5" width="153" height="39" rx="7.5" stroke="currentColor" class="stroke-gray-100 dark:stroke-neutral-800" shape-rendering="crispEdges"/><rect x="20" y="14" width="24" height="24" rx="4" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600"/><rect x="52" y="17" width="60" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600"/><rect x="52" y="29" width="106" height="6" rx="3" fill="currentColor" class="fill-gray-200 dark:fill-neutral-600"/></g><defs><filter id="filter-empty-search-1" x="0" y="0" width="178" height="64" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/><feOffset dy="6"/><feGaussianBlur stdDeviation="6"/><feComposite in2="hardAlpha" operator="out"/><feColorMatrix type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.03 0"/><feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow_1187_14810"/><feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1187_14810" result="shape"/></filter></defs></svg>
+                    <div class="max-w-sm mx-auto">
+                      <p class="mt-2 font-medium text-gray-800 dark:text-neutral-200">No search results</p>
+                      <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400">No messages or students match your search.</p>
                     </div>
-                  </template>
-                </div>
-              </template>
-            </div>
+                  </div>
+                </template>
+
+                <!-- Messages Group -->
+                <template x-if="sidebarSearchChats.length > 0">
+                  <div class="pt-2">
+                    <div class="block text-xs font-medium text-gray-500 dark:text-neutral-400 mb-1 px-5">Messages</div>
+                    <div role="list">
+                      <template x-for="chat in sidebarSearchChats" :key="chat.id">
+                        <div class="relative cursor-pointer bg-white dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 transition-colors" :class="activeChatId === chat.id ? 'bg-gray-100 dark:bg-neutral-700' : ''" @click="activeChatId = chat.id; showChatList = false; sidebarSearchQuery = ''; $nextTick(() => { document.getElementById('chat-textarea-' + chat.id)?.focus() })" role="button" :aria-selected="activeChatId === chat.id">
+                          <div class="py-3 px-5 flex items-center gap-x-3">
+                            <!-- Avatar -->
+                            <div class="shrink-0">
+                              <div class="relative size-8">
+                                <template x-if="chat.avatar">
+                                  <img class="shrink-0 size-8 rounded-full" :src="chat.avatar" :alt="chat.name">
+                                </template>
+                                <span x-show="!chat.avatar" class="flex shrink-0 justify-center items-center size-8 text-xs font-medium uppercase text-white rounded-full" :class="getAvatarColor(chat.id)" x-text="chat.initials ? chat.initials.charAt(0) : ''"></span>
+                                <!-- Online dot -->
+                                <span x-show="chat.online" class="absolute bottom-0 right-0 block size-2 rounded-full ring-2 ring-gray-100 dark:ring-neutral-800 bg-green-500"></span>
+                              </div>
+                            </div>
+                            <!-- End Avatar -->
+                            <div class="grow truncate">
+                              <div class="flex justify-between items-center gap-x-1">
+                                <p class="truncate font-medium text-[13px] text-gray-800 dark:text-neutral-200" x-text="chat.name"></p>
+                                <span class="uppercase text-[10px] text-gray-400 dark:text-neutral-500" x-text="chat.lastTime"></span>
+                              </div>
+                              <div class="truncate mt-0.5">
+                                <p class="truncate text-gray-500 dark:text-neutral-400 text-xs" x-text="chat.lastMessage"></p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Students Group -->
+                <template x-if="sidebarSearchStudents.length > 0">
+                  <div class="pt-2 pb-4">
+                    <div class="block text-xs font-medium text-gray-500 dark:text-neutral-400 mb-1 px-5" :class="sidebarSearchChats.length > 0 ? 'mt-3' : ''">Students</div>
+                    <div role="list">
+                      <template x-for="student in sidebarSearchStudents" :key="student.id">
+                        <div class="relative cursor-pointer bg-white dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 transition-colors" @click="startNewChat(student.id, student.name, student.avatar, student.initials); sidebarSearchQuery = ''">
+                          <div class="py-3 px-5 flex items-center gap-x-3">
+                            <div class="shrink-0">
+                              <div class="relative size-8">
+                                <template x-if="student.avatar">
+                                  <img class="shrink-0 size-8 rounded-full" :src="student.avatar" :alt="student.name">
+                                </template>
+                                <template x-if="!student.avatar">
+                                  <span class="flex shrink-0 justify-center items-center size-8 text-xs font-medium uppercase text-white rounded-full" :class="getAvatarColor(student.id)" x-text="student.initials"></span>
+                                </template>
+                              </div>
+                            </div>
+                            <div class="grow truncate">
+                              <p class="truncate font-medium text-[13px] text-gray-800 dark:text-neutral-200" x-text="student.name"></p>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
           </div>
           <!-- End Chat List -->
 
