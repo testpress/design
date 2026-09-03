@@ -1,0 +1,239 @@
+{% from "../../../../ui-system/components/button.html" import button %}
+{% from "../../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../../ui-system/components/modal.html" import modal %}
+{% from "../../../../ui-system/components/radio.html" import radio %}
+
+<script>
+  const initOfferStore = () => {
+    if (!Alpine.store('offerStore')) {
+      Alpine.store('offerStore', { sent: false, selected: '' });
+    }
+  };
+  if (typeof Alpine !== 'undefined') {
+    initOfferStore();
+  } else {
+    document.addEventListener('alpine:init', initOfferStore);
+  }
+</script>
+
+<!-- Status Card -->
+<div @modal-confirmed-send-offer.window="$store.offerStore.sent = true" class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl h-full flex flex-col">
+  <!-- Header -->
+  <div class="py-2.5 px-4 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700">
+    <h2 class="font-medium text-gray-800 dark:text-neutral-200">
+      Conversation
+    </h2>
+  </div>
+  <!-- End Header -->
+
+  <!-- Body -->
+  <div id="chat-body" class="flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500" x-init="$nextTick(() => { $el.scrollTop = $el.scrollHeight }); $watch('$store.offerStore.sent', value => { if(value) { $nextTick(() => { $el.scrollTo({top: $el.scrollHeight, behavior: 'smooth'}) }) } })">
+    <div class="pt-2 pb-5 px-4">
+      <div class="relative">
+        
+        <!-- List -->
+        <div class="w-full space-y-5">
+          
+          {% set current_date_group = "" %}
+          
+          {% for msg in item.messages %}
+            
+            {% set raw_date = msg.time | split(',') | first | trim %}
+            {% set display_date = raw_date %}
+            {% if raw_date == "3 days ago" %}
+              {% set display_date = "Aug 15, 2026" %}
+            {% elif raw_date == "2 days ago" %}
+              {% set display_date = "Aug 16, 2026" %}
+            {% endif %}
+
+            {% if display_date != current_date_group %}
+              {% set current_date_group = display_date %}
+              <!-- Date Chip -->
+              <div class="sticky top-0 inset-x-0 z-8 max-w-lg mx-auto text-center mt-6 mb-4">
+                <span class="py-0.5 px-1.5 bg-gray-100 dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 rounded-full">{{ current_date_group }}</span>
+              </div>
+            {% endif %}
+            
+            {% if msg.type == 'system' %}
+              <!-- System Event -->
+              <div class="flex flex-col items-center justify-center my-4 text-center">
+                <p class="text-xs font-medium text-gray-500 dark:text-neutral-400 flex items-center gap-x-1.5 justify-center">
+                  <i data-lucide="{{ msg.icon }}" class="size-3.5 text-gray-400"></i> {{ msg.title }}
+                </p>
+                <p class="text-[11px] text-gray-400 dark:text-neutral-500 mt-0.5">
+                  {% if msg.text %}{{ msg.text }} <span class="mx-0.5">&middot;</span> {% endif %}{{ msg.time | split(',') | last | trim }}
+                </p>
+              </div>
+
+            {% elif msg.type == 'staff' or msg.type == 'note' %}
+              <!-- Staff / Note Item -->
+              <div class="max-w-md ms-auto text-end flex justify-end gap-x-2">
+                <div>
+                  <p class="mb-1.5 pe-2.5 text-xs text-gray-400 dark:text-neutral-500">You</p>
+                  <div class="space-y-1">
+                    <div class="group flex justify-end gap-x-2" style="word-break: break-word;">
+                      <div class="order-2 text-start {% if msg.type == 'note' %}bg-amber-100 dark:bg-amber-900/30{% else %}bg-primary-100 dark:bg-primary-500/20{% endif %} inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                        <div class="text-sm text-gray-800 dark:text-neutral-200">
+                          {% if msg.type == 'note' %}<i data-lucide="lock" class="inline-block shrink-0 size-3 me-1 align-middle -mt-0.5 text-amber-700 dark:text-amber-500"></i>{% endif %}
+                          {{ msg.text }}
+                          <span>
+                            <span class="ms-1 text-[11px] text-end text-gray-400 dark:text-neutral-500 italic">{{ msg.time | split(',') | last | trim }}</span>
+                            {% if msg.read %}
+                            <svg class="inline-block shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+                            {% elif msg.type == 'staff' %}
+                            <svg class="inline-block shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                            {% endif %}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="shrink-0 mt-auto">
+                  <img class="shrink-0 size-8 rounded-full" src="{{ msg.avatar }}" alt="{{ msg.name }}">
+                </div>
+              </div>
+              <!-- End Staff / Note Item -->
+
+            {% elif msg.type == 'student' %}
+              <!-- Student Item -->
+              <div class="max-w-md flex gap-x-2">
+                <div class="shrink-0 mt-auto">
+                  <img class="shrink-0 size-8 rounded-full" src="{{ msg.avatar }}" alt="{{ msg.name }}">
+                </div>
+                <div>
+                  <p class="mb-1.5 ps-2.5 text-xs text-gray-400 dark:text-neutral-500">{{ msg.name }}</p>
+                  <div class="space-y-1">
+                    <div class="group flex justify-start gap-x-2" style="word-break: break-word;">
+                      <div class="order-1 bg-gray-100 dark:bg-neutral-800 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                        <div class="text-sm text-gray-800 dark:text-neutral-200">
+                          {{ msg.text }}
+                          <span>
+                            <span class="ms-1 text-[11px] text-gray-400 dark:text-neutral-500 italic">{{ msg.time | split(',') | last | trim }}</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- End Student Item -->
+            {% endif %}
+
+          {% endfor %}
+
+          <!-- Sent Offer Bubble -->
+          <div x-show="$store.offerStore.sent" x-cloak class="max-w-md ms-auto text-end flex justify-end gap-x-2 mt-4">
+            <div>
+              <p class="mb-1.5 pe-2.5 text-xs text-gray-400 dark:text-neutral-500">You</p>
+              <div class="space-y-1">
+                <div class="group flex justify-end gap-x-2" style="word-break: break-word;">
+                  <div class="order-2 text-start bg-primary-100 dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                    <div class="text-sm text-gray-800 dark:text-neutral-200">
+                      <p class="mb-2">I noticed you were looking at <strong class="font-semibold">{{ item.product | split(' - ') | first }}</strong>. I've activated a special discount for you! It will automatically apply to your account when you proceed to checkout.</p>
+                      
+                      <div class="bg-white dark:bg-neutral-800 rounded-lg p-2.5 border border-primary-200 dark:border-primary-700/50 mb-1 flex items-center gap-x-3">
+                        <div class="p-1.5 bg-primary-50 dark:bg-primary-900/30 rounded-md shrink-0 text-primary-600 dark:text-primary-500">
+                          <i data-lucide="tag" class="size-4"></i>
+                        </div>
+                        <div class="flex-1">
+                          <h4 class="text-sm font-semibold text-gray-800 dark:text-neutral-200" x-text="$store.offerStore.selected === '3_off' ? '3% off' : ($store.offerStore.selected === '5_off' ? '5% off' : '10% off')">5% off</h4>
+                          <p class="text-[11px] text-gray-500 dark:text-neutral-400" x-text="'Valid for ' + ($store.offerStore.selected === '3_off' ? '24 hours' : ($store.offerStore.selected === '5_off' ? '4 hours' : '2 hours'))">Valid for 4 hours</p>
+                        </div>
+                      </div>
+
+                      <div class="text-[11px] text-end text-gray-400 dark:text-neutral-500 italic mt-1">
+                        Just now
+                        <svg class="inline-block shrink-0 size-3.5 ms-0.5 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="shrink-0 mt-auto">
+              <img class="shrink-0 size-8 rounded-full" src="https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80" alt="You">
+            </div>
+          </div>
+
+        </div>
+        <!-- End List -->
+      </div>
+    </div>
+  </div>
+  <!-- End Body -->
+
+  <!-- Textarea -->
+  <footer class="bg-white dark:bg-neutral-800 rounded-b-xl" x-data="{ tab: 'message' }" x-init="$nextTick(() => $refs.chatInput.focus()); $watch('tab', () => $nextTick(() => $refs.chatInput.focus()))">
+    <!-- Dropdown Selector -->
+    <div class="px-3 pt-3 pb-2 border-b border-gray-200 dark:border-neutral-700">
+      {% set tab_trigger %}
+        <button type="button" class="inline-flex items-center gap-x-1.5 text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 focus:outline-hidden">
+          <span x-show="tab === 'message'" class="flex items-center gap-x-1.5"><i data-lucide="message-square" class="size-3.5"></i> Message</span>
+          <span x-show="tab === 'note'" x-cloak class="flex items-center gap-x-1.5 text-amber-600 dark:text-amber-500"><i data-lucide="lock" class="size-3.5"></i> Internal Note</span>
+          <i data-lucide="chevron-down" class="shrink-0 size-4 text-gray-500 dark:text-neutral-500"></i>
+        </button>
+      {% endset %}
+      {% call dropdown(trigger=tab_trigger, width="w-40", placement="bottom-start") %}
+        <button type="button" @click="tab = 'message'; $dispatch('close-dropdown')" class="w-full flex items-center py-2 px-3 rounded-lg text-sm font-medium text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden">
+          <i data-lucide="message-square" class="shrink-0 size-3.5 me-2"></i> Message
+        </button>
+        <button type="button" @click="tab = 'note'; $dispatch('close-dropdown')" class="w-full flex items-center py-2 px-3 rounded-lg text-sm font-medium text-start text-amber-600 dark:text-amber-500 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden">
+          <i data-lucide="lock" class="shrink-0 size-3.5 me-2"></i> Internal Note
+        </button>
+      {% endcall %}
+    </div>
+
+    <label for="hs-chat-widgets-sidebar-example-autoheight-textarea" class="sr-only">Message</label>
+    <div class="pb-2 ps-2 transition-colors rounded-b-xl">
+      <textarea x-ref="chatInput" id="hs-chat-widgets-sidebar-example-autoheight-textarea" class="max-h-36 pt-4 pb-2 ps-2 pe-4 block w-full bg-transparent border-transparent rounded-0 md:text-sm leading-4 resize-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-hidden focus:border-transparent focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500" :placeholder="tab === 'message' ? 'Message {{ item.student_name }}' : 'Write a note for your team...'" rows="1" data-hs-textarea-auto-height='{"defaultHeight": 48}'></textarea>
+      
+      <div class="pe-4 flex justify-between items-center gap-x-1">
+        <!-- Button Group -->
+        <div class="flex items-center gap-x-1">
+          <button type="button" class="flex justify-center items-center gap-x-1.5 size-8 text-sm text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700">
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            <span class="sr-only">Attach file</span>
+          </button>
+          
+          <button type="button" @click="$dispatch('open-modal-send-offer')" class="inline-flex items-center gap-x-1.5 text-xs font-medium text-gray-800 dark:text-white bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 hover:bg-gray-100 dark:hover:bg-neutral-700 py-1.5 px-2.5 rounded-full focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none">
+            <i data-lucide="tag" class="shrink-0 size-3.5"></i>
+            Send offer
+          </button>
+
+        </div>
+        <!-- End Button Group -->
+        
+        <!-- Button Group -->
+        <div class="flex items-center gap-x-1">
+
+          
+          <div x-show="tab === 'message'">
+            {{ button(text="Send", variant="primary", size="sm", icon="send", icon_position="right") }}
+          </div>
+          <div x-show="tab === 'note'" x-cloak>
+            {{ button(text="Add Note", variant="primary", size="sm") }}
+          </div>
+        </div>
+        <!-- End Button Group -->
+      </div>
+    </div>
+  </footer>
+  <!-- End Textarea -->
+</div>
+
+{% call modal(
+  id="send-offer",
+  title="Send an offer",
+  size="md",
+  variant="primary",
+  confirm_text="Send to student",
+  confirm_attrs=":disabled=\"!$store.offerStore.selected\""
+) %}
+  <p class="text-sm text-gray-800 dark:text-neutral-200 mb-4">Choose a pre-authorized offer to help the student overcome price concerns. This will be sent immediately in the chat.</p>
+  <div class="space-y-3">
+    {{ radio(name="offer_selection", label="3% off · Valid for 24 hours", value="3_off", x_model="$store.offerStore.selected") }}
+    {{ radio(name="offer_selection", label="5% off · Valid for 4 hours", value="5_off", x_model="$store.offerStore.selected") }}
+    {{ radio(name="offer_selection", label="10% off · Valid for 2 hours", value="10_off", x_model="$store.offerStore.selected") }}
+  </div>
+{% endcall %}

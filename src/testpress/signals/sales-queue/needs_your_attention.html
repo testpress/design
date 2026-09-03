@@ -1,0 +1,106 @@
+{% from "src/ui-system/components/popover.html" import popover %}
+{% from "src/ui-system/components/empty-state.html" import empty_state %}
+{% from "src/ui-system/components/badge.html" import badge %}
+<!-- Card -->
+<div class="flex flex-col h-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xs rounded-xl overflow-hidden" x-data="{ status: new URLSearchParams(window.location.search).get('status') }">
+  <!-- Header -->
+  <div class="flex gap-3 px-5 pt-5 pb-3">
+    <div class="grow">
+      <h2 class="font-medium text-sm sm:text-base text-gray-800 dark:text-neutral-200">
+        Needs your attention
+      </h2>
+      <p class="text-sm text-gray-500 dark:text-neutral-400 mt-1">
+        Students waiting for your response or purchase help.
+      </p>
+    </div>
+  </div>
+
+  <!-- Empty State -->
+  <div x-show="status === 'empty'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="Nothing needs your attention right now",
+      description="New actionable activity will appear here.",
+      icon="bell-off",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Empty State -->
+
+  <!-- Onboarding State -->
+  <div x-show="status === 'onboarding'" style="display: none;" class="flex flex-col justify-center min-h-[300px]">
+    {{ empty_state(
+      title="Your sales work will appear here",
+      description="Students needing your response will be surfaced here.",
+      icon="bell-off",
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+  <!-- End Onboarding State -->
+
+  <!-- Data State -->
+  <div x-show="status !== 'empty' && status !== 'onboarding'" class="flex flex-col flex-grow">
+    <ul role="list" class="overflow-hidden">
+      {% set attention_items = my_opportunities | filterByStates(['awaiting-your-response', 'no-conversation-yet']) %}
+      {% for item in attention_items | limit(5) %}
+      <li class="relative px-5 py-4 hover:bg-gray-50 dark:hover:bg-neutral-700/40 transition-colors">
+        <a href="{{ ('/signals/my-opportunities/' ~ item.id ~ '/') | url }}" class="absolute inset-0" aria-label="Open {{ item.student_name }}'s opportunity"></a>
+
+        <div class="flex gap-x-3">
+          <div class="shrink-0">
+            <img src="{{ item.avatar }}" alt="{{ item.student_name }}" class="size-10 rounded-full object-cover">
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <div class="text-sm">
+              <span class="font-semibold text-gray-900 dark:text-white">
+                {{ item.student_name }}
+              </span>
+              {% set display_activity = item.latest_activity | lower %}
+              {% if display_activity == 'pre-purchase enquiry' %}
+                {% set display_activity = 'asked about purchase' %}
+              {% elif display_activity == 'student replied' %}
+                {% set display_activity = 'replied' %}
+              {% endif %}
+              {% if item.student_reply and display_activity != 'asked about purchase' %}
+                {% set display_activity = 'replied' %}
+              {% endif %}
+              <span class="text-gray-500 dark:text-neutral-400">
+                · {{ display_activity }} {{ item.activity_time }}
+              </span>
+            </div>
+
+            {% if item.student_reply %}
+            <div class="mt-1 text-sm text-gray-700 dark:text-neutral-300">
+              <p class="line-clamp-1">
+                “{{ item.student_reply }}”
+              </p>
+            </div>
+            {% endif %}
+
+            <div class="mt-1.5 text-xs font-medium text-gray-500 dark:text-neutral-400">
+              {{ item.product | replace(" - ", " · ") }}
+            </div>
+          </div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+
+    <!-- Footer -->
+    <div class="text-center mt-auto border-t border-gray-200 dark:border-neutral-700">
+      <a class="group p-3 flex justify-center items-center text-sm  text-primary-600 dark:text-primary-500 rounded-b-lg hover:text-primary-700 dark:hover:text-primary-600 focus:outline-none focus:decoration-2 focus:underline focus:text-primary-700 dark:focus:text-primary-600 transition-colors" href="{{ '/signals/my-opportunities/?filter=Needs+attention' | url }}">
+        {% if attention_items | length > 5 %}
+          + {{ (attention_items | length) - 5 }} more
+        {% else %}
+          See all
+        {% endif %}
+        <i data-lucide="arrow-right" class="shrink-0 size-4 ml-1 transition-transform group-hover:translate-x-1"></i>
+      </a>
+    </div>
+    <!-- End Footer -->
+  </div>
+  <!-- End Data State -->
+</div>
+
