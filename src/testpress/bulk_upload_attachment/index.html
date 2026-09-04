@@ -1,0 +1,290 @@
+---
+tags: testpress
+title: Bulk Upload Attachments
+date: 2024-12-05
+permalink: "/testpress/bulk_upload_attachment/"
+view: "Content Actions"
+---
+
+{% extends "layouts/admin_base.html" %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock %}
+{% block extra_head %}
+{% endblock extra_head %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto xl:px-8 py-8">
+  <div x-data="bulkAttachmentApp()">
+    {% include "./includes/header.html" %}
+    <div data-hs-stepper='{"currentIndex":1}'>
+      {% include "./includes/stepper_nav.html" %}
+      
+      <!-- Main Content Card Container -->
+      <div class="mt-4 bg-white dark:bg-neutral-800">
+        {% include "./includes/select_attachments.html" %}
+        {% include "./includes/configuration.html" %}
+        {% include "./includes/preview_attachments.html" %}
+      </div>
+
+      <!-- Navigation Buttons Outside the Card Container -->
+      {% include "./includes/navigation_buttons.html" %}
+    </div>
+  </div>
+</div>
+{% endblock content %}
+
+{% block script %}
+{% include "../../ui-system/scripts/select_script.html" %}
+{% include "../../ui-system/scripts/date_picker_script.html" %}
+<script>
+  function bulkAttachmentApp() {
+    return {
+      // Pre-populated demo files (mixed PDF and non-PDF)
+      assets: [
+        {
+          id: crypto.randomUUID(),
+          name: "Lecture_01_Introduction_to_Neural_Networks.pdf",
+          size: 4521984,
+          type: "application/pdf",
+          ext: "pdf",
+          isPdf: true,
+          isSelected: false,
+          progress: 0,
+          status: "Queued"
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "Chapter_01_Assignment_Questions.pdf",
+          size: 1845120,
+          type: "application/pdf",
+          ext: "pdf",
+          isPdf: true,
+          isSelected: false,
+          progress: 0,
+          status: "Queued"
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "Neural_Network_Dataset_Examples.xlsx",
+          size: 832410,
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          ext: "xlsx",
+          isPdf: false,
+          isSelected: false,
+          progress: 0,
+          status: "Queued"
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "PyTorch_Installation_Guide.docx",
+          size: 1245000,
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ext: "docx",
+          isPdf: false,
+          isSelected: false,
+          progress: 0,
+          status: "Queued"
+        },
+        {
+          id: crypto.randomUUID(),
+          name: "Source_Code_Archive.zip",
+          size: 12582912,
+          type: "application/zip",
+          ext: "zip",
+          isPdf: false,
+          isSelected: false,
+          progress: 0,
+          status: "Queued"
+        }
+      ],
+
+      // Configuration Settings
+      pdfSettings: {
+        showInPdfViewer: true,  // DEFAULT: ENABLED
+        allowDownload: false,    // DEFAULT: UNCHECKED / CONFIGURABLE
+        enableAiAssistant: false,
+        allowFreePreview: false,
+        scheduleType: "immediately",
+        batches: ["1", "2"]
+      },
+
+      isSelectAllChecked: false,
+      error: null,
+      uploadStarted: false,
+      isAllUploaded: false,
+
+      // Getters
+      get hasPdf() {
+        return this.assets.some(asset => asset.isPdf);
+      },
+      get hasNonPdf() {
+        return this.assets.some(asset => !asset.isPdf);
+      },
+      get pdfCount() {
+        return this.assets.filter(asset => asset.isPdf).length;
+      },
+      get nonPdfCount() {
+        return this.assets.filter(asset => !asset.isPdf).length;
+      },
+      get completedCount() {
+        return this.assets.filter(asset => asset.status === 'Completed').length;
+      },
+      get failedCount() {
+        return this.assets.filter(asset => asset.status === 'Error').length;
+      },
+      get isAllCompleted() {
+        return this.assets.length > 0 && this.assets.every(asset => asset.status === 'Completed');
+      },
+
+      // File Selection Handler
+      selectFile(evt) {
+        evt.preventDefault();
+        const files = evt.dataTransfer ? [...evt.dataTransfer.files] : [...evt.target.files];
+
+        if (!files || files.length === 0) return;
+
+        const newObjects = files.map((file) => {
+          const ext = file.name.split('.').pop().toLowerCase();
+          const isPdf = ext === 'pdf' || file.type === 'application/pdf';
+
+          return {
+            id: crypto.randomUUID(),
+            name: file.name,
+            size: file.size,
+            type: file.type || `application/${ext}`,
+            ext: ext,
+            isPdf: isPdf,
+            isSelected: false,
+            progress: 0,
+            status: "Queued"
+          };
+        });
+
+        this.assets = this.assets.concat(newObjects);
+      },
+
+      removeFile(id) {
+        if (this.$refs.assetsInput) this.$refs.assetsInput.value = null;
+        this.assets = this.assets.filter(asset => asset.id !== id);
+      },
+
+      selectAll() {
+        this.assets.forEach(asset => asset.isSelected = true);
+      },
+
+      unSelectAll() {
+        this.assets.forEach(asset => asset.isSelected = false);
+      },
+
+      removeSelected() {
+        this.assets = this.assets.filter(asset => !asset.isSelected);
+        this.isSelectAllChecked = false;
+      },
+
+      preventPageNavigation() {
+        window.onbeforeunload = (event) => {
+          if (this.uploadStarted && !this.isAllUploaded) {
+            event.preventDefault();
+            return "An attachment upload is in progress. Are you sure you want to leave?";
+          }
+        };
+      },
+
+      // Upload Simulation Logic
+      startUpload() {
+        this.preventPageNavigation();
+        this.uploadStarted = true;
+        this.isAllUploaded = false;
+
+        // Reset all assets to Queued initially
+        this.assets.forEach(asset => {
+          asset.status = 'Queued';
+          asset.progress = 0;
+        });
+
+        let currentIdx = 0;
+
+        const processNextFile = () => {
+          if (currentIdx >= this.assets.length) {
+            this.isAllUploaded = true;
+            this.uploadStarted = false;
+            window.onbeforeunload = null;
+            return;
+          }
+
+          const asset = this.assets[currentIdx];
+          asset.status = 'Uploading';
+          asset.progress = 0;
+
+          const fileTimer = setInterval(() => {
+            asset.progress += 25;
+
+            if (asset.progress >= 100) {
+              clearInterval(fileTimer);
+              if (currentIdx === 4 || asset.ext === 'zip') {
+                asset.status = 'Error';
+                asset.progress = 0;
+              } else {
+                asset.status = 'Completed';
+                asset.progress = 100;
+              }
+              currentIdx++;
+              setTimeout(processNextFile, 300);
+            }
+          }, 250);
+        };
+
+        processNextFile();
+      },
+
+      // Retry failed single file upload
+      retryUpload(asset) {
+        const item = this.assets.find(i => i.id === asset.id);
+        if (!item) return;
+
+        item.status = 'Uploading';
+        item.progress = 0;
+        this.uploadStarted = true;
+        this.isAllUploaded = false;
+        this.preventPageNavigation();
+
+        const timer = setInterval(() => {
+          if (item.status === 'Uploading') {
+            item.progress += 25;
+
+            if (item.progress >= 100) {
+              item.status = 'Completed';
+              item.progress = 100;
+              clearInterval(timer);
+              
+              const allDone = this.assets.every(a => a.status === 'Completed');
+              if (allDone) {
+                this.isAllUploaded = true;
+                this.uploadStarted = false;
+                window.onbeforeunload = null;
+              }
+            }
+          }
+        }, 300);
+      },
+
+      resetUpload() {
+        this.uploadStarted = false;
+        this.isAllUploaded = false;
+        this.assets.forEach(item => {
+          item.status = "Queued";
+          item.progress = 0;
+        });
+      },
+
+      humanizeBytes(bytes) {
+        if (!bytes || bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+    };
+  }
+
+</script>
+{% endblock script %}

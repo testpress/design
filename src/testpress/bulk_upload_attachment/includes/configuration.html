@@ -1,0 +1,153 @@
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+{% from "../../../ui-system/components/select.html" import select %}
+{% from "../../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../../ui-system/components/input.html" import input %}
+
+<!-- Step 2: Configure Settings Section -->
+<div data-hs-stepper-content-item='{"index": 2}' class="bg-white dark:bg-neutral-800 border-y sm:border-y sm:border-x border-gray-200 dark:border-neutral-700 shadow-2xs rounded-none sm:rounded-xl p-5 space-y-4">
+  <div class="px-1 sm:px-0 mb-6">
+    <h2 class="text-base font-semibold leading-7 text-gray-900 dark:text-neutral-100">Configure Attachment Settings</h2>
+    <p class="text-sm text-gray-500 dark:text-neutral-400">
+      Configure settings for all selected attachments, as well as PDF-specific access controls.
+    </p>
+  </div>
+
+  <div class="space-y-6">
+    <!-- PART 1: COMMON SETTINGS -->
+
+    <!-- Allow Free Preview Checkbox -->
+    {{ checkbox(
+        name="allow_free_preview",
+        label="Allow free preview",
+        description="If enabled, these attachments can be previewed before purchasing the course.",
+        x_model="pdfSettings.allowFreePreview"
+    ) }}
+
+    <!-- Release Schedule Type & Dynamic Fields -->
+    <div class="grid sm:grid-cols-2" @change="if ($event.target.name === 'release_schedule_type') pdfSettings.scheduleType = $event.target.value;">
+      <!-- Left side: Schedule Type -->
+      <div class="max-w-md">
+        {% set schedule_options = [
+            { "value": "immediately", "label": "Immediately" },
+            { "value": "date", "label": "Specific date & time" },
+            { "value": "days", "label": "Days after enrollment" }
+        ] %}
+        {{ select(
+            name="release_schedule_type",
+            label="Release Schedule Type",
+            options=schedule_options,
+            selected_value="immediately"
+        ) }}
+      </div>
+
+      <!-- Right side: Dynamic Field -->
+      <div class="max-w-md">
+        <!-- Shown when Specific date & time is selected -->
+        <div x-cloak x-show="pdfSettings.scheduleType === 'date'">
+          {{ date_picker(
+              name="start_datetime",
+              label="Start Date & Time",
+              placeholder="Select start date & time",
+              datetime=true
+          ) }}
+        </div>
+
+        <!-- Shown when Days after enrollment is selected -->
+        <div x-cloak x-show="pdfSettings.scheduleType === 'days'">
+          {{ input(
+              name="release_after_days",
+              label="Release After Days",
+              type="number",
+              placeholder="e.g. 7"
+          ) }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Batches Selection -->
+    <div>
+      {% set batch_options = [
+          { "value": "1", "label": "Data Science Morning Batch (Jan 2024)" },
+          { "value": "2", "label": "Weekend Intensive Cohort" },
+          { "value": "3", "label": "Machine Learning Foundations - Evening" },
+          { "value": "4", "label": "Python Bootcamp (Self-Paced)" },
+          { "value": "5", "label": "Advanced Neural Networks Masterclass" }
+      ] %}
+      {{ select(
+          name="batches",
+          label="Select Batches",
+          placeholder="Select batches...",
+          options=batch_options,
+          multiple=true,
+          extra_classes="max-w-md lg:w-1/2",
+          help_text="Only selected batches can access these attachments. Leave empty to allow all course learners."
+      ) }}
+    </div>
+
+    <!-- End Date & Time -->
+    <div class="max-w-md lg:w-1/2">
+      {{ date_picker(
+          name="end_datetime",
+          label="End Date & Time",
+          placeholder="Select end date & time",
+          datetime=true
+      ) }}
+    </div>
+
+    <!-- PART 2: PDF SETTINGS (Shown when hasPdf is true) -->
+    <div x-cloak x-show="hasPdf" class="space-y-6 pt-6 border-t border-gray-200 dark:border-neutral-700" x-transition>
+      <div>
+        <h3 class="text-base font-semibold text-gray-900 dark:text-neutral-100">PDF Settings</h3>
+      </div>
+
+      <!-- PDF Validation Error Alert -->
+      <div x-cloak x-show="!pdfSettings.showInPdfViewer && !pdfSettings.allowDownload" class="rounded-lg bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 p-4" role="alert">
+        <div class="flex">
+          <div class="shrink-0">
+            <svg class="size-5 text-red-600 dark:text-red-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div class="ms-3">
+            <h3 class="text-sm font-semibold text-red-800 dark:text-red-200">
+              Invalid PDF Configuration
+            </h3>
+            <p class="text-xs text-red-700 dark:text-red-300 mt-0.5">
+              For PDF files, at least one of <span class="font-bold">'Show in PDF viewer'</span> or <span class="font-bold">'Allow download'</span> must be enabled.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1. Allow Download -->
+      {{ checkbox(
+          name="allow_download",
+          label="Allow download",
+          description="If enabled, learners can download PDF attachments.",
+          x_model="pdfSettings.allowDownload"
+      ) }}
+
+      <!-- 2. Show in PDF Viewer -->
+      {{ checkbox(
+          name="show_in_pdf_viewer",
+          label="Show in PDF viewer",
+          description="Allows learners to view and read PDF attachments directly in the web reader without downloading.",
+          x_model="pdfSettings.showInPdfViewer"
+      ) }}
+
+      <!-- 3. Enable AI Assistant -->
+      <div :class="{ 'opacity-50': !pdfSettings.showInPdfViewer }">
+        {{ checkbox(
+            name="enable_ai",
+            label="Enable ai assistant",
+            description="Allows learners to ask questions about PDF attachments using the AI assistant.",
+            x_model="pdfSettings.enableAiAssistant",
+            extra_attrs=':disabled="!pdfSettings.showInPdfViewer"'
+        ) }}
+      </div>
+    </div>
+
+  </div>
+</div>
