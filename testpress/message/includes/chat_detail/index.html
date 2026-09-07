@@ -1,0 +1,367 @@
+
+
+<main id="content" class="flex-1 flex flex-col h-full overflow-hidden transition-all duration-300 min-w-0 bg-gray-50 dark:bg-neutral-900">
+
+  <div class="relative flex-1 flex flex-col overflow-hidden">
+    <template x-if="activeChatId !== null">
+      <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Header -->
+    <header class="shrink-0 z-9 py-2 px-2 sm:px-5 flex justify-between items-center bg-white dark:bg-neutral-800 border-b border-gray-200 dark:border-neutral-700 relative">
+      
+      <!-- Mobile back button -->
+      <div class="lg:hidden shrink-0">
+        <button type="button"
+          class="flex justify-center items-center gap-x-1 py-1.5 px-2 min-h-8 text-xs text-gray-600 dark:text-neutral-300 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700"
+          @click="showChatList = true" aria-label="Back to messages">
+          <svg class="shrink-0 size-4 -ml-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          Messages
+        </button>
+      </div>
+
+      <!-- Student info -->
+      <button type="button" class="absolute left-1/2 -translate-x-1/2 lg:static lg:transform-none lg:left-auto flex items-center gap-x-3 w-[50%] lg:w-auto justify-center lg:justify-start text-center lg:text-left transition-colors focus:outline-hidden" @click="$dispatch('open-modal-student-details')">
+        <!-- Avatar -->
+        <span class="lg:block hidden relative shrink-0">
+          <template x-if="activeChat.avatar">
+            <img class="shrink-0 size-8 rounded-full" :src="activeChat.avatar" :alt="activeChat.name">
+          </template>
+          <template x-if="!activeChat.avatar">
+            <span class="flex shrink-0 justify-center items-center size-8 text-xs font-medium uppercase text-white rounded-full"
+              :class="getAvatarColor(activeChat.id)"
+              x-text="activeChat.initials">
+            </span>
+          </template>
+          <span x-show="activeChat.online" class="absolute bottom-0 right-0 block size-2 rounded-full ring-2 ring-white dark:ring-neutral-800 bg-green-500"></span>
+        </span>
+        <!-- Name + status -->
+        <span class="truncate min-w-0">
+          <span class="truncate block font-semibold text-sm leading-4 text-gray-800 dark:text-neutral-200" x-text="activeChat.name"></span>
+          <span class="truncate block text-xs leading-4"
+            :class="activeChat.online ? 'text-primary-600 dark:text-primary-500' : 'text-gray-500 dark:text-neutral-400'"
+            x-text="activeChat.lastSeen">
+          </span>
+        </span>
+      </button>
+
+    </header>
+    <!-- End Header -->
+
+    <!-- Chat Messages -->
+    <div id="chat-scroll-container" class="flex-1 overflow-y-auto overflow-x-hidden [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+      <div class="p-4 space-y-5">
+
+        <!-- Date separator -->
+        <div class="sticky top-0 inset-x-0 z-8 max-w-lg mx-auto text-center">
+          <span class="py-0.5 px-1.5 bg-gray-100 dark:bg-neutral-900 text-xs text-gray-500 dark:text-neutral-400 rounded-full">Today</span>
+        </div>
+
+        <!-- Messages loop -->
+        <div class="w-full space-y-5">
+          <template x-for="msg in activeChat.messages" :key="msg.id">
+            <!-- Single root div required by Alpine x-for -->
+            <div>
+
+              <!-- Student message (incoming) -->
+              <div x-show="msg.from === 'student'" class="max-w-md flex gap-x-2">
+                <!-- Avatar -->
+                <div class="shrink-0 mt-auto">
+                  <img x-show="activeChat.avatar" class="shrink-0 size-8 rounded-full" :src="activeChat.avatar" :alt="activeChat.name">
+                  <span x-show="!activeChat.avatar"
+                    class="flex shrink-0 justify-center items-center size-8 text-xs font-medium uppercase text-white rounded-full"
+                    :class="getAvatarColor(activeChat.id)"
+                    x-text="activeChat.initials ? activeChat.initials.charAt(0) : ''">
+                  </span>
+                </div>
+                <!-- Bubble -->
+                <div>
+                  <p class="mb-1.5 pl-2.5 text-xs text-gray-400 dark:text-neutral-500" x-text="activeChat.name"></p>
+                  <div class="group flex justify-start gap-x-2" style="word-break: break-word;">
+                    <div class="order-1 bg-white dark:bg-neutral-800 shadow-2xs inline-block rounded-xl pt-2 pb-1.5 px-2.5 max-w-xs">
+
+                      <!-- Product card (shown when message has product context) -->
+                      <div x-show="msg.product" class="mb-2">
+                        <a :href="msg.product ? msg.product.url : '#'" target="_blank"
+                          class="block rounded-lg overflow-hidden border border-gray-100 dark:border-neutral-700 hover:border-primary-300 dark:hover:border-primary-700 transition-colors">
+                          <!-- Thumbnail 16:9 -->
+                          <div class="aspect-video w-full overflow-hidden">
+                            <img :src="msg.product ? msg.product.thumbnail : ''"
+                              :alt="msg.product ? msg.product.name : ''"
+                              class="w-full h-full object-cover">
+                          </div>
+                          <!-- Product info -->
+                          <div class="px-2.5 py-2 bg-gray-50 dark:bg-neutral-700/50 flex items-start gap-x-2">
+                            <!-- Left accent bar (primary color) -->
+                            <span class="w-0.5 self-stretch rounded-full bg-primary-600 dark:bg-primary-500 shrink-0 mt-0.5"></span>
+                            <div class="min-w-0 flex-1">
+                              <p class="text-xs font-semibold text-gray-800 dark:text-neutral-200 leading-snug line-clamp-2"
+                                x-text="msg.product ? msg.product.name : ''"></p>
+                              <p class="text-xs text-gray-500 dark:text-neutral-400 mt-0.5"
+                                x-text="msg.product ? msg.product.price : ''"></p>
+                            </div>
+                            <!-- External link icon -->
+                            <svg class="shrink-0 size-3 text-gray-400 dark:text-neutral-500 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                          </div>
+                        </a>
+                      </div>
+
+                      <!-- Message text -->
+                      <div class="text-sm text-gray-800 dark:text-neutral-200">
+                        <span x-text="msg.text"></span>
+                        <span class="ml-1.5 text-[11px] text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Staff message (outgoing) -->
+              <div x-show="msg.from === 'staff'" class="max-w-md ml-auto text-end flex justify-end gap-x-2">
+                <div>
+                  <p class="mb-1.5 pr-2.5 text-xs text-gray-400 dark:text-neutral-500" x-text="msg.author?.name || 'You'"></p>
+                  
+                  <div class="space-y-1">
+                    <div class="group flex justify-end gap-x-2" style="word-break: break-word;">
+                      
+                      <!-- Internal Note -->
+                      <template x-if="msg.isNote">
+                        <div class="order-2 text-start bg-amber-100 dark:bg-amber-900/30 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                          <div class="text-sm text-gray-800 dark:text-neutral-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="lock" aria-hidden="true" class="lucide lucide-lock inline-block shrink-0 size-3 me-1 align-middle -mt-0.5 text-amber-700 dark:text-amber-500"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                            <span x-text="msg.text"></span>
+                            <span>
+                              <span class="ml-1 text-[11px] text-end text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
+                            </span>
+                          </div>
+                        </div>
+                      </template>
+                      
+                      <!-- Regular Message -->
+                      <template x-if="!msg.isNote && !msg.isOffer">
+                        <div class="order-2 text-start bg-primary-100 shadow-2xs dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                          <div class="text-sm text-gray-800 dark:text-neutral-200">
+                            <span x-text="msg.text"></span>
+                            <span class="ml-1.5 text-[11px] text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
+                            <svg class="inline-block shrink-0 size-4 text-gray-400 dark:text-neutral-500 ml-0.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+                          </div>
+                        </div>
+                      </template>
+                      
+                      <!-- Offer Message -->
+                      <template x-if="msg.isOffer">
+                        <div class="order-2 text-start bg-primary-100 shadow-2xs dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5 max-w-sm" x-transition.duration.300ms>
+                          
+                          <div class="text-sm font-medium text-gray-800 dark:text-neutral-200 mb-1">
+                            Special offer for <span x-text="msg.product?.name"></span>
+                          </div>
+
+                          <!-- Product/Offer card matching enquiry style exactly -->
+                          <a :href="msg.product?.url || '#'" target="_blank" class="mb-2 block rounded-lg overflow-hidden border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-sm mt-2 hover:border-primary-300 dark:hover:border-primary-700 transition-colors">
+                            <!-- Thumbnail 16:9 -->
+                            <div class="aspect-video w-full overflow-hidden">
+                              <img :src="msg.product?.thumbnail" :alt="msg.product?.name" class="w-full h-full object-cover">
+                            </div>
+                            <!-- Offer info -->
+                            <div class="px-2.5 py-2 bg-gray-50 dark:bg-neutral-700/50 flex items-start gap-x-2 border-t border-gray-200 dark:border-neutral-700">
+                              <span class="w-0.5 self-stretch rounded-full bg-primary-600 dark:bg-primary-500 shrink-0 mt-0.5"></span>
+                              <div class="min-w-0 flex-1">
+                                <p class="text-xs font-semibold text-gray-800 dark:text-neutral-200 leading-snug line-clamp-2" x-text="msg.product?.name"></p>
+                                <!-- Discount row -->
+                                <div class="mt-1 flex items-center gap-x-1 text-xs">
+                                  <span>🏷️</span> 
+                                  <span class="font-medium text-primary-600 dark:text-primary-500" x-text="msg.offerDetails?.percent"></span>
+                                  <span class="line-through text-gray-400 dark:text-neutral-500 mx-1" x-text="msg.offerDetails?.original"></span>
+                                  <span class="font-semibold text-gray-800 dark:text-neutral-200" x-text="msg.offerDetails?.discounted"></span>
+                                </div>
+                                <p class="text-[10px] text-gray-500 dark:text-neutral-400 mt-0.5" x-text="msg.offerDetails?.valid"></p>
+                              </div>
+                              <!-- External link icon -->
+                              <svg class="shrink-0 size-3 text-gray-400 dark:text-neutral-500 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                            </div>
+                          </a>
+
+                          <div class="text-sm text-gray-800 dark:text-neutral-200">
+                            <span x-text="msg.text"></span>
+                            <span class="ml-1.5 text-[11px] text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
+                            <svg class="inline-block shrink-0 size-4 text-gray-400 dark:text-neutral-500 ml-0.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
+                          </div>
+                          
+                        </div>
+                      </template>
+
+                    </div>
+                  </div>
+                </div>
+                <!-- Avatar -->
+                <div class="shrink-0 mt-auto">
+                  <img class="shrink-0 size-8 rounded-full object-cover" :src="msg.author?.avatar" :alt="msg.author?.name">
+                </div>
+              </div>
+
+            </div>
+          </template>
+        </div>
+        <!-- End Messages loop -->
+
+      </div>
+    </div>
+    <!-- End Chat Messages -->
+
+    <!-- Reply Box -->
+    <footer x-data="{ tab: 'message', textInput: '' }" class="shrink-0 z-10 bg-white dark:bg-neutral-800">
+      <!-- Tab Navigation (Message vs Note) -->
+      <div class="px-4 pt-2">
+        <nav class="flex gap-1 relative" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
+          <button type="button" @click="tab = 'message'; $nextTick(() => document.getElementById('chat-textarea-' + activeChatId)?.focus())" 
+                  class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 focus:text-gray-800 dark:focus:text-neutral-200 after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-gray-100 dark:hover:bg-neutral-700 hover:text-gray-800 dark:hover:text-neutral-200"
+                  :class="tab === 'message' ? 'after:bg-gray-800 dark:after:bg-neutral-200 text-gray-800 dark:text-neutral-200' : 'text-gray-500 dark:text-neutral-400'">
+            Reply
+          </button>
+          <button type="button" @click="tab = 'note'; $nextTick(() => document.getElementById('chat-textarea-' + activeChatId)?.focus())" 
+                  class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 focus:text-gray-800 dark:focus:text-neutral-200 after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-gray-100 dark:hover:bg-neutral-700 hover:text-gray-800 dark:hover:text-neutral-200"
+                  :class="tab === 'note' ? 'after:bg-gray-800 dark:after:bg-neutral-200 text-gray-800 dark:text-neutral-200' : 'text-gray-500 dark:text-neutral-400'">
+            Notes
+          </button>
+        </nav>
+      </div>
+
+      <label :for="'chat-textarea-' + activeChatId" class="sr-only">Message</label>
+      <div class="pb-2 pl-2">
+        <textarea
+          x-model="textInput"
+          @keydown.enter.prevent="if (! $event.shiftKey) { handleSendMessage(tab, textInput); textInput = ''; }"
+          :id="'chat-textarea-' + activeChatId"
+          class="min-h-[67px] max-h-36 pt-4 pb-2 pl-2 pr-4 block w-full bg-white dark:bg-neutral-800 border-transparent rounded-0 md:text-sm leading-4 resize-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-hidden focus:border-transparent focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"
+          :placeholder="tab === 'note' ? 'Write an internal note for your team...' : 'Message ' + activeChat.name"
+          data-hs-textarea-auto-height></textarea>
+
+        <div class="pr-4 flex justify-between items-center gap-x-1">
+          <!-- Left buttons -->
+          <div class="flex items-center gap-x-1">
+            
+            <button type="button" class="flex justify-center items-center gap-x-1.5 size-8 text-sm text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              <span class="sr-only">Attach file</span>
+            </button>
+
+            <!-- Send offer -->
+            
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-xs bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"   x-show="tab !== 'note'" @click="$dispatch('open-modal-send-offer')">
+  
+
+    
+    
+
+    <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg><span>Send offer</span>
+
+    
+
+  
+    </button>
+  
+
+
+
+            <!-- Schedule followup -->
+            
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-xs bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"   x-show="tab !== 'note'" @click="$dispatch(activeChat.followupDue ? 'open-modal-view-followup' : 'open-modal-schedule-followup')">
+  
+
+    
+    
+
+    <svg x-show="!activeChat.followupDue" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="M12 14v4"/><path d="M12 14h-4"/></svg><svg x-show="activeChat.followupDue" style="display: none;" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/></svg><span x-text="activeChat.followupDue ? 'Followup scheduled on ' + (activeChat.followupTime || 'Tomorrow 10:00 AM') : 'Schedule followup'"></span>
+
+    
+
+  
+    </button>
+  
+
+
+          </div>
+
+          <!-- Right buttons -->
+          <div class="flex items-center gap-x-1">
+            <!-- Send -->
+            
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-xs bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:bg-primary-700 dark:focus:ring-offset-neutral-800"   @click="handleSendMessage(tab, textInput); textInput = ''">
+  
+
+    
+    
+
+    <span x-text="tab === 'note' ? 'Add Note' : 'Send'"></span><svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+
+    
+
+  
+    </button>
+  
+
+
+          </div>
+        </div>
+      </div>
+    </footer>
+    <!-- End Reply Box -->
+      </div>
+    </template>
+
+    <!-- Onboarding Empty State -->
+    <template x-if="activeChatId === null">
+      <div class="h-full flex flex-col justify-center items-center text-center p-5 bg-white dark:bg-neutral-800">
+        <svg class="size-16 text-gray-300 dark:text-neutral-600 mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <h2 class="text-xl font-medium text-gray-800 dark:text-neutral-200">Start a conversation</h2>
+        <p class="mt-2 text-sm text-gray-500 dark:text-neutral-400 max-w-sm">Connect with students directly to answer questions, help with products, and provide support.</p>
+        <div class="mt-6">
+          <button type="button" @click="showNewMessage = true" class="py-2.5 px-4 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-primary-600 text-white hover:bg-primary-700 focus:outline-hidden focus:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none">
+            Start a conversation
+          </button>
+        </div>
+      </div>
+    </template>
+
+  </div>
+</main>
