@@ -9,15 +9,371 @@ new_student_page: true
 {% extends "src/testpress/layout/student_layout.html" %}
 {% from "src/ui-system/components/tabs.html" import tabs as ui_tabs %}
 {% from "src/ui-system/components/dropdown.html" import dropdown as ui_dropdown %}
+{% from "src/ui-system/components/modal.html" import modal as ui_modal %}
+{% from "src/ui-system/components/textarea.html" import textarea as ui_textarea %}
+{% from "src/ui-system/components/input.html" import input as ui_input %}
+{% from "src/ui-system/components/tooltip.html" import tooltip as ui_tooltip %}
+{% from "src/ui-system/components/empty-state.html" import empty_state as ui_empty_state %}
 
 {% block main_content %}
 <div class="max-w-7xl mx-auto space-y-5" x-data="{ selectedFilter: 'all', categories: [{% for entry in student_diary.history %}{% if entry.can_student_view %}'{{ entry.category }}',{% endif %}{% endfor %}] }">
   {% include "./includes/student_header.html" %}
-  
+  {% include "./includes/mock_notes.html" %}
+
   {% set notes_content %}
-  <div class="p-8 text-center bg-white border border-gray-200 rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
-    <p class="text-sm text-gray-500 dark:text-neutral-400">My Notes feature coming soon.</p>
+  <div class="grid grid-cols-1 lg:grid-cols-4 lg:gap-8" x-data="{ 
+    selectedNoteFolder: 'all', 
+    mobileNotesFolderOpen: false, 
+    searchQuery: '',
+    notes: window.mockNotes,
+    folders: window.mockNotesFolders,
+    get visibleNotesCount() {
+      return this.filteredNotes.length;
+    },
+    get filteredNotes() {
+      return this.notes.filter(n => {
+        const matchFolder = this.selectedNoteFolder === 'all' || n.folderId === this.selectedNoteFolder;
+        if (!matchFolder) return false;
+        if (!this.searchQuery) return true;
+        const q = this.searchQuery.toLowerCase();
+        return n.title.toLowerCase().includes(q) || n.content.replace(/<[^>]*>?/gm, '').toLowerCase().includes(q);
+      });
+    }
+  }">
+      <!-- Left Side: Folders -->
+      <div class="lg:col-span-1 lg:sticky lg:top-[3.75rem] -mt-5 pt-5 lg:self-start lg:max-h-[calc(100vh-4rem)] z-10 bg-gray-50 dark:bg-neutral-900">
+        <div class="flex flex-col">
+          <!-- Mobile toggle button -->
+      <div class="lg:hidden mb-4">
+        <button @click="mobileNotesFolderOpen = true" type="button" class="py-2 px-3 w-full inline-flex justify-between items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+          <span class="flex items-center gap-x-2">
+            <svg class="shrink-0 size-4 text-emerald-600 dark:text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z"></path></svg>
+            <span x-show="selectedNoteFolder === 'all'">All Notes</span>
+            <span x-show="selectedNoteFolder === 'uncategorized'" x-cloak>Uncategorized</span>
+            <template x-for="folder in folders" :key="folder.id">
+              <span x-show="selectedNoteFolder === folder.id" x-cloak x-text="folder.name"></span>
+            </template>
+          </span>
+          <svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+
+      <!-- Desktop Sidebar -->
+      <aside class="hidden lg:flex lg:flex-col border border-gray-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-800 overflow-hidden lg:max-h-[calc(100vh-4rem)]">
+        <div class="shrink-0 px-4 py-3 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700">
+          <h2 class="text-sm font-semibold text-gray-900 dark:text-neutral-200">Folders</h2>
+          {% call ui_tooltip("New folder") %}
+            <button @click="$dispatch('open-modal-add-folder')" type="button" class="size-6 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-400 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus size-4"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            </button>
+          {% endcall %}
+        </div>
+        <nav aria-label="Directory" class="min-h-0 flex-1 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600 dark:hover:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+          <ul role="list" class="relative z-0 divide-y divide-gray-100 dark:divide-neutral-700">
+            <!-- All Notes -->
+            <li @click="selectedNoteFolder = 'all'" class="relative flex items-center space-x-3 px-4 py-3 cursor-pointer transition-colors duration-150" :class="selectedNoteFolder === 'all' ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-gray-50 dark:hover:bg-neutral-700/50'">
+              <div class="shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6 text-primary-500">
+                  <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z"></path>
+                </svg>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-gray-900 dark:text-neutral-200">All Notes</p>
+                <p class="truncate text-xs text-gray-500 dark:text-neutral-500" x-text="notes.length + ' notes'"></p>
+              </div>
+            </li>
+
+            <!-- Uncategorized -->
+            <li @click="selectedNoteFolder = 'uncategorized'" class="relative flex items-center space-x-3 px-4 py-3 cursor-pointer transition-colors duration-150" :class="selectedNoteFolder === 'uncategorized' ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-gray-50 dark:hover:bg-neutral-700/50'">
+              <div class="shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6 text-gray-400">
+                  <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z"></path>
+                </svg>
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="text-sm font-medium text-gray-900 dark:text-neutral-200">Uncategorized</p>
+                <p class="truncate text-xs text-gray-500 dark:text-neutral-500" x-text="notes.filter(n => n.folderId === 'uncategorized').length + ' notes'"></p>
+              </div>
+            </li>
+
+            <!-- Dynamic Folders -->
+            <template x-for="folder in folders" :key="folder.id">
+              <li @click="selectedNoteFolder = folder.id" class="relative flex items-center space-x-3 px-4 py-3 cursor-pointer transition-colors duration-150" :class="selectedNoteFolder === folder.id ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-gray-50 dark:hover:bg-neutral-700/50'">
+                <div class="shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-6 text-yellow-500/80">
+                    <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z"></path>
+                  </svg>
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-medium text-gray-900 dark:text-neutral-200 line-clamp-1" x-text="folder.name"></p>
+                  <p class="truncate text-xs text-gray-500 dark:text-neutral-500" x-text="notes.filter(n => n.folderId === folder.id).length + ' notes'"></p>
+                </div>
+                <!-- Folder Actions Dropdown -->
+                <div class="hs-dropdown [--placement:bottom-right] relative inline-flex" @click.stop>
+                  <button :id="'hs-pro-fldmd-' + folder.id" type="button" class="size-7 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-800 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-800">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="8" r="1"></circle>
+                      <circle cx="12" cy="16" r="1"></circle>
+                    </svg>
+                  </button>
+                  <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-32 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-900 dark:border-neutral-800" role="menu" aria-orientation="vertical" :aria-labelledby="'hs-pro-fldmd-' + folder.id">
+                    <div class="p-1 space-y-0.5">
+                      <button @click="$dispatch('open-modal-rename-folder')" type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                        Rename
+                      </button>
+                      <button @click="$dispatch('open-modal-delete-folder')" type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            </template>
+          </ul>
+        </nav>
+        </div>
+      </div>
+
+    <!-- Right Side: Notes Feed -->
+    <div class="lg:col-span-3 flex flex-col gap-4">
+      <div class="sticky top-[3.75rem] -mt-5 pt-5 z-10 bg-gray-50 dark:bg-neutral-900" x-cloak x-show="visibleNotesCount > 0">
+        <div class="p-4 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-xs rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <h2 class="text-lg font-semibold text-gray-800 dark:text-neutral-200 sm:hidden">My Notes</h2>
+          
+          <!-- Search Input -->
+        <div class="flex items-center gap-x-2 w-full sm:max-w-sm">
+          <div class="relative w-full">
+            <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-3.5">
+              <svg class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
+            <input x-model="searchQuery" type="text" class="py-2 ps-10 pe-3 block w-full bg-white border-gray-200 rounded-lg text-sm focus:border-emerald-500 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500" placeholder="Search notes...">
+          </div>
+        </div>
+
+        <button type="button" @click="$dispatch('open-modal-add-note')" class="inline-flex justify-center items-center gap-x-1.5 py-2 px-3 text-sm font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 dark:focus:bg-emerald-600 whitespace-nowrap">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-4">
+            <path d="M5 12h14"></path>
+            <path d="M12 5v14"></path>
+          </svg>
+          <span>Add Notes</span>
+        </button>
+        </div>
+      </div>
+
+      <!-- Feed Container -->
+      <div class="flex flex-col gap-4" x-cloak x-show="visibleNotesCount > 0">
+        <template x-for="note in filteredNotes" :key="note.id">
+          <div class="p-5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xs"
+               x-transition>
+            <!-- Header -->
+            <div class="flex items-start justify-between mb-2">
+              <h3 class="text-base font-medium text-gray-900 dark:text-neutral-200 line-clamp-1 pe-4" x-text="note.title" :title="note.title"></h3>
+              
+              <!-- Action Dropdown -->
+              <div class="hs-dropdown [--placement:bottom-right] relative inline-flex shrink-0 -me-2 -mt-1">
+                <button type="button" class="relative flex items-center rounded-full p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none">
+                  <span class="absolute -inset-1"></span>
+                  <span class="sr-only">Open options</span>
+                  <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11.5 15.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0z"></path>
+                  </svg>
+                </button>
+                <div class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-48 bg-white shadow-md rounded-lg p-2 mt-2 dark:bg-neutral-800 dark:border dark:border-neutral-700 z-[60]">
+                  <a class="flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700" href="#">
+                    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v10"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10.4 12.6a2 2 0 1 1 3 3L8 21l-4 1-1-4Z"/></svg>
+                    Edit
+                  </a>
+                  
+                  <!-- Move to Folder Sub-menu -->
+                  <div class="hs-dropdown [--strategy:static] md:[--strategy:absolute] [--adaptive:none] md:[--trigger:hover] [--placement:left-top] relative" x-data="{ folderSearch: '' }">
+                    <button type="button" class="hs-dropdown-toggle group w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-700">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder size-4 shrink-0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                      Move to Folder
+                      <svg class="ms-auto size-3 text-gray-400 rotate-90 md:rotate-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+  
+                    <div class="hs-dropdown-menu transition-[opacity,margin] duration-[0.1ms] md:duration-[150ms] hs-dropdown-open:opacity-100 opacity-0 md:w-56 hidden z-[70] top-0 end-full md:me-3 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-800 shadow-xl rounded-xl" role="menu" @click.stop>
+                      <div class="p-2 border-b border-gray-200 dark:border-neutral-800">
+                        <div class="relative">
+                          <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                            <svg class="shrink-0 size-3.5 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                          </div>
+                          <input x-model="folderSearch" type="text" class="py-1.5 ps-9 block w-full border-gray-200 rounded-lg text-xs focus:border-emerald-500 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500" placeholder="Search folder...">
+                        </div>
+                      </div>
+                      <div class="max-h-48 overflow-y-auto p-1 space-y-0.5 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600 dark:hover:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                        <button type="button" x-show="note.folderId !== 'uncategorized'" class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
+                          <span>Uncategorized</span>
+                        </button>
+                        <template x-for="folder in folders" :key="folder.id">
+                          <button 
+                            type="button"
+                            x-show="note.folderId !== folder.id && (!folderSearch || folder.name.toLowerCase().includes(folderSearch.toLowerCase()))"
+                            class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
+                            <span x-text="folder.name"></span>
+                          </button>
+                        </template>
+                      </div>
+                    </div>
+                  </div>
+
+                <a class="flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-red-600 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-red-500 dark:hover:bg-neutral-700 dark:hover:text-red-400 dark:focus:bg-neutral-700" href="#">
+                  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                  Delete
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Content Preview -->
+          <div class="mt-2 space-y-4 text-sm text-gray-700 dark:text-neutral-300 mb-4">
+            <div class="line-clamp-2">
+              <div class="prose prose-sm max-w-none dark:prose-invert" x-html="note.content"></div>
+            </div>
+          </div>
+
+          <!-- Meta -->
+          <div class="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-neutral-400 mt-auto">
+            <div class="flex items-center">
+              <button type="button" @click="selectedNoteFolder = note.folderId" x-cloak x-show="selectedNoteFolder === 'all' && note.folderId !== 'uncategorized'" class="inline-flex items-center gap-x-1.5 font-medium text-gray-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400 transition-colors focus:outline-none group">
+                <svg class="shrink-0 size-4 text-yellow-500/80" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z"></path>
+                </svg>
+                <span class="group-hover:underline" x-text="note.folderName"></span>
+              </button>
+            </div>
+            <span x-text="'Updated ' + note.date"></span>
+          </div>
+        </div>
+        </template>
+      </div>
+
+      <!-- Empty State -->
+      <div x-cloak x-show="visibleNotesCount === 0">
+        {{ ui_empty_state(
+          title="No notes in this folder yet",
+          description="Create a note to keep your study notes organized.",
+          icon="folder-open",
+          primary_action_text="Add note",
+          primary_action_icon="plus",
+          primary_action_attrs='@click="$dispatch(\'open-modal-add-note\')"'
+        ) }}
+      </div>
+    </div>
+
+    <!-- Mobile Folders Drawer -->
+    <div x-show="mobileNotesFolderOpen" x-cloak
+         class="fixed inset-0 z-[100] lg:hidden" role="dialog" aria-modal="true">
+      <div x-show="mobileNotesFolderOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0"
+           x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-200"
+           x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0" @click="mobileNotesFolderOpen = false"
+           class="fixed inset-0 bg-gray-900/50 transition-opacity"></div>
+      
+      <div x-show="mobileNotesFolderOpen" x-transition:enter="transform transition ease-in-out duration-300"
+           x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0"
+           x-transition:leave="transform transition ease-in-out duration-300" x-transition:leave-start="translate-x-0"
+           x-transition:leave-end="-translate-x-full"
+           class="fixed inset-y-0 start-0 flex max-w-xs w-full bg-white shadow-xl dark:bg-neutral-900">
+        <div class="flex flex-col h-full w-full bg-white dark:bg-neutral-900 overflow-hidden">
+          <div class="shrink-0 py-3 px-4 flex justify-between items-center border-b border-gray-200 dark:border-neutral-800">
+            <h3 class="font-medium text-gray-800 dark:text-neutral-200">Folders</h3>
+            <button @click="mobileNotesFolderOpen = false" type="button"
+                    class="p-1 inline-flex justify-center items-center rounded-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+          <div class="flex-1 min-h-0 flex flex-col overflow-y-auto">
+            <ul role="list" class="divide-y divide-gray-100 dark:divide-neutral-800">
+              <li @click="selectedNoteFolder = 'all'; mobileNotesFolderOpen = false" class="flex items-center px-4 py-4 cursor-pointer" :class="selectedNoteFolder === 'all' ? 'bg-primary-50 dark:bg-primary-500/10' : ''">
+                <span class="text-sm font-medium" :class="selectedNoteFolder === 'all' ? 'text-primary-700 dark:text-primary-400' : 'text-gray-900 dark:text-neutral-200'">All Notes</span>
+              </li>
+              <li @click="selectedNoteFolder = 'uncategorized'; mobileNotesFolderOpen = false" class="flex items-center px-4 py-4 cursor-pointer" :class="selectedNoteFolder === 'uncategorized' ? 'bg-primary-50 dark:bg-primary-500/10' : ''">
+                <span class="text-sm font-medium" :class="selectedNoteFolder === 'uncategorized' ? 'text-primary-700 dark:text-primary-400' : 'text-gray-900 dark:text-neutral-200'">Uncategorized</span>
+              </li>
+              <template x-for="folder in folders" :key="folder.id">
+                <li @click="selectedNoteFolder = folder.id; mobileNotesFolderOpen = false" class="flex items-center px-4 py-4 cursor-pointer" :class="selectedNoteFolder === folder.id ? 'bg-primary-50 dark:bg-primary-500/10' : ''">
+                  <span class="text-sm font-medium" :class="selectedNoteFolder === folder.id ? 'text-primary-700 dark:text-primary-400' : 'text-gray-900 dark:text-neutral-200'" x-text="folder.name"></span>
+                </li>
+              </template>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Add Note Modal -->
+  {% call ui_modal(id="add-note", title="Add Notes", confirm_text="Save Note", confirm_classes="bg-emerald-600 text-white hover:bg-emerald-700", size="xl") %}
+    <form class="space-y-4 pt-2 text-start">
+      {{ ui_input(name="note_title", label="Note Title", placeholder="Enter the title of your note") }}
+      
+      <div>
+        <label class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Description</label>
+        <div class="bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl overflow-hidden">
+          <div class="tiptap-editor-container">
+            <div class="sticky top-0 bg-white dark:bg-neutral-800 flex flex-wrap align-middle gap-x-0.5 border-b border-gray-200 dark:border-neutral-700 p-2">
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-bold>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 12a4 4 0 0 0 0-8H6v8"/><path d="M15 20a4 4 0 0 0 0-8H6v8Z"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-italic>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-underline>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4v6a6 6 0 0 0 12 0V4"/><line x1="4" x2="20" y1="20" y2="20"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-strike>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4H9a3 3 0 0 0-2.83 4"/><path d="M14 12a4 4 0 0 1 0 8H6"/><line x1="4" x2="20" y1="12" y2="12"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-image>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-attachment>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              </button>
+              <input type="file" class="hidden hs-editor-tiptap-file-input" accept="image/*">
+              <input type="file" class="hidden hs-editor-tiptap-attachment-input">
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-ol>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" x2="21" y1="6" y2="6"/><line x1="10" x2="21" y1="12" y2="12"/><line x1="10" x2="21" y1="18" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-ul>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-blockquote>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 6H3"/><path d="M21 12H8"/><path d="M21 18H8"/><path d="M3 12v6"/></svg>
+              </button>
+              <button class="size-8 inline-flex justify-center items-center gap-x-2 text-sm font-semibold rounded-full text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" type="button" data-hs-editor-code>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 16 4-4-4-4"/><path d="m6 8-4 4 4 4"/><path d="m14.5 4-5 16"/></svg>
+              </button>
+            </div>
+            <div class="h-60 overflow-auto p-4 [&_.ProseMirror]:min-h-full [&_.ProseMirror]:outline-none" data-hs-editor-field></div>
+            <div class="hidden" data-hs-editor-content></div>
+          </div>
+        </div>
+      </div>
+    </form>
+  {% endcall %}
+
+
+  <!-- Add Folder Modal -->
+  {% call ui_modal(id="add-folder", title="New Folder", confirm_text="Create", confirm_classes="bg-emerald-600 text-white hover:bg-emerald-700") %}
+    <form class="space-y-4 pt-2 text-start">
+      {{ ui_input(name="folder_name", label="Folder Name", placeholder="e.g. Physics", help_text="Pick a name to help organize your notes.") }}
+    </form>
+  {% endcall %}
+
+  <!-- Rename Folder Modal -->
+  {% call ui_modal(id="rename-folder", title="Rename Folder", confirm_text="Save", confirm_classes="bg-emerald-600 text-white hover:bg-emerald-700") %}
+    <form class="space-y-4 pt-2 text-start">
+      {{ ui_input(name="folder_name", label="Folder Name", value="Physics 101", placeholder="Enter new folder name") }}
+    </form>
+  {% endcall %}
+
+  <!-- Delete Folder Modal -->
+  {% call ui_modal(id="delete-folder", title="Delete Folder", confirm_text="Delete", confirm_classes="bg-red-600 text-white hover:bg-red-700") %}
+    <div class="pt-2 text-start">
+      <p class="text-sm text-gray-600 dark:text-neutral-400">Are you sure you want to delete this folder? All notes inside will be moved to Uncategorized.</p>
+    </div>
+  {% endcall %}
   {% endset %}
 
   {% set shared_content %}
@@ -117,9 +473,11 @@ new_student_page: true
       {'key': 'notes', 'label': 'My Notes', 'content': notes_content},
       {'key': 'shared', 'label': 'Shared with Me', 'content': shared_content}
     ],
-    active_tab='shared',
-    id='student-diary-tabs'
+    active_tab='notes',
+    id='student-diary-tabs',
+    content_class=""
   ) }}
 
+  {% include "./includes/text_editor_script.html" %}
 </div>
 {% endblock main_content %}
