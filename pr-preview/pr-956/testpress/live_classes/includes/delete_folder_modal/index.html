@@ -1,0 +1,1315 @@
+
+
+
+
+<div x-data="{
+    folderId: '',
+    folderName: '',
+    count: 0,
+    subCount: 0,
+    action: 'uncategorized', // 'uncategorized', 'move', 'delete'
+    destFolderId: '',
+    
+    get isEmpty() {
+        return this.count === 0 && this.subCount === 0;
+    },
+
+    openModal(e) {
+        this.folderId = e.detail.id;
+        this.folderName = e.detail.name || '';
+        this.count = parseInt(e.detail.count) || 0;
+        this.subCount = parseInt(e.detail.subCount) || 0;
+        this.action = 'uncategorized';
+        this.destFolderId = '';
+        this.$dispatch('open-modal-delete-folder-modal');
+    },
+
+    submitDelete() {
+        if (!this.folderId) return;
+        
+        if (!this.isEmpty && this.action === 'move') {
+            const input = document.querySelector('input[name=\'destination_folder_delete\']');
+            this.destFolderId = input ? input.value : '';
+            if (!this.destFolderId) return; // Prevent if no destination
+        }
+        
+        // Dispatch delete event to root component
+        this.$dispatch('execute-delete-folder', {
+            id: this.folderId,
+            name: this.folderName,
+            action: this.isEmpty ? 'delete' : this.action,
+            destFolderId: this.destFolderId
+        });
+        
+        this.$dispatch('close-modal-delete-folder-modal');
+    }
+}" @open-modal-delete-folder.window="openModal($event)">
+
+    
+
+
+
+<div x-data="{ 
+       open: false,
+       toggle() { this.open = !this.open; },
+       init() {
+         this.$watch('open', value => {
+           if (value) {
+             document.body.classList.add('overflow-hidden');
+             this.$nextTick(() => {
+               if (this.$refs.closeBtn) this.$refs.closeBtn.focus();
+               if (window.lucide) { window.lucide.createIcons(); }
+             });
+           } else {
+             document.body.classList.remove('overflow-hidden');
+           }
+         });
+       }
+     }"
+     @open-modal-delete-folder-modal.window="open = true"
+     @close-modal-delete-folder-modal.window="open = false"
+     class="inline-block">
+
+  
+  
+
+  
+  <div x-show="open"
+       x-cloak
+       class="fixed inset-0 z-[10000] overflow-y-auto"
+       role="dialog"
+       aria-modal="true"
+       aria-labelledby="modal-title-delete-folder-modal">
+    
+    
+    <div x-show="open"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @click="open = false"
+         class="fixed inset-0 bg-neutral-900/50 dark:bg-neutral-900/80 backdrop-blur-sm"></div>
+
+    
+    <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
+      
+      
+      <div x-show="open"
+           x-transition:enter="transition ease-out duration-300"
+           x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+           x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+           x-transition:leave="transition ease-in duration-200"
+           x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
+           x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+           @keydown.escape.window="open = false"
+           class="relative overflow-hidden rounded-xl bg-white dark:bg-neutral-800 text-start shadow-xl sm:my-8 w-full sm:max-w-md border border-gray-200 dark:border-neutral-700 flex flex-col max-h-[90vh]">
+        
+        
+        <div class="py-2.5 px-4 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700">
+          <div>
+            <h2 id="modal-title-delete-folder-modal" class="font-semibold text-gray-800 dark:text-neutral-200 text-sm sm:text-base">
+              Delete Folder?
+            </h2>
+            
+          </div>
+          <button x-ref="closeBtn" type="button" @click="open = false" class="size-8 shrink-0 flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-50 dark:bg-neutral-800 text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700" aria-label="Close">
+            <span class="sr-only">Close</span>
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+
+        
+        <div class="overflow-y-auto p-5 flex-1 min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500 text-sm text-gray-700 dark:text-neutral-300">
+          
+        
+        <div class="text-sm text-gray-600 dark:text-neutral-400">
+            <!-- Empty state -->
+            <template x-if="isEmpty">
+                <div>
+                    <p>"<span class="font-medium text-gray-800 dark:text-neutral-200" x-text="folderName"></span>" is empty.</p>
+                    <p class="mt-2">Are you sure you want to delete this folder?</p>
+                </div>
+            </template>
+
+            <!-- Not empty state -->
+            <template x-if="!isEmpty">
+                <div class="space-y-4">
+                    <p>"<span class="font-medium text-gray-800 dark:text-neutral-200" x-text="folderName"></span>" contains <span x-text="count"></span> PDFs. Choose what to do before deleting them.</p>
+
+                    <div class="space-y-4">
+                        <div>
+                            
+
+
+  
+    
+  
+
+
+
+<div class="relative">
+  <div class="flex gap-3">
+    <div class="flex h-6 shrink-0 items-center">
+      <input 
+        id="folder_action-move" 
+        name="folder_action" 
+        type="radio" 
+        class="shrink-0 size-4 mt-0.5 bg-transparent border-gray-300 dark:border-neutral-600 rounded-full shadow-2xs text-primary-600 dark:text-primary-500 focus:ring-0 focus:ring-offset-0 checked:bg-primary-600 dark:checked:bg-primary-500 checked:border-primary-600 dark:checked:border-primary-500 disabled:opacity-50 disabled:pointer-events-none  "
+        value="move"
+        
+        
+        
+        x-model="action"
+        
+        >
+    </div>
+    
+    
+      <div class="text-sm/6">
+        
+          <label for="folder_action-move" class="font-medium text-gray-800 dark:text-neutral-200">
+            Move everything to another folder
+          </label>
+        
+        
+      </div>
+    
+  </div>
+
+  
+</div>
+
+
+                            
+                            <div x-show="action === 'move'" x-collapse>
+                                <div class="mt-2 pl-7">
+                                    
+<div class="space-y-2" x-data="{
+    open: false,
+    searchQuery: '',
+    selectedFolderId: '',
+    selectedFolderName: '',
+    expandedFolders: [],
+    top: 'auto',
+    bottom: 'auto',
+    left: 0,
+    width: 0,
+    placement: 'bottom',
+    
+    toggleFolder(id) {
+        if (this.expandedFolders.includes(id)) {
+            this.expandedFolders = this.expandedFolders.filter(f => f !== id);
+        } else {
+            this.expandedFolders.push(id);
+        }
+    },
+    selectFolder(id, name) {
+        this.selectedFolderId = id;
+        this.selectedFolderName = name;
+        this.open = false;
+    },
+    updatePosition() {
+        const toggle = this.$refs.toggle;
+        const dropdown = this.$refs.dropdown;
+        if (!toggle || !dropdown) return;
+        
+        const r = toggle.getBoundingClientRect();
+        
+        const wasHidden = dropdown.style.display === 'none' || getComputedStyle(dropdown).display === 'none';
+        if (wasHidden) dropdown.style.setProperty('display', 'block', 'important');
+        const dropH = dropdown.offsetHeight || 280;
+        if (wasHidden) dropdown.style.removeProperty('display');
+        
+        const gap = 4;
+        const spaceBelow = window.innerHeight - r.bottom;
+        if (spaceBelow < dropH + gap && r.top > dropH + gap) {
+            this.placement = 'top';
+            this.top = 'auto';
+            this.bottom = window.innerHeight - r.top + gap;
+        } else {
+            this.placement = 'bottom';
+            this.top = r.bottom + gap;
+            this.bottom = 'auto';
+        }
+        
+        this.left = r.left;
+        this.width = r.width;
+    }
+}" @click.outside="open = false" @scroll.window.capture.passive="if(open) updatePosition()" @resize.window.passive="if(open) updatePosition()">
+    
+    
+    
+    <input type="hidden" name="destination_folder_delete" x-model="selectedFolderId">
+
+    <div class="relative">
+        <!-- Toggle -->
+        <div x-ref="toggle" @click="open = !open; if(open) $nextTick(() => updatePosition())" 
+             class="relative flex items-center justify-between w-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm text-gray-800 dark:text-white focus-within:border-primary-700 focus-within:ring-primary-700 py-2 sm:py-2.5 px-3 pe-12 hover:bg-gray-50 dark:hover:bg-neutral-700 transition-colors duration-200 cursor-pointer text-start">
+             
+            <span x-show="selectedFolderName" x-text="selectedFolderName" class="truncate pe-2"></span>
+            <span x-show="!selectedFolderName" class="text-gray-500 dark:text-neutral-400 truncate">Select Folder...</span>
+            
+            <div class="absolute top-1/2 end-3 -translate-y-1/2 flex items-center gap-1">
+                <!-- Clear Selection Button -->
+                <button type="button" x-show="selectedFolderId !== ''" @click.stop="selectFolder('', '')" class="text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300 focus:outline-none transition-colors" aria-label="Clear selection">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                </button>
+                <!-- Chevron -->
+                <svg class="w-4 h-4 text-gray-500 dark:text-neutral-400 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+        </div>
+
+        <!-- Dropdown -->
+        <div x-show="open" x-cloak 
+             x-ref="dropdown"
+             x-transition:enter="transition ease-out duration-100"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-75"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', width: width + 'px' }"
+             class="fixed z-[10000] mt-0 max-h-72 p-1 space-y-0.5 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-xl overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+             
+            <!-- Search -->
+            <div class="p-2 sticky top-0 bg-white dark:bg-neutral-900 z-10 border-b border-gray-100 dark:border-neutral-800 -mx-1 -mt-1 mb-1">
+                <div class="relative">
+                    <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+                        <svg class="w-4 h-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    </div>
+                    <input type="text" x-model="searchQuery" placeholder="Search folders..." class="py-2 px-3 ps-9 block w-full bg-transparent border-gray-200 dark:border-neutral-700 rounded-lg text-sm focus:border-primary-700 focus:ring-primary-700 dark:text-neutral-200">
+                </div>
+            </div>
+
+            <div class="py-1 flex flex-col gap-y-0.5">
+                
+                    <div x-data="{
+                        folder: {
+                            id: '1', 
+                            name: 'Biology 101', 
+                            hasSub: true,
+                            subfolders: [
+                                
+                                    { id: '1-1', name: 'Botany' },
+                                
+                                    { id: '1-2', name: 'Zoology' }
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '2', 
+                            name: 'Physics Formulas', 
+                            hasSub: true,
+                            subfolders: [
+                                
+                                    { id: '2-1', name: 'Kinematics' },
+                                
+                                    { id: '2-2', name: 'Thermodynamics' }
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '3', 
+                            name: 'Chemistry Basics', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '4', 
+                            name: 'Mathematics', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '5', 
+                            name: 'History - World War II', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '6', 
+                            name: 'Geography', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '7', 
+                            name: 'Literature', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '8', 
+                            name: 'Computer Science', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '9', 
+                            name: 'Economics', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '10', 
+                            name: 'Psychology', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '11', 
+                            name: 'Sociology', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '12', 
+                            name: 'Philosophy', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '13', 
+                            name: 'Political Science', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '14', 
+                            name: 'Art History', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+                    <div x-data="{
+                        folder: {
+                            id: '15', 
+                            name: 'Music Theory', 
+                            hasSub: false,
+                            subfolders: [
+                                
+                            ]
+                        },
+                        get isVisible() {
+                            if (!searchQuery) return true;
+                            const q = searchQuery.toLowerCase();
+                            if (this.folder.name.toLowerCase().includes(q)) return true;
+                            return this.folder.subfolders.some(s => s.name.toLowerCase().includes(q));
+                        }
+                    }" x-show="isVisible">
+                        
+                        <!-- Parent Row -->
+                        <button type="button" 
+                                @click="folder.hasSub ? toggleFolder(folder.id) : selectFolder(folder.id, folder.name)"
+                                class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                :class="selectedFolderId === folder.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder" class="size-4 text-gray-400"></i>
+                                <span x-text="folder.name"></span>
+                            </div>
+                            <template x-if="folder.hasSub">
+                                <svg class="w-4 h-4 text-gray-400 transition-transform duration-200" :class="expandedFolders.includes(folder.id) ? 'rotate-90' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            </template>
+                            <template x-if="!folder.hasSub && selectedFolderId === folder.id">
+                                <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                            </template>
+                        </button>
+                        
+                        <!-- Subfolders Tree -->
+                        <div x-show="folder.hasSub && (expandedFolders.includes(folder.id) || searchQuery)" x-collapse>
+                            <div class="ms-6 mt-1 border-s-2 border-gray-100 dark:border-neutral-700 flex flex-col gap-y-0.5 ps-2">
+                                <template x-for="sub in folder.subfolders" :key="sub.id">
+                                    <button type="button" 
+                                            x-show="!searchQuery || sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || folder.name.toLowerCase().includes(searchQuery.toLowerCase())"
+                                            @click="selectFolder(sub.id, folder.name + ' / ' + sub.name)"
+                                            class="flex items-center justify-between py-2 px-4 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer rounded-lg focus:outline-none hover:bg-gray-50 dark:hover:bg-neutral-800/50"
+                                            :class="selectedFolderId === sub.id ? 'bg-gray-100 dark:bg-neutral-800 font-medium' : ''">
+                                        <div class="flex items-center gap-2">
+                                            <i data-lucide="corner-down-right" class="size-3.5 text-gray-400"></i>
+                                            <span x-text="sub.name"></span>
+                                        </div>
+                                        <template x-if="selectedFolderId === sub.id">
+                                            <svg class="shrink-0 w-4 h-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                                        </template>
+                                    </button>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                
+            </div>
+        </div>
+    </div>
+    
+    
+</div>
+
+                                </div>
+                            </div>
+                        </div>
+
+                        
+
+
+  
+    
+  
+
+
+
+<div class="relative">
+  <div class="flex gap-3">
+    <div class="flex h-6 shrink-0 items-center">
+      <input 
+        id="folder_action-uncategorized" 
+        name="folder_action" 
+        type="radio" 
+        class="shrink-0 size-4 mt-0.5 bg-transparent border-gray-300 dark:border-neutral-600 rounded-full shadow-2xs text-primary-600 dark:text-primary-500 focus:ring-0 focus:ring-offset-0 checked:bg-primary-600 dark:checked:bg-primary-500 checked:border-primary-600 dark:checked:border-primary-500 disabled:opacity-50 disabled:pointer-events-none  "
+        value="uncategorized"
+        
+        
+        
+        x-model="action"
+        
+        >
+    </div>
+    
+    
+      <div class="text-sm/6">
+        
+          <label for="folder_action-uncategorized" class="font-medium text-gray-800 dark:text-neutral-200">
+            Move PDFs to Uncategorized
+          </label>
+        
+        
+      </div>
+    
+  </div>
+
+  
+</div>
+
+
+
+                        
+
+
+  
+    
+  
+
+
+
+<div class="relative">
+  <div class="flex gap-3">
+    <div class="flex h-6 shrink-0 items-center">
+      <input 
+        id="folder_action-delete" 
+        name="folder_action" 
+        type="radio" 
+        class="shrink-0 size-4 mt-0.5 bg-transparent border-gray-300 dark:border-neutral-600 rounded-full shadow-2xs text-primary-600 dark:text-primary-500 focus:ring-0 focus:ring-offset-0 checked:bg-primary-600 dark:checked:bg-primary-500 checked:border-primary-600 dark:checked:border-primary-500 disabled:opacity-50 disabled:pointer-events-none  "
+        value="delete"
+        
+        
+        
+        x-model="action"
+        
+        >
+    </div>
+    
+    
+      <div class="text-sm/6">
+        
+          <label for="folder_action-delete" class="font-medium text-gray-800 dark:text-neutral-200">
+            Permanently delete the folder including all PDFs in it.
+          </label>
+        
+        
+      </div>
+    
+  </div>
+
+  
+</div>
+
+
+                    </div>
+                </div>
+            </template>
+        </div>
+        
+    
+        </div>
+
+        
+        
+          <div class="p-4 flex justify-end gap-x-2">
+            
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-white border border-gray-200 text-gray-800 hover:bg-gray-50 focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"   @click="open = false">
+  
+
+    
+    
+
+    Cancel
+
+    
+
+  
+    </button>
+  
+
+
+            
+            
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-red-500 border border-transparent text-white hover:bg-red-600 focus:bg-red-600 dark:focus:ring-offset-neutral-800"   @click="$dispatch('modal-confirmed-delete-folder-modal'); open = false" :disabled='!isEmpty && action === "move" && !destFolderId' @click='submitDelete()'>
+  
+
+    
+    
+
+    Delete Folder
+
+    
+
+  
+    </button>
+  
+
+
+            
+          </div>
+        
+
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
