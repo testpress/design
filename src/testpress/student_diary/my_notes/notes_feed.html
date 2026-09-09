@@ -19,6 +19,41 @@
             <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
           </button>
         </div>
+        <!-- Tag Filter Dropdown -->
+        <div class="relative shrink-0 z-20" x-show="allTags.length > 0">
+          {% set filter_trigger %}
+            <button type="button" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              Tags
+              <span x-show="selectedTags.length > 0" x-text="selectedTags.length" class="inline-block font-medium text-[10px] py-0.5 px-[5px] bg-gray-900 dark:bg-white text-white dark:text-neutral-800 leading-3 rounded-full"></span>
+            </button>
+          {% endset %}
+
+          {% set filter_menu %}
+            <div class="p-1 space-y-0.5 max-h-64 overflow-y-auto">
+              <template x-for="tag in allTags" :key="tag">
+                <label class="flex items-center gap-x-2 py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer">
+                  <input type="checkbox" :value="tag" x-model="selectedTags" class="shrink-0 mt-0.5 border-gray-200 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="tag"></span>
+                </label>
+              </template>
+            </div>
+            <div class="p-2 border-t border-gray-200 dark:border-neutral-700" x-show="selectedTags.length > 0">
+              <button type="button" @click="selectedTags = []; open = false;" class="w-full py-1.5 px-2 inline-flex justify-center items-center gap-x-2 text-xs font-medium rounded-lg border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none dark:bg-white/10 dark:text-white dark:hover:bg-white/20 dark:focus:bg-white/20">
+                Clear filters
+              </button>
+            </div>
+          {% endset %}
+          
+          {% call ui_dropdown(
+            trigger=filter_trigger,
+            placement="bottom-end",
+            width="w-56"
+          ) %}
+            {{ filter_menu | safe }}
+          {% endcall %}
+        </div>
+
         <!-- Sort Dropdown -->
         <div class="relative shrink-0 z-20">
           {% set sort_trigger %}
@@ -134,16 +169,48 @@
         </div>
 
         <!-- Meta -->
-        <div class="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-neutral-400 mt-auto">
-          <div class="flex items-center">
+        <div class="mt-auto">
+          <!-- Tags -->
+          <div class="flex flex-wrap items-center gap-1.5 mb-5" x-show="note.tags && note.tags.length > 0">
+            <template x-for="(tag, index) in (note.tags ? note.tags.slice(0, 3) : [])" :key="tag">
+              <button type="button" 
+                      @click.prevent="selectedTags.includes(tag) ? selectedTags = selectedTags.filter(t => t !== tag) : selectedTags.push(tag)"
+                      class="relative z-10 py-1 px-2.5 inline-flex items-center gap-x-1 text-[11px] rounded-md border text-gray-800 dark:text-white transition-colors cursor-pointer"
+                      :class="selectedTags.includes(tag) ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-800/30 dark:border-emerald-800' : 'bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700'">
+                <span x-text="tag"></span>
+              </button>
+            </template>
+
+            <!-- Dropdown for extra tags -->
+            <div x-show="note.tags && note.tags.length > 3" class="hs-dropdown [--trigger:hover] inline-block relative z-10">
+              <button type="button" class="py-1 px-2.5 inline-flex items-center gap-x-1 text-[11px] rounded-md bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-neutral-700 cursor-pointer" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <span x-text="'+' + (note.tags ? note.tags.length - 3 : 0)"></span>
+              </button>
+              <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 max-w-64 transition-[opacity,margin] duration opacity-0 hidden z-50 p-2 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg" role="menu" aria-orientation="vertical">
+                <div class="flex flex-wrap gap-1.5">
+                  <template x-for="(tag, index) in (note.tags ? note.tags.slice(3) : [])" :key="tag">
+                    <button type="button" 
+                            @click.prevent="selectedTags.includes(tag) ? selectedTags = selectedTags.filter(t => t !== tag) : selectedTags.push(tag)"
+                            class="relative z-10 py-1 px-2.5 inline-flex items-center gap-x-1 text-[11px] rounded-md border text-gray-800 dark:text-white transition-colors cursor-pointer"
+                            :class="selectedTags.includes(tag) ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-800/30 dark:border-emerald-800' : 'bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700'">
+                      <span x-text="tag"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Folder and Date -->
+          <div class="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-neutral-400">
             <button type="button" @click="selectedNoteFolder = note.folderId" x-cloak x-show="selectedNoteFolder === 'all' && note.folderId !== 'uncategorized'" class="relative z-10 inline-flex items-center gap-x-1.5 font-medium text-gray-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400 transition-colors focus:outline-none group">
               <svg class="shrink-0 size-4 text-yellow-500/80" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z"></path>
               </svg>
-              <span class="group-hover:underline" x-text="note.folderName"></span>
+              <span class="group-hover:underline whitespace-nowrap" x-text="note.folderName"></span>
             </button>
+            <span class="whitespace-nowrap text-right ml-auto" x-text="'Updated ' + note.date"></span>
           </div>
-          <span x-text="'Updated ' + note.date"></span>
         </div>
       </div>
     </template>
