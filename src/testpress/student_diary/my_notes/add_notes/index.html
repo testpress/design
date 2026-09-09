@@ -61,7 +61,22 @@ new_student_page: true
                 </div>
 
                 <!-- Folder Select -->
-                <div>
+                <div x-data="{
+                       addFolder(name) {
+                         if(!name) return;
+                         const selectEl = this.$refs.folderWrapper.querySelector('[x-data]');
+                         if(!selectEl) return;
+                         const newId = name.toLowerCase().replace(/\s+/g, '-');
+                         let uiState = selectEl.__x ? selectEl.__x.$data : (window.Alpine ? Alpine.$data(selectEl) : null);
+                         if (uiState && uiState.options) {
+                           uiState.options.push({ value: newId, label: name });
+                           selectEl.dispatchEvent(new CustomEvent('set-options', { detail: uiState.options }));
+                           selectEl.dispatchEvent(new CustomEvent('set-selected-values', { detail: newId }));
+                         }
+                       }
+                     }"
+                     @folder-created.window="addFolder($event.detail.name)"
+                     x-ref="folderWrapper">
                   {% set folder_options = [
                     { "value": "none", "label": "No folder" },
                     { "value": "physics", "label": "Physics 101" },
@@ -76,6 +91,9 @@ new_student_page: true
                     label="Folder",
                     options=folder_options,
                     selected_value="none",
+                    label_action_text="+ New folder",
+                    label_action_url="javascript:void(0)",
+                    label_action_attrs="@click.prevent=\"$dispatch('open-modal-add-folder')\"",
                     placeholder="Select a folder",
                     description="Choose which folder this note belongs to",
                     search=true,
@@ -141,6 +159,8 @@ new_student_page: true
       </form>
     </div>
   </div>
+
+  {% include "../modals.html" %}
 </div>
 
 {% endblock %}
