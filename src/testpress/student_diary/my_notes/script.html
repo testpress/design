@@ -1,0 +1,70 @@
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('myNotes', () => ({
+      selectedNoteFolder: 'all',
+      mobileNotesFolderOpen: false,
+      searchQuery: '',
+      status: new URLSearchParams(window.location.search).get('status'),
+      notes: {{ notes_data.notes | dump | safe | default('[]') }},
+      folders: {{ notes_data.folders | dump | safe | default('[]') }},
+      
+      get folderCounts() {
+        const counts = { all: 0, uncategorized: 0 };
+        this.folders.forEach(f => counts[f.id] = 0);
+        this.notes.forEach(n => {
+          const fid = n.folderId || 'uncategorized';
+          counts[fid] = (counts[fid] || 0) + 1;
+          counts.all++;
+        });
+        return counts;
+      },
+      
+      get visibleNotesCount() {
+        return this.filteredNotes.length;
+      },
+      
+      get filteredNotes() {
+        return this.notes.filter(n => {
+          const matchFolder = this.selectedNoteFolder === 'all' || n.folderId === this.selectedNoteFolder;
+          if (!matchFolder) return false;
+          if (!this.searchQuery) return true;
+          const q = this.searchQuery.toLowerCase();
+          return n.title.toLowerCase().includes(q) || n.content.replace(/<[^>]*>?/gm, '').toLowerCase().includes(q);
+        });
+      },
+
+      async animateFolderRename(folderId, nextName) {
+        const f = this.folders.find(x => x.id === folderId);
+        if (!f) return;
+        const currentName = f.name;
+        if (currentName === nextName) return;
+
+        const DELETE_START_DELAY = 40;
+        const DELETE_ACCELERATION = 30;
+        const PAUSE_DURATION = 150;
+        const REVEAL_START_DELAY = 70;
+        const REVEAL_DECELERATION = 40;
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+        const updateName = (name) => {
+          f.name = name;
+          this.notes.forEach(n => { if (n.folderId === f.id) n.folderName = name });
+        };
+
+        for (let i = currentName.length; i >= 0; i--) {
+          updateName(currentName.slice(0, i));
+          const progress = 1 - (i / currentName.length);
+          await sleep(DELETE_START_DELAY - (progress * DELETE_ACCELERATION));
+        }
+
+        await sleep(PAUSE_DURATION);
+
+        for (let i = 1; i <= nextName.length; i++) {
+          updateName(nextName.slice(0, i));
+          const progress = i / nextName.length;
+          await sleep(REVEAL_START_DELAY + (progress * REVEAL_DECELERATION));
+        }
+      }
+    }));
+  });
+</script>
