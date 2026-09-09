@@ -23,6 +23,16 @@
         return this.filteredNotes.length;
       },
       
+      get allTags() {
+        const tags = new Set();
+        this.notes.forEach(n => {
+          if (n.tags) n.tags.forEach(t => tags.add(t));
+        });
+        return Array.from(tags).sort();
+      },
+
+      selectedTags: new URLSearchParams(window.location.search).getAll('tag'),
+
       get notesInFolderCount() {
         return this.notes.filter(n => this.selectedNoteFolder === 'all' || n.folderId === this.selectedNoteFolder).length;
       },
@@ -32,6 +42,13 @@
         let result = this.notes.filter(n => {
           const matchFolder = this.selectedNoteFolder === 'all' || n.folderId === this.selectedNoteFolder;
           if (!matchFolder) return false;
+          
+          if (this.selectedTags.length > 0) {
+            if (!n.tags) return false;
+            const hasAllTags = this.selectedTags.every(t => n.tags.includes(t));
+            if (!hasAllTags) return false;
+          }
+
           if (!this.searchQuery) return true;
           const q = this.searchQuery.toLowerCase();
           return n.title.toLowerCase().includes(q) || n.content.replace(/<[^>]*>?/gm, '').toLowerCase().includes(q);
