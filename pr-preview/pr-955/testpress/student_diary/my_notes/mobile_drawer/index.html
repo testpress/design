@@ -1,4 +1,5 @@
 
+
 <!-- Mobile Folders Drawer -->
 <div x-show="mobileNotesFolderOpen" x-cloak
      class="fixed inset-0 z-[100] lg:hidden" role="dialog" aria-modal="true">
@@ -57,23 +58,126 @@
                 </div>
               </div>
               <!-- Folder Actions Dropdown -->
-              <div class="hs-dropdown [--placement:bottom-right] relative inline-flex" @click.stop>
-                <button :id="'hs-mob-fldmd-mod-' + folder.id" type="button" class="size-8 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-800 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-800">
+              <div @click.stop>
+                
+                
+
+
+
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           console.log('Watch open value:', value);
+           if (value) {
+             console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               console.log('Calling updatePosition from setTimeout');
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         console.log('updatePosition called, trigger:', trigger);
+         if (!trigger) {
+           console.log('No trigger element found!');
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         console.log('Trigger bounding rect:', rect);
+         this.top = rect.bottom + 4;
+         const placement = 'bottom-end';
+         console.log('Placement:', placement);
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            if (rect.right < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.left = rect.right - menuWidth;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (window.innerWidth - leftPos < menuWidth) {
+              this.left = 'auto';
+              this.right = window.innerWidth - rect.right;
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     class="inline-flex ">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    
+      
+                <button type="button" class="size-8 inline-flex justify-center items-center text-gray-400 hover:bg-gray-100 rounded-full dark:text-neutral-500 dark:hover:bg-neutral-800 transition-colors focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-800">
                   <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="8" r="1"></circle>
                     <circle cx="12" cy="16" r="1"></circle>
                   </svg>
                 </button>
-                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-32 z-50 transition-[opacity,margin] duration opacity-0 bg-white border border-gray-200 rounded-xl shadow-lg hidden dark:bg-neutral-900 dark:border-neutral-800" role="menu" aria-orientation="vertical" :aria-labelledby="'hs-mob-fldmd-mod-' + folder.id">
-                  <div class="p-1 space-y-0.5">
-                    <button @click="$dispatch('open-modal-rename-folder', { folderId: folder.id, folderName: folder.name }); mobileNotesFolderOpen = false" type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                
+    
+  </div>
+
+  <!-- Dropdown Menu -->
+  <div x-show="open" 
+       x-ref="menu"
+       x-cloak
+       @click.outside="open = false"
+       x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] w-32 bg-white dark:bg-neutral-900 border border-transparent rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      
+        
+                    <button @click="$dispatch('open-modal-rename-folder', { folderId: folder.id, folderName: folder.name }); mobileNotesFolderOpen = false; open = false" type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800">
                       Rename
                     </button>
-                    <button @click="$dispatch('open-modal-delete-folder'); mobileNotesFolderOpen = false" type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-800">
+                    <button @click="$dispatch('open-modal-delete-folder'); mobileNotesFolderOpen = false; open = false" type="button" class="w-full flex items-center py-2 px-3 rounded-lg text-sm text-red-600 dark:text-red-500 hover:bg-gray-100 dark:hover:bg-neutral-800">
                       Delete
                     </button>
-                  </div>
-                </div>
+                
+      
+  </div>
+</div>
+
               </div>
             </li>
           </template>
