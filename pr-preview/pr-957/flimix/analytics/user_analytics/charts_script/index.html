@@ -1,0 +1,458 @@
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script>
+  (function () {
+    const dateRangeInput = document.getElementById('user-analytics-date-range');
+    let activeChart = null;
+    let watchTimeChart = null;
+    let deviceDistributionChart = null;
+    let bingeVsCasualChart = null;
+    let viewingByHourChart = null;
+    let viewerLocationsChart = null;
+
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function initOrUpdateChart(chartInstance, elId, options) {
+      const el = document.getElementById(elId);
+      if (!el) return null;
+      if (!chartInstance) {
+        chartInstance = echarts.init(el);
+        window.addEventListener('resize', () => chartInstance.resize());
+      }
+      chartInstance.setOption(options);
+      return chartInstance;
+    }
+
+    function getRangeBucket(val) {
+      const v = parseInt(val, 10) || 30;
+      if (v <= 14) return '7';
+      if (v <= 60) return '30';
+      if (v <= 180) return '90';
+      return '365';
+    }
+
+    function getWeekLabels(days) {
+      const n = Math.ceil(days / 7);
+      const labels = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      for (let i = n - 1; i >= 0; i--) {
+        const weekEnd = new Date(today);
+        weekEnd.setDate(weekEnd.getDate() - (i * 7));
+        const weekStart = new Date(weekEnd);
+        weekStart.setDate(weekStart.getDate() - 6);
+        if (weekStart.getMonth() === weekEnd.getMonth()) {
+          labels.push(MONTHS[weekStart.getMonth()] + ' ' + weekStart.getDate() + '–' + weekEnd.getDate());
+        } else {
+          labels.push(
+            MONTHS[weekStart.getMonth()] + ' ' + weekStart.getDate() +
+            ' – ' +
+            MONTHS[weekEnd.getMonth()] + ' ' + weekEnd.getDate()
+          );
+        }
+      }
+      return labels;
+    }
+
+    function getMonthLabels(count) {
+      const labels = [];
+      const d = new Date();
+      for (let i = count - 1; i >= 0; i--) {
+        const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+        labels.push(MONTHS[m.getMonth()]);
+      }
+      return labels;
+    }
+
+    function trendSeries(n, direction, base) {
+      const arr = [];
+      const step = base * 0.06;
+      for (let i = 0; i < n; i++) {
+        if (direction === 'up') arr.push(Math.round(base + i * step));
+        else if (direction === 'down') arr.push(Math.round(base + (n - 1 - i) * step));
+        else {
+          const tiny = base * 0.002;
+          arr.push(Math.round(base + (i % 3 - 1) * tiny));
+        }
+      }
+      return arr;
+    }
+
+    function getActivityScenario(range) {
+      const raw = parseInt(range != null && range !== '' ? range : (dateRangeInput ? dateRangeInput.value : '30'), 10);
+      if (isNaN(raw) || raw <= 14) {
+        return { pattern: 'flat_flat', status: 'Attention' };
+      }
+      if (raw <= 60) {
+        return { pattern: 'up_up', status: 'Good' };
+      }
+      if (raw <= 180) {
+        return { pattern: 'down_flat', status: 'Attention' };
+      }
+      return { pattern: 'down_down', status: 'Critical' };
+    }
+
+    function getActivityData(range) {
+      const raw = range || (dateRangeInput ? dateRangeInput.value : '30');
+      const bucket = getRangeBucket(raw);
+      const days = parseInt(raw, 10) || 30;
+      const scenario = getActivityScenario(raw);
+
+      let categories;
+      let activeBase;
+      let watchBase;
+
+      if (bucket === '7') {
+        categories = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        activeBase = 14000;
+        watchBase = 95000;
+      } else if (bucket === '30') {
+        categories = getWeekLabels(days);
+        activeBase = 15000;
+        watchBase = 110000;
+      } else if (bucket === '90') {
+        const monthCount = days <= 90 ? 3 : 6;
+        categories = getMonthLabels(monthCount);
+        activeBase = 16000;
+        watchBase = 120000;
+      } else {
+        categories = getMonthLabels(12);
+        activeBase = 15500;
+        watchBase = 118000;
+      }
+
+      let activeDir = 'flat';
+      let watchDir = 'flat';
+      if (scenario.pattern === 'up_up') {
+        activeDir = 'up'; watchDir = 'up';
+      } else if (scenario.pattern === 'down_down') {
+        activeDir = 'down'; watchDir = 'down';
+      } else if (scenario.pattern === 'down_flat') {
+        activeDir = 'down'; watchDir = 'flat';
+      } else if (scenario.pattern === 'flat_down') {
+        activeDir = 'flat'; watchDir = 'down';
+      }
+
+      const n = categories.length;
+      return {
+        categories,
+        active: trendSeries(n, activeDir, activeBase),
+        watch: trendSeries(n, watchDir, watchBase)
+      };
+    }
+
+    function renderActiveChart(range) {
+      const data = getActivityData(range);
+      const options = {
+        grid: { top: 10, right: 35, bottom: 20, left: 40, borderColor: '#e7e5e4', show: false, borderWidth: 0 },
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: data.categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            formatter: function (v) {
+              if (v >= 100000) return (v / 100000).toFixed(1) + 'L';
+              if (v >= 1000) return (v / 1000).toFixed(0) + 'k';
+              return Math.round(v);
+            }
+          }
+        },
+        series: [{
+          name: 'Active viewers',
+          type: 'line',
+          data: data.active,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2, color: '#0ea5e9' },
+          itemStyle: { color: '#0ea5e9' },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(14, 165, 233, 0.06)' },
+              { offset: 1, color: 'rgba(14, 165, 233, 0)' }
+            ])
+          }
+        }]
+      };
+      
+      activeChart = initOrUpdateChart(activeChart, 'user-analytics-active-viewers-chart', options);
+    }
+
+    function renderWatchTimeChart(range) {
+      const data = getActivityData(range);
+      const options = {
+        grid: { top: 10, right: 35, bottom: 20, left: 40, borderColor: '#e7e5e4', show: false, borderWidth: 0 },
+        tooltip: { trigger: 'axis' },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: data.categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            formatter: function (v) {
+              if (v >= 100000) return (v / 1000).toFixed(0) + 'k';
+              if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+              return Math.round(v);
+            }
+          }
+        },
+        series: [{
+          name: 'Watch time (hours)',
+          type: 'line',
+          data: data.watch,
+          smooth: true,
+          symbol: 'none',
+          lineStyle: { width: 2, color: '#22c55e' },
+          itemStyle: { color: '#22c55e' },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(34, 197, 94, 0.06)' },
+              { offset: 1, color: 'rgba(34, 197, 94, 0)' }
+            ])
+          }
+        }]
+      };
+      
+      watchTimeChart = initOrUpdateChart(watchTimeChart, 'user-analytics-watch-time-chart', options);
+    }
+
+    function updateStatusBadgeAndTooltip(range) {
+      const scenario = getActivityScenario(range);
+      const badgeEl = document.getElementById('user-activity-status-badge');
+      const labelEl = badgeEl ? badgeEl.querySelector('.user-activity-status-label') : null;
+      const dotEl = badgeEl ? badgeEl.querySelector('.user-activity-status-dot') : null;
+      const tooltipEl = document.querySelector('.user-activity-tooltip-text');
+
+      const TOOLTIP_BY_PATTERN = {
+        'up_up': 'More people are watching and consuming more content. Maintain content release schedule and monitor sustained growth.',
+        'flat_flat': 'Viewer activity has plateaued. Refresh content catalog, improve discovery, and review engagement features.',
+        'down_flat': 'Fewer viewers are visiting but remaining viewers watch normally. Focus on retention campaigns and onboarding improvements.',
+        'down_down': 'Both audience size and content consumption are declining. Investigate platform issues, content freshness, and user experience problems immediately.'
+      };
+
+      let badgeClass = 'bg-stone-100 text-stone-700 dark:bg-neutral-700/60 dark:text-neutral-200';
+      let dotClass = 'bg-stone-500 after:bg-stone-500 dark:bg-neutral-300 dark:after:bg-neutral-300';
+      let label = 'Neutral';
+      let tooltip = TOOLTIP_BY_PATTERN[scenario.pattern] || TOOLTIP_BY_PATTERN['flat_flat'];
+
+      if (scenario.status === 'Good') {
+        badgeClass = 'bg-green-100 text-green-700 dark:bg-green-500/10 dark:text-green-400';
+        dotClass = 'bg-green-700 after:bg-green-700 dark:bg-green-400 dark:after:bg-green-400';
+        label = 'Good';
+      } else if (scenario.status === 'Attention') {
+        badgeClass = 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400';
+        dotClass = 'bg-amber-600 after:bg-amber-600 dark:bg-amber-400 dark:after:bg-amber-400';
+        label = 'Attention';
+      } else if (scenario.status === 'Critical') {
+        badgeClass = 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400';
+        dotClass = 'bg-red-700 after:bg-red-700 dark:bg-red-400 dark:after:bg-red-400';
+        label = 'Critical';
+      }
+
+      if (badgeEl) {
+        badgeEl.className = 'hs-tooltip-toggle py-1 px-2.5 inline-flex items-center gap-x-2 text-start whitespace-nowrap font-medium text-[13px] rounded-full cursor-pointer ' + badgeClass;
+      }
+      if (labelEl) labelEl.textContent = label;
+      if (dotEl) {
+        dotEl.className = 'user-activity-status-dot relative w-2.5 h-px after:absolute after:top-1/2 after:-start-1 after:size-1.5 after:rounded-full after:-translate-y-1/2 ' + dotClass;
+      }
+      if (tooltipEl) tooltipEl.textContent = tooltip;
+    }
+
+    function updateCharts(range) {
+      renderActiveChart(range);
+      renderWatchTimeChart(range);
+      updateStatusBadgeAndTooltip(range);
+    }
+
+    function renderBingeVsCasualChart() {
+      const options = {
+        tooltip: { trigger: 'item', formatter: '{b}<br/>{c}% of sessions', fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' },
+        color: ['#F59E0B', '#3B82F6', '#8B5CF6'],
+        series: [
+          {
+            type: 'pie',
+            radius: ['60%', '95%'],
+            avoidLabelOverlap: false,
+            itemStyle: {
+              borderColor: '#fff',
+              borderWidth: 2
+            },
+            label: { show: false },
+            data: [
+              { value: 40, name: 'Casual viewing (<30 min)' },
+              { value: 35, name: 'Normal engagement (30–90 min)' },
+              { value: 25, name: 'Binge watching (90+ min)' }
+            ]
+          }
+        ]
+      };
+      bingeVsCasualChart = initOrUpdateChart(bingeVsCasualChart, 'user-analytics-binge-vs-casual-chart', options);
+    }
+
+    function renderViewingByHourChart() {
+      const hours = [];
+      for (let h = 0; h < 24; h++) {
+        hours.push(h.toString().padStart(2, '0'));
+      }
+      const data = [
+        60, 40, 30, 25, 30, 60, 90, 140, 190, 220, 260, 300,
+        340, 380, 420, 460, 520, 560, 600, 640, 700, 620, 480, 220
+      ];
+      
+      const options = {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { top: 10, right: 10, bottom: 20, left: 40 },
+        xAxis: {
+          type: 'category',
+          data: hours,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 10, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif', interval: 0, rotate: -45 }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            formatter: function (v) {
+              if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+              return Math.round(v);
+            }
+          }
+        },
+        series: [{
+          name: 'Viewers',
+          type: 'bar',
+          data: data,
+          barWidth: '55%',
+          itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] }
+        }]
+      };
+      
+      viewingByHourChart = initOrUpdateChart(viewingByHourChart, 'user-analytics-viewing-by-hour-chart', options);
+    }
+
+    function renderDeviceDistributionChart() {
+      const categories = ['Android', 'Web', 'iOS', 'TV'];
+      const data = [5200, 3100, 2400, 1200];
+      const colors = ['#3B82F6', '#8B5CF6', '#06B6D4', '#6366F1'];
+      
+      const options = {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { top: 10, right: 10, bottom: 20, left: 40 },
+        xAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          splitNumber: 4,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: {
+            color: '#78716c',
+            fontSize: 12,
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            formatter: function (v) {
+              if (v >= 1000) return (v / 1000).toFixed(1) + 'k';
+              return Math.round(v);
+            }
+          }
+        },
+        series: [{
+          name: 'Viewers',
+          type: 'bar',
+          data: data.map((val, idx) => ({ value: val, itemStyle: { color: colors[idx] } })),
+          barWidth: '55%',
+          itemStyle: { borderRadius: [4, 4, 0, 0] }
+        }]
+      };
+      
+      deviceDistributionChart = initOrUpdateChart(deviceDistributionChart, 'user-analytics-device-distribution-chart', options);
+    }
+
+    function renderViewerLocationsChart() {
+      const categories = ['Australia', 'Canada', 'United Kingdom', 'India', 'United States'];
+      const data = [11.1, 12.4, 15.8, 25.2, 35.5];
+      
+      const options = {
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: function(params) { return params[0].name + ': ' + params[0].value + '%'; } },
+        grid: { top: 10, right: 40, bottom: 20, left: 100 },
+        xAxis: {
+          type: 'value',
+          max: 40,
+          splitLine: { lineStyle: { type: 'dashed', color: '#e7e5e4' } },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif', formatter: '{value}%' }
+        },
+        yAxis: {
+          type: 'category',
+          data: categories,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: { color: '#78716c', fontSize: 12, fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif' }
+        },
+        series: [{
+          name: 'Viewers',
+          type: 'bar',
+          data: data,
+          barWidth: '65%',
+          itemStyle: { color: '#3B82F6', borderRadius: [0, 4, 4, 0] },
+          label: {
+            show: true,
+            position: 'insideRight',
+            formatter: '{c}%',
+            color: '#fff',
+            fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+            fontSize: 12
+          }
+        }]
+      };
+      
+      viewerLocationsChart = initOrUpdateChart(viewerLocationsChart, 'user-analytics-viewer-locations-chart', options);
+    }
+
+    if (dateRangeInput) {
+      dateRangeInput.addEventListener('change', function () {
+        updateCharts(this.value);
+      });
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () {
+        setTimeout(function () { updateCharts(); renderDeviceDistributionChart(); renderBingeVsCasualChart(); renderViewingByHourChart(); renderViewerLocationsChart(); }, 100);
+      });
+    } else {
+      setTimeout(function () { updateCharts(); renderDeviceDistributionChart(); renderBingeVsCasualChart(); renderViewingByHourChart(); renderViewerLocationsChart(); }, 100);
+    }
+  })();
+</script>

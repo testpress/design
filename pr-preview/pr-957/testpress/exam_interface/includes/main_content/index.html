@@ -1,0 +1,357 @@
+  <div class="w-full md:w-4/5 flex flex-col h-full min-h-0">
+    <div class="w-full">
+  <div class="flex flex-wrap justify-between basis-full items-center w-full">
+    <div class="grid grid-cols-1 sm:hidden border-b border-gray-200 w-full px-4 sm:px-6">
+      <!-- Use an "onChange" listener to redirect the user to the selected tab URL. -->
+      <div x-data="{openSectionDropdown:false}" @click.outside="openSectionDropdown = false" class="relative w-full">
+        <!-- Trigger Button -->
+        <button
+          @click="openSectionDropdown = !openSectionDropdown"
+          class="w-full text-left py-2 bg-white text-gray-800 flex items-center justify-between"
+        >
+          <span x-text="currentSection.name"></span>
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+      
+        <!-- Dropdown List -->
+        <div
+          x-show="openSectionDropdown"
+          x-transition
+          class="absolute mt-2 z-50 w-full max-h-60 overflow-y-auto rounded-xl bg-white shadow-xl space-y-0.5 p-1 border border-gray-200"
+        >
+        <template x-for="(section, index) in exam.sections" :key="section.name">
+          <div
+            @click="selectSection(index), openSectionDropdown = false,show_section_switch_modal=true"
+            class="px-4 py-2 text-sm rounded-lg"
+            :class="{
+              'cursor-pointer text-gray-800 hover:bg-gray-100': isActive(index),
+              'cursor-pointer opacity-50 text-gray-400': !isActive(index),
+              'bg-gray-100': currentSectionIndex === index
+            }"
+            x-text="section.name"
+          ></div>
+        </template>
+        </div>
+      </div>
+      
+    </div>
+    <div class="hidden sm:block w-full ">
+      <div x-data="scrollTabsData()" x-init="requestAnimationFrame(() => updateScrollState()),  $refs.tabList.addEventListener('wheel', (e) => {
+        if (e.shiftKey) {
+          e.preventDefault();
+          $refs.tabList.scrollBy({
+            left: e.deltaY, // or -e.deltaY depending on direction
+            behavior: 'smooth'
+          });
+        }
+      });"
+      class="relative flex items-center  border-b border-gray-200"
+    >
+      <!-- Left Arrow -->
+      <button
+        type="button" x-cloak x-show="canScrollLeft"
+        class="absolute left-0 z-10 h-full px-2 bg-gradient-to-r from-white"
+        @click="scrollTabsLeft"
+      >
+        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    
+      <!-- Scrollable Tab List -->
+      <nav
+        @scroll="updateScrollState()"
+        x-ref="tabList"
+        class="scroll-smooth scrollbar-hide mx-6 flex overflow-hidden"
+        aria-label="Tabs"
+      >
+        <template x-for="(section, index) in exam.sections" :key="index">
+          <button
+            @click="selectSection(index); show_section_switch_modal = true"
+            class="whitespace-nowrap border-b-2 py-2 text-sm mr-4"
+            :class="{
+              'border-emerald-500 text-emerald-600': currentSectionIndex === index,
+              'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700': currentSectionIndex !== index,
+              'text-gray-400 border-transparent': !isActive(index)
+            }"
+            x-text="section.name"
+          ></button>
+        </template>
+      </nav>
+    
+      <!-- Right Arrow -->
+      <button
+        type="button" x-cloak x-show="canScrollRight"
+        class="absolute right-0 z-10 h-full px-2 bg-gradient-to-l from-white"
+        @click="scrollTabsRight"
+      >
+        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="flex flex-wrap w-full h-full">
+
+    <div :class="currentQuestion.passage ? 'w-full md:w-1/2' : 'w-full'" x-cloak x-show="currentQuestion.passage">
+      <div class="bg-white p-4 sm:px-6 ">
+      <div>
+  <p x-text="currentQuestion.passage"></p>
+</div>
+      </div>
+      </div> 
+    <div :class="currentQuestion.passage ? 'w-full md:w-1/2 border-l border-gray-200' : 'w-full'">
+    <div class="border-b border-gray-200">
+      <div class="flex flex-wrap justify-between basis-full items-center w-full py-2 sm:px-6 px-4">
+  <div class="flex">
+  <p class="text-wrap font-medium  text-gray-800 dark:text-neutral-200">
+    <span class="hidden sm:inline">Question No. </span>
+    <span class="inline sm:hidden">Q No. </span>
+    <span x-text="currentQuestion.q_no"></span>
+    <span class="ml-2 text-xs hidden sm:inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5  font-medium text-emerald-700" 
+    x-text="currentQuestion.type === 'gap_fill' ? 'Gap Fill' :
+               currentQuestion.type === 'mcq' ? 'MCQ' :
+               currentQuestion.type === 'essay' ? 'Essay' :
+               currentQuestion.type === 'match' ? 'Match' :
+               currentQuestion.type === 'file' ? 'File Upload' :
+               currentQuestion.type.toUpperCase()"></span>
+               <span class="ml-2 inline sm:hidden items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700" x-text="'+ '+ currentQuestion.mark"></span>
+               <span class="inline sm:hidden items-center rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700" x-text="'- '+ currentQuestion.negative"></span>
+  </p>
+
+</div>
+  <div>
+    <span class="hidden sm:inline-flex items-center rounded-full bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-700" x-text="'+ '+ currentQuestion.mark"></span>
+    <span class="hidden sm:inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700" x-text="'- '+ currentQuestion.negative"></span>
+    <span
+    @click="
+    markForReview();
+    if (currentQuestionIndex < currentSection.questions.length - 1) {
+      goToQuestion(currentQuestionIndex + 1);
+    }
+  "
+    class="sm:hidden cursor-pointer inline-flex items-center ml-1">
+      <svg x-cloak x-show="!(responses[currentSection.name]?.[currentQuestion.q_no]?.markedForReview)"
+
+      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-4 text-purple-600">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z"></path>
+      </svg>
+      <svg 
+      x-cloak   x-show="responses[currentSection.name]?.[currentQuestion.q_no]?.markedForReview"
+      xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="size-4 text-purple-600">
+        <path fill-rule="evenodd" d="M6.32 2.577a49.255 49.255 0 0 1 11.36 0c1.497.174 2.57 1.46 2.57 2.93V21a.75.75 0 0 1-1.085.67L12 18.089l-7.165 3.583A.75.75 0 0 1 3.75 21V5.507c0-1.47 1.073-2.756 2.57-2.93Z" clip-rule="evenodd" />
+      </svg>
+      <span class="text-sm ml-1">mark for review</span>
+    </span>
+  </div>
+</div>
+
+    </div>
+    <div class="bg-white p-4 sm:px-6">
+      <div x-cloak x-show="currentQuestion.type=='mcq'">
+        <div>
+  <p x-text="currentQuestion.text"></p>
+</div>
+<div class="mt-4 space-y-4">
+    <fieldset aria-label="Options" >
+        <template x-for="(option, idx) in currentQuestion.options" :key="idx">
+        <div class="relative flex items-start mb-4">
+          <template x-if="!currentQuestion.is_multi_choice">
+          <div class="flex h-6 items-center">
+            <input :id="'option-' + idx"  name="question-options"
+            x-model="selectedOption"
+            :checked="responses[currentSection.name]?.[currentQuestion.q_no]?.selected === idx" :value="idx" type="radio" class="relative size-4 appearance-none rounded-full border border-gray-300 bg-white before:absolute before:inset-1 before:rounded-full before:bg-white not-checked:before:hidden checked:border-emerald-600 hover:text-emerald-600 focus:text-emerald-600  focus:ring-emerald-600 checked:bg-emerald-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:before:bg-gray-400 forced-colors:appearance-auto forced-colors:before:hidden">
+          </div>
+        </template>
+        <template x-if="currentQuestion.is_multi_choice">
+          <div class="flex h-6 shrink-0 items-center">
+            <div class="group grid size-4 grid-cols-1">
+              <input :id="'option-' + idx"  x-model="selectedOption[idx]" aria-describedby="offers-description" name="question-options" type="checkbox" class="col-start-1 row-start-1 appearance-none rounded-sm text-emerald-600 focus:ring-emerald-600 border border-gray-300 bg-white checked:border-emerald-600 checked:bg-emerald-600 indeterminate:border-emerald-600 indeterminate:bg-emerald-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto">
+              <svg class="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-disabled:stroke-gray-950/25" viewBox="0 0 14 14" fill="none">
+                <path class="opacity-0 group-has-checked:opacity-100" d="M3 8L6 11L11 3.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path class="opacity-0 group-has-indeterminate:opacity-100" d="M3 7H11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </div>
+          </div>
+          </template>
+          <div class="ml-3">
+            <p x-text="option"></p>
+          </div>
+        </div>
+      </template>
+    </fieldset>
+</div>
+      </div>
+      <div x-cloak x-show="currentQuestion.type=='essay'">
+        <div>
+  <p  x-text="currentQuestion.text"></p>
+</div>
+<div class="mt-4 space-y-4 text-sm">
+    <fieldset aria-label="Options" >
+      <div class="space-y-2">
+        <textarea  x-model="essayDraft" class="py-2 px-3 block w-full border-gray-200 rounded-lg text-sm placeholder:text-gray-400 focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-transparent dark:border-neutral-700 dark:text-neutral-300 dark:placeholder:text-white/60 dark:focus:ring-neutral-600" rows="3" placeholder="Type your answer here..."></textarea>
+      </div>
+    </fieldset>
+</div>
+      </div>
+      <div x-cloak x-show="currentQuestion.type=='gap_fill'">
+        <div>
+  <p class="leading-8" x-html="getGapFillHTML()"></p>
+</div>
+
+
+
+      </div>
+      <div x-cloak x-show="currentQuestion.type=='match'">
+        <div>
+  <p x-text="currentQuestion.text"></p>
+</div>
+<div class="mt-4 space-y-4 text-sm">
+    <fieldset aria-label="Options" >
+        <template x-for="(question, qidx) in currentQuestion.questions" :key="qidx">
+        <div class="relative flex items-start mb-4 gap-4">
+          <div class="text-sm/6 min-w-24">
+            <span class="mr-2" x-text="String.fromCharCode(65 + qidx) + '.'"></span>
+            <label :for="'question-' + qidx" x-text="question"></label>
+          </div>
+          <div class="w-1/2">
+            <select
+              class="appearance-none min-w-32 text-sm border border-gray-300 rounded-md px-2 py-1 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500"
+              x-model="matchAnswers[qidx]"
+            >
+              <option value="" x-text="matchAnswers[qidx] || 'Select'"></option>
+              <template x-for="(opt, idx) in currentQuestion.answers" :key="idx">
+                <option :value="opt" x-text="opt"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+      </template>
+    </fieldset>
+</div>
+      </div>
+      <div x-cloak x-show="currentQuestion.type=='file'">
+        <div>
+  <p  x-text="currentQuestion.text"></p>
+</div>
+<div class="mt-4 space-y-4 text-sm">
+<!-- Drag 'n Drop -->
+<div class="space-y-2">
+  <div id="file-upload" data-hs-file-upload='{
+    "url": "/upload",
+    "maxFilesize": 1000,
+    "extensions": {
+      "default": {
+        "class": "shrink-0 size-5"
+      },
+      "xls": {
+        "class": "shrink-0 size-5"
+      },
+      "zip": {
+        "class": "shrink-0 size-5"
+      },
+      "csv": {
+        "icon": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 22h14a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v4\"/><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"/><path d=\"m5 12-3 3 3 3\"/><path d=\"m9 18 3-3-3-3\"/></svg>",
+        "class": "shrink-0 size-5"
+      }
+    }
+  }'>
+    <template data-hs-file-upload-preview="">
+      <div class="p-3 bg-white border border-solid border-gray-300 rounded-xl dark:bg-neutral-800 dark:border-neutral-600">
+        <div class="mb-1 flex justify-between items-center">
+          <div class="flex items-center gap-x-3">
+            <span class="size-10 flex justify-center items-center border border-gray-200 text-gray-500 rounded-lg dark:border-neutral-700 dark:text-neutral-500" data-hs-file-upload-file-icon="">
+              <img class="rounded-lg hidden" data-dz-thumbnail="">
+            </span>
+            <div>
+              <p class="text-sm font-medium text-gray-800 dark:text-white">
+                <span class="truncate inline-block max-w-[300px] align-bottom" data-hs-file-upload-file-name=""></span>.<span data-hs-file-upload-file-ext=""></span>
+              </p>
+              <p class="text-xs text-gray-500 dark:text-neutral-500" data-hs-file-upload-file-size="" data-hs-file-upload-file-success=""></p>
+              <p class="text-xs text-red-500" style="display: none;" data-hs-file-upload-file-error="">File exceeds size limit.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-x-2">
+            <span class="hs-tooltip [--placement:top] inline-block" style="display: none;" data-hs-file-upload-file-error="">
+              <span class="hs-tooltip-toggle text-red-500 hover:text-red-800 focus:outline-none focus:text-red-800 dark:text-red-500 dark:hover:text-red-200 dark:focus:text-red-200">
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" x2="12" y1="8" y2="12"></line>
+                  <line x1="12" x2="12.01" y1="16" y2="16"></line>
+                </svg>
+                <span class="hs-tooltip-content max-w-[100px] hs-tooltip-shown:opacity-100 hs-tooltip-shown:visible opacity-0 transition-opacity inline-block absolute invisible z-10 py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded shadow-sm dark:bg-neutral-700" role="tooltip">
+                  Please try to upload a file smaller than 100MB.
+                </span>
+              </span>
+            </span>
+            <button type="button" class="text-gray-500 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-neutral-200 dark:focus:text-neutral-200" data-hs-file-upload-reload="">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                <path d="M21 3v5h-5"></path>
+              </svg>
+            </button>
+            <button type="button" class="text-gray-500 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-neutral-200 dark:focus:text-neutral-200" data-hs-file-upload-remove="">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                <line x1="10" x2="10" y1="11" y2="17"></line>
+                <line x1="14" x2="14" y1="11" y2="17"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+  
+        <div class="flex items-center gap-x-3 whitespace-nowrap">
+          <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" data-hs-file-upload-progress-bar="">
+            <div class="flex flex-col justify-center rounded-full overflow-hidden bg-emerald-600 text-xs text-white text-center whitespace-nowrap transition-all duration-500 hs-file-upload-complete:bg-emerald-500" style="width: 0" data-hs-file-upload-progress-bar-pane=""></div>
+          </div>
+          <div class="w-10 text-end">
+            <span class="text-sm text-gray-800">
+              <span data-hs-file-upload-progress-bar-value="">0</span>%
+            </span>
+          </div>
+        </div>
+      </div>
+    </template>
+    <div class="cursor-pointer p-12 flex justify-center bg-white border  border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-600"  data-hs-file-upload-trigger="">
+      <div class="text-center">
+        <svg class="w-16 text-gray-400 mx-auto" width="70" height="46" viewBox="0 0 70 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M6.05172 9.36853L17.2131 7.5083V41.3608L12.3018 42.3947C9.01306 43.0871 5.79705 40.9434 5.17081 37.6414L1.14319 16.4049C0.515988 13.0978 2.73148 9.92191 6.05172 9.36853Z" fill="currentColor" stroke="currentColor" stroke-width="2" class="fill-white stroke-gray-400"/>
+          <path d="M63.9483 9.36853L52.7869 7.5083V41.3608L57.6982 42.3947C60.9869 43.0871 64.203 40.9434 64.8292 37.6414L68.8568 16.4049C69.484 13.0978 67.2685 9.92191 63.9483 9.36853Z" fill="currentColor" stroke="currentColor" stroke-width="2" class="fill-white stroke-gray-400"/>
+          <rect x="17.0656" y="1.62305" width="35.8689" height="42.7541" rx="5" fill="currentColor" stroke="currentColor" stroke-width="2" class="fill-white stroke-gray-400"/>
+          <path d="M47.9344 44.3772H22.0655C19.3041 44.3772 17.0656 42.1386 17.0656 39.3772L17.0656 35.9161L29.4724 22.7682L38.9825 33.7121C39.7832 34.6335 41.2154 34.629 42.0102 33.7025L47.2456 27.5996L52.9344 33.7209V39.3772C52.9344 42.1386 50.6958 44.3772 47.9344 44.3772Z" stroke="currentColor" stroke-width="2" class="stroke-gray-400"/>
+          <circle cx="39.5902" cy="14.9672" r="4.16393" stroke="currentColor" stroke-width="2" class="stroke-gray-400 dark:stroke-neutral-500"/>
+        </svg>
+
+        <div class="mt-4 flex flex-wrap justify-center text-sm leading-6 text-gray-600">
+          <span class="pe-1 font-medium text-gray-800">
+            Drop your files here or
+          </span>
+          <label for="@@browseID" class="relative cursor-pointer bg-white font-semibold text-emerald-600 hover:text-emerald-700 rounded-lg decoration-2 hover:underline focus-within:outline-none focus-within:ring-2 focus-within:ring-emerald-600 focus-within:ring-offset-2">
+            <span>browse</span>
+            <input id="@@browseID" type="file" class="sr-only">
+          </label>
+        </div>
+
+        <p class="mt-1 text-xs text-gray-400 dark:text-neutral-400">
+          CSV, XLS, DOCX
+        </p>
+      </div>
+    </div>      
+    <div class="mt-4 space-y-2 empty:mt-0" data-hs-file-upload-previews=""></div>
+  </div>
+</div>
+<!-- End Drag 'n Drop -->
+</div>
+      </div>
+    </div>
+    </div> 
+   </div>
+</div>
