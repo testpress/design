@@ -9,6 +9,7 @@
       selectedUsers: [],
       modalSearchQuery: '',
       presentationCohorts: [],
+      openOrganization: null,
 
       organizations: [
         {
@@ -52,47 +53,50 @@
       ],
 
       readyToStart: [
-        {
-          id: 1,
-          name: 'Fire Safety Training - January 2026',
-          course_name: 'Fire Safety Training',
-          course_id: 1,
-          learners_count: 25,
-          payment_date: '2024-01-15T10:00:00Z'
-        },
-        {
-          id: 2,
-          name: 'AvSec Awareness - February 2026',
-          course_name: 'AvSec Awareness',
-          course_id: 2,
-          learners_count: 30,
-          payment_date: '2024-02-20T11:30:00Z'
-        },
-        {
-          id: 3,
-          name: 'Emergency Response - March 2026',
-          course_name: 'Emergency Response',
-          course_id: 3,
-          learners_count: 15,
-          payment_date: '2024-03-10T09:15:00Z'
-        },
-        {
-          id: 4,
-          name: 'Fire Safety Training - April 2026',
-          course_name: 'Fire Safety Training',
-          course_id: 1,
-          learners_count: 20,
-          payment_date: '2024-04-05T14:20:00Z'
-        },
-        {
-          id: 5,
-          name: 'AvSec Awareness - May 2026',
-          course_name: 'AvSec Awareness',
-          course_id: 2,
-          learners_count: 22,
-          payment_date: '2024-05-12T10:45:00Z'
-        }
-      ],
+      {
+        organization: 'Agile Aviation Services Pvt Ltd',
+        organizationID: 'agile',
+        learners_count: 55,
+
+        cohorts: [
+          {
+            id: 1,
+            name: 'Fire Safety Training - January 2026',
+            course_name: 'Fire Safety Training',
+            learners_count: 25,
+            payment_date: '2024-01-15T10:00:00Z',
+            partially_presented: true
+          },
+          {
+            id: 2,
+            name: 'AvSec Awareness - February 2026',
+            course_name: 'AvSec Awareness',
+            learners_count: 30,
+            payment_date: '2024-02-20T11:30:00Z',
+            partially_presented: false,
+          }
+        ]
+      },
+
+
+      {
+        ono_id: 2,
+        organization: 'Skyway Ground Handling',
+        organizationID: 'skyway',
+        learners_count: 15,
+
+        cohorts: [
+          {
+            id: 3,
+            name: 'Emergency Response - March 2026',
+            course_name: 'Emergency Response',
+            learners_count: 15,
+            payment_date: '2024-03-10T09:15:00Z',
+            partially_presented: false,
+          }
+        ]
+      }
+    ],
 
       activeSessions: [
         {
@@ -165,13 +169,39 @@
         }
       ],
 
+      get tableRows() {
+      const rows = []
+      this.filteredReadyToStart.forEach(ono => {
+        rows.push({ type: 'ono', ono })
+
+        ono.cohorts.forEach(cohort => {
+          rows.push({ type: 'cohort', ono, cohort })
+        })
+      })
+      return rows
+},
+
       get filteredReadyToStart() {
         if (!this.searchQuery) return this.readyToStart;
         const query = this.searchQuery.toLowerCase();
-        return this.readyToStart.filter(c =>
-          c.name.toLowerCase().includes(query) ||
-          c.course_name.toLowerCase().includes(query)
-        );
+
+        return this.readyToStart
+          .map(ono => {
+            const cohorts = ono.cohorts.filter(c =>
+              c.name.toLowerCase().includes(query) ||
+              c.course_name.toLowerCase().includes(query)
+            );
+            if (cohorts.length) {
+              return {
+                ...ono,
+                cohorts
+              };
+            }
+          })
+          .filter(Boolean);
+      },
+      toggleOrganization(id) {
+        this.openOrganization = this.openOrganization === id ? null : id
       },
 
       get filteredActiveSessions() {
@@ -241,25 +271,18 @@
         // Filtering is handled by computed properties
       },
 
-      toggleAllCohorts() {
-        const allSelected = this.filteredReadyToStart.length > 0 &&
-          this.filteredReadyToStart.every(c => this.selectedCohorts.includes(c.id));
-        if (allSelected) {
-          this.selectedCohorts = this.selectedCohorts.filter(id =>
-            !this.filteredReadyToStart.some(c => c.id === id));
-        } else {
-          const idsToAdd = this.filteredReadyToStart.map(c => c.id).filter(id => !this.selectedCohorts.includes(id));
-          this.selectedCohorts = [...this.selectedCohorts, ...idsToAdd];
-        }
-      },
-
+toggleAllCohorts() {
+      const ids = this.readyToStart.flatMap(o => o.cohorts.map(c => c.id))
+      this.selectedCohorts =
+        this.selectedCohorts.length === ids.length ? [] : ids
+    },
       toggleCohortSelection(id) {
         if (this.selectedCohorts.includes(id)) {
-          this.selectedCohorts = this.selectedCohorts.filter(cid => cid !== id);
+          this.selectedCohorts = this.selectedCohorts.filter(i => i !== id)
         } else {
-          this.selectedCohorts = [...this.selectedCohorts, id];
+          this.selectedCohorts.push(id)
         }
-      },
+    },
 
       openPresentationForCohort(cohort) {
         // Single-cohort flow: show exactly this cohort in the modal
