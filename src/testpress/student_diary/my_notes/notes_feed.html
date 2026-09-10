@@ -1,0 +1,286 @@
+{% from "src/ui-system/components/empty-state.html" import empty_state %}
+{% from "src/ui-system/components/dropdown.html" import dropdown as ui_dropdown %}
+<!-- Right Side: Notes Feed -->
+<div class="lg:col-span-3 flex flex-col gap-4">
+
+  <!-- Sticky Search + Add Notes Bar -->
+  <div class="sticky top-[3.75rem] pt-5 z-20 bg-gray-50 dark:bg-neutral-900" x-cloak x-show="notesInFolderCount > 0 && status !== 'onboarding'">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <h2 class="hidden text-lg font-semibold text-gray-800 dark:text-neutral-200">My Notes</h2>
+
+      <!-- Actions: Search + Sort -->
+      <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-2 w-full sm:max-w-md">
+        <div class="relative w-full">
+          <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none z-20 ps-3.5">
+            <svg class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+          <input x-model="searchQuery" type="text" class="py-2 ps-10 pe-10 block w-full bg-white border-gray-200 rounded-lg text-sm focus:border-emerald-500 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500" placeholder="Search notes...">
+          <button type="button" x-show="searchQuery.length > 0" @click="searchQuery = ''" class="absolute inset-y-0 end-0 flex items-center z-20 px-3 text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300" style="display: none;">
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+        
+        <!-- Filters Group (Mobile Row 2) -->
+        <div class="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto shrink-0">
+          <!-- Tag Filter Dropdown -->
+          <div class="relative shrink-0 z-20" x-show="allTags.length > 0">
+            {% set filter_trigger %}
+              <button type="button" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                Tags
+                <span x-show="selectedTags.length > 0" x-text="selectedTags.length" class="inline-block font-medium text-[10px] py-0.5 px-[5px] bg-gray-900 dark:bg-white text-white dark:text-neutral-800 leading-3 rounded-full"></span>
+              </button>
+            {% endset %}
+
+            {% set filter_menu %}
+              <div class="p-1 space-y-0.5 max-h-64 overflow-y-auto">
+                <template x-for="tag in allTags" :key="tag">
+                  <label class="flex items-center gap-x-2 py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-800 cursor-pointer">
+                    <input type="checkbox" :value="tag" x-model="selectedTags" class="shrink-0 mt-0.5 border-gray-200 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-900 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                    <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="tag"></span>
+                  </label>
+                </template>
+              </div>
+              <div class="p-2 border-t border-gray-200 dark:border-neutral-700" x-show="selectedTags.length > 0">
+                <button type="button" @click="selectedTags = []; open = false;" class="w-full py-1.5 px-2 inline-flex justify-center items-center gap-x-2 text-xs font-medium rounded-lg border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-hidden focus:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none dark:bg-white/10 dark:text-white dark:hover:bg-white/20 dark:focus:bg-white/20">
+                  Clear filters
+                </button>
+              </div>
+            {% endset %}
+            
+            {% call ui_dropdown(
+              trigger=filter_trigger,
+              placement="bottom-end",
+              width="w-56"
+            ) %}
+              {{ filter_menu | safe }}
+            {% endcall %}
+          </div>
+
+          <!-- Sort Dropdown -->
+          <div class="relative shrink-0 z-20">
+            {% set sort_trigger %}
+            <button type="button" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+              <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5h10"/><path d="M11 9h7"/><path d="M11 13h4"/><path d="m3 17 3 3 3-3"/><path d="M6 18V4"/></svg>
+              <span x-text="sortOrder === 'latest' ? 'Recent' : 'Oldest'">Recent</span>
+              <svg class="shrink-0 size-3.5 text-gray-500 transition-transform" :class="{ 'rotate-180': open }" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            {% endset %}
+
+            {% call ui_dropdown(trigger=sort_trigger, placement="bottom-end", width="40") %}
+              <div class="py-2 first:pt-0 last:pb-0">
+                <button type="button" @click="sortOrder = 'latest'; open = false" class="w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700" :class="{ 'bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white': sortOrder === 'latest' }">
+                  Recent
+                  <svg x-show="sortOrder === 'latest'" class="shrink-0 size-3.5 ms-auto text-emerald-600 dark:text-emerald-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+                <button type="button" @click="sortOrder = 'oldest'; open = false" class="w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700" :class="{ 'bg-gray-100 dark:bg-neutral-700 text-gray-900 dark:text-white': sortOrder === 'oldest' }">
+                  Oldest
+                  <svg x-show="sortOrder === 'oldest'" class="shrink-0 size-3.5 ms-auto text-emerald-600 dark:text-emerald-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </button>
+              </div>
+            {% endcall %}
+          </div>
+        </div>
+      </div>
+
+      <a :href="'{{ '/testpress/student_diary/my_notes/add_notes/' | url }}' + (selectedNoteFolder && selectedNoteFolder !== 'all' && selectedNoteFolder !== 'uncategorized' ? '?folder=' + selectedNoteFolder : '')" class="hidden sm:inline-flex justify-center items-center gap-x-1.5 py-2 px-3 text-sm font-semibold rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 focus:outline-none focus:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 dark:focus:bg-emerald-600 whitespace-nowrap">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 size-4"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+        <span>Add Notes</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Feed Cards -->
+  <div class="flex flex-col gap-4" x-cloak x-show="visibleNotesCount > 0 && status !== 'onboarding'">
+    <template x-for="note in filteredNotes" :key="note.id">
+      <div class="relative p-5 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xs cursor-pointer" x-transition>
+        <!-- Header -->
+        <div class="flex items-start justify-between mb-2">
+          <a :href="'{{ '/testpress/student_diary/my_notes/detail/' | url }}' + note.id + '/'" class="text-base font-medium text-gray-900 dark:text-neutral-200 hover:text-emerald-600 dark:hover:text-emerald-500 line-clamp-1 pe-4 transition-colors before:absolute before:inset-0 before:z-0" x-text="note.title" :title="note.title"></a>
+
+          <!-- Action Dropdown -->
+          <div class="relative inline-flex shrink-0 -me-2 -mt-1 z-10" @click.stop>
+            {% set note_actions_trigger %}
+            <button type="button" class="relative flex items-center rounded-full p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none">
+              <span class="absolute -inset-1"></span>
+              <span class="sr-only">Open options</span>
+              <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path d="M10 3a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM10 8.5a1.5 1.5 0 110 3 1.5 1.5 0 010-3zM11.5 15.5a1.5 1.5 0 10-3 0 1.5 1.5 0 003 0z"></path>
+              </svg>
+            </button>
+            {% endset %}
+            
+            {% call ui_dropdown(trigger=note_actions_trigger, placement="bottom-end", width="medium") %}
+              <div x-data="{ showFolderMenu: false, folderSearch: '' }" class="w-full relative">
+                <!-- Edit -->
+                <a class="w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 dark:focus:bg-neutral-700" :href="'{{ '/testpress/student_diary/my_notes/edit_notes/' | url }}' + note.id + '/'">
+                  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22h6a2 2 0 0 0 2-2V7l-5-5H6a2 2 0 0 0-2 2v10"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10.4 12.6a2 2 0 1 1 3 3L8 21l-4 1-1-4Z"/></svg>
+                  Edit
+                </a>
+                
+                <!-- Move to Folder Trigger -->
+                <button type="button" @click="showFolderMenu = !showFolderMenu; if(showFolderMenu) $nextTick(() => { $refs.searchInput?.focus(); })" class="w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 dark:hover:text-neutral-300 focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-folder size-4 shrink-0"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+                  Move to Folder
+                  <svg class="ms-auto size-3 text-gray-400 rotate-90 md:rotate-0 transition-transform duration-200" :class="{ '-rotate-90 md:rotate-0': showFolderMenu }" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+                
+                <!-- Folders List (Flyout / Accordion) -->
+                <div x-show="showFolderMenu" 
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0 md:scale-95"
+                     x-transition:enter-end="opacity-100 md:scale-100"
+                     x-transition:leave="transition ease-in duration-100"
+                     x-transition:leave-start="opacity-100 md:scale-100"
+                     x-transition:leave-end="opacity-0 md:scale-95"
+                     @click.outside="if (showFolderMenu) { showFolderMenu = false; $event.stopPropagation(); }"
+                     class="mt-1 md:mt-0 static md:absolute z-[70] top-0 end-full md:me-3 md:w-56 bg-white dark:bg-neutral-900 border-x border-b border-gray-200 md:border-t rounded-b-xl md:rounded-t-xl dark:border-neutral-800 shadow-inner md:shadow-xl overflow-hidden">
+                  <div class="p-2 border-b border-gray-200 dark:border-neutral-800 bg-gray-50/50 md:bg-white dark:bg-neutral-900">
+                    <div class="relative">
+                      <div class="absolute inset-y-0 start-0 flex items-center ps-3 pointer-events-none">
+                        <svg class="shrink-0 size-3.5 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                      </div>
+                      <input x-ref="searchInput" @click.stop @keydown.stop x-model="folderSearch" type="text" class="py-1.5 ps-9 block w-full border-gray-200 rounded-lg text-xs focus:border-emerald-500 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500" placeholder="Search folder...">
+                    </div>
+                  </div>
+                  <div class="max-h-48 overflow-y-auto p-1 space-y-0.5 bg-gray-50/30 md:bg-white dark:bg-neutral-900 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600 dark:hover:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                    <template x-for="folder in folders" :key="folder.id">
+                      <button type="button"
+                        x-show="note.folderId !== folder.id && (!folderSearch || folder.name.toLowerCase().includes(folderSearch.toLowerCase()))"
+                        @click.stop="open = false; /* Implement move */"
+                        class="w-full text-start py-2 px-3 flex items-center gap-x-2.5 text-sm text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-lg">
+                        <span x-text="folder.name" class="line-clamp-1"></span>
+                      </button>
+                    </template>
+                  </div>
+                </div>
+
+                <!-- Delete -->
+                <button type="button" class="w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-red-600 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-red-500 dark:hover:bg-neutral-700 dark:hover:text-red-400 dark:focus:bg-neutral-700" @click.prevent="$dispatch('open-modal-delete-note', { noteTitle: note.title }); open = false">
+                  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                  Delete
+                </button>
+              </div>
+            {% endcall %}
+          </div>
+        </div>
+
+        <!-- Content Preview -->
+        <div class="mt-2 space-y-4 text-sm text-gray-700 dark:text-neutral-300 mb-4">
+          <div class="line-clamp-2">
+            <div x-text="note.content.replace(/<\/[^>]+>/g, ' ').replace(/<[^>]*>?/gm, '').trim()"></div>
+          </div>
+        </div>
+
+        <!-- Meta -->
+        <div class="mt-auto">
+          <!-- Tags -->
+          <div class="flex flex-wrap items-center gap-1.5 mb-5" x-show="note.tags && note.tags.length > 0">
+            <template x-for="(tag, index) in (note.tags ? note.tags.slice(0, 3) : [])" :key="tag">
+              <button type="button" 
+                      @click.prevent="selectedTags.includes(tag) ? selectedTags = selectedTags.filter(t => t !== tag) : selectedTags.push(tag)"
+                      class="relative z-10 py-1 px-2.5 inline-flex items-center gap-x-1 text-[11px] rounded-md border text-gray-800 dark:text-white transition-colors cursor-pointer"
+                      :class="selectedTags.includes(tag) ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-800/30 dark:border-emerald-800' : 'bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700'">
+                <span x-text="tag"></span>
+              </button>
+            </template>
+
+            <!-- Dropdown for extra tags -->
+            <div x-show="note.tags && note.tags.length > 3" class="hs-dropdown [--trigger:hover] inline-block relative z-10">
+              <button type="button" class="py-1 px-2.5 inline-flex items-center gap-x-1 text-[11px] rounded-md bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-white hover:bg-gray-50 dark:hover:bg-neutral-700 cursor-pointer" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+                <span x-text="'+' + (note.tags ? note.tags.length - 3 : 0)"></span>
+              </button>
+              <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 max-w-64 transition-[opacity,margin] duration opacity-0 hidden z-50 p-2 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-lg shadow-lg" role="menu" aria-orientation="vertical">
+                <div class="flex flex-wrap gap-1.5">
+                  <template x-for="(tag, index) in (note.tags ? note.tags.slice(3) : [])" :key="tag">
+                    <button type="button" 
+                            @click.prevent="selectedTags.includes(tag) ? selectedTags = selectedTags.filter(t => t !== tag) : selectedTags.push(tag)"
+                            class="relative z-10 py-1 px-2.5 inline-flex items-center gap-x-1 text-[11px] rounded-md border text-gray-800 dark:text-white transition-colors cursor-pointer"
+                            :class="selectedTags.includes(tag) ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-800/30 dark:border-emerald-800' : 'bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 hover:bg-gray-50 dark:hover:bg-neutral-700'">
+                      <span x-text="tag"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Folder and Date -->
+          <div class="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-neutral-400">
+            <button type="button" @click="selectedNoteFolder = note.folderId" x-cloak x-show="selectedNoteFolder === 'all' && note.folderId && note.folderId !== 'uncategorized'" class="relative z-10 inline-flex items-center gap-x-1.5 font-medium text-gray-600 hover:text-emerald-600 dark:text-neutral-300 dark:hover:text-emerald-400 transition-colors focus:outline-none group">
+              <svg class="shrink-0 size-4 text-yellow-500/80" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19.5 21a3 3 0 003-3v-4.5a3 3 0 00-3-3h-15a3 3 0 00-3 3V18a3 3 0 003 3h15zM1.5 10.146V6a3 3 0 013-3h5.379a2.25 2.25 0 011.59.659l2.122 2.121c.14.141.331.22.53.22H19.5a3 3 0 013 3v1.146A4.483 4.483 0 0019.5 9h-15a4.483 4.483 0 00-3 1.146z"></path>
+              </svg>
+              <span class="group-hover:underline whitespace-nowrap" x-text="note.folderName"></span>
+            </button>
+            <span class="whitespace-nowrap text-right ml-auto" x-text="'Updated ' + note.date"></span>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- Empty State: No Notes in Folder -->
+  <div x-cloak x-show="notesInFolderCount === 0 && status !== 'onboarding'" class="mt-5">
+    {% set folder_empty_img %}
+      <div class="mb-4 mx-auto flex items-center justify-center size-[72px] rounded-full bg-gray-100 dark:bg-neutral-800">
+        <svg class="shrink-0 size-8 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>
+      </div>
+    {% endset %}
+    
+    {{ empty_state(
+      title="Folder is empty",
+      description="There are no notes in this folder yet. Add a new note to this folder to get started.",
+      primary_action_text="Add note",
+      primary_action_icon="plus",
+      primary_action_attrs="@click=\"window.location.href = '" ~ ('/testpress/student_diary/my_notes/add_notes/' | url) ~ "' + (selectedNoteFolder && selectedNoteFolder !== 'all' && selectedNoteFolder !== 'uncategorized' ? '?folder=' + selectedNoteFolder : '')\"",
+      image=folder_empty_img
+    ) }}
+  </div>
+
+  <!-- Empty State: No Search Results -->
+  <div x-cloak x-show="notesInFolderCount > 0 && visibleNotesCount === 0 && status !== 'onboarding'">
+    {% set search_empty_img %}
+      <div class="mb-4 mx-auto flex items-center justify-center size-[72px] rounded-full bg-gray-100 dark:bg-neutral-800">
+        <svg class="shrink-0 size-8 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+    {% endset %}
+    
+    {% set search_empty_action %}
+      <button type="button" @click="searchQuery = ''" class="inline-flex items-center gap-x-1.5 py-2 px-3 text-sm font-semibold rounded-lg border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+        Clear search
+      </button>
+    {% endset %}
+
+    {{ empty_state(
+      title="No results found",
+      description="We couldn't find any notes matching your search. Try different keywords.",
+      image=search_empty_img,
+      primary_action=search_empty_action
+    ) }}
+  </div>
+
+  <!-- Onboarding Empty State -->
+  <div x-cloak x-show="status === 'onboarding'" class="mt-5">
+    {% set taking_notes_img %}
+      <img src="{{ '/img/my_dairy/taking_notes.svg' | url }}" class="w-48 mx-auto mb-6" alt="Taking Notes">
+    {% endset %}
+    {{ empty_state(
+      title="Start your first note",
+      description="Keep your study notes, ideas, and important information organized in one place.",
+      primary_action_text="Add note",
+      primary_action_icon="plus",
+      primary_action_attrs="@click=\"window.location.href = '" ~ ('/testpress/student_diary/my_notes/add_notes/' | url) ~ "' + (selectedNoteFolder && selectedNoteFolder !== 'all' && selectedNoteFolder !== 'uncategorized' ? '?folder=' + selectedNoteFolder : '')\"",
+      illustration=taking_notes_img
+    ) }}
+  </div>
+
+  <!-- Mobile Floating Action Button -->
+  <a x-show="status !== 'onboarding'" :href="'{{ '/testpress/student_diary/my_notes/add_notes/' | url }}' + (selectedNoteFolder && selectedNoteFolder !== 'all' && selectedNoteFolder !== 'uncategorized' ? '?folder=' + selectedNoteFolder : '')" class="fixed bottom-6 end-6 z-50 flex justify-center items-center size-14 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 hover:shadow-xl transition-all sm:hidden focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600 dark:focus:ring-offset-neutral-900">
+    <svg class="size-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12h14"></path>
+      <path d="M12 5v14"></path>
+    </svg>
+    <span class="sr-only">Add Note</span>
+  </a>
+</div>

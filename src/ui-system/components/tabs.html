@@ -1,4 +1,4 @@
-  {% macro tabs(tabs=[], active_tab="", variant="standard", full_width=false, show_border=true, x_model="", id="") %}
+  {% macro tabs(tabs=[], active_tab="", variant="standard", full_width=false, show_border=true, x_model="", id="", content_class="mt-3") %}
 {% set default_active = active_tab if active_tab else (tabs[0].key if tabs | length else "") %}
 {% set unique_id = id if id else "tabs-" ~ range(1000, 9999) | random %}
 
@@ -57,15 +57,21 @@
          role="menu"
          aria-orientation="vertical">
       {% for tab in tabs %}
-        <button type="button"
-                class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm font-normal text-start focus:outline-hidden hover:bg-gray-100 focus:bg-gray-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200"
-                @click="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} = '{{ tab.key }}'; open = false"
-                {% if tab.disabled %}disabled{% endif %}>
-          {% if tab.icon %}
-            <i data-lucide="{{ tab.icon }}" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
-          {% endif %}
-          <span>{{ tab.label }}{% if tab.badge %} ({{ tab.badge }}){% endif %}</span>
-        </button>
+        {% if tab.href %}
+          <a href="{{ tab.href }}"
+             class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm font-normal text-start focus:outline-hidden hover:bg-gray-100 focus:bg-gray-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200">
+            {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>{% endif %}
+            <span>{{ tab.label }}{% if tab.badge %} ({{ tab.badge }}){% endif %}</span>
+          </a>
+        {% else %}
+          <button type="button"
+                  class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm font-normal text-start focus:outline-hidden hover:bg-gray-100 focus:bg-gray-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800 text-gray-800 dark:text-neutral-200"
+                  @click="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} = '{{ tab.key }}'; open = false"
+                  {% if tab.disabled %}disabled{% endif %}>
+            {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>{% endif %}
+            <span>{{ tab.label }}{% if tab.badge %} ({{ tab.badge }}){% endif %}</span>
+          </button>
+        {% endif %}
       {% endfor %}
     </div>
   </div>
@@ -74,37 +80,50 @@
   <nav class="hidden sm:flex {% if full_width %}w-full{% endif %} gap-1 relative {% if show_border %}after:absolute after:bottom-0 after:inset-x-0 after:border-b after:border-gray-200 dark:after:border-neutral-700{% endif %}" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
     
     {% for tab in tabs %}
-      <button type="button" 
-              {% if x_model %}
-                @click="{{ x_model }} = '{{ tab.key }}'"
-              {% else %}
-                @click="activeTab = '{{ tab.key }}'"
-              {% endif %}
-              class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 focus:text-gray-800 dark:focus:text-neutral-200 after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-gray-100 dark:hover:bg-neutral-700 hover:text-gray-800 dark:hover:text-neutral-200 {% if full_width %}flex-1{% endif %}"
-              :class="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}' 
-                        ? 'after:bg-gray-800 dark:after:bg-neutral-200 text-gray-800 dark:text-neutral-200' 
-                        : 'text-gray-500 dark:text-neutral-400'"
-              :aria-selected="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}'"
-              id="{{ unique_id }}-item-{{ tab.key }}" 
-              aria-controls="{{ unique_id }}-panel-{{ tab.key }}"
-              role="tab"
-              {% if tab.disabled %}disabled{% endif %}>
-              
-        {% if tab.icon %}
-          <i data-lucide="{{ tab.icon }}" class="shrink-0 size-4"></i>
-        {% endif %}
-        
-        {{ tab.label }}
-        
-        {% if tab.badge %}
-          <span class="ml-2 inline-flex items-center justify-center rounded-full min-w-[1.5rem] h-5 px-2 text-[10px] sm:text-xs font-medium leading-none transition-colors"
+      {% if tab.href %}
+        {# href-based tab: active state via Nunjucks active_tab param #}
+        {% set is_active = (active_tab == tab.key) %}
+        <a href="{{ tab.href }}"
+           class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm rounded-lg after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-gray-100 dark:hover:bg-neutral-700 hover:text-gray-800 dark:hover:text-neutral-200 focus:outline-hidden {% if full_width %}flex-1{% endif %} {{ 'after:bg-gray-800 dark:after:bg-neutral-200 text-gray-800 dark:text-neutral-200' if is_active else 'text-gray-500 dark:text-neutral-400' }}"
+           aria-selected="{{ 'true' if is_active else 'false' }}"
+           id="{{ unique_id }}-item-{{ tab.key }}"
+           role="tab">
+          {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4"></i>{% endif %}
+          {{ tab.label }}
+          {% if tab.badge %}
+            <span class="ml-2 inline-flex items-center justify-center rounded-full min-w-[1.5rem] h-5 px-2 text-[10px] sm:text-xs font-medium leading-none transition-colors {{ 'bg-gray-800 text-white dark:bg-neutral-500' if is_active else 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300' }}">
+              {{ tab.badge }}
+            </span>
+          {% endif %}
+        </a>
+      {% else %}
+        <button type="button"
+                {% if x_model %}
+                  @click="{{ x_model }} = '{{ tab.key }}'"
+                {% else %}
+                  @click="activeTab = '{{ tab.key }}'"
+                {% endif %}
+                class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 focus:text-gray-800 dark:focus:text-neutral-200 after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-gray-100 dark:hover:bg-neutral-700 hover:text-gray-800 dark:hover:text-neutral-200 {% if full_width %}flex-1{% endif %}"
                 :class="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}' 
-                  ? 'bg-gray-800 text-white dark:bg-neutral-500' 
-                  : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300'">
-            {{ tab.badge }}
-          </span>
-        {% endif %}
-      </button>
+                          ? 'after:bg-gray-800 dark:after:bg-neutral-200 text-gray-800 dark:text-neutral-200' 
+                          : 'text-gray-500 dark:text-neutral-400'"
+                :aria-selected="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}'"
+                id="{{ unique_id }}-item-{{ tab.key }}"
+                aria-controls="{{ unique_id }}-panel-{{ tab.key }}"
+                role="tab"
+                {% if tab.disabled %}disabled{% endif %}>
+          {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4"></i>{% endif %}
+          {{ tab.label }}
+          {% if tab.badge %}
+            <span class="ml-2 inline-flex items-center justify-center rounded-full min-w-[1.5rem] h-5 px-2 text-[10px] sm:text-xs font-medium leading-none transition-colors"
+                  :class="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}' 
+                    ? 'bg-gray-800 text-white dark:bg-neutral-500' 
+                    : 'bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300'">
+              {{ tab.badge }}
+            </span>
+          {% endif %}
+        </button>
+      {% endif %}
     {% endfor %}
   </nav>
 
@@ -116,7 +135,7 @@
   {% endfor %}
 
   {% if has_content %}
-  <div class="mt-3">
+  <div class="{{ content_class }}">
     {% for tab in tabs %}
       {% if tab.content %}
         <div id="{{ unique_id }}-panel-{{ tab.key }}" 
