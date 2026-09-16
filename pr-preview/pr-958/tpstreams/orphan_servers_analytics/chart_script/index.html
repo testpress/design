@@ -1,0 +1,221 @@
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+
+<script id="chart-dates-data" type="application/json">["2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01"]</script>
+<script id="chart-wasted-hours-data" type="application/json">[12, 15, 14, 18, 10]</script>
+
+<script>
+  window.addEventListener('load', () => {
+    let chartDates = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
+    let chartData = [10, 20, 15, 25, 30];
+
+    try {
+      const datesText = document.getElementById('chart-dates-data').textContent.trim();
+      const hoursText = document.getElementById('chart-wasted-hours-data').textContent.trim();
+      if (datesText && datesText !== "" && !datesText.includes("{" + "{")) chartDates = JSON.parse(datesText);
+      if (hoursText && hoursText !== "" && !hoursText.includes("{" + "{")) chartData = JSON.parse(hoursText);
+    } catch (e) {
+      console.warn("Could not parse dynamic chart data");
+    }
+
+    const clearFilterBadge = document.getElementById('clear-filter-badge');
+    const clearFilterText = document.getElementById('clear-filter-text');
+    const rows = document.querySelectorAll('.anomaly-row');
+    const activeTab = document.getElementById('active-anomalies-tab');
+    const resolvedTab = document.getElementById('historical-orphans-tab');
+
+    // 1 & 4. Reset logic
+    const resetTableAndBadge = () => {
+      rows.forEach(row => row.style.display = '');
+      if (clearFilterBadge) {
+        clearFilterBadge.classList.add('hidden');
+        clearFilterBadge.style.display = '';
+      }
+    };
+
+    // 2. Chart Click (Filter by Date)
+    const chartDom = document.getElementById('hs-single-area-chart');
+    if (chartDom) {
+      const myChart = echarts.init(chartDom);
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          backgroundColor: 'transparent',
+          borderWidth: 0,
+          padding: 0,
+          extraCssText: 'box-shadow: none;',
+          formatter: function (params) {
+            let item = params[0];
+            let val = item.value;
+            let formattedVal = val >= 1000 ? (val / 1000) + 'k' : val;
+            let dateStr = item.name;
+            const dateObj = new Date(dateStr);
+            if (!isNaN(dateObj)) {
+               dateStr = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+            }
+            return `
+              <div class="px-3 py-2 min-w-32 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 shadow-sm rounded-xl text-sm">
+                <div class="font-medium text-gray-800 dark:text-neutral-200 mb-1.5">${dateStr}</div>
+                <div class="flex items-center gap-x-2">
+                  <span class="size-2 rounded-sm bg-blue-600"></span>
+                  <span class="text-gray-500 dark:text-neutral-400">Wasted Hours:</span>
+                  <span class="font-medium text-gray-800 dark:text-neutral-200 ml-auto">${formattedVal}</span>
+                </div>
+              </div>
+            `;
+          }
+        },
+        grid: {
+          top: 15,
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: chartDates,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#94a3b8',
+            margin: 15,
+            formatter: function (value) {
+              const d = new Date(value);
+              if (!isNaN(d)) {
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              }
+              return value;
+            }
+          }
+        },
+        yAxis: {
+          type: 'value',
+          splitLine: {
+            lineStyle: {
+              type: 'dashed',
+              color: '#e2e8f0'
+            }
+          },
+          axisLabel: {
+            color: '#94a3b8',
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        series: [
+          {
+            name: 'Wasted Hours',
+            type: 'line',
+            smooth: true,
+            symbol: 'circle',
+            showSymbol: false,
+            symbolSize: 8,
+            itemStyle: {
+              color: '#2563eb'
+            },
+            lineStyle: {
+              width: 2
+            },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(37, 99, 235, 0.5)' },
+                { offset: 1, color: 'rgba(37, 99, 235, 0)' }
+              ])
+            },
+            data: chartData
+          }
+        ]
+      };
+
+      myChart.setOption(option);
+      
+      myChart.getZr().on('click', function(params) {
+        const pointInPixel = [params.offsetX, params.offsetY];
+        if (myChart.containPixel('grid', pointInPixel)) {
+          const xIndex = Math.round(myChart.convertFromPixel({seriesIndex: 0}, pointInPixel)[0]);
+          const dateClicked = chartDates[xIndex];
+          if (dateClicked) {
+            let filterText = dateClicked;
+            const parts = dateClicked.split('-');
+            if (parts.length === 3) {
+              filterText = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            if (clearFilterText) {
+              clearFilterText.textContent = filterText;
+            }
+            if (clearFilterBadge) {
+              clearFilterBadge.classList.remove('hidden');
+              clearFilterBadge.style.display = 'inline-flex';
+            }
+            rows.forEach(row => {
+              row.style.display = row.getAttribute('data-date') === dateClicked ? '' : 'none';
+            });
+          }
+        }
+      });
+      
+      window.addEventListener('resize', function() {
+        myChart.resize();
+      });
+    }
+
+    // 3. Leaderboard Click (Filter by Org)
+    document.querySelectorAll('.org-filter-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const orgName = e.currentTarget.getAttribute('data-filter-org');
+        if (orgName) {
+          if (clearFilterText) {
+            clearFilterText.textContent = orgName;
+          }
+          if (clearFilterBadge) {
+            clearFilterBadge.classList.remove('hidden');
+            clearFilterBadge.style.display = 'inline-flex';
+          }
+          rows.forEach(row => {
+            row.style.display = row.getAttribute('data-org') === orgName ? '' : 'none';
+          });
+        }
+      });
+    });
+
+    // 4. Tab Toggle & Clear Filters
+    if (clearFilterBadge) {
+      const clearBtn = clearFilterBadge.querySelector('a');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          resetTableAndBadge();
+        });
+      }
+    }
+
+    const activeClass = "px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:bg-gray-800 dark:text-white dark:hover:bg-neutral-800 dark:focus:bg-neutral-800 dark:after:bg-white";
+    const inactiveClass = "px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-gray-500 hover:text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800";
+
+    const updateTabs = (clickedTab, otherTab) => {
+      if (clickedTab && otherTab) {
+        clickedTab.className = activeClass;
+        otherTab.className = inactiveClass;
+      }
+    };
+
+    if (activeTab) {
+      activeTab.addEventListener('click', (e) => {
+        e.preventDefault();
+        updateTabs(activeTab, resolvedTab);
+      });
+    }
+
+    if (resolvedTab) {
+      resolvedTab.addEventListener('click', (e) => {
+        e.preventDefault();
+        updateTabs(resolvedTab, activeTab);
+      });
+    }
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  });
+</script>

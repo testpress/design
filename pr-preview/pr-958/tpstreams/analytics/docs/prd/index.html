@@ -1,0 +1,820 @@
+<hr>
+<h2>Overview</h2>
+<ul>
+<li>Adds a self-serve, <strong>library-wide</strong> <strong>Video Analytics Dashboard</strong> to TPStreams, complementing the existing per-video analytics on individual asset detail pages.</li>
+<li>Provides a single view showing <strong>all videos</strong> in the library with period-specific performance metrics (Total Views, Unique Viewers, Avg. Watch Time, Completion Rate, Storage Size).</li>
+<li>Allows users to answer all their key questions directly on-screen without contacting Support or exporting data.</li>
+<li>Includes summary views highlighting Top and Bottom performers at a glance.</li>
+<li>CSV export available as a secondary, optional action for users who need offline data manipulation.</li>
+<li>Eliminates the Client → Support → Engineering → Support → Client loop entirely.</li>
+</ul>
+<hr>
+<h2>Problem Statement</h2>
+<ul>
+<li>Per-video analytics exist only on each video's detail page — no cross-library view exists. Clients with large libraries cannot get a strategic overview without visiting each video individually.</li>
+<li>Clients are unable to run their own monthly workflows, including:
+<ul>
+<li><strong>Content Strategy:</strong> Identifying which topics or individual videos are performing well or declining.</li>
+<li><strong>Storage Optimization:</strong> Finding videos with consistently low or zero views and calculating storage savings from archiving them.</li>
+</ul>
+</li>
+<li>This capability represents a <strong>regression</strong> for clients migrating from platforms like Vimeo, where aggregated, library-wide asset-level analytics were available directly in the dashboard.</li>
+<li>The current manual process (Support ticket → Engineering script → emailed report) doesn't scale and creates dependency, delays, and potential for errors.</li>
+<li><strong>The underlying problem isn't the absence of a report—it's the absence of visibility.</strong> Users shouldn't have to ask a human or download a file to see basic performance data about their own content.</li>
+</ul>
+<hr>
+<h2>Objective</h2>
+<ul>
+<li>Enable any authenticated user to access a single page that provides <strong>complete, library-wide visibility</strong> into video performance across any date range.</li>
+<li>The dashboard must answer all user questions directly on-screen, without requiring Support intervention or CSV export.</li>
+<li><strong>Scope of Completion (Definition of Done):</strong> The dashboard must enable users to answer the following questions directly on the page:</li>
+</ul>
+<h3>Content Strategy Questions</h3>
+<ul>
+<li>Which videos/topics are performing well?</li>
+<li>Which individual videos are getting the most views?</li>
+<li>Which content is getting low or no engagement?</li>
+<li>How does video performance change month over month?</li>
+<li>Which content should we focus on creating more of?</li>
+<li>Which videos are my top performers?</li>
+<li>Which videos are my bottom performers?</li>
+</ul>
+<h3>Storage &amp; Cost Optimization Questions</h3>
+<ul>
+<li>Which videos have consistently low or zero views over several months?</li>
+<li>Which videos are candidates for archiving or deletion?</li>
+<li>What's the storage cost impact of deleting a video?</li>
+<li>How much storage can I save by archiving unused videos?</li>
+<li>Which assets have not been viewed for several months?</li>
+</ul>
+<h3>Workflow &amp; Decision Support Questions</h3>
+<ul>
+<li>
+<p>What does my library-wide performance look like for a specific month or date range?</p>
+</li>
+<li>
+<p>How does this month compare to previous months?</p>
+</li>
+<li>
+<p>Can I generate/download this data myself without contacting Support?</p>
+</li>
+<li>
+<p>Can I export this data for use in my own reporting tools?</p>
+</li>
+<li>
+<p><strong>Outcome:</strong> Support tickets for monthly view requests drop to zero; users regain the capability they had on previous platforms; content and storage decisions happen independently and instantly.</p>
+</li>
+</ul>
+<hr>
+<h2>User Stories</h2>
+<h3>Generate a Monthly Views Report</h3>
+<p><em>As a user, I want to select a month and generate a video views report, so that I can see my library's performance without contacting Support.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>User can pick a month/year via a preset selector.</li>
+<li>Table renders total views per video for that period, sorted by views descending, paginated.</li>
+<li>Table includes all videos — those with zero views display &quot;0&quot;.</li>
+<li>CSV export can be triggered from the same screen.</li>
+</ul>
+<h3>Export a Custom Date Range</h3>
+<p><em>As a user, I want to export view data for a custom start/end date, so that I can evaluate a specific campaign or period.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Custom start and end date inputs are available alongside the monthly preset.</li>
+<li>Date range selector is capped at a maximum of 3 months.</li>
+<li>Export and table both respect the custom range.</li>
+<li>Export is synchronous and streams the CSV directly to the browser.</li>
+</ul>
+<h3>Download a Completed Report</h3>
+<p><em>As a user, I want to download my generated CSV immediately, so that I can use it in my own reporting tools.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Export runs synchronously via Django <code>StreamingHttpResponse</code>.</li>
+<li>CSV streams directly to the browser chunk-by-chunk as the database is queried.</li>
+<li>No background task (Celery) is used.</li>
+<li>No intermediate file is stored.</li>
+<li>CSV contains columns: Asset UUID, Asset Title, Total Views.</li>
+<li>Browser saves the file locally with a meaningful filename (e.g., <code>video_views_YYYY-MM-DD.csv</code>).</li>
+</ul>
+<hr>
+<h2>User Stories</h2>
+<h3>View Library-Wide Performance</h3>
+<p><em>As a user, I want to see a single page showing performance metrics for all my videos, so that I can understand my library's performance without opening each video individually.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Page loads with a default date range (current month).</li>
+<li>Table shows all videos with columns: Asset UUID, Title, Total Views, Unique Viewers, Avg. Watch Time, Completion Rate, Storage Size.</li>
+<li>Table is paginated for large libraries.</li>
+<li>Data is specific to the selected date range.</li>
+</ul>
+<h3>Identify Top and Bottom Performers</h3>
+<p><em>As a user, I want to quickly see which videos are performing best and worst, so that I can make informed content decisions.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Table can be sorted by any column (views, engagement metrics, storage size).</li>
+<li>Summary cards at the top show Top 5 and Bottom 5 performers based on Total Views.</li>
+<li>Sorting is intuitive and responsive.</li>
+</ul>
+<h3>Analyze Performance Over Time</h3>
+<p><em>As a user, I want to compare video performance across different periods, so that I can track trends and identify declining content.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Date range selector includes monthly presets (This Month, Last Month, Last 3 Months, etc.).</li>
+<li>Custom date range selection is available (capped at 3 months).</li>
+<li>Table updates automatically when date range changes.</li>
+</ul>
+<h3>Identify Archiving Candidates</h3>
+<p><em>As a user, I want to filter for videos with zero or low views, so that I can identify assets that may be candidates for archiving.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Quick filter for &quot;Zero/Low-View&quot; videos is available.</li>
+<li>Filter identifies videos with no views in the selected period.</li>
+<li>Videos with no views at all (all-time) are also surfaced.</li>
+<li>Last Viewed Date is visible to distinguish abandoned assets from newly uploaded ones.</li>
+</ul>
+<h3>Calculate Storage Savings</h3>
+<p><em>As a user, I want to see storage size alongside performance data, so that I can prioritize which videos to archive based on cost savings.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Storage Size (GB/MB) is displayed as a column in the table.</li>
+<li>Table can be sorted by Storage Size.</li>
+<li>Users can identify high-storage, low-performance videos easily.</li>
+</ul>
+<h3>Export Data (Optional)</h3>
+<p><em>As a user, I want to download the current view as CSV, so that I can use the data in my own reporting tools if needed.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Export button is available but not prominently emphasized.</li>
+<li>CSV contains all columns shown in the table.</li>
+<li>Export respects current filters and sorting.</li>
+<li>File is downloaded with a meaningful filename.</li>
+</ul>
+<h3>Self-Service Access</h3>
+<p><em>As a user, I want to access this dashboard without contacting Support, so that I can run my monthly workflows independently.</em></p>
+<p><strong>Acceptance Criteria</strong></p>
+<ul>
+<li>Dashboard is accessible to all authenticated users in the organization.</li>
+<li>No special permissions or roles required.</li>
+<li>No Support ticket needed to generate or view data.</li>
+</ul>
+<hr>
+<h2>Use Cases</h2>
+<h3>View Library-Wide Performance Dashboard</h3>
+<p><strong>Actors:</strong> Any authenticated user in an organization</p>
+<p><strong>Preconditions:</strong> User is logged in; organization has at least one video</p>
+<p><strong>Main Flow</strong></p>
+<ol>
+<li>User navigates to Analytics → Video Analytics.</li>
+<li>Dashboard loads with default date range (current month).</li>
+<li>Table displays all videos with performance metrics.</li>
+<li>User can:
+<ul>
+<li>Sort by any column to identify top/bottom performers.</li>
+<li>Change date range to view different periods.</li>
+<li>Apply quick filters to isolate specific segments.</li>
+</ul>
+</li>
+<li>User gains immediate visibility into library performance without exporting or contacting Support.</li>
+</ol>
+<p><strong>Alternate Flows</strong></p>
+<ul>
+<li><strong>No videos in library:</strong> Dashboard displays empty state with clear message.</li>
+<li><strong>Zero views in range:</strong> Videos with zero views display &quot;0&quot; in relevant columns.</li>
+<li><strong>Large library:</strong> Table is paginated; performance remains responsive.</li>
+</ul>
+<hr>
+<h3>Identify Archiving Candidates</h3>
+<p><strong>Actors:</strong> Any authenticated user in an organization</p>
+<p><strong>Preconditions:</strong> User is logged in; organization has videos with low/no views</p>
+<p><strong>Main Flow</strong></p>
+<ol>
+<li>User navigates to Analytics → Video Analytics.</li>
+<li>User selects date range (e.g., Last 3 Months).</li>
+<li>User applies &quot;Zero/Low-View&quot; filter.</li>
+<li>Table updates to show only videos with no views in the selected period.</li>
+<li>User reviews Last Viewed Date and Storage Size columns.</li>
+<li>User identifies high-storage, zero-view videos as archiving candidates.</li>
+<li>User makes data-driven decision on which videos to archive.</li>
+</ol>
+<p><strong>Alternate Flows</strong></p>
+<ul>
+<li><strong>No zero-view videos:</strong> Filter returns empty state with message.</li>
+<li><strong>All videos have zero views:</strong> Table shows all videos; user can still review and decide.</li>
+</ul>
+<hr>
+<h3>Analyze Monthly Performance Trends</h3>
+<p><strong>Actors:</strong> Any authenticated user in an organization</p>
+<p><strong>Preconditions:</strong> User is logged in; organization has videos with view data</p>
+<p><strong>Main Flow</strong></p>
+<ol>
+<li>User navigates to Analytics → Video Analytics.</li>
+<li>User selects &quot;This Month&quot; from date presets.</li>
+<li>User reviews Top 5 performers summary cards.</li>
+<li>User sorts table by Total Views descending.</li>
+<li>User changes date range to &quot;Last Month&quot; to compare.</li>
+<li>User identifies videos with significant changes in performance.</li>
+<li>User makes content strategy decisions based on trends.</li>
+</ol>
+<p><strong>Alternate Flows</strong></p>
+<ul>
+<li><strong>Custom date range:</strong> User selects specific start/end dates (capped at 3 months).</li>
+<li><strong>Invalid date range:</strong> System shows validation error if range exceeds 3 months or includes future dates.</li>
+</ul>
+<hr>
+<h3>Export Data for Offline Analysis</h3>
+<p><strong>Actors:</strong> Any authenticated user in an organization</p>
+<p><strong>Preconditions:</strong> User is logged in; dashboard is displaying the desired view</p>
+<p><strong>Main Flow</strong></p>
+<ol>
+<li>User navigates to Analytics → Video Analytics.</li>
+<li>User applies desired filters and date range.</li>
+<li>User clicks Export button.</li>
+<li>System streams CSV directly to browser.</li>
+<li>Browser downloads file with meaningful filename.</li>
+<li>User uses CSV in external reporting tools.</li>
+</ol>
+<p><strong>Alternate Flows</strong></p>
+<ul>
+<li><strong>Export fails:</strong> System shows error message; user can retry.</li>
+<li><strong>Large dataset:</strong> Export streams progressively without timeout.</li>
+</ul>
+<hr>
+<h2>Empathy Lens</h2>
+<h3>What the User Actually Feels</h3>
+<ul>
+<li>&quot;I shouldn't need to ask a human for data about my own content.&quot;</li>
+<li>&quot;On Vimeo, I could see all my videos at once. Why can't I do that here?&quot;</li>
+<li>&quot;I have to do this every month—why can't I just click a button?&quot;</li>
+<li>&quot;I don't want a CSV—I want to see the answer immediately.&quot;</li>
+</ul>
+<h3>The Real Need</h3>
+<ul>
+<li>Users don't want a report—they want <strong>visibility</strong>.</li>
+<li>They want to make decisions, not request data.</li>
+<li>They want independence, not dependency.</li>
+</ul>
+<h3>What Success Looks Like</h3>
+<ul>
+<li>The moment a user opens the dashboard and sees their entire library's performance on one screen.</li>
+<li>The moment they sort by views and instantly see their top-performing video.</li>
+<li>The moment they apply the zero-view filter and identify their first archiving candidate—without exporting, without waiting, without asking.</li>
+</ul>
+<h3>What Failure Would Feel Like</h3>
+<ul>
+<li>The dashboard is slow or times out.</li>
+<li>The data doesn't match what they see on individual video pages.</li>
+<li>They still need to export a CSV to answer their questions.</li>
+<li>They still need to contact Support for anything.</li>
+</ul>
+<h3>Why This Matters</h3>
+<p>The user's workflow is <strong>monthly and recurring</strong>. Every month they:</p>
+<ol>
+<li>Need to see what performed well.</li>
+<li>Need to decide what content to create next.</li>
+<li>Need to identify what to archive.</li>
+<li>Need to calculate storage savings.</li>
+</ol>
+<p>They can't do any of this without data. Currently, they wait for us. With this dashboard, they can do it <strong>immediately, on their own schedule, without interruption.</strong></p>
+<hr>
+<p>To maintain your exact document structure and formatting without altering existing sections, here are the <strong>3 specific additions/adjustments</strong> to incorporate:</p>
+<ol>
+<li><strong>Updated Screen Mockup</strong>: Cleaned up the mockup to remove the obsolete Folder dropdown, selection checkboxes, and Archive/Delete sticky bar (since asset lifecycle management was removed from scope).</li>
+<li><strong>Data &amp; Payload Contracts added under API Requirements</strong>: Added the explicit JSON Data Payload Contract and CSV Column Header format under API Requirements so front-end UI mockups and back-end implementation share the exact same key names.</li>
+<li><strong>Comprehensive Edge Cases Table</strong>: Expanded the <strong>Edge Cases &amp; Mitigations</strong> table to include all 8 edge cases (including large tenant scale, cross-tenant isolation, connection drops, and concurrent exports) in your exact Markdown table format.</li>
+</ol>
+<p>Here is your complete document with these updates seamlessly integrated:</p>
+<hr>
+<h2>Functional Requirements (FRs)</h2>
+<h3>FR-1: Library-Wide Aggregated Performance Table</h3>
+<ul>
+<li><strong>Single Unified View:</strong> Render all library assets in a central table where each row represents one video asset (replacing the need to visit individual video detail pages).</li>
+<li><strong>Date Range Selector:</strong>
+<ul>
+<li>Presets: <em>This Month</em> (default), <em>Last Month</em>, <em>Last 30 Days</em>, <em>Last 90 Days (3 Months)</em>, and <em>Custom Date Range</em>.</li>
+<li><strong>Constraint:</strong> Custom date ranges are capped at a <strong>maximum of 3 months (90 days)</strong> to ensure high-performance query execution and fast streaming.</li>
+</ul>
+</li>
+<li><strong>Period-Scoped Metrics (Hit</strong> <code>**AssetViewerLog**</code><strong>):</strong>
+<ul>
+<li><code>Total Views (Period)</code>: Count of session views within the selected date range.</li>
+<li><code>Unique Viewers (Period)</code>: Distinct count of <code>visitor_id</code>s in the period.</li>
+<li><code>Average Watch Time (Period)</code>: Mean view duration in seconds in the period.</li>
+<li><code>Completion Rate (Period)</code>: % of views reaching completion criteria within the period.</li>
+</ul>
+</li>
+<li><strong>Column Sorting:</strong> Allow ascending/descending sorting on all key metrics (<code>Total Views</code>, <code>Unique Viewers</code>, <code>Storage Size</code>, <code>Last Viewed Date</code>, <code>Completion Rate</code>).</li>
+</ul>
+<h3>FR-2: Storage-Cost Optimization &amp; Low/Zero-View Detection</h3>
+<ul>
+<li><strong>Storage Size Display:</strong> Surface total asset storage size (<code>Asset.bytes</code> formatted into MB/GB).</li>
+<li><strong>Last Viewed Recency:</strong> Display <code>Last Viewed Date</code> (<code>MAX(created)</code> from <code>AssetViewerLog</code> across all time) and <code>Days Since Last View</code>.</li>
+<li><strong>Quick Filter Toggles:</strong>
+<ul>
+<li>Zero Views in Selected Period</li>
+<li>Unviewed in Last 90+ Days</li>
+<li>Low Performers (&lt; N views)</li>
+</ul>
+</li>
+</ul>
+<h3>FR-3: Content Strategy &amp; At-a-Glance Insights</h3>
+<ul>
+<li><strong>Top 5 &amp; Bottom 5 Performer Summary Cards:</strong> Render visual highlight cards above the main table showing the top 5 most-viewed and bottom 5 least-viewed videos in the selected date range.</li>
+<li><strong>Storage Cleanup Opportunity Card:</strong> Displays total unviewed assets in the last 90+ days alongside total reclaimable storage (e.g., <em>&quot;34 Assets with 0 views in &gt; 90 days | Total Reclaimable Storage: 512 GB&quot;</em>).</li>
+<li><strong>Month-over-Month Trend Indicator:</strong> Display a directional trend badge next to period view counts comparing current period performance to an equal preceding period (e.g., <code>▲ +24% vs. previous month</code>).</li>
+</ul>
+<h3>FR-4: Synchronous Streaming CSV Download</h3>
+<ul>
+<li><strong>Instant Browser Download:</strong> Clicking &quot;Export CSV&quot; immediately triggers a native browser file download using Django's <code>StreamingHttpResponse</code>. The backend streams chunk-by-chunk directly to the browser for the active filter state.</li>
+</ul>
+<hr>
+<h2>Non-Functional Requirements (NFRs)</h2>
+<h3>NFR-1: Performance &amp; Responsiveness</h3>
+<ul>
+<li><strong>Synchronous Response Streaming:</strong> CSV exports must stream data chunks immediately using Django's <code>StreamingHttpResponse</code> to keep the HTTP connection alive and prevent Gateway Timeouts (504).</li>
+<li><strong>Bounded Query Execution:</strong> Enforce a maximum 3-month date range cap to ensure database aggregations complete rapidly.</li>
+<li><strong>Backend Pagination:</strong> Server-side pagination (25, 50, 100 items per page) for table UI rendering.</li>
+</ul>
+<h3>NFR-2: Data Security &amp; Multi-Tenancy</h3>
+<ul>
+<li><strong>Tenant Isolation:</strong> Enforce strict organization scoping (<code>organization=current_tenant</code>) on all database queries and log aggregations.</li>
+<li><strong>Role-Based Access Control (RBAC):</strong>
+<ul>
+<li>Viewers/All Users: View analytics table and stream CSV exports.</li>
+</ul>
+</li>
+</ul>
+<h3>NFR-3: Data Accuracy &amp; Distinction</h3>
+<ul>
+<li><strong>Period vs. Lifetime Separation:</strong> Strict code separation so period analytics hit <code>AssetViewerLog</code> filtered by <code>created__date</code> and never pull lifetime stats from <code>Asset.views_count</code>.</li>
+</ul>
+<hr>
+<h2>User Navigation &amp; Screen Definitions</h2>
+<h3>Navigation Flow</h3>
+<pre><code>[ Main Sidebar ] ──► [ Analytics ] ──► [ Library Video Analytics Page ]
+                                                      │
+                                    ┌─────────────────┴─────────────────┐
+                                    ▼                                   ▼
+                       (View On-Screen Table &amp; Cards)          (Click &quot;Export CSV&quot; Button)
+                        Renders directly in browser             Triggers instant file download
+</code></pre>
+<h3>Screen Mockup &amp; Component Layout</h3>
+<pre><code>+---------------------------------------------------------------------------------------------------------+
+|  Analytics / Library Video Analytics                                                                    |
+|                                                                                                         |
+|  [ Date Range: This Month (Aug 1 - Aug 31) v ]    [ Search Assets...        ]                           |
+|  [ Quick Filters: [x] Low/Zero View  [ ] Unviewed &gt; 90 Days ]              [ Direct Download CSV ]    |
++---------------------------------------------------------------------------------------------------------+
+|                                                                                                         |
+|  +-------------------------------------+   +-------------------------------------+                      |
+|  | TOP PERFORMERS (Aug)                |   | STORAGE CLEANUP OPPORTUNITY         |                      |
+|  | 1. Intro to React (1,240 views)     |   | 34 Assets with 0 views in &gt; 90 days |                      |
+|  | 2. Advanced Django (980 views)      |   | Total Reclaimable Storage: 512 GB   |                      |
+|  +-------------------------------------+   +-------------------------------------+                      |
+|                                                                                                         |
++---------------------------------------------------------------------------------------------------------+
+| Asset Title             | Storage Size | Views (Period) | Trend   | Unique Viewers | Last Viewed        |
++---------------------------------------------------------------------------------------------------------+
+| 01_Intro_Lecture.mp4    | 4.2 GB       | 0              |  --     | 0              | 120 days ago       |
+| Module_2_DeepDive.mp4   | 12.8 GB      | 0              |  --     | 0              | Never              |
+| React_Hooks_Final.mp4   | 1.1 GB       | 450            | ▲ +12%  | 380            | Yesterday          |
++---------------------------------------------------------------------------------------------------------+
+| Pagination: &lt; 1 2 3 4 5 &gt;                                                            Items per page: [25] |
++---------------------------------------------------------------------------------------------------------+
+</code></pre>
+<hr>
+<h2>API Requirements</h2>
+<p><strong>2 Django views</strong> will be created.</p>
+<h3>View 1: <code>AggregatedVideoAnalyticsView</code> (Django Class-Based View)</h3>
+<ul>
+<li><strong>HTTP Method:</strong> <code>GET</code></li>
+<li><strong>Query Parameters:</strong> <code>start_date</code>, <code>end_date</code>, <code>search</code>, <code>zero_views_only</code> (bool), <code>unviewed_days</code> (int), <code>ordering</code>, <code>page</code>, <code>page_size</code></li>
+</ul>
+<h3>View 2: <code>AggregatedVideoAnalyticsExportView</code> (Django Streaming View)</h3>
+<ul>
+<li><strong>HTTP Method:</strong> <code>GET</code></li>
+<li><strong>Query Parameters:</strong> Same filter parameters as View 1 (<code>start_date</code>, <code>end_date</code>, <code>search</code>, <code>zero_views_only</code>, etc.)</li>
+<li><strong>Response Type:</strong> <code>StreamingHttpResponse</code> (<code>text/csv</code>)</li>
+</ul>
+<hr>
+<h3>Input Validation Rules</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Field / Parameter</th>
+<th style="text-align:left">Validation Rule</th>
+<th style="text-align:left">Default Fallback</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><code>start_date</code> <strong>&amp;</strong> <code>end_date</code></td>
+<td style="text-align:left">Must be valid ISO dates (<code>YYYY-MM-DD</code>). <code>start_date</code> must be <code>&lt;= end_date</code>.</td>
+<td style="text-align:left">Default to current month: <code>start_date = 1st of current month</code>, <code>end_date = today</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Date Range Duration</strong></td>
+<td style="text-align:left"><code>(end_date - start_date).days</code> <strong>must not exceed 90 days (3 months)</strong>.</td>
+<td style="text-align:left">Reject submission / cap range.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>end_date</code> <strong>Future Cap</strong></td>
+<td style="text-align:left"><code>end_date</code> cannot be in the future (<code>&gt; today</code>).</td>
+<td style="text-align:left">Auto-cap <code>end_date</code> to <code>today</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>unviewed_days</code></td>
+<td style="text-align:left">Must be a non-negative integer (<code>&gt;= 0</code>).</td>
+<td style="text-align:left">Default to <code>0</code> (ignored).</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>page</code> <strong>&amp;</strong> <code>page_size</code></td>
+<td style="text-align:left"><code>page</code> must be an integer <code>&gt;= 1</code>. <code>page_size</code> restricted to allowed choices <code>[25, 50, 100]</code>.</td>
+<td style="text-align:left"><code>page = 1</code>, <code>page_size = 25</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><code>ordering</code></td>
+<td style="text-align:left">Must be one of allowed white-listed fields: <code>['period_views', '-period_views', 'bytes', '-bytes', 'last_viewed_at', '-last_viewed_at', 'title', '-title']</code>.</td>
+<td style="text-align:left">Default to <code>-period_views</code>.</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h3>Error Conditions &amp; Handling</h3>
+<pre><code>                                  [ User Request ]
+                                         │
+                        ┌────────────────┴────────────────┐
+                        ▼                                 ▼
+             [ Auth / Tenant Check ]             [ Date &amp; Input Validation ]
+                        │                                 │
+           ┌────────────┴────────────┐       ┌────────────┴────────────┐
+           ▼                         ▼       ▼                         ▼
+   [ 401 Unauthorized ]      [ 403 Forbidden ] [ Form Error / 400 ] [ 200 OK / CSV Stream ]
+</code></pre>
+<h4>1. Authentication &amp; Permission Errors</h4>
+<ul>
+<li><strong>Condition: Unauthenticated User</strong>
+<ul>
+<li><strong>Handling:</strong> Enforce <code>LoginRequiredMixin</code>. Unauthenticated GET requests are redirected to login (HTTP 302).</li>
+</ul>
+</li>
+<li><strong>Condition: Missing Organization / Tenant Access</strong>
+<ul>
+<li><strong>Handling:</strong> Enforce <code>PermissionRequiredMixin</code> and tenant scoping (<code>get_current_tenant()</code>). If the user does not belong to the organization, return <strong>HTTP 403 Forbidden</strong>.</li>
+</ul>
+</li>
+</ul>
+<h4>2. Date &amp; Filter Input Validation Errors</h4>
+<ul>
+<li><strong>Condition: Date Range Exceeds 90 Days</strong>
+<ul>
+<li><strong>Dashboard UI View:</strong> Display inline form validation error: <em>&quot;Date range cannot exceed 90 days (3 months). Please select a narrower date range.&quot;</em></li>
+<li><strong>Export View:</strong> Return <strong>HTTP 400 Bad Request</strong> with message: <code>{&quot;error&quot;: &quot;Date range cannot exceed 90 days&quot;}</code>.</li>
+</ul>
+</li>
+<li><strong>Condition: Inverted Date Range (</strong><code>**start_date &gt; end_date**</code><strong>)</strong>
+<ul>
+<li><strong>Handling:</strong> Render form validation error: <em>&quot;Start date cannot be after end date.&quot;</em> (Export View returns <strong>HTTP 400 Bad Request</strong>).</li>
+</ul>
+</li>
+<li><strong>Condition: Invalid Date String (e.g.</strong> <code>**start_date=invalid_string**</code><strong>)</strong>
+<ul>
+<li><strong>Handling:</strong> Catch <code>ValueError</code> on date parsing and fall back to the default current month preset while attaching a user warning message via <code>messages.warning()</code>.</li>
+</ul>
+</li>
+</ul>
+<h4>3. Data &amp; Streaming Runtime Errors</h4>
+<ul>
+<li><strong>Condition: Empty Dataset (0 Matching Assets)</strong>
+<ul>
+<li><strong>Dashboard UI View:</strong> Render empty table state component (<em>&quot;No assets found matching the selected criteria&quot;</em>).</li>
+<li><strong>Export View:</strong> Return HTTP 200 with CSV header row only (<code>Asset UUID, Title, Storage Size, Period Views, ...</code>) without raising an exception.</li>
+</ul>
+</li>
+<li><strong>Condition: Client Disconnect During Streaming (</strong><code>**StreamingHttpResponse**</code><strong>)</strong>
+<ul>
+<li><strong>Handling:</strong> Catch <code>BrokenPipeError</code> / <code>ConnectionResetError</code> gracefully on backend generator iteration to log a warning and avoid polluting exception logs.</li>
+</ul>
+</li>
+</ul>
+<hr>
+<h3>Data Payload &amp; CSV Contracts</h3>
+<h4>Data Payload Structure (<code>GET</code> Data Context / Response)</h4>
+<pre><code class="language-json">{
+  &quot;summary&quot;: {
+    &quot;total_period_views&quot;: 45200,
+    &quot;total_library_bytes&quot;: 536870912000,
+    &quot;formatted_total_library_size&quot;: &quot;500 GB&quot;,
+    &quot;storage_cleanup_opportunity&quot;: {
+      &quot;reclaimable_unviewed_90d_count&quot;: 34,
+      &quot;reclaimable_unviewed_90d_bytes&quot;: 128849018880,
+      &quot;formatted_reclaimable_size&quot;: &quot;120 GB&quot;
+    },
+    &quot;top_performers&quot;: [
+      { &quot;uuid&quot;: &quot;ast_9a8b7c6d5e4&quot;, &quot;title&quot;: &quot;Intro to React Hooks&quot;, &quot;period_views&quot;: 1240, &quot;formatted_size&quot;: &quot;1.2 GB&quot; }
+    ]
+  },
+  &quot;pagination&quot;: { &quot;count&quot;: 142, &quot;page&quot;: 1, &quot;page_size&quot;: 25, &quot;total_pages&quot;: 6 },
+  &quot;results&quot;: [
+    {
+      &quot;uuid&quot;: &quot;ast_9a8b7c6d5e4&quot;,
+      &quot;title&quot;: &quot;Intro to React Hooks&quot;,
+      &quot;bytes&quot;: 1288490188,
+      &quot;formatted_size&quot;: &quot;1.2 GB&quot;,
+      &quot;period_views&quot;: 1240,
+      &quot;period_unique_viewers&quot;: 950,
+      &quot;period_avg_watch_time&quot;: 485,
+      &quot;period_completion_rate&quot;: 78.5,
+      &quot;trend_percentage&quot;: 24.5,
+      &quot;trend_direction&quot;: &quot;up&quot;,
+      &quot;last_viewed_at&quot;: &quot;2026-08-30T14:22:10Z&quot;,
+      &quot;days_since_last_view&quot;: 1,
+      &quot;created_at&quot;: &quot;2026-01-15T08:00:00Z&quot;
+    }
+  ]
+}
+</code></pre>
+<h4>CSV Stream Structure (Export View)</h4>
+<ul>
+<li><strong>Headers:</strong> <code>Asset UUID,Asset Title,Storage Size (Bytes),Formatted Storage Size,Period Views,Period Unique Viewers,Period Avg Watch Time (sec),Period Completion Rate (%),Last Viewed Date,Days Since Last View,Uploaded Date</code></li>
+<li><strong>Sample Row:</strong> <code>&quot;ast_9a8b7c6d5e4&quot;,&quot;Intro to React Hooks&quot;,1288490188,&quot;1.2 GB&quot;,1240,950,485,78.5,&quot;2026-08-30 14:22:10&quot;,1,&quot;2026-01-15 08:00:00&quot;</code></li>
+</ul>
+<hr>
+<h2>Data &amp; Entity Considerations</h2>
+<h3>Existing Model Capabilities</h3>
+<ul>
+<li><strong>[Asset]</strong>(<code>app/models/asset.py</code>):
+<ul>
+<li><code>Asset.bytes</code> and <code>Asset.source_file_size_bytes</code> <strong>already exist</strong> to provide storage sizes.</li>
+</ul>
+</li>
+<li><strong>[AssetViewerLog]</strong>(<code>app/models/asset.py</code>):
+<ul>
+<li>Stores granular view events (<code>asset</code>, <code>visitor_id</code>, <code>duration</code>, <code>created</code>, <code>organization</code>).</li>
+</ul>
+</li>
+</ul>
+<h3>Performance Optimization (DB Indexing)</h3>
+<ul>
+<li>Add a composite index on <code>AssetViewerLog(organization_id, created, asset_id)</code> via a lightweight Django migration to accelerate period-scoped <code>GROUP BY</code> aggregations.</li>
+</ul>
+<hr>
+<h2>Edge Cases &amp; Mitigations</h2>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">Edge Case</th>
+<th style="text-align:left">Risk</th>
+<th style="text-align:left">Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left"><strong>Date Range Exceeds 3 Months</strong></td>
+<td style="text-align:left">Synchronous query takes too long to stream.</td>
+<td style="text-align:left">Frontend enforces a max 90-day selection on date pickers; API validates and rejects date ranges &gt; 90 days with <code>400 Bad Request</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Newly Uploaded Assets</strong></td>
+<td style="text-align:left">A video uploaded 2 days ago has 0 views and shows up in zero-view filters.</td>
+<td style="text-align:left">Display <code>Uploaded Date</code> alongside <code>Last Viewed Date</code>. Exclude assets uploaded in the last &lt; 30 days from default cleanup filters.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Assets Never Viewed</strong></td>
+<td style="text-align:left"><code>AssetViewerLog</code> has zero entries, causing <code>MAX(created)</code> to return <code>NULL</code>.</td>
+<td style="text-align:left">Explicitly handle <code>NULL</code> as <code>&quot;Never Viewed&quot;</code> and format gracefully as <code>&quot;N/A&quot;</code>.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Timezone Boundaries</strong></td>
+<td style="text-align:left">Views near midnight recorded in UTC don't match the client's local month.</td>
+<td style="text-align:left">Convert <code>start_date</code> and <code>end_date</code> using Organization's configured timezone before querying.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Large Tenant (Millions of Log Rows)</strong></td>
+<td style="text-align:left">Table loads slowly or memory spikes.</td>
+<td style="text-align:left">**Table UI:**Server-side paginated.<br><strong>Export:</strong> CSV generation streams chunk-by-chunk using Django's <code>StreamingHttpResponse</code> iterator.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Cross-Tenant Data Leakage</strong></td>
+<td style="text-align:left">Security risk of accessing another org's data.</td>
+<td style="text-align:left"><strong>Strict Tenant Isolation:</strong> Every query and export path filters by <code>organization=current_tenant</code>. No code path accepts an asset ID without verifying org ownership.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Browser Closed Mid-Export</strong></td>
+<td style="text-align:left">Interrupts streaming CSV export connection.</td>
+<td style="text-align:left"><strong>Zero Stale State:</strong> Nothing is saved to S3/disk. Backend catches <code>BrokenPipeError</code> gracefully; user re-triggers export upon returning.</td>
+</tr>
+<tr>
+<td style="text-align:left"><strong>Concurrent Export Requests</strong></td>
+<td style="text-align:left">Multiple export clicks by a user.</td>
+<td style="text-align:left">Each click opens an independent HTTP stream. Runs as a separate query stream without complex lock logic for MVP.</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2>Success Metrics</h2>
+<h3>What Changes Upon Feature Rollout?</h3>
+<ul>
+<li><strong>0 Support &amp; Engineering Manual Tickets:</strong> Self-service streaming export completely removes recurring monthly engineering query requests.</li>
+<li><strong>Immediate Download Experience:</strong> Instant CSV stream without waiting for background queues or email notifications.</li>
+<li><strong>Actionable Storage Cleanup:</strong> Clients can immediately identify zero-view videos over 90 days old, calculate storage savings, and execute cleanup directly.</li>
+</ul>
+<hr>
+<h2>Tasks</h2>
+<h3>PR 1: UI Design (Mockup)</h3>
+<p><strong>Goal:</strong> Create design mockup for Analytics → Video Library Analytics page.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>[ ] Design date-range selector component (monthly presets + custom range with 3-month cap).</li>
+<li>[ ] Design Executive Summary Cards at page top:
+<ul>
+<li><strong>Top Performers Card</strong> (Top 5 videos by views in selected period).</li>
+<li><strong>Storage Cleanup Opportunity Card</strong> (Count of videos unviewed &gt; 90 days &amp; total reclaimable storage size).</li>
+</ul>
+</li>
+<li>[ ] Design Quick Filter Toggle buttons (<em>Zero/Low Views</em>, <em>Unviewed &gt; 90 Days</em>).</li>
+<li>[ ] Design paginated table showing columns:
+<ul>
+<li><code>Asset Title</code> (with UUID tooltip/subtext)</li>
+<li><code>Storage Size</code> (formatted in MB/GB)</li>
+<li><code>Views (Period)</code> &amp; <code>Trend Badge</code> (<code>▲ +X%</code>)</li>
+<li><code>Unique Viewers</code></li>
+<li><code>Last Viewed Date</code> (with <code>Days Since Last View</code>)</li>
+</ul>
+</li>
+<li>[ ] Design Export button (&quot;Export CSV&quot; primary action in page header).</li>
+<li>[ ] Design empty state (<em>No videos found matching criteria</em>).</li>
+<li>[ ] Design loading state for table refresh.</li>
+<li>[ ] Design error state (e.g., date range &gt; 90 days validation error).</li>
+<li>[ ] Ensure mobile-responsive design.</li>
+<li>[ ] Get design reviewed and approved.</li>
+</ul>
+<p><strong>Testing &amp; Verification:</strong></p>
+<ul>
+<li>[ ] Mockup reviewed by stakeholders.</li>
+<li>[ ] Design follows TPStreams design system.</li>
+<li>[ ] All states (idle, loading, empty, error) are represented.</li>
+</ul>
+<hr>
+<h3>PR 2: Backend — Database Index, Views &amp; Export Logic</h3>
+<p><strong>Goal:</strong> Implement database indexing, backend query logic, summary card calculations, and streaming CSV export.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>[ ] <strong>Create Database Index Migration:</strong>
+<ul>
+<li>Add composite index on <code>AssetViewerLog</code> for <code>(organization_id, created, asset_id)</code> to optimize date-range aggregation queries.</li>
+</ul>
+</li>
+<li>[ ] <strong>Create</strong> <code>**VideoViewsReportView**</code> <strong>(ListView / TemplateView):</strong>
+<ul>
+<li>Query all <code>Asset</code> objects for current organization (<code>organization=current_tenant</code>).</li>
+<li>Annotate period metrics from <code>AssetViewerLog</code>: <code>period_views</code>, <code>period_unique_viewers</code>, <code>period_avg_watch_time</code>.</li>
+<li>Annotate recency stats: <code>last_viewed_at</code> (<code>MAX(created)</code>) and <code>days_since_last_view</code>.</li>
+<li>Include all videos (zero-view videos show 0 views, unviewed show <code>last_viewed_at = None</code>).</li>
+<li>Calculate Summary Card data: <strong>Top 5 Performers</strong> and <strong>Storage Cleanup Opportunity</strong> (assets with <code>last_viewed_at &lt; 90 days</code> or <code>None</code>, and sum of <code>Asset.bytes</code>).</li>
+<li>Apply pagination (25, 50, or 100 per page).</li>
+<li>Support white-listed column sorting (<code>period_views</code>, <code>bytes</code>, <code>last_viewed_at</code>, <code>title</code>).</li>
+<li>Apply Quick Filters (<code>zero_views_only</code>, <code>unviewed_days</code>).</li>
+<li>Enforce strict tenant isolation on all query branches.</li>
+</ul>
+</li>
+<li>[ ] <strong>Create</strong> <code>**VideoViewsExportView**</code> <strong>(Streaming View):</strong>
+<ul>
+<li>Accept same filter parameters (<code>start_date</code>, <code>end_date</code>, <code>search</code>, <code>zero_views_only</code>, <code>unviewed_days</code>).</li>
+<li>Run the annotated asset query without pagination using <code>queryset.iterator()</code>.</li>
+<li>Return <code>StreamingHttpResponse(content_type=&quot;text/csv&quot;)</code>.</li>
+<li>Yield CSV headers: <code>Asset UUID, Asset Title, Storage Size (Bytes), Formatted Storage Size, Period Views, Period Unique Viewers, Period Avg Watch Time (sec), Period Completion Rate (%), Last Viewed Date, Days Since Last View, Uploaded Date</code>.</li>
+<li>Format <code>last_viewed_at = None</code> as <code>&quot;Never Viewed&quot;</code> and <code>days_since_last_view = None</code> as <code>&quot;N/A&quot;</code>.</li>
+<li>Set <code>Content-Disposition: attachment; filename=&quot;video_analytics_YYYY_MM_DD.csv&quot;</code>.</li>
+<li>Catch <code>BrokenPipeError</code> / <code>ConnectionResetError</code> gracefully for connection drops.</li>
+<li><strong>No Celery — synchronous streaming only.</strong></li>
+</ul>
+</li>
+<li>[ ] <strong>Modify</strong> <code>**urls.py**</code><strong>:</strong>
+<ul>
+<li>Add route for <code>analytics/video-views/</code> → <code>VideoViewsReportView</code>.</li>
+<li>Add route for <code>analytics/video-views/export/</code> → <code>VideoViewsExportView</code>.</li>
+</ul>
+</li>
+<li>[ ] <strong>Add validation logic:</strong>
+<ul>
+<li>Enforce maximum date range of 3 months (90 days).</li>
+<li><code>start_date</code> ≤ <code>end_date</code>.</li>
+<li>Auto-cap future <code>end_date</code> to <code>today</code>.</li>
+</ul>
+</li>
+<li>[ ] <strong>Add error handling:</strong>
+<ul>
+<li>Return HTTP 400 for invalid date ranges with clear JSON / form error message.</li>
+<li>Return HTTP 403 for unauthorized/cross-tenant requests.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Testing &amp; Verification:</strong></p>
+<ul>
+<li>[ ] Unit tests for <code>AssetViewerLog</code> period aggregation and recency (<code>MAX(created)</code>).</li>
+<li>[ ] Unit tests for summary card calculations (Top 5 &amp; 90+ days reclaimable storage).</li>
+<li>[ ] Unit tests for tenant isolation (verify no cross-tenant data leakage).</li>
+<li>[ ] Unit tests for date range validation (3-month cap, future dates).</li>
+<li>[ ] Unit tests for zero-view and never-viewed assets.</li>
+<li>[ ] Unit tests for CSV output format and column headers.</li>
+<li>[ ] Test streaming behavior (<code>StreamingHttpResponse</code>).</li>
+<li>[ ] Integration test: export endpoint returns valid chunked CSV.</li>
+<li>[ ] Performance test: aggregation query over large log dataset executes rapidly with composite DB index.</li>
+</ul>
+<hr>
+<h3>PR 3: UI Implementation (Django Templates &amp; JS)</h3>
+<p><strong>Goal:</strong> Implement approved design in Django templates, wired to backend views.</p>
+<p><strong>Tasks:</strong></p>
+<ul>
+<li>[ ] <strong>Modify sidebar navigation &amp; tabs:</strong>
+<ul>
+<li>Update navigation links in <code>sidebar_desktop.html</code> and <code>sidebar_mobile.html</code> to point to Video Library Analytics.</li>
+<li>Update <code>desktop_tabs.html</code> and <code>tablet_tabs.html</code> to set active state correctly.</li>
+</ul>
+</li>
+<li>[ ] <strong>Create/Modify Template</strong> <code>**video_views.html**</code><strong>:</strong>
+<ul>
+<li>Implement date-range selector (monthly presets + custom date picker) with 3-month cap validation.</li>
+<li>Render <strong>Top Performers Card</strong> and <strong>Storage Cleanup Opportunity Card</strong> at top of page.</li>
+<li>Render Quick Filter toggle buttons (<em>Zero/Low Views</em>, <em>Unviewed &gt; 90 Days</em>).</li>
+<li>Implement table displaying <code>Asset Title</code>, <code>Storage Size</code>, <code>Views (Period)</code>, <code>Trend Badge</code>, <code>Unique Viewers</code>, <code>Last Viewed Date</code>.</li>
+<li>Render &quot;Never&quot; for unviewed assets.</li>
+<li>Implement &quot;Export CSV&quot; button calling the export route with active GET filter parameters.</li>
+<li>Render pagination controls (25, 50, 100 per page choices).</li>
+<li>Render loading state spinner during table updates.</li>
+<li>Render empty state (<em>No videos found matching criteria</em>).</li>
+<li>Render error alert when date range validation fails.</li>
+</ul>
+</li>
+<li>[ ] <strong>JavaScript Interactions:</strong>
+<ul>
+<li>Date range change / filter toggle → trigger table update (via AJAX / GET query reload).</li>
+<li>Frontend date validation: alert/prevent custom date selections &gt; 90 days.</li>
+<li>Export button click → trigger native browser CSV download.</li>
+</ul>
+</li>
+</ul>
+<p><strong>Testing &amp; Verification:</strong></p>
+<ul>
+<li>[ ] Test navigation: sidebar → Analytics → Video Library Analytics loads correctly.</li>
+<li>[ ] Test date-range selector: presets and custom ranges work up to 90 days limit.</li>
+<li>[ ] Test summary cards: display correct top performers and reclaimable storage numbers.</li>
+<li>[ ] Test table rendering: displays storage size, period views, recency, and zero-view assets.</li>
+<li>[ ] Test CSV Export: downloads file with correct headers, filename, and filtered data.</li>
+<li>[ ] Test 3-month cap: UI blocks selection exceeding 90 days.</li>
+<li>[ ] Test loading, empty, and error states.</li>
+<li>[ ] Test mobile responsiveness across devices.</li>
+<li>[ ] End-to-end workflow test: page load → filter date range → view summary cards &amp; table → stream CSV export.</li>
+</ul>
+<hr>
+<h2>Timeline Predictor</h2>
+<table>
+<thead>
+<tr>
+<th><strong>Task</strong></th>
+<th><strong>Owner</strong></th>
+<th><strong>Estimated Duration</strong></th>
+<th><strong>Dependencies</strong></th>
+<th><strong>Notes</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Design UI Mockup</strong></td>
+<td>Design team</td>
+<td>0.5 days (4 hrs)</td>
+<td>None</td>
+<td>Can start in parallel with backend development.</td>
+</tr>
+<tr>
+<td><strong>Backend DB Index, Views &amp; Export Logic</strong></td>
+<td>Engineering</td>
+<td>0.5–0.75 days (4–5 hrs)</td>
+<td>None</td>
+<td>Includes DB index migration, annotated ORM queries, summary cards logic, and streaming CSV.</td>
+</tr>
+<tr>
+<td><strong>UI Implementation</strong></td>
+<td>Engineering</td>
+<td>0.5 days (4 hrs)</td>
+<td>Design finalized, Backend views ready</td>
+<td>Integrates templates, summary cards, table filters, and JS interactions.</td>
+</tr>
+<tr>
+<td><strong>Testing &amp; Verification</strong></td>
+<td>Engineering</td>
+<td>0.25–0.5 days (2–3 hrs)</td>
+<td>UI Implementation complete</td>
+<td>Covers unit tests (tenant isolation, date validation), streaming CSV verification, and performance tests.</td>
+</tr>
+</tbody>
+</table>
+<h2>Roll-up Summary</h2>
+<p><strong>Total engineering hours:</strong> ~10 hours</p>
+<p><strong>Approximate delivery time:</strong> 3-4 calendar days (assuming 8-hour workdays, parallel work possible, with delays)</p>
+<p><strong>Opportunities for Parallelization:</strong></p>
+<ul>
+<li>UI Design and Backend Query/Index work can execute simultaneously.</li>
+<li>Frontend Django template implementation begins as soon as the design mockup and backend view contracts are ready.</li>
+</ul>
+<p><strong>Total across all teams:</strong> ~2–3 days end-to-end with parallelization (4 days maximum accounting for testing, code review, and QA).</p>
