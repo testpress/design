@@ -1,3 +1,4 @@
+{% from "src/ui-system/components/date-picker.html" import date_picker %}
 <!-- Toolbar: Search + Filters -->
 <div class="pb-4 border-b border-gray-200 dark:border-neutral-700 flex flex-wrap items-center justify-between gap-2">
 
@@ -17,7 +18,7 @@
   <div class="flex items-center gap-2 flex-wrap">
 
     <!-- Date Range Dropdown -->
-    <div class="hs-dropdown [--placement:bottom-start] relative inline-flex" x-data="{ dateLabel: 'Last 30 days' }">
+    <div class="hs-dropdown [--placement:bottom-start] [--auto-close:inside] relative inline-flex" x-data="{ dateLabel: 'Last 30 days', showCustom: false }">
       <button type="button" id="cp-date-toggle"
         class="py-[7px] px-3 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
         aria-haspopup="menu" aria-expanded="false">
@@ -28,20 +29,42 @@
         <svg class="shrink-0 size-3.5 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </button>
       <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-44 transition-[opacity,margin] duration opacity-0 hidden z-20 bg-white rounded-xl shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] border border-gray-200 py-1 dark:bg-neutral-900 dark:border-neutral-700" role="menu" aria-labelledby="cp-date-toggle">
-        <button type="button" @click="dateLabel='Last 7 days'" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">Last 7 days</button>
-        <button type="button" @click="dateLabel='Last 30 days'" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">Last 30 days</button>
-        <button type="button" @click="dateLabel='Last 90 days'" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">Last 90 days</button>
-        <button type="button" @click="dateLabel='All time'" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">All time</button>
+        <button type="button" @click="dateLabel='Last 7 days'; try { window.HSDropdown.getInstance($el.closest('.hs-dropdown')).close(); } catch(e){}" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">Last 7 days</button>
+        <button type="button" @click="dateLabel='Last 30 days'; try { window.HSDropdown.getInstance($el.closest('.hs-dropdown')).close(); } catch(e){}" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">Last 30 days</button>
+        <button type="button" @click="dateLabel='Last 90 days'; try { window.HSDropdown.getInstance($el.closest('.hs-dropdown')).close(); } catch(e){}" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">Last 90 days</button>
+        <button type="button" @click="dateLabel='All time'; try { window.HSDropdown.getInstance($el.closest('.hs-dropdown')).close(); } catch(e){}" class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800" role="menuitem">All time</button>
         <div class="my-1 border-t border-gray-100 dark:border-neutral-700"></div>
-        <button type="button"
-          @click="dateLabel='Custom'"
-          onclick="document.getElementById('perf-custom-date')._flatpickr ? document.getElementById('perf-custom-date')._flatpickr.open() : null"
-          class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          role="menuitem">Custom</button>
+        
+        <!-- Custom range — click opens left flyout -->
+        <div class="relative" @click.stop>
+          <button type="button"
+            @click="showCustom = !showCustom"
+            class="w-full flex items-center justify-between gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+            role="menuitem">
+            Custom range
+            <i data-lucide="chevron-right" class="shrink-0 size-3.5 text-gray-400"></i>
+          </button>
+
+          <!-- Flyout: below on mobile, LEFT on sm+ -->
+          <div x-show="showCustom" x-cloak @click.stop
+               class="absolute top-full left-0 mt-1 sm:top-0 sm:right-full sm:left-auto sm:mt-0 sm:mr-2 z-50 shadow-xl rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 [&_.shadow-lg]:shadow-none">
+            <div @click="
+              if ($event.target.innerText?.trim() === 'Apply') {
+                var val = $el.querySelector('input[name=perf_custom_date]')?.value;
+                if (val) {
+                  dateLabel = val;
+                  showCustom = false;
+                  try { window.HSDropdown.getInstance($el.closest('.hs-dropdown')).close(); } catch(e){}
+                }
+              }
+            ">
+              {{ date_picker(name="perf_custom_date", inline=true, range=true, show_footer_actions=true) }}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
-    <!-- Hidden flatpickr anchor — calendar pops from here -->
-    <input id="perf-custom-date" class="flatpickr-input sr-only" type="text" readonly="readonly" placeholder="Select date range">
     <!-- End Date Range -->
 
     <!-- Country Dropdown -->
