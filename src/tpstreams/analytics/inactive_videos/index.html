@@ -1,0 +1,138 @@
+---
+slug: analytics/inactive_videos
+tags: tpstreams
+title: Inactive Videos
+---
+
+{% from "src/ui-system/components/modal.html" import modal %}
+
+{% extends "layouts/tpstreams/sidebar_layout.html" %}
+
+{% block main_content %}
+<div class="space-y-5" x-data="{
+  selected: [],
+  deleteTarget: null,
+  toggleAll(event) {
+    const checkboxes = document.querySelectorAll('.row-checkbox');
+    checkboxes.forEach(cb => {
+      cb.checked = event.target.checked;
+      const id = cb.dataset.id;
+      if (event.target.checked) { if (!this.selected.includes(id)) this.selected.push(id); }
+      else { this.selected = []; }
+    });
+  },
+  openSingleDelete(name, storage) {
+    this.deleteTarget = { name, storage };
+    Alpine.store('ivDelete').name = name;
+    Alpine.store('ivDelete').storage = storage;
+    this.$dispatch('open-modal-delete-single');
+  },
+  get bulkStorage() {
+    const sizes = { '1': 12.4, '2': 9.8, '3': 18.2, '4': 22.1, '5': 7.5, '6': 14.3 };
+    return this.selected.reduce((sum, id) => sum + (sizes[id] || 0), 0).toFixed(1);
+  },
+  syncBulkStore() {
+    Alpine.store('ivDelete').count = this.selected.length;
+    Alpine.store('ivDelete').bulkGB = this.bulkStorage;
+    this.$dispatch('open-modal-delete-bulk');
+  }
+}">
+
+  {% include "./includes/breadcrumb.html" %}
+
+  <!-- Card -->
+  <div class="p-5 flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+
+    {% include "./includes/toolbar.html" %}
+
+    <!-- Bulk Action Bar (shown on selection) -->
+    <div x-show="selected.length > 0" x-cloak
+      class="mt-3 mb-2 flex items-center justify-between gap-x-3 py-2 px-3 bg-yellow-50 border border-yellow-200 rounded-lg dark:bg-yellow-500/10 dark:border-yellow-900">
+      <span class="text-sm text-yellow-800 dark:text-yellow-400">
+        <span x-text="selected.length"></span> video(s) selected
+      </span>
+      <button type="button"
+        @click="syncBulkStore()"
+        class="inline-flex items-center gap-x-1.5 py-1.5 px-3 text-xs font-medium rounded-lg border border-transparent bg-red-600 text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+        Delete Selected
+      </button>
+    </div>
+
+    <!-- Table -->
+    <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+      <div class="min-w-full inline-block align-middle">
+        {% include "./includes/table_header.html" %}
+        {% include "./includes/table_items.html" %}
+      </div>
+    </div>
+    <!-- End Table -->
+
+  </div>
+  <!-- End Card -->
+
+</div>
+
+<!-- ============================================================ -->
+<!-- Single Delete Modal                                          -->
+<!-- ============================================================ -->
+{% call modal(
+  id="delete-single",
+  title="Delete permanently?",
+  size="sm",
+  variant="danger",
+  confirm_text="Delete permanently",
+  cancel_text="Cancel"
+) %}
+  <div x-data="{ get s() { return Alpine.store('ivDelete') } }" class="space-y-3">
+    <p class="text-sm text-gray-600 dark:text-neutral-400">
+      Are you sure you want to permanently delete
+      <span class="font-semibold text-gray-800 dark:text-neutral-200" x-text="s.name"></span>?
+      This action cannot be undone.
+    </p>
+    <!-- Storage info -->
+    <div class="border-l-2 border-gray-300 dark:border-neutral-600 pl-3 py-1">
+      <p class="text-sm text-gray-500 dark:text-neutral-400">
+        <span class="font-semibold text-gray-700 dark:text-neutral-200" x-text="s.storage"></span>
+        of storage will be freed.
+      </p>
+    </div>
+  </div>
+{% endcall %}
+
+<!-- ============================================================ -->
+<!-- Bulk Delete Modal                                            -->
+<!-- ============================================================ -->
+{% call modal(
+  id="delete-bulk",
+  title="Delete permanently?",
+  size="sm",
+  variant="danger",
+  confirm_text="Delete permanently",
+  cancel_text="Cancel"
+) %}
+  <div x-data="{ get s() { return Alpine.store('ivDelete') } }" class="space-y-3">
+    <p class="text-sm text-gray-600 dark:text-neutral-400">
+      Are you sure you want to permanently delete
+      <span class="font-semibold text-gray-800 dark:text-neutral-200" x-text="s.count + ' videos'"></span>?
+      This action cannot be undone.
+    </p>
+    <!-- Storage info -->
+    <div class="border-l-2 border-gray-300 dark:border-neutral-600 pl-3 py-1">
+      <p class="text-sm text-gray-500 dark:text-neutral-400">
+        <span class="font-semibold text-gray-700 dark:text-neutral-200" x-text="s.bulkGB + ' GB'"></span>
+        of storage will be freed.
+      </p>
+    </div>
+  </div>
+{% endcall %}
+
+{% endblock main_content %}
+
+{% block script %}
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.store('ivDelete', { name: '', storage: '', count: 0, bulkGB: '0' });
+  });
+</script>
+{% endblock script %}

@@ -1,0 +1,146 @@
+<!-- Scripts for Regional Performance Datamap -->
+<style>
+  .datamaps-hoverover {
+    pointer-events: none;
+  }
+  .datamaps-subunit {
+    transition: fill 0.2s ease-in-out;
+  }
+  .datamaps-subunit:hover {
+    fill: var(--map-colors-highlight, #0768fd) !important;
+  }
+  html.dark .datamaps-subunit:hover {
+    fill: var(--map-colors-highlight-inverse, #0768fd) !important;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.3/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.9/topojson.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/datamaps/0.5.9/datamaps.world.min.js"></script>
+<script src="https://preline.co/assets/vendor/preline/dist/helper-shared.js"></script>
+
+<script>
+  // Regional Performance Datamap
+  (function () {
+    const tabpanel = document.querySelector('#hs-users-datamap').closest('[role="tabpanel"]');
+    let tabTheme = null;
+    const dataSet = {
+      BRA: {
+        views: '4,512',
+        watchTime: '1,900',
+        fillKey: 'MAJOR',
+        short: 'br'
+      },
+      CHN: {
+        views: '6,837',
+        watchTime: '2,450',
+        fillKey: 'MAJOR',
+        short: 'cn'
+      },
+      DEU: {
+        views: '3,795',
+        watchTime: '1,240',
+        fillKey: 'MAJOR',
+        short: 'de'
+      },
+      GBR: {
+        views: '2,100',
+        watchTime: '890',
+        fillKey: 'MAJOR',
+        short: 'gb'
+      },
+      IND: {
+        views: '8,545',
+        watchTime: '3,890',
+        fillKey: 'MAJOR',
+        short: 'in'
+      },
+      USA: {
+        views: '10,013',
+        watchTime: '4,120',
+        fillKey: 'MAJOR',
+        short: 'us',
+        customName: 'United States'
+      }
+    };
+    const dataMap = new Datamap({
+      element: document.querySelector('#hs-users-datamap'),
+      projection: 'mercator',
+      responsive: true,
+      fills: {
+        defaultFill: varToColor('--map-colors-default') || '#f3f4f6',
+        MAJOR: varToColor('--map-colors-primary') || '#0768fd',
+      },
+      data: dataSet,
+      geographyConfig: {
+        highlightOnHover: false,
+        borderColor: (localStorage.getItem('hs_theme') === 'dark') ? varToColor('--map-colors-border-inverse') || '#374151' : varToColor('--map-colors-border') || '#e5e7eb',
+        highlightFillColor: () => (localStorage.getItem('hs_theme') === 'dark') ? varToColor('--map-colors-highlight-inverse') || '#0768fd' : varToColor('--map-colors-highlight') || '#0768fd',
+        highlightBorderColor: () => (localStorage.getItem('hs_theme') === 'dark') ? varToColor('--map-colors-highlight-inverse') || '#0768fd' : varToColor('--map-colors-highlight') || '#0768fd',
+        popupTemplate: function (geo, data) {
+          if (!data || !data.views) return '<div style="display: none;"></div>';
+          return `<div class="bg-white rounded-xl shadow-xl w-40 p-3 dark:bg-neutral-800 dark:border dark:border-neutral-700">
+            <div class="flex mb-1">
+              <div class="me-2">
+                <div class="w-4 h-4 rounded-full bg-no-repeat bg-center bg-cover" style="background-image: url('https://cdn.jsdelivr.net/npm/svg-country-flags/svg/${data.short}.svg')"></div>
+              </div>
+              <span class="text-sm font-medium text-gray-800 dark:text-neutral-200">${data.customName || geo.properties.name}</span>
+            </div>
+            <div class="flex flex-col mt-2 gap-y-1">
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-500 dark:text-neutral-400">Views:</span>
+                <span class="text-xs font-semibold text-gray-800 dark:text-neutral-200">${data.views}</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-gray-500 dark:text-neutral-400">Watch Time:</span>
+                <span class="text-xs font-semibold text-gray-800 dark:text-neutral-200">${data.watchTime} hrs</span>
+              </div>
+            </div>
+          </div>`;
+        }
+      }
+    });
+    dataMap.addPlugin('update', function (_, mode) {
+      this.options.fills = (mode === 'dark') ? {
+        defaultFill: varToColor('--map-colors-default-inverse') || '#374151',
+        MAJOR: varToColor('--map-colors-primary-inverse') || '#0768fd',
+      } : {
+        defaultFill: varToColor('--map-colors-default') || '#f3f4f6',
+        MAJOR: varToColor('--map-colors-primary') || '#0768fd',
+      };
+
+      this.svg.selectAll('.datamaps-subunit').style('stroke', () => (mode === 'dark') ? varToColor('--map-colors-border-inverse') || '#4b5563' : varToColor('--map-colors-border') || '#e5e7eb');
+
+      this.updateChoropleth(dataSet, { reset: true });
+    });
+
+    dataMap.update(localStorage.getItem('hs_theme'));
+
+    window.addEventListener('on-hs-appearance-change', (evt) => {
+      tabTheme = evt.detail;
+      dataMap.update(evt.detail);
+    });
+
+    const getCurrentMapMode = (eventDetail) => {
+      if (tabTheme) return tabTheme;
+      if (typeof eventDetail === 'string') return eventDetail;
+      return localStorage.getItem('hs_theme');
+    };
+
+    window.addEventListener('on-hs-color-theme-change', (evt) => {
+      dataMap.update(getCurrentMapMode(evt.detail));
+    });
+
+    window.addEventListener('on-hs-brand-change', (evt) => {
+      dataMap.update(getCurrentMapMode(evt.detail));
+    });
+
+    if (tabpanel) tabpanel.addEventListener('on-hs-appearance-change', (evt) => {
+      tabTheme = evt.detail;
+      dataMap.update(tabTheme);
+    });
+
+    window.addEventListener('resize', function () {
+      dataMap.resize();
+    });
+  })();
+</script>
