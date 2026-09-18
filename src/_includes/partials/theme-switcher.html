@@ -1,6 +1,6 @@
 <!-- Theme Switcher Toolbar -->
 <div id="template-preview-toolbar" class="fixed top-0 inset-x-0 z-[60] bg-white border-b border-stone-200 dark:bg-neutral-900 dark:border-neutral-700 shrink-0 px-3 pt-2 pb-2 sm:px-4 lg:px-5">
-        <div class="flex items-center justify-between gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3">
           <!-- Title & Breadcrumbs -->
           <div class="min-w-0 lg:flex lg:flex-col lg:justify-center">
             <div class="flex items-center gap-x-1.5">
@@ -637,13 +637,13 @@
             <!-- End Dark Mode Switch -->
 
             <div class="relative ps-2 lg:ps-3 ms-1 lg:ms-2 before:absolute before:top-1/2 before:start-0 before:w-px before:h-4 before:bg-stone-300 before:-translate-y-1/2 dark:before:bg-neutral-600">
-              <button data-download="all-templates" type="button" class="mt-auto py-1.5 lg:py-2 ps-2 lg:ps-3 pe-1.5 lg:pe-2 inline-flex justify-center items-center gap-x-1 whitespace-nowrap text-sm font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-blue-700">
+              <button id="download-design-btn" type="button" class="mt-auto py-1.5 lg:py-2 ps-2 lg:ps-3 pe-2 lg:pe-2.5 inline-flex justify-center items-center gap-x-1.5 whitespace-nowrap text-sm font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-blue-700">
                 <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"></path>
                   <path d="M12 12v9"></path>
                   <path d="m8 17 4 4 4-4"></path>
                 </svg>
-                Download Templates
+                Download Design
               </button>
             </div>
           </div>
@@ -823,12 +823,6 @@
           header.style.transition = 'top 0.2s';
           header.style.top = height + 'px';
         }
-        
-        // We also need to push the main content down because the header moved down
-        const main = document.querySelector('main#content');
-        if (main) {
-          main.style.paddingTop = `calc(3.75rem + ${height}px)`;
-        }
       }
     }
     
@@ -878,6 +872,198 @@
       
       breadcrumbContainer.innerHTML = breadcrumbsHTML;
     }
+
+    // --- Download Logic ---
+    function getPageSlug() {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      return parts[parts.length - 1] || 'design';
+    }
+
+    // Extract all CSS custom properties (theme variables) from computed styles
+    function collectThemeCSS() {
+      let css = '';
+
+      // 1. Collect all CSS rules from same-origin stylesheets
+      //    This captures theme variables, custom utility definitions, etc.
+      for (const sheet of document.styleSheets) {
+        try {
+          const rules = sheet.cssRules || sheet.rules;
+          if (rules) {
+            for (const rule of rules) {
+              const text = rule.cssText;
+              // Keep rules that define CSS custom properties (--) or @theme/@layer
+              // Also keep rules for custom classes not in standard Tailwind
+              if (text.includes('--') || text.includes('@layer') || text.includes('@theme') ||
+                  text.includes('data-theme') || text.includes('data-font') || text.includes('data-brand') ||
+                  text.includes('.hs-') || text.includes('[data-')) {
+                css += text + '\n';
+              }
+            }
+          }
+        } catch (e) {
+          // Cross-origin — skip
+        }
+      }
+
+      // 2. Also grab any inline <style> content (includes runtime-injected CSS vars)
+      document.querySelectorAll('style').forEach(s => {
+        css += s.textContent + '\n';
+      });
+
+      return css;
+    }
+
+    function buildCleanHTML() {
+      const origin = window.location.origin;
+      const themeCSS = collectThemeCSS();
+
+      const pageHtml = document.documentElement.cloneNode(true);
+
+      // Remove toolbar/spacer
+      pageHtml.querySelector('#template-preview-toolbar')?.remove();
+      pageHtml.querySelector('#template-preview-spacer')?.remove();
+
+      const head = pageHtml.querySelector('head');
+
+      // Remove ALL existing <link rel="stylesheet"> and <style> tags
+      pageHtml.querySelectorAll('link[rel="stylesheet"]').forEach(l => l.remove());
+      pageHtml.querySelectorAll('style').forEach(s => s.remove());
+
+      // Remove local script tags (node_modules etc.)
+      pageHtml.querySelectorAll('script[src]').forEach(s => {
+        const src = s.getAttribute('src');
+        if (src && !src.startsWith('http')) s.remove();
+      });
+
+      // --- Add CDN links ---
+      // Preline CSS
+      const prelineCss = document.createElement('link');
+      prelineCss.rel = 'stylesheet';
+      prelineCss.href = 'https://cdn.jsdelivr.net/npm/preline@2.6.0/dist/preline.min.css';
+      head?.insertBefore(prelineCss, head.firstChild);
+
+      // Google Fonts (Inter + others)
+      const fontsLink = document.createElement('link');
+      fontsLink.rel = 'stylesheet';
+      fontsLink.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@100..900&family=Outfit:wght@100..900&family=Nunito:ital,wght@0,200..1000;1,200..1000&family=Domine:wght@400..700&family=Kode+Mono:wght@400..700&family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap';
+      head?.insertBefore(fontsLink, head.firstChild);
+
+      // Preconnect for Google Fonts
+      const preconnect1 = document.createElement('link');
+      preconnect1.rel = 'preconnect';
+      preconnect1.href = 'https://fonts.googleapis.com';
+      head?.insertBefore(preconnect1, head.firstChild);
+      const preconnect2 = document.createElement('link');
+      preconnect2.rel = 'preconnect';
+      preconnect2.href = 'https://fonts.gstatic.com';
+      preconnect2.crossOrigin = '';
+      head?.insertBefore(preconnect2, preconnect1.nextSibling);
+
+      // Inject theme CSS variables as inline <style>
+      const styleEl = document.createElement('style');
+      let finalThemeCSS = themeCSS;
+
+      // Ensure brand color is applied correctly by injecting it into :root
+      const currentBrandColor = localStorage.getItem('hs_brand_color') || 'blue';
+      if (currentBrandColor !== 'default' && currentBrandColor !== 'blue') {
+        const c = currentBrandColor;
+        finalThemeCSS += `
+:root {
+  --primary-50: var(--color-${c}-50);
+  --primary-100: var(--color-${c}-100);
+  --primary-200: var(--color-${c}-200);
+  --primary-300: var(--color-${c}-300);
+  --primary-400: var(--color-${c}-400);
+  --primary-500: var(--color-${c}-500);
+  --primary-600: var(--color-${c}-600);
+  --primary-700: var(--color-${c}-700);
+  --primary-800: var(--color-${c}-800);
+  --primary-900: var(--color-${c}-900);
+  --primary-950: var(--color-${c}-950);
+  --primary: var(--color-${c}-600);
+  --primary-hover: var(--color-${c}-700);
+  --primary-focus: var(--color-${c}-700);
+  --primary-active: var(--color-${c}-700);
+  --primary-checked: var(--color-${c}-600);
+}
+`;
+      }
+      
+      styleEl.textContent = finalThemeCSS;
+      head?.appendChild(styleEl);
+      
+      // Remove any lingering inline styles on the html tag to prevent conflicts
+      pageHtml.removeAttribute('style');
+
+      // --- Add CDN scripts at end of body ---
+      const body = pageHtml.querySelector('body');
+
+      // Lodash
+      const lodashJs = document.createElement('script');
+      lodashJs.src = 'https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js';
+      body?.appendChild(lodashJs);
+
+      // ApexCharts
+      const apexJs = document.createElement('script');
+      apexJs.src = 'https://cdn.jsdelivr.net/npm/apexcharts';
+      body?.appendChild(apexJs);
+
+      // Preline JS
+      const prelineJs = document.createElement('script');
+      prelineJs.src = 'https://cdn.jsdelivr.net/npm/preline@2.6.0/dist/preline.min.js';
+      body?.appendChild(prelineJs);
+
+      // Alpine.js
+      const alpineJs = document.createElement('script');
+      alpineJs.defer = true;
+      alpineJs.src = 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js';
+      body?.appendChild(alpineJs);
+
+      // Lucide icons
+      const lucideJs = document.createElement('script');
+      lucideJs.src = 'https://unpkg.com/lucide@latest';
+      body?.appendChild(lucideJs);
+      const lucideInit = document.createElement('script');
+      lucideInit.textContent = 'document.addEventListener("DOMContentLoaded",function(){if(window.lucide)lucide.createIcons();});';
+      body?.appendChild(lucideInit);
+
+      // Fix relative image src to absolute URLs
+      pageHtml.querySelectorAll('[src]').forEach(el => {
+        const val = el.getAttribute('src');
+        if (val && !val.startsWith('http') && !val.startsWith('data:') && !val.startsWith('blob:')) {
+          try { el.setAttribute('src', new URL(val, origin).href); } catch {}
+        }
+      });
+
+      // Set current theme/font/brand attributes
+      const currentTheme = document.documentElement.getAttribute('data-theme') || '';
+      const currentBrand = document.documentElement.getAttribute('data-brand') || '';
+      const currentFont  = document.documentElement.getAttribute('data-font') || 'sans';
+      if (currentTheme) pageHtml.setAttribute('data-theme', currentTheme);
+      if (currentBrand) pageHtml.setAttribute('data-brand', currentBrand);
+      pageHtml.setAttribute('data-font', currentFont);
+
+      // Reset inline styles injected by toolbar JS
+      const header = pageHtml.querySelector('header.fixed, header[style*="top"]');
+      if (header) { header.style.top = ''; header.style.transition = ''; }
+      const main = pageHtml.querySelector('main#content, main[style*="padding"]');
+      if (main) { main.style.paddingTop = ''; }
+
+      return '<!DOCTYPE html>\n' + pageHtml.outerHTML;
+    }
+
+    // Single download button
+    document.getElementById('download-design-btn')?.addEventListener('click', () => {
+      const slug = getPageSlug();
+      const html = buildCleanHTML();
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${slug}.html`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
 
   })();
 </script>
