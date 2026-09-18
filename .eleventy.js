@@ -75,6 +75,7 @@ module.exports = config => {
     config.addPassthroughCopy("css/limeread.css");
     config.addPassthroughCopy("css/sentinel.css");
     config.addPassthroughCopy("css/sentinel-backend.css");
+    config.addPassthroughCopy("css/testpress-v2.css");
     config.addPassthroughCopy({
         "src/odinhire/node_modules/preline/dist/preline.js":
             "src/odinhire/node_modules/preline/dist/preline.js",
@@ -90,6 +91,10 @@ module.exports = config => {
     config.addPassthroughCopy({
         "src/sentinel/node_modules/preline/dist/preline.js":
             "src/sentinel/node_modules/preline/dist/preline.js",
+    });
+    config.addPassthroughCopy({
+        "src/testpress/node_modules/preline/dist/preline.js":
+            "src/testpress/node_modules/preline/dist/preline.js",
     });
     config.addPassthroughCopy({
         "src/simba/node_modules/apexcharts/dist/apexcharts.css":
