@@ -5,7 +5,8 @@
   width="small",
   id="",
   extra_classes="",
-  trigger_classes=""
+  trigger_classes="",
+  adaptive=true
 ) %}
 
 {% set width_classes = {
@@ -28,6 +29,7 @@
          this.$watch('open', value => {
            console.log('Watch open value:', value);
            if (value) {
+             this.$dispatch('dropdown-opened');
              console.log('Trigger ref:', this.$refs.trigger, 'Menu ref:', this.$refs.menu);
              this._triggerEl = this.$refs.trigger;
              this._menuEl = this.$refs.menu;
@@ -57,22 +59,23 @@
          console.log('Trigger bounding rect:', rect);
          this.top = rect.bottom + 4;
          const placement = '{{ placement }}';
+         const adaptive = {{ 'true' if adaptive else 'false' }};
          console.log('Placement:', placement);
           const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
           const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
           
           if (placement === 'bottom-end' || placement === 'top-end') {
-            if (rect.right < menuWidth) {
+            if (adaptive && rect.right < menuWidth) {
               this.left = rect.left;
               this.right = 'auto';
             } else {
-              this.left = rect.right - menuWidth;
-              this.right = 'auto';
+              this.left = 'auto';
+              this.right = window.innerWidth - rect.right;
             }
             this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
           } else if (placement === 'bottom-start' || placement === 'top-start') {
             let leftPos = rect.left;
-            if (window.innerWidth - leftPos < menuWidth) {
+            if (adaptive && (window.innerWidth - leftPos < menuWidth)) {
               this.left = 'auto';
               this.right = window.innerWidth - rect.right;
             } else {
@@ -84,6 +87,7 @@
        }
      }" 
      @keydown.escape.window="open = false"
+     @dropdown-opened.window="if ($event.target !== $el) open = false"
      class="inline-flex {{ extra_classes }}">
   
   <!-- Trigger -->
