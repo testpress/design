@@ -8,6 +8,9 @@ module.exports = {
     "./src/**/*.{html,js}",
     "!./src/simba/**",
     "!./src/sentinel/proctor_widget/**",
+    "!./src/sentinel/session_monitor/**",
+    "!./src/sentinel/warning_widget/**",
+    "!./src/sentinel/authentication/**",
     "node_modules/preline/dist/*.js",
     "node_modules/@themesberg/tailwind-datepicker/dist/js/*.js"
   ],
