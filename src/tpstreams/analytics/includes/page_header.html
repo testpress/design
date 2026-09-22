@@ -1,0 +1,123 @@
+{% from "src/ui-system/components/date-picker.html" import date_picker %}
+
+<div class="flex flex-wrap justify-between items-start gap-2 mb-8"
+  x-data="userAnalyticsDateRange()"
+  @user-analytics-date-range-applied.window="label = $event.detail.label">
+  <div>
+    <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-neutral-200">
+      Analytics
+    </h1>
+  </div>
+  <div class="flex justify-end items-center gap-x-2 mt-2 sm:mt-0">
+
+    <!-- Date Range Dropdown -->
+    <div x-data="{ showCustom: false, hideTimeout: null }"
+         class="hs-dropdown [--auto-close:inside] [--placement:bottom-end] inline-flex">
+      <button id="user-analytics-date-range-toggle" type="button"
+        class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+        aria-haspopup="menu" aria-expanded="false" aria-label="Date range">
+        <span x-text="label"></span>
+        <i data-lucide="chevron-down" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
+      </button>
+      <div
+        class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden min-w-[11rem] z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 dark:bg-neutral-800 dark:border-neutral-700"
+        role="menu" aria-orientation="vertical" aria-labelledby="user-analytics-date-range-toggle">
+        <button type="button" @click="setRange('7')"
+          class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          role="menuitem">Last 7 days</button>
+        <button type="button" @click="setRange('30')"
+          class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          role="menuitem">Last 30 days</button>
+        <button type="button" @click="setRange('60')"
+          class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          role="menuitem">Last 2 months</button>
+        <button type="button" @click="setRange('90')"
+          class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          role="menuitem">Last 3 months</button>
+        <button type="button" @click="setRange('180')"
+          class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          role="menuitem">Last 6 months</button>
+        <button type="button" @click="setRange('365')"
+          class="w-full flex items-center gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+          role="menuitem">Last 12 months</button>
+
+        <!-- Divider -->
+        <div class="my-1 border-t border-gray-100 dark:border-neutral-700"></div>
+
+        <!-- Custom range — click opens left flyout -->
+        <div class="relative" @click.stop>
+          <button type="button"
+            @click="showCustom = !showCustom"
+            class="w-full flex items-center justify-between gap-x-2 py-2 px-3 text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"
+            role="menuitem">
+            Custom range
+            <i data-lucide="chevron-right" class="shrink-0 size-3.5 text-gray-400"></i>
+          </button>
+
+          <!-- Flyout: below on mobile, LEFT on sm+ -->
+          <div x-show="showCustom" x-cloak @click.stop
+               class="absolute top-full left-0 mt-1 sm:top-0 sm:right-full sm:left-auto sm:mt-0 sm:mr-2 z-50 shadow-xl rounded-xl border border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 [&_.shadow-lg]:shadow-none">
+            <div @click="
+              if ($event.target.innerText?.trim() === 'Apply') {
+                var val = $el.querySelector('input[name=analytics_custom_date]')?.value;
+                if (val) { setCustomRange(val); showCustom = false; }
+              }
+            ">
+              {{ date_picker(name="analytics_custom_date", inline=true, range=true, show_footer_actions=true) }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <input type="hidden" id="user-analytics-date-range" value="30" />
+
+    <button type="button"
+      class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700"
+      aria-label="Export">
+      <i data-lucide="download" class="shrink-0 size-4"></i>
+      Export
+    </button>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('alpine:init', function () {
+    Alpine.data('userAnalyticsDateRange', function () {
+      const labels = {
+        '7': 'Last 7 days',
+        '30': 'Last 30 days',
+        '60': 'Last 2 months',
+        '90': 'Last 3 months',
+        '180': 'Last 6 months',
+        '365': 'Last 12 months'
+      };
+      return {
+        label: 'Last 30 days',
+        setRange(value) {
+          const el = document.getElementById('user-analytics-date-range');
+          if (!el) return;
+          el.value = value;
+          this.label = labels[value] || (value + ' days');
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          var toggle = document.getElementById('user-analytics-date-range-toggle');
+          if (window.HSDropdown && toggle) {
+            try { window.HSDropdown.getInstance(toggle).close(); } catch (e) {}
+          }
+        },
+        setCustomRange(value) {
+          const el = document.getElementById('user-analytics-date-range');
+          if (!el) return;
+          el.value = value;
+          this.label = value;
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          var toggle = document.getElementById('user-analytics-date-range-toggle');
+          if (window.HSDropdown && toggle) {
+            try { window.HSDropdown.getInstance(toggle).close(); } catch (e) {}
+          }
+        }
+      };
+    });
+  });
+</script>
