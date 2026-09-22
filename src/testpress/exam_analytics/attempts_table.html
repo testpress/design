@@ -1,0 +1,208 @@
+{% from "../../ui-system/components/table.html" import table %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../ui-system/components/badge.html" import badge %}
+
+{% set filters %}
+  <div class="flex items-center gap-2">
+    <button @click="$dispatch('open-drawer-attempts-filter')" type="button" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-label="Filter">
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"></line><line x1="10" x2="3" y1="4" y2="4"></line><line x1="21" x2="12" y1="12" y2="12"></line><line x1="8" x2="3" y1="12" y2="12"></line><line x1="21" x2="16" y1="20" y2="20"></line><line x1="12" x2="3" y1="20" y2="20"></line><line x1="14" x2="14" y1="2" y2="6"></line><line x1="8" x2="8" y1="10" y2="14"></line><line x1="16" x2="16" y1="18" y2="22"></line></svg>
+      Filter
+      <span class="font-medium text-[10px] py-0.5 px-[5px] bg-gray-800 text-white leading-3 rounded-full dark:bg-neutral-500">
+        3
+      </span>
+    </button>
+  </div>
+{% endset %}
+
+{% macro preline_th(id, title, options) %}
+<th scope="col" class="{% if title == 'Student Name' %}min-w-[250px]{% endif %}">
+  <div class="hs-dropdown relative inline-flex w-full cursor-pointer">
+    <button id="{{ id }}" type="button" class="px-4 py-2.5 whitespace-nowrap text-start w-full flex items-center gap-x-1 text-sm font-normal text-gray-500 dark:text-neutral-500 focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+      {{ title }}
+      <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+    </button>
+
+    <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 w-48 transition-[opacity,margin] duration opacity-0 hidden z-10 bg-white rounded-xl shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_40px_10px_rgba(0,0,0,0.2)] dark:bg-neutral-900" role="menu" aria-orientation="vertical" aria-labelledby="{{ id }}">
+      <div class="p-1">
+        {% for opt in options %}
+        <button type="button" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal text-gray-800 hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-300 focus:outline-none focus:bg-gray-100 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+          {% if loop.index % 2 != 0 %}
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+          {% else %}
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+          {% endif %}
+          {{ opt }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</th>
+{% endmacro %}
+
+{% set table_header %}
+  {{ preline_th("sort-student", "Student Name", ["A-Z Student Name", "Z-A Student Name", "Latest attempted", "Old attempted"]) }}
+  {{ preline_th("sort-score", "Score", ["Sort ascending", "Sort descending"]) }}
+  {{ preline_th("sort-percent", "Percentage", ["Sort ascending", "Sort descending"]) }}
+  {{ preline_th("sort-answered", "Answered", ["Sort ascending", "Sort descending"]) }}
+  {{ preline_th("sort-correct", "Correct", ["Sort ascending", "Sort descending"]) }}
+  {{ preline_th("sort-incorrect", "Incorrect", ["Sort ascending", "Sort descending"]) }}
+  {{ preline_th("sort-integrity", "Integrity Score", ["Sort ascending", "Sort descending"]) }}
+  <th scope="col" class="px-4 py-3 text-end text-sm font-medium text-gray-800 dark:text-neutral-200"></th>
+{% endset %}
+
+{% set action_items = [
+  {"label": "Re-evaluate", "icon": "file-pen", "url": "#"},
+  {"label": "View Answers", "icon": "file-text", "url": "#"},
+  {"label": "Get Review PDF", "icon": "file-down", "url": "#"},
+  {"label": "Access History", "icon": "clock", "url": "#"},
+  {"label": "Delete Attempt", "icon": "x-circle", "url": "#", "variant": "danger"},
+  {"label": "Extend Time", "icon": "timer", "url": "#"}
+] %}
+
+{% set students = [
+  {"name": "Ramesh Gupta", "status": "completed", "result": "passed", "date": "Jan 12 09:30 am", "answered": "108", "correct": "98", "incorrect": "10", "score": "90/150", "percentage": "60%", "integrity_score": "30", "is_flagged": true, "avatar": "https://images.unsplash.com/photo-1541101767792-f9b2b1c4f127?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=300&h=300&q=80"},
+  {"name": "Anita Sharma", "status": "completed", "result": "passed", "date": "Feb 01 10:15 am", "answered": "115", "correct": "105", "incorrect": "10", "score": "92/150", "percentage": "61%", "integrity_score": "95", "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80"},
+  {"name": "Olivia Smith", "status": "running", "date": "Jan 10 11:00 am", "answered": "110", "correct": "100", "incorrect": "10", "score": "95/150", "percentage": "63%", "integrity_score": "-"},
+  {"name": "Sanjay Verma", "status": "completed", "result": "failed", "date": "Feb 10 11:20 am", "answered": "112", "correct": "100", "incorrect": "12", "score": "88/150", "percentage": "58%", "integrity_score": "88", "avatar": "https://images.unsplash.com/photo-1531427186611-ecfd6d936c79?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80"},
+  {"name": "David Clark", "status": "completed", "result": "failed", "date": "Mar 08 04:30 pm", "answered": "110", "correct": "95", "incorrect": "15", "score": "85/150", "percentage": "56%", "integrity_score": "91", "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80"},
+  {"name": "Rajesh Kumar", "status": "running", "date": "Jan 11 02:00 pm", "answered": "45", "correct": "40", "incorrect": "5", "score": "-", "percentage": "-", "integrity_score": "-"},
+  {"name": "Vikas Singh", "status": "completed", "result": "passed", "date": "Feb 05 02:45 pm", "answered": "105", "correct": "95", "incorrect": "10", "score": "91/150", "percentage": "60%", "integrity_score": "98", "avatar": "https://images.unsplash.com/photo-1599566150163-29194dcaad36?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80"},
+  {"name": "Sarah Jenkins", "status": "completed", "result": "failed", "date": "Apr 12 11:55 am", "answered": "114", "correct": "102", "incorrect": "12", "score": "89/150", "percentage": "59%", "integrity_score": "25", "is_flagged": true, "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2&w=300&h=300&q=80"},
+  {"name": "Sneha Patel", "status": "running", "date": "Jan 11 03:30 pm", "answered": "60", "correct": "55", "incorrect": "5", "score": "-", "percentage": "-", "integrity_score": "-"}
+] %}
+
+<div class="mt-6 space-y-4" x-data="{ selectedStatus: 'all' }">
+  <div class="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+    <button type="button" @click="selectedStatus = 'all'"
+      class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-xs rounded-md border cursor-pointer transition-colors whitespace-nowrap"
+      :class="selectedStatus === 'all' ? 'bg-emerald-50 text-emerald-700 border-transparent dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-white border-gray-200 text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700'">
+      <span class="font-medium">All Attempts</span>
+      <span class="opacity-70 text-[11px]">1,250</span>
+    </button>
+
+    <button type="button" @click="selectedStatus = 'in_progress'"
+      class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-xs rounded-md border cursor-pointer transition-colors whitespace-nowrap"
+      :class="selectedStatus === 'in_progress' ? 'bg-emerald-50 text-emerald-700 border-transparent dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-white border-gray-200 text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700'">
+      <span class="font-medium">In Progress</span>
+      <span class="opacity-70 text-[11px]">24</span>
+    </button>
+    <button type="button" @click="selectedStatus = 'completed'"
+      class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-xs rounded-md border cursor-pointer transition-colors whitespace-nowrap"
+      :class="selectedStatus === 'completed' ? 'bg-emerald-50 text-emerald-700 border-transparent dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-white border-gray-200 text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700'">
+      <span class="font-medium">Completed</span>
+      <span class="opacity-70 text-[11px]">996</span>
+    </button>
+    <button type="button" @click="selectedStatus = 'passed'"
+      class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-xs rounded-md border cursor-pointer transition-colors whitespace-nowrap"
+      :class="selectedStatus === 'passed' ? 'bg-emerald-50 text-emerald-700 border-transparent dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-white border-gray-200 text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700'">
+      <span class="font-medium">Passed</span>
+      <span class="opacity-70 text-[11px]">820</span>
+    </button>
+    <button type="button" @click="selectedStatus = 'failed'"
+      class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-xs rounded-md border cursor-pointer transition-colors whitespace-nowrap"
+      :class="selectedStatus === 'failed' ? 'bg-emerald-50 text-emerald-700 border-transparent dark:bg-emerald-900/30 dark:text-emerald-500' : 'bg-white border-gray-200 text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700'">
+      <span class="font-medium">Failed</span>
+      <span class="opacity-70 text-[11px]">176</span>
+    </button>
+  </div>
+
+  {% call table(
+    search_enabled=true,
+    search_placeholder="Search users",
+    filters=filters,
+    table_header=table_header,
+    hoverable=false,
+    padded=true,
+    pagination=true
+  ) %}
+    
+    {% for student in students %}
+    <!-- Row -->
+    <tr x-show="selectedStatus === 'all' || 
+                (selectedStatus === 'in_progress' && '{{ student.status }}' === 'running') || 
+                (selectedStatus === 'completed' && '{{ student.status }}' === 'completed') || 
+                (selectedStatus === 'passed' && '{{ student.result }}' === 'passed') || 
+                (selectedStatus === 'failed' && '{{ student.result }}' === 'failed')">
+      <td class="px-4 py-3 whitespace-nowrap">
+        <div class="flex items-center gap-x-3">
+          {% if student.avatar %}
+            <img class="shrink-0 size-[38px] rounded-full" src="{{ student.avatar }}" alt="Avatar">
+          {% else %}
+            <span class="inline-flex items-center justify-center size-[38px] rounded-full bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200">
+              <span class="font-medium leading-none">{{ student.name | first }}</span>
+            </span>
+          {% endif %}
+          <div class="flex flex-col">
+            <div class="flex items-center gap-x-2">
+              <a href="#" class="text-sm font-medium text-gray-800 hover:text-emerald-600 decoration-2 hover:underline focus:outline-hidden focus:underline focus:text-emerald-600 dark:text-neutral-200 dark:hover:text-emerald-500 dark:focus:text-emerald-500">
+                {{ student.name }}
+              </a>
+              {% if student.status == "running" %}
+                {% set dot_trigger %}
+                  <span class="relative flex size-2 shrink-0 cursor-pointer">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full size-2 bg-blue-600"></span>
+                  </span>
+                {% endset %}
+                {{ tooltip(trigger=dot_trigger, content="Taking test", placement="top") }}
+              {% endif %}
+            </div>
+            {% if student.status == "running" %}
+              <span class="text-xs text-gray-500 dark:text-neutral-500">started on {{ student.date }}</span>
+            {% else %}
+              <span class="text-xs text-gray-500 dark:text-neutral-500">attempted on {{ student.date }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </td>
+      {% if student.status == "running" %}
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">-</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">-</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">-</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">-</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">-</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">-</td>
+      {% else %}
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">{{ student.score }}</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-800 dark:text-neutral-200">{{ student.percentage }}</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">{{ student.answered }}</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">{{ student.correct }}</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">{{ student.incorrect }}</td>
+        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">
+          <div class="flex items-center gap-x-1.5">
+            <span>{{ student.integrity_score }}</span>
+            {% if student.is_flagged %}
+              {% set alert_trigger %}
+                <i data-lucide="triangle-alert" class="size-4 text-red-500 cursor-help"></i>
+              {% endset %}
+              {{ tooltip(trigger=alert_trigger, content="Flagged: Anomalies detected", placement="top") }}
+            {% endif %}
+          </div>
+        </td>
+      {% endif %}
+      <td class="px-4 py-3 whitespace-nowrap text-end text-sm font-medium">
+        <div class="hs-dropdown [--placement:bottom-right] relative inline-flex">
+          <button id="hs-pro-dropdown-{{ loop.index }}" type="button" class="size-7 inline-flex justify-center items-center gap-x-2 rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-expanded="false" aria-label="Dropdown">
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+          </button>
+          
+          <div class="hs-dropdown-menu transition-[opacity,margin] duration hs-dropdown-open:opacity-100 opacity-0 hidden z-10 w-48 bg-white shadow-[0_10px_40px_10px_rgba(0,0,0,0.08)] rounded-xl dark:shadow-[0_10px_40px_10px_rgba(0,0,0,0.2)] dark:bg-neutral-900" aria-labelledby="hs-pro-dropdown-{{ loop.index }}">
+            <div class="p-1">
+              {% for item in action_items %}
+              <a class="flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] font-normal focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800 {% if item.variant == 'danger' %}text-red-500 hover:bg-red-600/10 focus:bg-red-600/10 dark:text-red-500 dark:hover:bg-red-950 dark:focus:bg-red-950{% else %}text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800{% endif %}" href="{{ item.url }}">
+                <i data-lucide="{{ item.icon }}" class="shrink-0 size-4 {% if item.variant == 'danger' %}text-red-500 dark:text-red-500{% else %}text-gray-500 dark:text-neutral-400{% endif %}"></i>
+                {{ item.label }}
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+
+  {% endcall %}
+</div>
