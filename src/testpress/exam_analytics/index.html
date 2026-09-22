@@ -11,24 +11,51 @@ permalink: "/exam_analytics/"
 
 {% block content %}
 <div class="py-10 max-w-7xl mx-auto lg:px-8 px-4 space-y-5">
-    <div class="space-y-1">
+    <div class="space-y-3">
         {% include "./breadcrumbs.html" %}
         {% include "./header.html" %}
     </div>
     
-    {% include "./stats.html" %}
-    {% include "./cards.html" %}
-    
-    <div class="grid lg:grid-cols-2 gap-4 sm:gap-6 mt-4 sm:mt-6">
+    <!-- Tabs -->
+    {% set overview_content %}
+      <div class="space-y-4 sm:space-y-6">
         {% include "./needs_attention.html" %}
-        {% include "./top_students.html" %}
-    </div>
+        {% include "./stats.html" %}
+        {% include "./cards.html" %}
+        <div class="grid lg:grid-cols-2 gap-4 sm:gap-6">
+            {% include "./top_students.html" %}
+            {% include "./lowest_performing.html" %}
+        </div>
+      </div>
+    {% endset %}
+
+    {% set attempts_content %}
+      {% include "./attempts_table.html" %}
+    {% endset %}
+
+    {% from "../../ui-system/components/tabs.html" import tabs %}
+    {{ tabs(
+      tabs=[
+        {"key": "overview", "label": "Overview", "content": overview_content},
+        {"key": "attempts", "label": "Attempts", "content": attempts_content}
+      ],
+      active_tab="overview",
+      content_class="mt-5"
+    ) }}
+    <!-- End Tabs -->
+
+    {% include "./attempts_filter_drawer.html" %}
 </div>
 {% endblock content %}
 
 {% block script %}
 <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/wnumb/1.2.0/wNumb.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/nouislider@15.8.1/dist/nouislider.min.js"></script>
+<script src="/node_modules/preline/dist/preline.js"></script>
+
+{% include "../../ui-system/scripts/date_picker_script.html" %}
 
 <script>
 window.addEventListener('load', () => {
@@ -104,81 +131,112 @@ window.addEventListener('load', () => {
     const columnChartDom = document.getElementById('hs-score-distribution-chart');
     if (columnChartDom) {
         columnChartDom.style.height = '300px';
+        columnChartDom.style.cursor = 'pointer';
 
         const columnChart = echarts.init(columnChartDom);
+        const defaultLabelColor = isDarkMode ? '#a3a3a3' : '#737373';
+        const hoverLabelColor   = isDarkMode ? '#f5f5f5' : '#111111';
+        let hoveredIdx = -1;
+
+        const axisLabelConfig = (hIdx) => ({
+            margin: 12,
+            fontSize: 13,
+            formatter: (value) => `${value} >`,
+            color: (value, index) => index === hIdx ? hoverLabelColor : defaultLabelColor,
+            fontWeight: (value, index) => index === hIdx ? 'bold' : 'normal'
+        });
+
         const columnOption = {
             tooltip: {
                 trigger: 'axis',
-                axisPointer: {
-                    type: 'shadow'
-                },
+                axisPointer: { type: 'shadow' },
                 backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
                 borderColor: isDarkMode ? '#374151' : '#e5e7eb',
-                textStyle: {
-                    color: isDarkMode ? '#f3f4f6' : '#1f2937'
-                }
+                textStyle: { color: isDarkMode ? '#f3f4f6' : '#1f2937' }
             },
-            color: ['#2563eb'], // blue-600
-            grid: {
-                left: '2%',
-                right: '2%',
-                bottom: '0%',
-                top: '10%',
-                containLabel: true
-            },
-            xAxis: [
-                {
-                    type: 'category',
-                    data: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
-                    axisTick: {
-                        alignWithLabel: true,
-                        show: false
-                    },
-                    axisLine: {
-                        show: false
-                    },
-                    axisLabel: {
-                        color: isDarkMode ? '#a3a3a3' : '#737373',
-                        margin: 15,
-                        fontSize: 13
-                    }
-                }
-            ],
-            yAxis: [
-                {
-                    type: 'value',
-                    splitLine: {
-                        lineStyle: {
-                            type: 'dashed',
-                            color: isDarkMode ? '#404040' : '#e5e5e5'
-                        }
-                    },
-                    axisLabel: {
-                        color: isDarkMode ? '#a3a3a3' : '#737373',
-                        fontSize: 13
-                    }
-                }
-            ],
-            series: [
-                {
-                    name: 'Students',
-                    type: 'bar',
-                    barWidth: '40%',
+            color: ['#2563eb'],
+            grid: { left: '2%', right: '2%', bottom: '0%', top: '10%', containLabel: true },
+            xAxis: [{
+                type: 'category',
+                data: ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'],
+                axisTick: { alignWithLabel: true, show: false },
+                axisLine: { show: false },
+                axisLabel: axisLabelConfig(-1),
+                triggerEvent: true
+            }],
+            yAxis: [{
+                type: 'value',
+                splitLine: {
+                    lineStyle: { type: 'dashed', color: isDarkMode ? '#404040' : '#e5e5e5' }
+                },
+                axisLabel: { color: defaultLabelColor, fontSize: 13 }
+            }],
+            series: [{
+                name: 'Students',
+                type: 'bar',
+                barWidth: '40%',
+                cursor: 'pointer',
+                itemStyle: { borderRadius: [4, 4, 0, 0] },
+                // focus:'self' dims all OTHER bars when one is hovered
+                emphasis: {
+                    focus: 'self',
                     itemStyle: {
-                        borderRadius: [4, 4, 0, 0]
+                        color: isDarkMode ? '#6366f1' : '#1d4ed8',
+                        shadowBlur: 14,
+                        shadowColor: isDarkMode ? 'rgba(99,102,241,0.5)' : 'rgba(37,99,235,0.4)',
+                        shadowOffsetY: -3
                     },
                     label: {
-                        show: true,
-                        position: 'top',
-                        color: isDarkMode ? '#d4d4d4' : '#171717',
-                        fontSize: 12,
-                        distance: 10
-                    },
-                    data: [35, 90, 210, 310, 135]
-                }
-            ]
+                        color: isDarkMode ? '#ffffff' : '#000000',
+                        fontWeight: 'bold',
+                        fontSize: 13
+                    }
+                },
+                // blur dims non-hovered bars
+                blur: {
+                    itemStyle: { opacity: 0.35 },
+                    label: { opacity: 0.4 }
+                },
+                label: {
+                    show: true,
+                    position: 'top',
+                    color: isDarkMode ? '#d4d4d4' : '#404040',
+                    fontSize: 12,
+                    distance: 10
+                },
+                data: [35, 90, 210, 310, 135]
+            }]
         };
         columnChart.setOption(columnOption);
+
+        // Hover: darken the x-axis label of the hovered bar
+        const updateHover = (idx) => {
+            if (idx === hoveredIdx) return;
+            hoveredIdx = idx;
+            columnChart.setOption({ xAxis: [{ axisLabel: axisLabelConfig(idx) }] });
+        };
+
+        columnChart.on('mouseover', (params) => {
+            if (params.componentType === 'series') updateHover(params.dataIndex);
+        });
+        columnChart.on('mouseout', (params) => {
+            if (params.componentType === 'series') updateHover(-1);
+        });
+
+        // Click: navigate to filtered attempt table
+        const scoreRanges = ['0-20', '21-40', '41-60', '61-80', '81-100'];
+        columnChart.on('click', (params) => {
+            let rangeIndex;
+            if (params.componentType === 'series') {
+                rangeIndex = params.dataIndex;
+            } else if (params.componentType === 'xAxis') {
+                rangeIndex = scoreRanges.findIndex(r => params.value && params.value.startsWith(r));
+            }
+            if (rangeIndex !== undefined && rangeIndex >= 0) {
+                window.location.href = `?score_range=${scoreRanges[rangeIndex]}`;
+            }
+        });
+
         window.addEventListener('resize', () => columnChart.resize());
     }
 });
