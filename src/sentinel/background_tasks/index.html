@@ -1,0 +1,62 @@
+---
+tags: sentinel
+date: 2026-03-16
+dashboard_view: Background tasks
+---
+
+{% extends "src/sentinel/layout/index.html" %}
+
+{% block stylesheet %}
+<link rel="stylesheet" href="{{ '/css/sentinel-backend.css' | url }}" />
+{% endblock stylesheet %}
+
+{% block main_content %}
+<script id="sentinel-tasks-data" type="application/json">
+{{ sentinel_background_tasks | dump | safe }}
+</script>
+
+<div 
+  class="p-2 sm:p-5 md:pt-5 min-h-[90vh] space-y-5"
+  x-data="{
+    tasks: JSON.parse(document.getElementById('sentinel-tasks-data').textContent),
+    selectedCategory: 'All tasks',
+    searchQuery: '',
+    selectedStatus: 'All statuses',
+    statusOpen: false,
+    selectedDate: 'Last 7 days',
+    dateOpen: false,
+    selectedTaskId: null,
+    
+    get filteredTasks() {
+      return this.tasks.filter(t => {
+        const matchesCategory = this.selectedCategory === 'All tasks' || t.category === this.selectedCategory;
+        const matchesStatus = this.selectedStatus === 'All statuses' || 
+          (this.selectedStatus === 'Running' && t.status === 'RUNNING') ||
+          (this.selectedStatus === 'Completed' && t.status === 'SUCCESS') ||
+          (this.selectedStatus === 'Failed' && t.status === 'FAILURE');
+        const query = this.searchQuery.toLowerCase().trim();
+        const matchesSearch = !query || 
+          t.name.toLowerCase().includes(query) || 
+          t.id.toLowerCase().includes(query) || 
+          (t.candidate && t.candidate.toLowerCase().includes(query)) ||
+          (t.workspace && t.workspace.toLowerCase().includes(query));
+        return matchesCategory && matchesStatus && matchesSearch;
+      });
+    },
+
+    getSelectedTask() {
+      return this.tasks.find(t => t.id === this.selectedTaskId) || this.filteredTasks[0] || null;
+    },
+
+    getCounts(cat) {
+      if (cat === 'All tasks') return this.tasks.length;
+      return this.tasks.filter(t => t.category === cat).length;
+    }
+  }"
+>
+  {% include "./header.html" %}
+  {% include "./kpi_cards.html" %}
+  {% include "./filter.html" %}
+  {% include "./table.html" %}
+</div>
+{% endblock main_content %}
