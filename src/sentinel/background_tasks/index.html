@@ -1,7 +1,7 @@
 ---
 tags: sentinel
 date: 2026-03-16
-dashboard_view: Background tasks
+dashboard_view: Background Jobs
 ---
 
 {% extends "src/sentinel/layout/index.html" %}
@@ -16,21 +16,26 @@ dashboard_view: Background tasks
 </script>
 
 <div 
-  class="p-2 sm:p-5 md:pt-5 min-h-[90vh] space-y-5"
+  class="p-2 sm:p-5 md:pt-5 space-y-5"
   x-data="{
     tasks: JSON.parse(document.getElementById('sentinel-tasks-data').textContent),
-    selectedCategory: 'All tasks',
     searchQuery: '',
+    selectedTab: 'all',
     selectedStatus: 'All statuses',
     statusOpen: false,
     selectedDate: 'Last 7 days',
     dateOpen: false,
     selectedTaskId: null,
     
+    currentPage: 1,
+    pageSize: 20,
+    
     get filteredTasks() {
       return this.tasks.filter(t => {
-        const matchesCategory = this.selectedCategory === 'All tasks' || t.category === this.selectedCategory;
+        const matchesTab = this.selectedTab === 'all' || 
+          (this.selectedTab === 'created_by_me' && (t.isCreatedByMe || t.createdBy === 'James Collison'));
         const matchesStatus = this.selectedStatus === 'All statuses' || 
+          (this.selectedStatus === 'Queued' && (t.status === 'QUEUED' || t.status === 'PENDING')) ||
           (this.selectedStatus === 'Running' && t.status === 'RUNNING') ||
           (this.selectedStatus === 'Completed' && t.status === 'SUCCESS') ||
           (this.selectedStatus === 'Failed' && t.status === 'FAILURE');
@@ -38,25 +43,28 @@ dashboard_view: Background tasks
         const matchesSearch = !query || 
           t.name.toLowerCase().includes(query) || 
           t.id.toLowerCase().includes(query) || 
-          (t.candidate && t.candidate.toLowerCase().includes(query)) ||
-          (t.workspace && t.workspace.toLowerCase().includes(query));
-        return matchesCategory && matchesStatus && matchesSearch;
+          (t.createdBy && t.createdBy.toLowerCase().includes(query));
+        return matchesTab && matchesStatus && matchesSearch;
       });
     },
 
-    getSelectedTask() {
-      return this.tasks.find(t => t.id === this.selectedTaskId) || this.filteredTasks[0] || null;
+    get totalPages() {
+      return Math.ceil(this.filteredTasks.length / this.pageSize) || 1;
     },
 
-    getCounts(cat) {
-      if (cat === 'All tasks') return this.tasks.length;
-      return this.tasks.filter(t => t.category === cat).length;
+    get paginatedTasks() {
+      const start = (this.currentPage - 1) * this.pageSize;
+      return this.filteredTasks.slice(start, start + this.pageSize);
+    },
+
+    getSelectedTask() {
+      return this.tasks.find(t => t.id === this.selectedTaskId) || this.paginatedTasks[0] || null;
     }
   }"
+  x-init="$watch('searchQuery', () => { currentPage = 1; }); $watch('selectedTab', () => { currentPage = 1; }); $watch('selectedStatus', () => { currentPage = 1; }); $watch('selectedDate', () => { currentPage = 1; })"
 >
   {% include "./header.html" %}
   {% include "./kpi_cards.html" %}
-  {% include "./filter.html" %}
   {% include "./table.html" %}
 </div>
 {% endblock main_content %}
