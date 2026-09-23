@@ -1,10 +1,20 @@
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts/dist/apexcharts.css">
+<style>
+  .apexcharts-tooltip {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/4.7.0/apexcharts.min.js"></script>
 
 <script id="chart-dates-data" type="application/json">["2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01"]</script>
 <script id="chart-wasted-hours-data" type="application/json">[12, 15, 14, 18, 10]</script>
 
 <script>
+  console.log("Chart script tag parsed");
   window.addEventListener('load', () => {
+    console.log("Window loaded - initializing chart...");
     let chartDates = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
     let chartData = [10, 20, 15, 25, 30];
 
@@ -33,21 +43,99 @@
     };
 
     // 2. Chart Click (Filter by Date)
-    const chartDom = document.getElementById('hs-single-area-chart');
+    const chartDom = document.getElementById('hs-pro-smpc');
+    console.log("Found chart container:", chartDom);
     if (chartDom) {
-      const myChart = echarts.init(chartDom);
-      const option = {
+      console.log("Building ApexCharts options...");
+      const options = {
+        chart: {
+          type: 'bar',
+          height: '100%',
+          toolbar: { show: false },
+          zoom: { enabled: false },
+          events: {
+            dataPointSelection: function(event, chartContext, config) {
+              const xIndex = config.dataPointIndex;
+              if (xIndex !== undefined && xIndex !== -1) {
+                const dateClicked = chartDates[xIndex];
+                if (dateClicked) {
+                  let filterText = dateClicked;
+                  const parts = dateClicked.split('-');
+                  if (parts.length === 3) {
+                    filterText = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                  }
+                  if (clearFilterText) {
+                    clearFilterText.textContent = filterText;
+                  }
+                  if (clearFilterBadge) {
+                    clearFilterBadge.classList.remove('hidden');
+                    clearFilterBadge.style.display = 'inline-flex';
+                  }
+                  rows.forEach(row => {
+                    row.style.display = row.getAttribute('data-date') === dateClicked ? '' : 'none';
+                  });
+                }
+              }
+            }
+          }
+        },
+        series: [
+          {
+            name: 'Wasted Hours',
+            data: chartData
+          }
+        ],
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: '40px',
+            borderRadius: 4
+          }
+        },
+        colors: ['#2563eb'],
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        xaxis: {
+          categories: chartDates,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          labels: {
+            style: {
+              colors: '#94a3b8',
+              fontSize: '13px',
+              fontFamily: 'Inter, sans-serif'
+            },
+            formatter: function(value) {
+              const d = new Date(value);
+              if (!isNaN(d)) {
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              }
+              return value;
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#94a3b8',
+              fontSize: '13px',
+              fontFamily: 'Inter, sans-serif'
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        grid: {
+          borderColor: '#e2e8f0',
+          strokeDashArray: 4,
+          padding: {
+            bottom: 0
+          }
+        },
         tooltip: {
-          trigger: 'axis',
-          backgroundColor: 'transparent',
-          borderWidth: 0,
-          padding: 0,
-          extraCssText: 'box-shadow: none;',
-          formatter: function (params) {
-            let item = params[0];
-            let val = item.value;
-            let formattedVal = val >= 1000 ? (val / 1000) + 'k' : val;
-            let dateStr = item.name;
+          custom: function({series, seriesIndex, dataPointIndex, w}) {
+            const val = series[seriesIndex][dataPointIndex];
+            const formattedVal = val >= 1000 ? (val / 1000) + 'k' : val;
+            let dateStr = w.globals.labels[dataPointIndex];
             const dateObj = new Date(dateStr);
             if (!isNaN(dateObj)) {
                dateStr = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
@@ -63,88 +151,22 @@
               </div>
             `;
           }
-        },
-        grid: {
-          top: 15,
-          left: '3%',
-          right: '4%',
-          bottom: '3%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'category',
-          data: chartDates,
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: '#94a3b8',
-            margin: 15,
-            formatter: function (value) {
-              const d = new Date(value);
-              if (!isNaN(d)) {
-                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-              }
-              return value;
-            }
-          }
-        },
-        yAxis: {
-          type: 'value',
-          splitLine: {
-            lineStyle: {
-              type: 'dashed',
-              color: '#e2e8f0'
-            }
-          },
-          axisLabel: {
-            color: '#94a3b8',
-            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
-          }
-        },
-        series: [
-          {
-            name: 'Wasted Hours',
-            type: 'bar',
-            barMaxWidth: 40,
-            itemStyle: {
-              color: '#2563eb',
-              borderRadius: [4, 4, 0, 0]
-            },
-            data: chartData
-          }
-        ]
+        }
       };
 
-      myChart.setOption(option);
-      
-      myChart.getZr().on('click', function(params) {
-        const pointInPixel = [params.offsetX, params.offsetY];
-        if (myChart.containPixel('grid', pointInPixel)) {
-          const xIndex = Math.round(myChart.convertFromPixel({seriesIndex: 0}, pointInPixel)[0]);
-          const dateClicked = chartDates[xIndex];
-          if (dateClicked) {
-            let filterText = dateClicked;
-            const parts = dateClicked.split('-');
-            if (parts.length === 3) {
-              filterText = `${parts[2]}-${parts[1]}-${parts[0]}`;
-            }
-            if (clearFilterText) {
-              clearFilterText.textContent = filterText;
-            }
-            if (clearFilterBadge) {
-              clearFilterBadge.classList.remove('hidden');
-              clearFilterBadge.style.display = 'inline-flex';
-            }
-            rows.forEach(row => {
-              row.style.display = row.getAttribute('data-date') === dateClicked ? '' : 'none';
-            });
-          }
-        }
-      });
-      
-      window.addEventListener('resize', function() {
-        myChart.resize();
-      });
+      console.log("Rendering chart with options:", options);
+      try {
+        const chart = new ApexCharts(chartDom, options);
+        chart.render().then(() => {
+          console.log("Chart render promise resolved!");
+        }).catch(err => {
+          console.error("Chart render error:", err);
+        });
+      } catch (err) {
+        console.error("Error creating ApexCharts instance:", err);
+      }
+    } else {
+      console.warn("Chart container hs-pro-smpc not found in DOM!");
     }
 
     // 3. Leaderboard Click (Filter by Org)
