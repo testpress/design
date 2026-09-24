@@ -1,11 +1,9 @@
-<div class="flex flex-col lg:flex-row gap-5 items-start mt-2">
-  <!-- LEFT: Table Card -->
-  <div 
-    class="p-5 space-y-4 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl transition-all duration-300 w-full"
-    :class="selectedTaskId ? 'lg:w-7/12' : 'lg:w-full'"
-  >
-    <!-- Nav Tab -->
-    <nav class="flex gap-1 relative after:absolute after:bottom-0 after:inset-x-0 after:border-b after:border-gray-200 dark:after:border-neutral-700" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
+<!-- Table Card -->
+<div id="tasks-table" class="scroll-mt-[3.75rem] p-5 space-y-4 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl w-full">
+    <!-- Sticky Table Controls Header -->
+    <div class="sticky top-[3.75rem] z-20 bg-white dark:bg-neutral-800 -mx-5 -mt-5 p-5 pb-4 space-y-4 border-b border-gray-200 dark:border-neutral-700 rounded-t-xl">
+      <!-- Nav Tab -->
+      <nav class="flex gap-1 relative after:absolute after:bottom-0 after:inset-x-0 after:border-b after:border-gray-200 dark:after:border-neutral-700" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
       <button 
         type="button" 
         @click="selectedTab = 'all'"
@@ -39,7 +37,7 @@
     <!-- End Nav Tab -->
 
     <!-- Filter Group -->
-    <div class="pb-4 grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5 border-b border-gray-200 dark:border-neutral-700">
+    <div class="grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5">
       <div>
         <!-- Search Input -->
         <div class="relative">
@@ -181,10 +179,28 @@
           </div>
         </div>
         <!-- End Date Range Filter Dropdown -->
+
+        <!-- Clear Filters Button -->
+        <button 
+          type="button" 
+          x-show="selectedStatus !== 'All statuses' || searchQuery.trim() !== '' || selectedTab !== 'all' || selectedDate !== 'Last 7 days'"
+          x-cloak
+          @click="selectedStatus = 'All statuses'; searchQuery = ''; selectedTab = 'all'; selectedDate = 'Last 7 days'"
+          class="py-2 px-2.5 inline-flex items-center gap-x-1 text-xs font-medium rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 cursor-pointer transition"
+        >
+          <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18"/>
+            <path d="m6 6 12 12"/>
+          </svg>
+          Clear filters
+        </button>
+        <!-- End Clear Filters Button -->
       </div>
       <!-- End Col -->
     </div>
     <!-- End Filter Group -->
+  </div>
+  <!-- End Sticky Table Controls Header -->
 
     <!-- Table Container -->
     <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
@@ -195,13 +211,13 @@
               <th scope="col" class="px-5 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Task
               </th>
-              <th scope="col" class="px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider" :class="selectedTaskId ? 'hidden xl:table-cell' : 'hidden sm:table-cell'">
+              <th scope="col" class="hidden sm:table-cell px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Created by
               </th>
               <th scope="col" class="px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Status
               </th>
-              <th scope="col" class="px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider" :class="selectedTaskId ? 'hidden 2xl:table-cell' : 'hidden md:table-cell'">
+              <th scope="col" class="hidden md:table-cell px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Started
               </th>
             </tr>
@@ -227,9 +243,12 @@
             <!-- Table Rows -->
             <template x-for="task in paginatedTasks" :key="task.id">
               <tr 
-                @click="selectedTaskId = task.id"
+                @click="selectedTaskId = task.id; if (window.HSOverlay) window.HSOverlay.open('#hs-task-details-offcanvas')"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="hs-task-details-offcanvas"
                 class="cursor-pointer transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-neutral-700/50"
-                :class="selectedTaskId === task.id ? 'bg-blue-50 dark:bg-neutral-700' : ''"
+                :class="selectedTaskId === task.id ? 'bg-blue-50/60 dark:bg-neutral-700/40' : ''"
               >
                 <!-- Task Name & ID -->
                 <td class="px-5 py-3.5 whitespace-nowrap">
@@ -243,7 +262,7 @@
                 </td>
 
                 <!-- Created by -->
-                <td class="px-4 py-3.5 whitespace-nowrap text-sm text-gray-700 dark:text-neutral-300" :class="selectedTaskId ? 'hidden xl:table-cell' : 'hidden sm:table-cell'" x-text="task.createdBy"></td>
+                <td class="hidden sm:table-cell px-4 py-3.5 whitespace-nowrap text-sm text-gray-700 dark:text-neutral-300" x-text="task.createdBy"></td>
 
                 <!-- Status & Progress -->
                 <td class="px-4 py-3.5 whitespace-nowrap">
@@ -272,7 +291,7 @@
                 </td>
 
                 <!-- Started -->
-                <td class="px-4 py-3.5 whitespace-nowrap text-sm text-gray-500 dark:text-neutral-400" :class="selectedTaskId ? 'hidden 2xl:table-cell' : 'hidden md:table-cell'" x-text="task.startedAt"></td>
+                <td class="hidden md:table-cell px-4 py-3.5 whitespace-nowrap text-sm text-gray-500 dark:text-neutral-400" x-text="task.startedAt"></td>
               </tr>
             </template>
           </tbody>
@@ -332,8 +351,7 @@
     </div>
     <!-- End Table Pagination Footer -->
   </div>
-  <!-- END LEFT: Table Card -->
+  <!-- End Table Card -->
 
-  <!-- RIGHT: Side Detail Panel -->
+  <!-- Task Details Offcanvas (Drawer) -->
   {% include "./detail.html" %}
-</div>
