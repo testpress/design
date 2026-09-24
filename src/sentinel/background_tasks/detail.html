@@ -1,0 +1,265 @@
+<div 
+  id="hs-task-details-offcanvas" 
+  class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 inset-e-0 transition-all duration-300 transform h-full max-w-md md:max-w-lg w-full z-80 bg-white dark:bg-neutral-800 border-s border-gray-200 dark:border-neutral-700 shadow-xl flex flex-col hs-overlay-backdrop-open:bg-gray-900/50 dark:hs-overlay-backdrop-open:bg-neutral-900/80" 
+  role="dialog" 
+  tabindex="-1" 
+  aria-labelledby="hs-task-details-offcanvas-label"
+  data-hs-overlay-options='{
+    "backdropClasses": "hs-overlay-backdrop transition duration fixed inset-0 bg-gray-900/50 dark:bg-neutral-900/80"
+  }'
+  @close.hs.overlay="selectedTaskId = null; document.querySelectorAll('#hs-task-details-offcanvas-backdrop').forEach(el => el.remove())"
+>
+  <!-- Offcanvas Header -->
+  <div class="flex justify-between items-center py-3 px-4 sm:px-5 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" x-data="{ copied: false }">
+    <div class="grow min-w-0 pe-2">
+      <div class="flex items-center gap-x-2 text-xs text-gray-500 dark:text-neutral-400">
+        <span class="font-mono truncate" x-text="getSelectedTask() ? getSelectedTask().id : ''"></span>
+        <button 
+          type="button" 
+          @click="if (getSelectedTask()) { navigator.clipboard.writeText(getSelectedTask().id); copied = true; setTimeout(() => copied = false, 2000) }"
+          class="shrink-0 inline-flex items-center gap-x-1 text-gray-400 hover:text-gray-700 dark:text-neutral-500 dark:hover:text-neutral-300 transition cursor-pointer"
+          title="Copy task UUID"
+        >
+          <svg x-show="!copied" class="size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          <svg x-show="copied" x-cloak class="size-3.5 text-teal-600 dark:text-teal-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+      <h3 id="hs-task-details-offcanvas-label" class="mt-0.5 text-base font-semibold text-gray-800 dark:text-neutral-200 truncate" x-text="getSelectedTask() ? getSelectedTask().name : 'Task Details'">
+        Task Details
+      </h3>
+    </div>
+
+    <button 
+      type="button" 
+      class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full bg-gray-100 dark:bg-neutral-700 border border-transparent text-gray-800 dark:text-neutral-200 hover:bg-gray-200 dark:hover:bg-neutral-600 focus:outline-hidden focus:bg-gray-200 dark:focus:bg-neutral-600 disabled:opacity-50 disabled:pointer-events-none cursor-pointer shrink-0" 
+      aria-label="Close" 
+      data-hs-overlay="#hs-task-details-offcanvas"
+    >
+      <span class="sr-only">Close</span>
+      <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18"></path>
+        <path d="m6 6 12 12"></path>
+      </svg>
+    </button>
+  </div>
+  <!-- End Offcanvas Header -->
+
+  <!-- Offcanvas Body -->
+  <div class="p-4 sm:p-5 space-y-5 overflow-y-auto grow [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+    <template x-if="getSelectedTask()">
+      <div class="space-y-5">
+        <!-- Queued State Notice -->
+        <template x-if="getSelectedTask().status === 'QUEUED' || getSelectedTask().status === 'PENDING'">
+          <div class="p-3 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-x-2.5">
+            <svg class="size-4 text-amber-600 dark:text-amber-400 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <p class="text-xs text-amber-800 dark:text-amber-300">
+              Task is queued and waiting for worker allocation.
+            </p>
+          </div>
+        </template>
+
+        <!-- Running Progress -->
+        <template x-if="getSelectedTask().status === 'RUNNING'">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-medium text-gray-800 dark:text-neutral-200">Progress</span>
+              <span class="font-semibold text-gray-800 dark:text-neutral-200" x-text="getSelectedTask().progress + '%'"></span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-1.5 dark:bg-neutral-700 overflow-hidden">
+              <div class="bg-blue-600 h-1.5 rounded-full transition-all duration-500" :style="`width: ${getSelectedTask().progress}%`"></div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Failure Alert -->
+        <template x-if="getSelectedTask().status === 'FAILURE'">
+          <div class="space-y-1.5">
+            <div class="flex items-center gap-x-2 text-xs font-semibold text-red-600 dark:text-red-400">
+              <svg class="size-4 shrink-0" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              Task execution error
+            </div>
+            <p class="text-xs text-gray-700 dark:text-neutral-300 font-mono bg-gray-50 dark:bg-neutral-900 p-2.5 rounded-lg border border-gray-200 dark:border-neutral-700 break-all" x-text="getSelectedTask().exception"></p>
+          </div>
+        </template>
+
+        <!-- Key Details Grid (4 Cards: Status, Created by, Started, Duration) -->
+        <div class="grid grid-cols-2 gap-3 text-xs">
+          <!-- Status Card -->
+          <div class="p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-lg border border-gray-200 dark:border-neutral-700">
+            <span class="text-gray-500 dark:text-neutral-400 block mb-1">Status</span>
+            <div class="flex items-center gap-x-1.5">
+              <template x-if="getSelectedTask().status === 'QUEUED' || getSelectedTask().status === 'PENDING'">
+                <span class="size-2 rounded-full bg-amber-500"></span>
+              </template>
+              <template x-if="getSelectedTask().status === 'RUNNING'">
+                <span class="size-2 rounded-full bg-blue-500"></span>
+              </template>
+              <template x-if="getSelectedTask().status === 'SUCCESS'">
+                <span class="size-2 rounded-full bg-teal-500"></span>
+              </template>
+              <template x-if="getSelectedTask().status === 'FAILURE'">
+                <span class="size-2 rounded-full bg-red-500"></span>
+              </template>
+              <span 
+                class="font-medium text-gray-800 dark:text-neutral-200" 
+                x-text="getSelectedTask().status === 'SUCCESS' ? 'Completed' : (getSelectedTask().status === 'FAILURE' ? 'Failed' : (getSelectedTask().status === 'RUNNING' ? 'Running' : 'Queued'))"
+              ></span>
+            </div>
+          </div>
+
+          <!-- Created by Card -->
+          <div class="p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-lg border border-gray-200 dark:border-neutral-700">
+            <span class="text-gray-500 dark:text-neutral-400 block mb-1">Created by</span>
+            <span class="font-medium text-gray-800 dark:text-neutral-200 truncate block" x-text="getSelectedTask().createdBy"></span>
+          </div>
+
+          <!-- Started Card -->
+          <div class="p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-lg border border-gray-200 dark:border-neutral-700">
+            <span class="text-gray-500 dark:text-neutral-400 block mb-1">Started</span>
+            <span class="font-medium text-gray-800 dark:text-neutral-200 truncate block" x-text="getSelectedTask().startedAt"></span>
+          </div>
+
+          <!-- Duration Card -->
+          <div class="p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-lg border border-gray-200 dark:border-neutral-700">
+            <span class="text-gray-500 dark:text-neutral-400 block mb-1">Duration</span>
+            <span class="font-medium text-gray-800 dark:text-neutral-200 truncate block" x-text="getSelectedTask().duration"></span>
+          </div>
+        </div>
+
+        <!-- Generated Artifacts / Output Files Box -->
+        <template x-if="getSelectedTask().status === 'SUCCESS' && ((getSelectedTask().files && getSelectedTask().files.length > 0) || getSelectedTask().fileName)">
+          <div class="space-y-2.5">
+            <h5 class="text-xs font-semibold text-gray-800 dark:text-neutral-200 uppercase tracking-wider">
+              Output Files <span class="text-gray-400 dark:text-neutral-500 font-normal" x-text="'&bull; ' + (getSelectedTask().files ? getSelectedTask().files.length : 1)"></span>
+            </h5>
+
+            <div class="space-y-2">
+              <template x-if="getSelectedTask().files && getSelectedTask().files.length > 0">
+                <template x-for="(file, idx) in getSelectedTask().files" :key="idx">
+                  <div class="p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-xl border border-gray-200 dark:border-neutral-700 flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-x-3 min-w-0">
+                      <svg class="shrink-0 size-5 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                        <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                      </svg>
+                      <div class="grow min-w-0">
+                        <p class="text-xs font-medium text-gray-800 dark:text-neutral-200 truncate" x-text="file.name"></p>
+                        <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="file.size"></p>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      class="py-1.5 px-3 inline-flex justify-center items-center gap-x-1.5 text-xs font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-hidden focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none shadow-2xs cursor-pointer shrink-0"
+                    >
+                      <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                      Download
+                    </button>
+                  </div>
+                </template>
+              </template>
+
+              <template x-if="!getSelectedTask().files && getSelectedTask().fileName">
+                <div class="p-3 bg-gray-50 dark:bg-neutral-700/50 rounded-xl border border-gray-200 dark:border-neutral-700 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-x-3 min-w-0">
+                    <svg class="shrink-0 size-5 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
+                    </svg>
+                    <div class="grow min-w-0">
+                      <p class="text-xs font-medium text-gray-800 dark:text-neutral-200 truncate" x-text="getSelectedTask().fileName"></p>
+                      <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="getSelectedTask().fileSize"></p>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="button" 
+                    class="py-1.5 px-3 inline-flex justify-center items-center gap-x-1.5 text-xs font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-hidden focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none shadow-2xs cursor-pointer shrink-0"
+                  >
+                    <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download
+                  </button>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <!-- Event History Timeline -->
+        <div class="space-y-3 pt-2">
+          <h5 class="text-xs font-semibold text-gray-800 dark:text-neutral-200 uppercase tracking-wider">
+            Event History
+          </h5>
+
+          <!-- Timeline Container -->
+          <div class="w-full">
+            <template x-for="(event, idx) in getSelectedTask().events" :key="idx">
+              <!-- Item -->
+              <div class="group flex gap-x-3">
+                <!-- Left Content -->
+                <div class="min-w-14 text-end">
+                  <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="event.time"></span>
+                </div>
+                <!-- End Left Content -->
+
+                <!-- Icon -->
+                <div class="relative group-last:after:hidden after:absolute after:top-7 after:bottom-0 after:inset-s-3.5 after:-translate-x-[0.5px] after:border-s after:border-gray-200 dark:after:border-neutral-700">
+                  <div class="relative z-10 size-7 flex justify-center items-center">
+                    <div class="size-2 rounded-full bg-gray-400 dark:bg-neutral-600"></div>
+                  </div>
+                </div>
+                <!-- End Icon -->
+
+                <!-- Right Content -->
+                <div class="grow pt-0.5 pb-8 group-last:pb-0">
+                  <h3 class="flex gap-x-1.5 font-medium text-gray-800 dark:text-neutral-200" x-text="event.title || event.msg"></h3>
+                  <template x-if="event.desc">
+                    <p class="mt-1 text-sm text-gray-600 dark:text-neutral-300" x-text="event.desc"></p>
+                  </template>
+                </div>
+                <!-- End Right Content -->
+              </div>
+              <!-- End Item -->
+            </template>
+          </div>
+          <!-- End Timeline Container -->
+        </div>
+
+        <!-- Action Buttons Footer -->
+        <div class="pt-4 flex items-center justify-end gap-x-2">
+          <template x-if="getSelectedTask().status === 'FAILURE'">
+            <button 
+              type="button" 
+              class="py-2 px-3 inline-flex items-center gap-x-2 text-xs font-medium rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 focus:outline-hidden focus:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none shadow-2xs cursor-pointer"
+            >
+              <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                <path d="M3 3v5h5" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 6.74-2.74L21 16" />
+                <path d="M16 16h5v5" />
+              </svg>
+              Retry Task
+            </button>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+  <!-- End Offcanvas Body -->
+</div>
+<!-- End Task Details & Execution Logs Offcanvas (Drawer) -->
