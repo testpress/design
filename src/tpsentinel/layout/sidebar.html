@@ -67,12 +67,102 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
   fixed inset-y-0 start-0 z-60
   bg-white border-e border-gray-200
   dark:bg-neutral-800 dark:border-neutral-700" tabindex="-1" aria-label="Sidebar">
-  <div class="relative flex flex-col h-full pt-3">
+  <div class="relative flex flex-col h-full">
     <!-- Sidebar Header -->
-    <header class="h-11 ps-5 pe-2 lg:ps-8 flex items-center gap-x-1">
-      <a class="flex-none rounded-md text-xl inline-block font-semibold focus:outline-hidden text-gray-800 dark:text-neutral-300"
-        href="/" aria-label="Sentinel">Sentinel</a>
-      <div class="lg:hidden ms-auto">
+    <header class="px-5 pt-4 pb-2 flex items-center justify-between">
+      <!-- Organization Switcher Component -->
+      <div class="relative flex w-full" x-data="organizationSwitcher()">
+        <!-- Organization Button -->
+        <button @click="toggleDropdown"
+          class="group w-full inline-flex items-center text-start text-gray-800 align-middle disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden dark:text-white"
+          aria-haspopup="menu" :aria-expanded="dropdownOpen.toString()" aria-label="Organization Dropdown"
+          aria-expanded="false">
+          <!-- Organization Logo -->
+          <div class="flex items-center justify-center size-8 rounded-lg bg-blue-600 text-white font-semibold shrink-0"
+               x-text="currentOrg ? currentOrg.name.charAt(0).toUpperCase() : 'O'">
+          </div>
+          <!-- Text Content -->
+          <span class="ms-3 overflow-hidden">
+            <span
+              class="block text-sm font-medium text-gray-800 group-hover:text-blue-600 group-focus-hover:text-blue-600 dark:text-neutral-200 dark:group-hover:text-blue-600 dark:group-focus-hover:text-blue-600 truncate"
+              x-text="currentOrg ? currentOrg.name : 'Select Organization'">Select Organization</span>
+          </span>
+          <!-- Dropdown Arrow -->
+          <svg class="shrink-0 size-3.5 ms-auto self-center transition-transform duration-200"
+            :class="{ 'rotate-180': dropdownOpen }" xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="m7 15 5 5 5-5"></path>
+            <path d="m7 9 5-5 5 5"></path>
+          </svg>
+        </button>
+        <!-- Dropdown Menu -->
+        <div x-cloak
+            x-show="dropdownOpen"
+            @click.away="dropdownOpen = false"
+            x-transition:enter="transition ease-out duration-100"
+            x-transition:enter-start="transform opacity-0 scale-95"
+            x-transition:enter-end="transform opacity-100 scale-100"
+            x-transition:leave="transition ease-in duration-75"
+            x-transition:leave-start="transform opacity-100 scale-100"
+            x-transition:leave-end="transform opacity-0 scale-95"
+            class="absolute top-full left-0 z-20 mt-2 w-56 bg-white rounded-xl shadow-xl dark:bg-neutral-900 focus:outline-hidden"
+            role="menu"
+            aria-orientation="vertical"
+            tabindex="-1">
+          <div class="p-1 space-y-0.5">
+            <!-- Loading State -->
+            <div x-cloak x-show="loading" class="px-4 py-3 text-center">
+              <div class="inline-flex items-center">
+                <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-500 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <span class="text-sm text-gray-500 dark:text-neutral-500">Loading organizations...</span>
+              </div>
+            </div>
+
+            <!-- Organizations List -->
+            <div x-cloak x-show="!loading && organizations.length > 0">
+              <template x-for="org in organizations" :key="org.uuid">
+                <button @click="switchOrganization(org.uuid)"
+                        :class="org.is_current ? 'bg-gray-100 dark:bg-neutral-800' : 'hover:bg-gray-100 dark:hover:bg-neutral-800'"
+                        class="py-2 px-3 block w-full text-start rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800">
+                  <div class="flex gap-x-2">
+
+
+                    <div class="grow">
+                      <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="org.name"></p>
+
+                    </div>
+                    <div class="ms-auto self-center" x-show="org.is_current">
+                      <svg class="shrink-0 size-4 text-gray-800 dark:text-neutral-200" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                  </div>
+                </button>
+              </template>
+            </div>
+
+            <!-- Empty State -->
+            <div x-cloak x-show="!loading && organizations.length === 0" class="px-4 py-3 text-center">
+              <div class="text-sm text-gray-500 dark:text-neutral-500">No organizations found</div>
+            </div>
+
+            <!-- Error State -->
+            <div x-cloak x-show="error" class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800">
+              <div class="text-sm text-red-600 dark:text-red-400" x-text="error"></div>
+            </div>
+          </div>
+
+          <div class="p-1 border-t border-gray-200 dark:border-neutral-800">
+            <button type="button" class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800 whitespace-nowrap">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+              Add organization
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="lg:hidden shrink-0 ms-2">
         <button type="button"
           class="w-6 h-7 inline-flex justify-center items-center text-sm rounded-md cursor-pointer border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 focus:outline-hidden dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300"
           x-on:click="sidebarOpen = false" aria-label="Close sidebar">
@@ -95,7 +185,7 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
           <!-- Dashboard -->
           <li>
             <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg bg-gray-100 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:bg-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" href="/tpsentinel/dashboard/">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
               </svg>
               Dashboard
@@ -105,12 +195,12 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
           <!-- Review Accordion -->
           <li class="hs-accordion active" id="review-accordion">
             <button type="button" class="hs-accordion-toggle hs-accordion-active:hover:bg-transparent w-full text-start flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-expanded="true" aria-controls="review-accordion-child">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
               Review
-              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
-              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
             <div id="review-accordion-child" class="hs-accordion-content w-full overflow-hidden transition-[height] duration-300" role="region" aria-labelledby="review-accordion">
               <ul class="hs-accordion-group ps-7 mt-1.5 space-y-1.5 relative before:absolute before:top-0 before:start-[20px] before:w-px before:h-full before:bg-gray-200 dark:before:bg-neutral-700">
@@ -121,7 +211,7 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
                   </a>
                 </li>
                 <li>
-                  <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700" href="/tpsentinel/candidate/list/">
+                  <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700" href="/tpsentinel/audit/list/">
                     Review Queue
                     <span class="ms-auto inline-flex items-center gap-1.5 py-px px-1.5 rounded-lg text-[10px] leading-4 font-medium bg-white border border-gray-200 text-gray-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400">1,000</span>
                   </a>
@@ -138,12 +228,12 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
           <!-- Proctoring Accordion -->
           <li class="hs-accordion" id="proctoring-accordion">
             <button type="button" class="hs-accordion-toggle hs-accordion-active:hover:bg-transparent w-full text-start flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-expanded="false" aria-controls="proctoring-accordion-child">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
               </svg>
               Proctoring
-              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
-              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
             <div id="proctoring-accordion-child" class="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden" role="region" aria-labelledby="proctoring-accordion">
               <ul class="hs-accordion-group ps-7 mt-1.5 space-y-1.5 relative before:absolute before:top-0 before:start-[20px] before:w-px before:h-full before:bg-gray-200 dark:before:bg-neutral-700">
@@ -154,7 +244,7 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
                   </a>
                 </li>
                 <li>
-                  <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700" href="#">
+                  <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700" href="/tpsentinel/candidate/list/">
                     Candidates
                   </a>
                 </li>
@@ -170,12 +260,12 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
           <!-- Organization Accordion -->
           <li class="hs-accordion" id="organization-accordion">
             <button type="button" class="hs-accordion-toggle hs-accordion-active:hover:bg-transparent w-full text-start flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-expanded="false" aria-controls="organization-accordion-child">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
               </svg>
               Organization
-              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
-              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
             <div id="organization-accordion-child" class="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden" role="region" aria-labelledby="organization-accordion">
               <ul class="hs-accordion-group ps-7 mt-1.5 space-y-1.5 relative before:absolute before:top-0 before:start-[20px] before:w-px before:h-full before:bg-gray-200 dark:before:bg-neutral-700">
@@ -201,12 +291,12 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
           <!-- Integrations Accordion -->
           <li class="hs-accordion" id="integrations-accordion">
             <button type="button" class="hs-accordion-toggle hs-accordion-active:hover:bg-transparent w-full text-start flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" aria-expanded="false" aria-controls="integrations-accordion-child">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" />
               </svg>
               Integrations
-              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
-              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:block ms-auto hidden size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg class="hs-accordion-active:hidden ms-auto block size-4 text-gray-600 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
             </button>
             <div id="integrations-accordion-child" class="hs-accordion-content w-full overflow-hidden transition-[height] duration-300 hidden" role="region" aria-labelledby="integrations-accordion">
               <ul class="hs-accordion-group ps-7 mt-1.5 space-y-1.5 relative before:absolute before:top-0 before:start-[20px] before:w-px before:h-full before:bg-gray-200 dark:before:bg-neutral-700">
@@ -236,7 +326,7 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
     <ul class="mt-auto flex flex-col gap-y-1.5 px-2 lg:px-5 pb-4 pt-4 border-t border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
           <li>
             <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700" href="#">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
               </svg>
               Reports
@@ -245,7 +335,7 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
 
           <li>
             <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700" href="#">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
               </svg>
               <span class="truncate">Background Jobs</span>
@@ -255,7 +345,7 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
 
           <li>
             <a class="flex items-center gap-x-3 py-2 px-3 text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-300 dark:hover:bg-neutral-700" href="#">
-              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
               </svg>
               Documentation
@@ -263,4 +353,83 @@ id="sidebar" :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class=
           </li>
         </ul>
   </div>
+  <script>
+    function organizationSwitcher() {
+      return {
+        dropdownOpen: false,
+        loading: false,
+        error: null,
+
+        organizations: [],
+        currentOrg: null,
+
+        init() {
+          // Simulate loading delay (optional, for design realism)
+          this.loading = true;
+
+          setTimeout(() => {
+            this.organizations = [
+              {
+                uuid: 'org-1',
+                name: 'NISM',
+                domain: 'nism.ac.in',
+                is_current: true
+              },
+              {
+                uuid: 'org-2',
+                name: 'Globex Inc',
+                domain: 'globex.com',
+                is_current: false
+              },
+              {
+                uuid: 'org-3',
+                name: 'Initech Ltd',
+                domain: 'initech.com',
+                is_current: false
+              }
+            ];
+
+            this.currentOrg = this.organizations.find(o => o.is_current);
+            this.loading = false;
+          }, 500); // simulate API delay
+        },
+
+        toggleDropdown() {
+          this.dropdownOpen = !this.dropdownOpen;
+        },
+
+        switchOrganization(orgUuid) {
+          this.loading = true;
+
+          setTimeout(() => {
+            this.organizations = this.organizations.map(org => ({
+              ...org,
+              is_current: org.uuid === orgUuid
+            }));
+
+            this.currentOrg = this.organizations.find(o => o.uuid === orgUuid);
+
+            this.loading = false;
+            this.dropdownOpen = false;
+
+            this.showMessage(`Switched to ${this.currentOrg.name}`, 'success');
+          }, 300);
+        },
+
+        showMessage(message, type = 'info') {
+          const toast = document.createElement('div');
+          toast.className = `fixed top-4 right-4 z-50 px-4 py-2 rounded-md text-sm font-medium ${
+            type === 'success' ? 'bg-green-100 text-green-800' :
+            type === 'error' ? 'bg-red-100 text-red-800' :
+            'bg-blue-100 text-blue-800'
+          }`;
+          toast.textContent = message;
+
+          document.body.appendChild(toast);
+
+          setTimeout(() => toast.remove(), 3000);
+        }
+      }
+    }
+  </script>
 </aside>
