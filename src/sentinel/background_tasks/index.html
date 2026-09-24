@@ -40,6 +40,7 @@ dashboard_view: Background Jobs
     },
     
     get filteredTasks() {
+      const refTime = Math.max(...this.tasks.map(t => new Date(t.startedAt).getTime()));
       return this.tasks.filter(t => {
         const matchesTab = this.selectedTab === 'all' || 
           (this.selectedTab === 'created_by_me' && (t.isCreatedByMe || t.createdBy === 'James Collison'));
@@ -48,12 +49,18 @@ dashboard_view: Background Jobs
           (this.selectedStatus === 'Running' && t.status === 'RUNNING') ||
           (this.selectedStatus === 'Completed' && t.status === 'SUCCESS') ||
           (this.selectedStatus === 'Failed' && t.status === 'FAILURE');
+        const taskTime = new Date(t.startedAt).getTime();
+        const diffMs = refTime - taskTime;
+        const matchesDate = this.selectedDate === 'All time' ||
+          (this.selectedDate === 'Last 24 hours' && diffMs <= 24 * 60 * 60 * 1000) ||
+          (this.selectedDate === 'Last 7 days' && diffMs <= 7 * 24 * 60 * 60 * 1000) ||
+          (this.selectedDate === 'Last 30 days' && diffMs <= 30 * 24 * 60 * 60 * 1000);
         const query = this.searchQuery.toLowerCase().trim();
         const matchesSearch = !query || 
           t.name.toLowerCase().includes(query) || 
           t.id.toLowerCase().includes(query) || 
           (t.createdBy && t.createdBy.toLowerCase().includes(query));
-        return matchesTab && matchesStatus && matchesSearch;
+        return matchesTab && matchesStatus && matchesDate && matchesSearch;
       });
     },
 
