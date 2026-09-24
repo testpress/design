@@ -1,11 +1,9 @@
-<div class="flex flex-col lg:flex-row gap-5 items-start mt-2">
-  <!-- LEFT: Table Card -->
-  <div 
-    class="p-5 space-y-4 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl transition-all duration-300 w-full"
-    :class="selectedTaskId ? 'lg:w-7/12' : 'lg:w-full'"
-  >
-    <!-- Nav Tab -->
-    <nav class="flex gap-1 relative after:absolute after:bottom-0 after:inset-x-0 after:border-b after:border-gray-200 dark:after:border-neutral-700" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
+<!-- Table Card -->
+<div id="tasks-table" class="scroll-mt-[3.75rem] p-5 space-y-4 flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-2xs rounded-xl w-full">
+    <!-- Sticky Table Controls Header -->
+    <div class="sticky top-[3.75rem] z-20 bg-white dark:bg-neutral-800 -mx-5 -mt-5 p-5 pb-4 space-y-4 border-b border-gray-200 dark:border-neutral-700 rounded-t-xl">
+      <!-- Nav Tab -->
+      <nav class="flex gap-1 relative after:absolute after:bottom-0 after:inset-x-0 after:border-b after:border-gray-200 dark:after:border-neutral-700" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
       <button 
         type="button" 
         @click="selectedTab = 'all'"
@@ -39,7 +37,7 @@
     <!-- End Nav Tab -->
 
     <!-- Filter Group -->
-    <div class="pb-4 grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5 border-b border-gray-200 dark:border-neutral-700">
+    <div class="grid md:grid-cols-2 gap-y-2 md:gap-y-0 md:gap-x-5">
       <div>
         <!-- Search Input -->
         <div class="relative">
@@ -181,10 +179,28 @@
           </div>
         </div>
         <!-- End Date Range Filter Dropdown -->
+
+        <!-- Clear Filters Button -->
+        <button 
+          type="button" 
+          x-show="selectedStatus !== 'All statuses' || searchQuery.trim() !== '' || selectedTab !== 'all' || selectedDate !== 'Last 7 days'"
+          x-cloak
+          @click="selectedStatus = 'All statuses'; searchQuery = ''; selectedTab = 'all'; selectedDate = 'Last 7 days'"
+          class="py-2 px-2.5 inline-flex items-center gap-x-1 text-xs font-medium rounded-lg text-gray-500 hover:text-gray-800 hover:bg-gray-100 dark:text-neutral-400 dark:hover:text-white dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 cursor-pointer transition"
+        >
+          <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18"/>
+            <path d="m6 6 12 12"/>
+          </svg>
+          Clear filters
+        </button>
+        <!-- End Clear Filters Button -->
       </div>
       <!-- End Col -->
     </div>
     <!-- End Filter Group -->
+  </div>
+  <!-- End Sticky Table Controls Header -->
 
     <!-- Table Container -->
     <div class="overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
@@ -195,13 +211,13 @@
               <th scope="col" class="px-5 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Task
               </th>
-              <th scope="col" class="px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider" :class="selectedTaskId ? 'hidden xl:table-cell' : 'hidden sm:table-cell'">
+              <th scope="col" class="hidden sm:table-cell px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Created by
               </th>
               <th scope="col" class="px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Status
               </th>
-              <th scope="col" class="px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider" :class="selectedTaskId ? 'hidden 2xl:table-cell' : 'hidden md:table-cell'">
+              <th scope="col" class="hidden md:table-cell px-4 py-3.5 text-start text-xs font-semibold text-gray-600 dark:text-neutral-400 uppercase tracking-wider">
                 Started
               </th>
             </tr>
@@ -227,9 +243,12 @@
             <!-- Table Rows -->
             <template x-for="task in paginatedTasks" :key="task.id">
               <tr 
-                @click="selectedTaskId = task.id"
+                @click="selectedTaskId = task.id; if (window.HSOverlay) window.HSOverlay.open('#hs-task-details-offcanvas')"
+                aria-haspopup="dialog"
+                aria-expanded="false"
+                aria-controls="hs-task-details-offcanvas"
                 class="cursor-pointer transition-colors duration-150 hover:bg-gray-50 dark:hover:bg-neutral-700/50"
-                :class="selectedTaskId === task.id ? 'bg-blue-50 dark:bg-neutral-700' : ''"
+                :class="selectedTaskId === task.id ? 'bg-blue-50/60 dark:bg-neutral-700/40' : ''"
               >
                 <!-- Task Name & ID -->
                 <td class="px-5 py-3.5 whitespace-nowrap">
@@ -243,7 +262,7 @@
                 </td>
 
                 <!-- Created by -->
-                <td class="px-4 py-3.5 whitespace-nowrap text-sm text-gray-700 dark:text-neutral-300" :class="selectedTaskId ? 'hidden xl:table-cell' : 'hidden sm:table-cell'" x-text="task.createdBy"></td>
+                <td class="hidden sm:table-cell px-4 py-3.5 whitespace-nowrap text-sm text-gray-700 dark:text-neutral-300" x-text="task.createdBy"></td>
 
                 <!-- Status & Progress -->
                 <td class="px-4 py-3.5 whitespace-nowrap">
@@ -272,7 +291,7 @@
                 </td>
 
                 <!-- Started -->
-                <td class="px-4 py-3.5 whitespace-nowrap text-sm text-gray-500 dark:text-neutral-400" :class="selectedTaskId ? 'hidden 2xl:table-cell' : 'hidden md:table-cell'" x-text="task.startedAt"></td>
+                <td class="hidden md:table-cell px-4 py-3.5 whitespace-nowrap text-sm text-gray-500 dark:text-neutral-400" x-text="task.startedAt"></td>
               </tr>
             </template>
           </tbody>
@@ -332,58 +351,59 @@
     </div>
     <!-- End Table Pagination Footer -->
   </div>
-  <!-- END LEFT: Table Card -->
+  <!-- End Table Card -->
 
-  <!-- RIGHT: Side Detail Panel -->
-  <!-- Task Details & Execution Logs Panel -->
-<div 
-  x-show="selectedTaskId !== null" 
-  x-cloak 
-  x-transition:enter="transition ease-out duration-200"
-  x-transition:enter-start="opacity-0 translate-x-4"
-  x-transition:enter-end="opacity-100 translate-x-0"
-  x-transition:leave="transition ease-in duration-150"
-  x-transition:leave-start="opacity-100 translate-x-0"
-  x-transition:leave-end="opacity-0 translate-x-4"
-  class="w-full lg:w-5/12 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-2xs overflow-hidden"
+  <!-- Task Details Offcanvas (Drawer) -->
+  <div 
+  id="hs-task-details-offcanvas" 
+  class="hs-overlay hs-overlay-open:translate-x-0 hidden translate-x-full fixed top-0 inset-e-0 transition-all duration-300 transform h-full max-w-md md:max-w-lg w-full z-80 bg-white dark:bg-neutral-800 border-s border-gray-200 dark:border-neutral-700 shadow-xl flex flex-col hs-overlay-backdrop-open:bg-gray-900/50 dark:hs-overlay-backdrop-open:bg-neutral-900/80" 
+  role="dialog" 
+  tabindex="-1" 
+  aria-labelledby="hs-task-details-offcanvas-label"
+  data-hs-overlay-options='{
+    "backdropClasses": "hs-overlay-backdrop transition duration fixed inset-0 bg-gray-900/50 dark:bg-neutral-900/80"
+  }'
+  @close.hs.overlay="selectedTaskId = null; document.querySelectorAll('#hs-task-details-offcanvas-backdrop').forEach(el => el.remove())"
 >
-  <template x-if="getSelectedTask()">
-    <div x-data="{ copied: false }">
-      <!-- Panel Header -->
-      <div class="p-4 sm:p-5 border-b border-gray-200 dark:border-neutral-700 flex items-start justify-between gap-3 bg-white dark:bg-neutral-800">
-        <div class="grow min-w-0">
-          <div class="flex items-center gap-x-2 text-xs text-gray-500 dark:text-neutral-400">
-            <span class="font-mono break-all" x-text="getSelectedTask().id"></span>
-            <button 
-              type="button" 
-              @click="navigator.clipboard.writeText(getSelectedTask().id); copied = true; setTimeout(() => copied = false, 2000)"
-              class="shrink-0 inline-flex items-center gap-x-1 text-gray-400 hover:text-gray-700 dark:text-neutral-500 dark:hover:text-neutral-300 transition cursor-pointer"
-              title="Copy task UUID"
-            >
-              <svg x-show="!copied" class="size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-              <svg x-show="copied" x-cloak class="size-3.5 text-teal-600 dark:text-teal-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-            </button>
-          </div>
-          <h4 class="mt-1 text-base font-semibold text-gray-800 dark:text-neutral-200 truncate" x-text="getSelectedTask().name"></h4>
-        </div>
-
+  <!-- Offcanvas Header -->
+  <div class="flex justify-between items-center py-3 px-4 sm:px-5 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" x-data="{ copied: false }">
+    <div class="grow min-w-0 pe-2">
+      <div class="flex items-center gap-x-2 text-xs text-gray-500 dark:text-neutral-400">
+        <span class="font-mono truncate" x-text="getSelectedTask() ? getSelectedTask().id : ''"></span>
         <button 
           type="button" 
-          @click="selectedTaskId = null"
-          class="size-8 inline-flex justify-center items-center rounded-lg text-gray-500 hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 focus:outline-none cursor-pointer"
-          aria-label="Close task details"
+          @click="if (getSelectedTask()) { navigator.clipboard.writeText(getSelectedTask().id); copied = true; setTimeout(() => copied = false, 2000) }"
+          class="shrink-0 inline-flex items-center gap-x-1 text-gray-400 hover:text-gray-700 dark:text-neutral-500 dark:hover:text-neutral-300 transition cursor-pointer"
+          title="Copy task UUID"
         >
-          <svg class="size-4 text-gray-800 dark:text-neutral-300" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <svg x-show="!copied" class="size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+          <svg x-show="copied" x-cloak class="size-3.5 text-teal-600 dark:text-teal-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </button>
       </div>
-      <!-- End Panel Header -->
+      <h3 id="hs-task-details-offcanvas-label" class="mt-0.5 text-base font-semibold text-gray-800 dark:text-neutral-200 truncate" x-text="getSelectedTask() ? getSelectedTask().name : 'Task Details'">
+        Task Details
+      </h3>
+    </div>
 
-      <!-- Panel Body -->
-      <div class="p-4 sm:p-5 space-y-5 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
-        
+    <button 
+      type="button" 
+      class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full bg-gray-100 dark:bg-neutral-700 border border-transparent text-gray-800 dark:text-neutral-200 hover:bg-gray-200 dark:hover:bg-neutral-600 focus:outline-hidden focus:bg-gray-200 dark:focus:bg-neutral-600 disabled:opacity-50 disabled:pointer-events-none cursor-pointer shrink-0" 
+      aria-label="Close" 
+      data-hs-overlay="#hs-task-details-offcanvas"
+    >
+      <span class="sr-only">Close</span>
+      <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18"></path>
+        <path d="m6 6 12 12"></path>
+      </svg>
+    </button>
+  </div>
+  <!-- End Offcanvas Header -->
+
+  <!-- Offcanvas Body -->
+  <div class="p-4 sm:p-5 space-y-5 overflow-y-auto grow [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+    <template x-if="getSelectedTask()">
+      <div class="space-y-5">
         <!-- Queued State Notice -->
         <template x-if="getSelectedTask().status === 'QUEUED' || getSelectedTask().status === 'PENDING'">
           <div class="p-3 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-800 flex items-center gap-x-2.5">
@@ -546,7 +566,7 @@
           <div class="w-full">
             <template x-for="(event, idx) in getSelectedTask().events" :key="idx">
               <!-- Item -->
-              <div class="flex gap-x-3">
+              <div class="group flex gap-x-3">
                 <!-- Left Content -->
                 <div class="min-w-14 text-end">
                   <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="event.time"></span>
@@ -554,7 +574,7 @@
                 <!-- End Left Content -->
 
                 <!-- Icon -->
-                <div class="relative last:after:hidden after:absolute after:top-7 after:bottom-0 after:inset-s-3.5 after:-translate-x-[0.5px] after:border-s after:border-gray-200 dark:after:border-neutral-700">
+                <div class="relative group-last:after:hidden after:absolute after:top-7 after:bottom-0 after:inset-s-3.5 after:-translate-x-[0.5px] after:border-s after:border-gray-200 dark:after:border-neutral-700">
                   <div class="relative z-10 size-7 flex justify-center items-center">
                     <div class="size-2 rounded-full bg-gray-400 dark:bg-neutral-600"></div>
                   </div>
@@ -562,7 +582,7 @@
                 <!-- End Icon -->
 
                 <!-- Right Content -->
-                <div class="grow pt-0.5 pb-8">
+                <div class="grow pt-0.5 pb-8 group-last:pb-0">
                   <h3 class="flex gap-x-1.5 font-medium text-gray-800 dark:text-neutral-200" x-text="event.title || event.msg"></h3>
                   <template x-if="event.desc">
                     <p class="mt-1 text-sm text-gray-600 dark:text-neutral-300" x-text="event.desc"></p>
@@ -586,19 +606,17 @@
               <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
-                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 6.74-2.74L21 16" />
                 <path d="M16 16h5v5" />
               </svg>
               Retry Task
             </button>
           </template>
         </div>
-
       </div>
-      <!-- End Panel Body -->
-    </div>
-  </template>
+    </template>
+  </div>
+  <!-- End Offcanvas Body -->
 </div>
-<!-- End Task Details & Execution Logs Panel -->
+<!-- End Task Details & Execution Logs Offcanvas (Drawer) -->
 
-</div>
