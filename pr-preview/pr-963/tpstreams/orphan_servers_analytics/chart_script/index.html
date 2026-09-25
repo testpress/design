@@ -1,0 +1,273 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts/dist/apexcharts.css">
+<style>
+  .apexcharts-tooltip {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/apexcharts/4.7.0/apexcharts.min.js"></script>
+
+<script id="chart-dates-data" type="application/json">["2026-07-20", "2026-07-21", "2026-07-22", "2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31"]</script>
+<script id="chart-wasted-hours-data" type="application/json">[21, 42, 53, 55, 54, 59, 56, 61, 58, 64, 32, 76]</script>
+
+<script>
+  console.log("Chart script tag parsed");
+  window.addEventListener('load', () => {
+    console.log("Window loaded - initializing chart...");
+    let chartDates = ['Jan', 'Feb', 'Mar', 'Apr', 'May'];
+    let chartData = [10, 20, 15, 25, 30];
+
+    try {
+      const datesText = document.getElementById('chart-dates-data').textContent.trim();
+      const hoursText = document.getElementById('chart-wasted-hours-data').textContent.trim();
+      if (datesText && datesText !== "" && !datesText.includes("{" + "{")) chartDates = JSON.parse(datesText);
+      if (hoursText && hoursText !== "" && !hoursText.includes("{" + "{")) chartData = JSON.parse(hoursText);
+    } catch (e) {
+      console.warn("Could not parse dynamic chart data");
+    }
+
+    const clearFilterBadge = document.getElementById('clear-filter-badge');
+    const clearFilterText = document.getElementById('clear-filter-text');
+    const rows = document.querySelectorAll('.anomaly-row');
+    const activeTab = document.getElementById('active-anomalies-tab');
+    const resolvedTab = document.getElementById('historical-orphans-tab');
+
+    let chartInstance = null;
+
+    // 1 & 4. Reset logic
+    const resetTableAndBadge = () => {
+      rows.forEach(row => row.style.display = '');
+      if (clearFilterBadge) {
+        clearFilterBadge.classList.add('hidden');
+        clearFilterBadge.style.display = '';
+      }
+      if (chartInstance) {
+        chartInstance.updateSeries([{ name: 'Wasted Hours', data: chartData }]);
+      }
+    };
+
+    // 2. Chart Click (Filter by Date)
+    const chartDom = document.getElementById('hs-single-bar-chart');
+    console.log("Found chart container:", chartDom);
+    if (chartDom) {
+      console.log("Building ApexCharts options...");
+      const options = {
+        chart: {
+          type: 'bar',
+          height: '100%',
+          toolbar: { show: false },
+          zoom: { enabled: false },
+          events: {
+            dataPointSelection: function(event, chartContext, config) {
+              const xIndex = config.dataPointIndex;
+              if (xIndex !== undefined && xIndex !== -1) {
+                const dateClicked = chartDates[xIndex];
+                if (dateClicked) {
+                  let filterText = dateClicked;
+                  const parts = dateClicked.split('-');
+                  if (parts.length === 3) {
+                    filterText = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                  }
+                  if (clearFilterText) {
+                    clearFilterText.textContent = filterText;
+                  }
+                  if (clearFilterBadge) {
+                    clearFilterBadge.classList.remove('hidden');
+                    clearFilterBadge.style.display = 'inline-flex';
+                  }
+                  rows.forEach(row => {
+                    row.style.display = row.getAttribute('data-date') === dateClicked ? '' : 'none';
+                  });
+                }
+              }
+            }
+          }
+        },
+        series: [{
+          name: 'Wasted Hours',
+          data: chartData
+        }],
+        plotOptions: {
+          bar: { horizontal: false, columnWidth: '16px', borderRadius: 0 }
+        },
+        legend: { show: false },
+        dataLabels: { enabled: false },
+        stroke: { show: true, width: 8, colors: ['transparent'] },
+        xaxis: {
+          categories: chartDates,
+          axisBorder: { show: false },
+          axisTicks: { show: false },
+          crosshairs: { show: false },
+          labels: {
+            style: {
+              colors: '#94a3b8',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: -2,
+            formatter: function(value) {
+              const d = new Date(value);
+              if (!isNaN(d)) {
+                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+              }
+              return value;
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#94a3b8',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          }
+        },
+        states: {
+          hover: { filter: { type: 'darken', value: 0.9 } }
+        },
+        grid: {
+          borderColor: '#e2e8f0',
+          padding: { bottom: 0 }
+        },
+        colors: ['#2563eb'],
+        tooltip: {
+          y: {
+            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+          },
+          custom: function (props) {
+            const { categories } = props.ctx.opts.xaxis;
+            const { dataPointIndex } = props;
+            const val = props.series[props.seriesIndex][dataPointIndex];
+            const formattedVal = val >= 1000 ? (val / 1000) + 'k' : val;
+            let dateStr = categories[dataPointIndex];
+            const dateObj = new Date(dateStr);
+            if (!isNaN(dateObj)) {
+               dateStr = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+            }
+            return `
+              <div class="px-3 py-2 min-w-32 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 shadow-sm rounded-xl text-sm">
+                <div class="font-medium text-gray-800 dark:text-neutral-200 mb-1.5">${dateStr}</div>
+                <div class="flex items-center gap-x-2">
+                  <span class="size-2 rounded-sm bg-blue-600"></span>
+                  <span class="text-gray-500 dark:text-neutral-400">Wasted Hours:</span>
+                  <span class="font-medium text-gray-800 dark:text-neutral-200 ml-auto">${formattedVal}</span>
+                </div>
+              </div>
+            `;
+          }
+        },
+        responsive: [{
+          breakpoint: 568,
+          options: {
+            chart: { height: 300 },
+            plotOptions: { bar: { columnWidth: '14px' } },
+            stroke: { width: 8 },
+            labels: {
+              style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'Inter, ui-sans-serif', fontWeight: 400 },
+              offsetX: -2,
+              formatter: (title) => title.slice(0, 3)
+            },
+            yaxis: {
+              labels: {
+                align: 'left', minWidth: 0, maxWidth: 140,
+                style: { colors: '#94a3b8', fontSize: '11px', fontFamily: 'Inter, ui-sans-serif', fontWeight: 400 },
+                formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+              }
+            }
+          }
+        }]
+      };
+
+      console.log("Rendering chart with options:", options);
+      try {
+        chartInstance = new ApexCharts(chartDom, options);
+        chartInstance.render().then(() => {
+          console.log("Chart render promise resolved!");
+        }).catch(err => {
+          console.error("Chart render error:", err);
+        });
+      } catch (err) {
+        console.error("Error creating ApexCharts instance:", err);
+      }
+    } else {
+      console.warn("Chart container hs-single-bar-chart not found in DOM!");
+    }
+
+    // 3. Leaderboard Click (Filter by Org)
+    document.querySelectorAll('.org-filter-link').forEach(link => {
+      link.addEventListener('click', (e) => {
+        e.preventDefault();
+        const orgName = e.currentTarget.getAttribute('data-filter-org');
+        if (orgName) {
+          if (clearFilterText) {
+            clearFilterText.textContent = orgName;
+          }
+          if (clearFilterBadge) {
+            clearFilterBadge.classList.remove('hidden');
+            clearFilterBadge.style.display = 'inline-flex';
+          }
+          rows.forEach(row => {
+            row.style.display = row.getAttribute('data-org') === orgName ? '' : 'none';
+          });
+          
+          if (chartInstance) {
+            // Generate dynamic dummy data specific to the clicked org to simulate filtering
+            const factor = ((orgName.length % 5) * 0.15) + 0.3; 
+            const newData = chartData.map(val => Math.round(val * factor) + Math.floor(Math.random() * 5));
+            chartInstance.updateSeries([{
+              name: 'Wasted Hours',
+              data: newData
+            }]);
+          }
+        }
+      });
+    });
+
+    // 4. Tab Toggle & Clear Filters
+    if (clearFilterBadge) {
+      const clearBtn = clearFilterBadge.querySelector('a');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          resetTableAndBadge();
+        });
+      }
+    }
+
+    const activeClass = "px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:bg-gray-800 dark:text-white dark:hover:bg-neutral-800 dark:focus:bg-neutral-800 dark:after:bg-white";
+    const inactiveClass = "px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-gray-500 hover:text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800";
+
+    const updateTabs = (clickedTab, otherTab) => {
+      if (clickedTab && otherTab) {
+        clickedTab.className = activeClass;
+        otherTab.className = inactiveClass;
+      }
+    };
+
+    if (activeTab) {
+      activeTab.addEventListener('click', (e) => {
+        e.preventDefault();
+        updateTabs(activeTab, resolvedTab);
+      });
+    }
+
+    if (resolvedTab) {
+      resolvedTab.addEventListener('click', (e) => {
+        e.preventDefault();
+        updateTabs(resolvedTab, activeTab);
+      });
+    }
+
+    if (typeof lucide !== 'undefined') {
+      lucide.createIcons();
+    }
+  });
+</script>
