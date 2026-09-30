@@ -14,6 +14,7 @@
 
 
 
+
 <div class="mt-6 space-y-4" x-data="{ selectedStatus: 'all', showScaled: new URLSearchParams(window.location.search).get('type') === 'scaled' }">
   <div class="flex items-center gap-2 overflow-x-auto [&::-webkit-scrollbar]:hidden">
     <button type="button" @click="selectedStatus = 'all'"
@@ -393,11 +394,14 @@
           108 answered &middot; 98 correct &middot; 10 incorrect
         </td>
         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">
-          <div class="flex items-center gap-x-1.5">
-            <span>30</span>
-            
-              
-              
+          
+          
+
+          
+
+          
+  
+  
   
   
   
@@ -407,92 +411,186 @@
   <div x-data="{
          active: false,
          top: 0, left: 0,
+         currentPlacement: 'bottom',
          arrowOffset: '50%',
          updatePosition() {
            const trigger = this.$refs.trigger;
-           const tip = this.$refs.tip;
-           if (!trigger || !tip) return;
+           const pop = this.$refs.popover;
+           if (!trigger || !pop) return;
            const r = trigger.getBoundingClientRect();
-           const placement = 'top';
-           const gap = 8;
-           // Force display to measure real dimensions (tip may still be hidden via x-show)
-           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
-           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
-           const tipW = tip.offsetWidth || 100;
-           const tipH = tip.offsetHeight || 28;
-           if (wasHidden) tip.style.removeProperty('display');
-           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
-           if (placement === 'top') {
-             this.top  = r.top - tipH - gap;
-             this.left = r.left + (r.width - tipW) / 2;
-           } else if (placement === 'bottom') {
+           let placement = 'bottom';
+           if (window.innerWidth < 768 && (placement === 'left' || placement === 'right')) {
+             placement = 'bottom';
+           }
+           const gap = 12;
+           
+           // Temporarily display to measure dimensions
+           const wasHidden = pop.style.display === 'none' || getComputedStyle(pop).display === 'none';
+           if (wasHidden) pop.style.setProperty('display', 'block', 'important');
+           const popW = pop.offsetWidth || 280;
+           const popH = pop.offsetHeight || 150;
+           if (wasHidden) pop.style.removeProperty('display');
+           
+           let finalPlacement = placement;
+           if (placement === 'bottom' && r.bottom + popH + gap > window.innerHeight && r.top - popH - gap > 0) {
+             finalPlacement = 'top';
+           } else if (placement === 'top' && r.top - popH - gap < 0 && r.bottom + popH + gap < window.innerHeight) {
+             finalPlacement = 'bottom';
+           } else if (placement === 'right' && r.right + popW + gap > window.innerWidth && r.left - popW - gap > 0) {
+             finalPlacement = 'left';
+           } else if (placement === 'left' && r.left - popW - gap < 0 && r.right + popW + gap < window.innerWidth) {
+             finalPlacement = 'right';
+           }
+           this.currentPlacement = finalPlacement;
+
+           if (finalPlacement === 'top') {
+             this.top  = r.top - popH - gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'bottom') {
              this.top  = r.bottom + gap;
-             this.left = r.left + (r.width - tipW) / 2;
-           } else if (placement === 'left') {
-             this.top  = r.top + (r.height - tipH) / 2;
-             this.left = r.left - tipW - gap;
-           } else if (placement === 'right') {
-             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'left') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.left - popW - gap;
+           } else if (finalPlacement === 'right') {
+             this.top  = r.top + (r.height - popH) / 2;
              this.left = r.right + gap;
            }
+           
            // Clamp to viewport
-           const minL = 8, maxL = window.innerWidth - tipW - 8;
-           const origLeft = this.left;
-           this.left = Math.max(minL, Math.min(this.left, maxL));
-           if (placement === 'top' || placement === 'bottom') {
+           if (finalPlacement === 'top' || finalPlacement === 'bottom') {
+             const minL = 8, maxL = window.innerWidth - popW - 8;
+             this.left = Math.max(minL, Math.min(this.left, maxL));
              const triggerCenter = r.left + r.width / 2;
              const shift = triggerCenter - this.left;
-             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+             this.arrowOffset = Math.max(12, Math.min(shift, popW - 12)) + 'px';
+           } else {
+             const minT = 8, maxT = window.innerHeight - popH - 8;
+             this.top = Math.max(minT, Math.min(this.top, maxT));
+             const triggerCenterY = r.top + r.height / 2;
+             const shiftY = triggerCenterY - this.top;
+             this.arrowOffset = Math.max(12, Math.min(shiftY, popH - 12)) + 'px';
            }
-           console.log('[tooltip] final top:', this.top, '| left:', this.left);
          }
        }"
-       @mouseenter="active = true; $nextTick(() => updatePosition())"
-       @mouseleave="active = false"
-       @focusin="active = true; $nextTick(() => updatePosition())"
-       @focusout="active = false"
+       x-init="if (active) { $nextTick(() => updatePosition()) }"
+       
        @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       
        @click.outside="active = false"
        @keydown.escape.window="active = false"
        @scroll.window.capture.passive="if(active) updatePosition()"
        @resize.window.passive="if(active) updatePosition()"
-       class="relative inline-flex items-center align-middle cursor-pointer">
+       class="relative inline-flex items-center align-middle ">
 
     <!-- Trigger -->
     <div x-ref="trigger"
-         class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-5313">
+         class="inline-flex items-center justify-center "
+         aria-haspopup="dialog"
+         :aria-expanded="active"
+         aria-controls="popover-9609">
       
-                <i data-lucide="triangle-alert" class="size-4 text-red-500 cursor-help"></i>
+            <div class="flex items-center gap-x-2 cursor-pointer w-fit">
               
+                <span class="inline-flex items-center gap-x-1.5 py-1 px-2 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-500 text-xs font-medium">
+                  <i data-lucide="flag" class="size-3.5"></i>
+                  Review required
+                  <i data-lucide="chevron-down" class="size-3.5 opacity-70"></i>
+                </span>
+              
+            </div>
+          
     </div>
 
-    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <!-- Popover Card (fixed viewport relative container) -->
     <div x-show="active"
+         @click.stop
          x-cloak
-         x-ref="tip"
-         id="tooltip-5313"
-         role="tooltip"
-         x-transition:enter="transition ease-out duration-150"
+         x-ref="popover"
+         id="popover-9609"
+         role="dialog"
+         x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"
-         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100 scale-100"
          x-transition:leave-end="opacity-0 scale-95"
          :style="{ top: top + 'px', left: left + 'px' }"
-         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal max-w-xs">
+         class="fixed z-[9999] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-lg whitespace-normal text-start overflow-visible w-72">
 
-      Flagged: Anomalies detected
+      
+            <div class="px-4 py-3">
+              <div class="mb-4">
+                
+                  <span class="text-xl font-bold text-gray-800 dark:text-white">
+                    4 anomalies detected
+                  </span>
+                
+              </div>
+
+              
+                <ul class="space-y-3 text-[13px] text-gray-800 dark:text-neutral-200">
+                  
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="scan-face" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Face mismatch detected</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="eye-off" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Looking away frequently</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="monitor-off" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Tab switch detected</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="users" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Multiple faces detected</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  
+                </ul>
+              
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800">
+              <a href="#" class="w-full py-2 px-3 inline-flex justify-center items-center gap-x-2 text-[13px] font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-transparent dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <i data-lucide="external-link" class="size-3.5"></i>
+                View evidence
+              </a>
+            </div>
+          
 
       <!-- Arrow -->
-      
-        <span class="absolute top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-white" :style="{ left: arrowOffset }"></span>
-      
+      <template x-if="currentPlacement === 'top'">
+        <div class="absolute top-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-r border-gray-200 dark:border-neutral-700 rotate-45 -mt-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'bottom'">
+        <div class="absolute bottom-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-l border-gray-200 dark:border-neutral-700 rotate-45 -mb-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'left'">
+        <div class="absolute left-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-r border-gray-200 dark:border-neutral-700 rotate-45 -ml-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'right'">
+        <div class="absolute right-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-l border-gray-200 dark:border-neutral-700 rotate-45 -mr-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
     </div>
   </div>
 
-            
-          </div>
+          
         </td>
       
       <td class="px-4 py-3 whitespace-nowrap text-end text-sm font-medium lg:sticky lg:right-0 lg:bg-white dark:lg:bg-neutral-900 lg:z-10 lg:hover:z-20 lg:focus-within:z-20">
@@ -691,10 +789,172 @@
           115 answered &middot; 105 correct &middot; 10 incorrect
         </td>
         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">
-          <div class="flex items-center gap-x-1.5">
-            <span>95</span>
-            
-          </div>
+          
+          
+
+          
+
+          
+  
+  
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         currentPlacement: 'bottom',
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const pop = this.$refs.popover;
+           if (!trigger || !pop) return;
+           const r = trigger.getBoundingClientRect();
+           let placement = 'bottom';
+           if (window.innerWidth < 768 && (placement === 'left' || placement === 'right')) {
+             placement = 'bottom';
+           }
+           const gap = 12;
+           
+           // Temporarily display to measure dimensions
+           const wasHidden = pop.style.display === 'none' || getComputedStyle(pop).display === 'none';
+           if (wasHidden) pop.style.setProperty('display', 'block', 'important');
+           const popW = pop.offsetWidth || 280;
+           const popH = pop.offsetHeight || 150;
+           if (wasHidden) pop.style.removeProperty('display');
+           
+           let finalPlacement = placement;
+           if (placement === 'bottom' && r.bottom + popH + gap > window.innerHeight && r.top - popH - gap > 0) {
+             finalPlacement = 'top';
+           } else if (placement === 'top' && r.top - popH - gap < 0 && r.bottom + popH + gap < window.innerHeight) {
+             finalPlacement = 'bottom';
+           } else if (placement === 'right' && r.right + popW + gap > window.innerWidth && r.left - popW - gap > 0) {
+             finalPlacement = 'left';
+           } else if (placement === 'left' && r.left - popW - gap < 0 && r.right + popW + gap < window.innerWidth) {
+             finalPlacement = 'right';
+           }
+           this.currentPlacement = finalPlacement;
+
+           if (finalPlacement === 'top') {
+             this.top  = r.top - popH - gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'left') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.left - popW - gap;
+           } else if (finalPlacement === 'right') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.right + gap;
+           }
+           
+           // Clamp to viewport
+           if (finalPlacement === 'top' || finalPlacement === 'bottom') {
+             const minL = 8, maxL = window.innerWidth - popW - 8;
+             this.left = Math.max(minL, Math.min(this.left, maxL));
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(12, Math.min(shift, popW - 12)) + 'px';
+           } else {
+             const minT = 8, maxT = window.innerHeight - popH - 8;
+             this.top = Math.max(minT, Math.min(this.top, maxT));
+             const triggerCenterY = r.top + r.height / 2;
+             const shiftY = triggerCenterY - this.top;
+             this.arrowOffset = Math.max(12, Math.min(shiftY, popH - 12)) + 'px';
+           }
+         }
+       }"
+       x-init="if (active) { $nextTick(() => updatePosition()) }"
+       
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle ">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center "
+         aria-haspopup="dialog"
+         :aria-expanded="active"
+         aria-controls="popover-7424">
+      
+            <div class="flex items-center gap-x-2 cursor-pointer w-fit">
+              
+                <span class="inline-flex items-center gap-x-1.5 py-1 px-2 rounded-md bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300 text-xs font-medium">
+                  <i data-lucide="check-circle" class="size-3.5"></i>
+                  Clear
+                  <i data-lucide="chevron-down" class="size-3.5 opacity-70"></i>
+                </span>
+              
+            </div>
+          
+    </div>
+
+    <!-- Popover Card (fixed viewport relative container) -->
+    <div x-show="active"
+         @click.stop
+         x-cloak
+         x-ref="popover"
+         id="popover-7424"
+         role="dialog"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-lg whitespace-normal text-start overflow-visible w-72">
+
+      
+            <div class="px-4 py-3">
+              <div class="mb-4">
+                
+                  <span class="text-xl font-bold text-gray-800 dark:text-white">
+                    0 anomalies detected
+                  </span>
+                
+              </div>
+
+              
+                <p class="text-[13px] text-gray-500 dark:text-neutral-400">
+                  The system did not detect unusual activity during this attempt.
+                </p>
+              
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800">
+              <a href="#" class="w-full py-2 px-3 inline-flex justify-center items-center gap-x-2 text-[13px] font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-transparent dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <i data-lucide="external-link" class="size-3.5"></i>
+                View evidence
+              </a>
+            </div>
+          
+
+      <!-- Arrow -->
+      <template x-if="currentPlacement === 'top'">
+        <div class="absolute top-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-r border-gray-200 dark:border-neutral-700 rotate-45 -mt-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'bottom'">
+        <div class="absolute bottom-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-l border-gray-200 dark:border-neutral-700 rotate-45 -mb-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'left'">
+        <div class="absolute left-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-r border-gray-200 dark:border-neutral-700 rotate-45 -ml-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'right'">
+        <div class="absolute right-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-l border-gray-200 dark:border-neutral-700 rotate-45 -mr-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+    </div>
+  </div>
+
+          
         </td>
       
       <td class="px-4 py-3 whitespace-nowrap text-end text-sm font-medium lg:sticky lg:right-0 lg:bg-white dark:lg:bg-neutral-900 lg:z-10 lg:hover:z-20 lg:focus-within:z-20">
@@ -1053,10 +1313,187 @@
           112 answered &middot; 100 correct &middot; 12 incorrect
         </td>
         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">
-          <div class="flex items-center gap-x-1.5">
-            <span>88</span>
-            
-          </div>
+          
+          
+
+          
+
+          
+  
+  
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         currentPlacement: 'bottom',
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const pop = this.$refs.popover;
+           if (!trigger || !pop) return;
+           const r = trigger.getBoundingClientRect();
+           let placement = 'bottom';
+           if (window.innerWidth < 768 && (placement === 'left' || placement === 'right')) {
+             placement = 'bottom';
+           }
+           const gap = 12;
+           
+           // Temporarily display to measure dimensions
+           const wasHidden = pop.style.display === 'none' || getComputedStyle(pop).display === 'none';
+           if (wasHidden) pop.style.setProperty('display', 'block', 'important');
+           const popW = pop.offsetWidth || 280;
+           const popH = pop.offsetHeight || 150;
+           if (wasHidden) pop.style.removeProperty('display');
+           
+           let finalPlacement = placement;
+           if (placement === 'bottom' && r.bottom + popH + gap > window.innerHeight && r.top - popH - gap > 0) {
+             finalPlacement = 'top';
+           } else if (placement === 'top' && r.top - popH - gap < 0 && r.bottom + popH + gap < window.innerHeight) {
+             finalPlacement = 'bottom';
+           } else if (placement === 'right' && r.right + popW + gap > window.innerWidth && r.left - popW - gap > 0) {
+             finalPlacement = 'left';
+           } else if (placement === 'left' && r.left - popW - gap < 0 && r.right + popW + gap < window.innerWidth) {
+             finalPlacement = 'right';
+           }
+           this.currentPlacement = finalPlacement;
+
+           if (finalPlacement === 'top') {
+             this.top  = r.top - popH - gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'left') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.left - popW - gap;
+           } else if (finalPlacement === 'right') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.right + gap;
+           }
+           
+           // Clamp to viewport
+           if (finalPlacement === 'top' || finalPlacement === 'bottom') {
+             const minL = 8, maxL = window.innerWidth - popW - 8;
+             this.left = Math.max(minL, Math.min(this.left, maxL));
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(12, Math.min(shift, popW - 12)) + 'px';
+           } else {
+             const minT = 8, maxT = window.innerHeight - popH - 8;
+             this.top = Math.max(minT, Math.min(this.top, maxT));
+             const triggerCenterY = r.top + r.height / 2;
+             const shiftY = triggerCenterY - this.top;
+             this.arrowOffset = Math.max(12, Math.min(shiftY, popH - 12)) + 'px';
+           }
+         }
+       }"
+       x-init="if (active) { $nextTick(() => updatePosition()) }"
+       
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle ">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center "
+         aria-haspopup="dialog"
+         :aria-expanded="active"
+         aria-controls="popover-8579">
+      
+            <div class="flex items-center gap-x-2 cursor-pointer w-fit">
+              
+                <span class="inline-flex items-center gap-x-1.5 py-1 px-2 rounded-md bg-orange-100 text-orange-800 dark:bg-orange-800/30 dark:text-orange-500 text-xs font-medium">
+                  <i data-lucide="triangle-alert" class="size-3.5"></i>
+                  Flagged
+                  <i data-lucide="chevron-down" class="size-3.5 opacity-70"></i>
+                </span>
+              
+            </div>
+          
+    </div>
+
+    <!-- Popover Card (fixed viewport relative container) -->
+    <div x-show="active"
+         @click.stop
+         x-cloak
+         x-ref="popover"
+         id="popover-8579"
+         role="dialog"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-lg whitespace-normal text-start overflow-visible w-72">
+
+      
+            <div class="px-4 py-3">
+              <div class="mb-4">
+                
+                  <span class="text-xl font-bold text-gray-800 dark:text-white">
+                    2 anomalies detected
+                  </span>
+                
+              </div>
+
+              
+                <ul class="space-y-3 text-[13px] text-gray-800 dark:text-neutral-200">
+                  
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="eye-off" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Looking away frequently</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="monitor-off" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Tab switch detected</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  
+                </ul>
+              
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800">
+              <a href="#" class="w-full py-2 px-3 inline-flex justify-center items-center gap-x-2 text-[13px] font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-transparent dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <i data-lucide="external-link" class="size-3.5"></i>
+                View evidence
+              </a>
+            </div>
+          
+
+      <!-- Arrow -->
+      <template x-if="currentPlacement === 'top'">
+        <div class="absolute top-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-r border-gray-200 dark:border-neutral-700 rotate-45 -mt-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'bottom'">
+        <div class="absolute bottom-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-l border-gray-200 dark:border-neutral-700 rotate-45 -mb-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'left'">
+        <div class="absolute left-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-r border-gray-200 dark:border-neutral-700 rotate-45 -ml-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'right'">
+        <div class="absolute right-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-l border-gray-200 dark:border-neutral-700 rotate-45 -mr-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+    </div>
+  </div>
+
+          
         </td>
       
       <td class="px-4 py-3 whitespace-nowrap text-end text-sm font-medium lg:sticky lg:right-0 lg:bg-white dark:lg:bg-neutral-900 lg:z-10 lg:hover:z-20 lg:focus-within:z-20">
@@ -1255,10 +1692,172 @@
           110 answered &middot; 95 correct &middot; 15 incorrect
         </td>
         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">
-          <div class="flex items-center gap-x-1.5">
-            <span>91</span>
-            
-          </div>
+          
+          
+
+          
+
+          
+  
+  
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         currentPlacement: 'bottom',
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const pop = this.$refs.popover;
+           if (!trigger || !pop) return;
+           const r = trigger.getBoundingClientRect();
+           let placement = 'bottom';
+           if (window.innerWidth < 768 && (placement === 'left' || placement === 'right')) {
+             placement = 'bottom';
+           }
+           const gap = 12;
+           
+           // Temporarily display to measure dimensions
+           const wasHidden = pop.style.display === 'none' || getComputedStyle(pop).display === 'none';
+           if (wasHidden) pop.style.setProperty('display', 'block', 'important');
+           const popW = pop.offsetWidth || 280;
+           const popH = pop.offsetHeight || 150;
+           if (wasHidden) pop.style.removeProperty('display');
+           
+           let finalPlacement = placement;
+           if (placement === 'bottom' && r.bottom + popH + gap > window.innerHeight && r.top - popH - gap > 0) {
+             finalPlacement = 'top';
+           } else if (placement === 'top' && r.top - popH - gap < 0 && r.bottom + popH + gap < window.innerHeight) {
+             finalPlacement = 'bottom';
+           } else if (placement === 'right' && r.right + popW + gap > window.innerWidth && r.left - popW - gap > 0) {
+             finalPlacement = 'left';
+           } else if (placement === 'left' && r.left - popW - gap < 0 && r.right + popW + gap < window.innerWidth) {
+             finalPlacement = 'right';
+           }
+           this.currentPlacement = finalPlacement;
+
+           if (finalPlacement === 'top') {
+             this.top  = r.top - popH - gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'left') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.left - popW - gap;
+           } else if (finalPlacement === 'right') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.right + gap;
+           }
+           
+           // Clamp to viewport
+           if (finalPlacement === 'top' || finalPlacement === 'bottom') {
+             const minL = 8, maxL = window.innerWidth - popW - 8;
+             this.left = Math.max(minL, Math.min(this.left, maxL));
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(12, Math.min(shift, popW - 12)) + 'px';
+           } else {
+             const minT = 8, maxT = window.innerHeight - popH - 8;
+             this.top = Math.max(minT, Math.min(this.top, maxT));
+             const triggerCenterY = r.top + r.height / 2;
+             const shiftY = triggerCenterY - this.top;
+             this.arrowOffset = Math.max(12, Math.min(shiftY, popH - 12)) + 'px';
+           }
+         }
+       }"
+       x-init="if (active) { $nextTick(() => updatePosition()) }"
+       
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle ">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center "
+         aria-haspopup="dialog"
+         :aria-expanded="active"
+         aria-controls="popover-6982">
+      
+            <div class="flex items-center gap-x-2 cursor-pointer w-fit">
+              
+                <span class="inline-flex items-center gap-x-1.5 py-1 px-2 rounded-md bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300 text-xs font-medium">
+                  <i data-lucide="check-circle" class="size-3.5"></i>
+                  Clear
+                  <i data-lucide="chevron-down" class="size-3.5 opacity-70"></i>
+                </span>
+              
+            </div>
+          
+    </div>
+
+    <!-- Popover Card (fixed viewport relative container) -->
+    <div x-show="active"
+         @click.stop
+         x-cloak
+         x-ref="popover"
+         id="popover-6982"
+         role="dialog"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-lg whitespace-normal text-start overflow-visible w-72">
+
+      
+            <div class="px-4 py-3">
+              <div class="mb-4">
+                
+                  <span class="text-xl font-bold text-gray-800 dark:text-white">
+                    0 anomalies detected
+                  </span>
+                
+              </div>
+
+              
+                <p class="text-[13px] text-gray-500 dark:text-neutral-400">
+                  The system did not detect unusual activity during this attempt.
+                </p>
+              
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800">
+              <a href="#" class="w-full py-2 px-3 inline-flex justify-center items-center gap-x-2 text-[13px] font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-transparent dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <i data-lucide="external-link" class="size-3.5"></i>
+                View evidence
+              </a>
+            </div>
+          
+
+      <!-- Arrow -->
+      <template x-if="currentPlacement === 'top'">
+        <div class="absolute top-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-r border-gray-200 dark:border-neutral-700 rotate-45 -mt-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'bottom'">
+        <div class="absolute bottom-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-l border-gray-200 dark:border-neutral-700 rotate-45 -mb-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'left'">
+        <div class="absolute left-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-r border-gray-200 dark:border-neutral-700 rotate-45 -ml-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'right'">
+        <div class="absolute right-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-l border-gray-200 dark:border-neutral-700 rotate-45 -mr-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+    </div>
+  </div>
+
+          
         </td>
       
       <td class="px-4 py-3 whitespace-nowrap text-end text-sm font-medium lg:sticky lg:right-0 lg:bg-white dark:lg:bg-neutral-900 lg:z-10 lg:hover:z-20 lg:focus-within:z-20">
@@ -1617,10 +2216,172 @@
           105 answered &middot; 95 correct &middot; 10 incorrect
         </td>
         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">
-          <div class="flex items-center gap-x-1.5">
-            <span>98</span>
-            
-          </div>
+          
+          
+
+          
+
+          
+  
+  
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         currentPlacement: 'bottom',
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const pop = this.$refs.popover;
+           if (!trigger || !pop) return;
+           const r = trigger.getBoundingClientRect();
+           let placement = 'bottom';
+           if (window.innerWidth < 768 && (placement === 'left' || placement === 'right')) {
+             placement = 'bottom';
+           }
+           const gap = 12;
+           
+           // Temporarily display to measure dimensions
+           const wasHidden = pop.style.display === 'none' || getComputedStyle(pop).display === 'none';
+           if (wasHidden) pop.style.setProperty('display', 'block', 'important');
+           const popW = pop.offsetWidth || 280;
+           const popH = pop.offsetHeight || 150;
+           if (wasHidden) pop.style.removeProperty('display');
+           
+           let finalPlacement = placement;
+           if (placement === 'bottom' && r.bottom + popH + gap > window.innerHeight && r.top - popH - gap > 0) {
+             finalPlacement = 'top';
+           } else if (placement === 'top' && r.top - popH - gap < 0 && r.bottom + popH + gap < window.innerHeight) {
+             finalPlacement = 'bottom';
+           } else if (placement === 'right' && r.right + popW + gap > window.innerWidth && r.left - popW - gap > 0) {
+             finalPlacement = 'left';
+           } else if (placement === 'left' && r.left - popW - gap < 0 && r.right + popW + gap < window.innerWidth) {
+             finalPlacement = 'right';
+           }
+           this.currentPlacement = finalPlacement;
+
+           if (finalPlacement === 'top') {
+             this.top  = r.top - popH - gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'left') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.left - popW - gap;
+           } else if (finalPlacement === 'right') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.right + gap;
+           }
+           
+           // Clamp to viewport
+           if (finalPlacement === 'top' || finalPlacement === 'bottom') {
+             const minL = 8, maxL = window.innerWidth - popW - 8;
+             this.left = Math.max(minL, Math.min(this.left, maxL));
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(12, Math.min(shift, popW - 12)) + 'px';
+           } else {
+             const minT = 8, maxT = window.innerHeight - popH - 8;
+             this.top = Math.max(minT, Math.min(this.top, maxT));
+             const triggerCenterY = r.top + r.height / 2;
+             const shiftY = triggerCenterY - this.top;
+             this.arrowOffset = Math.max(12, Math.min(shiftY, popH - 12)) + 'px';
+           }
+         }
+       }"
+       x-init="if (active) { $nextTick(() => updatePosition()) }"
+       
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle ">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center "
+         aria-haspopup="dialog"
+         :aria-expanded="active"
+         aria-controls="popover-2867">
+      
+            <div class="flex items-center gap-x-2 cursor-pointer w-fit">
+              
+                <span class="inline-flex items-center gap-x-1.5 py-1 px-2 rounded-md bg-gray-100 text-gray-800 dark:bg-white/10 dark:text-gray-300 text-xs font-medium">
+                  <i data-lucide="check-circle" class="size-3.5"></i>
+                  Clear
+                  <i data-lucide="chevron-down" class="size-3.5 opacity-70"></i>
+                </span>
+              
+            </div>
+          
+    </div>
+
+    <!-- Popover Card (fixed viewport relative container) -->
+    <div x-show="active"
+         @click.stop
+         x-cloak
+         x-ref="popover"
+         id="popover-2867"
+         role="dialog"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-lg whitespace-normal text-start overflow-visible w-72">
+
+      
+            <div class="px-4 py-3">
+              <div class="mb-4">
+                
+                  <span class="text-xl font-bold text-gray-800 dark:text-white">
+                    0 anomalies detected
+                  </span>
+                
+              </div>
+
+              
+                <p class="text-[13px] text-gray-500 dark:text-neutral-400">
+                  The system did not detect unusual activity during this attempt.
+                </p>
+              
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800">
+              <a href="#" class="w-full py-2 px-3 inline-flex justify-center items-center gap-x-2 text-[13px] font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-transparent dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <i data-lucide="external-link" class="size-3.5"></i>
+                View evidence
+              </a>
+            </div>
+          
+
+      <!-- Arrow -->
+      <template x-if="currentPlacement === 'top'">
+        <div class="absolute top-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-r border-gray-200 dark:border-neutral-700 rotate-45 -mt-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'bottom'">
+        <div class="absolute bottom-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-l border-gray-200 dark:border-neutral-700 rotate-45 -mb-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'left'">
+        <div class="absolute left-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-r border-gray-200 dark:border-neutral-700 rotate-45 -ml-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'right'">
+        <div class="absolute right-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-l border-gray-200 dark:border-neutral-700 rotate-45 -mr-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+    </div>
+  </div>
+
+          
         </td>
       
       <td class="px-4 py-3 whitespace-nowrap text-end text-sm font-medium lg:sticky lg:right-0 lg:bg-white dark:lg:bg-neutral-900 lg:z-10 lg:hover:z-20 lg:focus-within:z-20">
@@ -1819,11 +2580,14 @@
           114 answered &middot; 102 correct &middot; 12 incorrect
         </td>
         <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-neutral-400">
-          <div class="flex items-center gap-x-1.5">
-            <span>25</span>
-            
-              
-              
+          
+          
+
+          
+
+          
+  
+  
   
   
   
@@ -1833,92 +2597,186 @@
   <div x-data="{
          active: false,
          top: 0, left: 0,
+         currentPlacement: 'bottom',
          arrowOffset: '50%',
          updatePosition() {
            const trigger = this.$refs.trigger;
-           const tip = this.$refs.tip;
-           if (!trigger || !tip) return;
+           const pop = this.$refs.popover;
+           if (!trigger || !pop) return;
            const r = trigger.getBoundingClientRect();
-           const placement = 'top';
-           const gap = 8;
-           // Force display to measure real dimensions (tip may still be hidden via x-show)
-           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
-           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
-           const tipW = tip.offsetWidth || 100;
-           const tipH = tip.offsetHeight || 28;
-           if (wasHidden) tip.style.removeProperty('display');
-           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
-           if (placement === 'top') {
-             this.top  = r.top - tipH - gap;
-             this.left = r.left + (r.width - tipW) / 2;
-           } else if (placement === 'bottom') {
+           let placement = 'bottom';
+           if (window.innerWidth < 768 && (placement === 'left' || placement === 'right')) {
+             placement = 'bottom';
+           }
+           const gap = 12;
+           
+           // Temporarily display to measure dimensions
+           const wasHidden = pop.style.display === 'none' || getComputedStyle(pop).display === 'none';
+           if (wasHidden) pop.style.setProperty('display', 'block', 'important');
+           const popW = pop.offsetWidth || 280;
+           const popH = pop.offsetHeight || 150;
+           if (wasHidden) pop.style.removeProperty('display');
+           
+           let finalPlacement = placement;
+           if (placement === 'bottom' && r.bottom + popH + gap > window.innerHeight && r.top - popH - gap > 0) {
+             finalPlacement = 'top';
+           } else if (placement === 'top' && r.top - popH - gap < 0 && r.bottom + popH + gap < window.innerHeight) {
+             finalPlacement = 'bottom';
+           } else if (placement === 'right' && r.right + popW + gap > window.innerWidth && r.left - popW - gap > 0) {
+             finalPlacement = 'left';
+           } else if (placement === 'left' && r.left - popW - gap < 0 && r.right + popW + gap < window.innerWidth) {
+             finalPlacement = 'right';
+           }
+           this.currentPlacement = finalPlacement;
+
+           if (finalPlacement === 'top') {
+             this.top  = r.top - popH - gap;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'bottom') {
              this.top  = r.bottom + gap;
-             this.left = r.left + (r.width - tipW) / 2;
-           } else if (placement === 'left') {
-             this.top  = r.top + (r.height - tipH) / 2;
-             this.left = r.left - tipW - gap;
-           } else if (placement === 'right') {
-             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left + (r.width - popW) / 2;
+           } else if (finalPlacement === 'left') {
+             this.top  = r.top + (r.height - popH) / 2;
+             this.left = r.left - popW - gap;
+           } else if (finalPlacement === 'right') {
+             this.top  = r.top + (r.height - popH) / 2;
              this.left = r.right + gap;
            }
+           
            // Clamp to viewport
-           const minL = 8, maxL = window.innerWidth - tipW - 8;
-           const origLeft = this.left;
-           this.left = Math.max(minL, Math.min(this.left, maxL));
-           if (placement === 'top' || placement === 'bottom') {
+           if (finalPlacement === 'top' || finalPlacement === 'bottom') {
+             const minL = 8, maxL = window.innerWidth - popW - 8;
+             this.left = Math.max(minL, Math.min(this.left, maxL));
              const triggerCenter = r.left + r.width / 2;
              const shift = triggerCenter - this.left;
-             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+             this.arrowOffset = Math.max(12, Math.min(shift, popW - 12)) + 'px';
+           } else {
+             const minT = 8, maxT = window.innerHeight - popH - 8;
+             this.top = Math.max(minT, Math.min(this.top, maxT));
+             const triggerCenterY = r.top + r.height / 2;
+             const shiftY = triggerCenterY - this.top;
+             this.arrowOffset = Math.max(12, Math.min(shiftY, popH - 12)) + 'px';
            }
-           console.log('[tooltip] final top:', this.top, '| left:', this.left);
          }
        }"
-       @mouseenter="active = true; $nextTick(() => updatePosition())"
-       @mouseleave="active = false"
-       @focusin="active = true; $nextTick(() => updatePosition())"
-       @focusout="active = false"
+       x-init="if (active) { $nextTick(() => updatePosition()) }"
+       
        @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       
        @click.outside="active = false"
        @keydown.escape.window="active = false"
        @scroll.window.capture.passive="if(active) updatePosition()"
        @resize.window.passive="if(active) updatePosition()"
-       class="relative inline-flex items-center align-middle cursor-pointer">
+       class="relative inline-flex items-center align-middle ">
 
     <!-- Trigger -->
     <div x-ref="trigger"
-         class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-1827">
+         class="inline-flex items-center justify-center "
+         aria-haspopup="dialog"
+         :aria-expanded="active"
+         aria-controls="popover-4255">
       
-                <i data-lucide="triangle-alert" class="size-4 text-red-500 cursor-help"></i>
+            <div class="flex items-center gap-x-2 cursor-pointer w-fit">
               
+                <span class="inline-flex items-center gap-x-1.5 py-1 px-2 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-500 text-xs font-medium">
+                  <i data-lucide="flag" class="size-3.5"></i>
+                  Review required
+                  <i data-lucide="chevron-down" class="size-3.5 opacity-70"></i>
+                </span>
+              
+            </div>
+          
     </div>
 
-    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <!-- Popover Card (fixed viewport relative container) -->
     <div x-show="active"
+         @click.stop
          x-cloak
-         x-ref="tip"
-         id="tooltip-1827"
-         role="tooltip"
-         x-transition:enter="transition ease-out duration-150"
+         x-ref="popover"
+         id="popover-4255"
+         role="dialog"
+         x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"
-         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100 scale-100"
          x-transition:leave-end="opacity-0 scale-95"
          :style="{ top: top + 'px', left: left + 'px' }"
-         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal max-w-xs">
+         class="fixed z-[9999] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl shadow-lg whitespace-normal text-start overflow-visible w-72">
 
-      Flagged: Anomalies detected
+      
+            <div class="px-4 py-3">
+              <div class="mb-4">
+                
+                  <span class="text-xl font-bold text-gray-800 dark:text-white">
+                    4 anomalies detected
+                  </span>
+                
+              </div>
+
+              
+                <ul class="space-y-3 text-[13px] text-gray-800 dark:text-neutral-200">
+                  
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="scan-face" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Face mismatch detected</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="eye-off" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Looking away frequently</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="monitor-off" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Tab switch detected</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  
+                  <li class="flex items-center justify-between">
+                    <div class="flex items-center gap-x-3">
+                      <i data-lucide="users" class="size-4 text-gray-500 dark:text-neutral-400"></i>
+                      <span>Multiple faces detected</span>
+                    </div>
+                    <span class="font-medium text-gray-800 dark:text-neutral-200">1</span>
+                  </li>
+                  
+                </ul>
+              
+            </div>
+
+            <div class="px-4 py-3 border-t border-gray-200 dark:border-neutral-800">
+              <a href="#" class="w-full py-2 px-3 inline-flex justify-center items-center gap-x-2 text-[13px] font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-transparent dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <i data-lucide="external-link" class="size-3.5"></i>
+                View evidence
+              </a>
+            </div>
+          
 
       <!-- Arrow -->
-      
-        <span class="absolute top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-white" :style="{ left: arrowOffset }"></span>
-      
+      <template x-if="currentPlacement === 'top'">
+        <div class="absolute top-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-r border-gray-200 dark:border-neutral-700 rotate-45 -mt-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'bottom'">
+        <div class="absolute bottom-full -translate-x-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-l border-gray-200 dark:border-neutral-700 rotate-45 -mb-1.5" :style="{ left: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'left'">
+        <div class="absolute left-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-t border-r border-gray-200 dark:border-neutral-700 rotate-45 -ml-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
+      <template x-if="currentPlacement === 'right'">
+        <div class="absolute right-full -translate-y-1/2 w-3 h-3 bg-white dark:bg-neutral-800 border-b border-l border-gray-200 dark:border-neutral-700 rotate-45 -mr-1.5" :style="{ top: arrowOffset }"></div>
+      </template>
     </div>
   </div>
 
-            
-          </div>
+          
         </td>
       
       <td class="px-4 py-3 whitespace-nowrap text-end text-sm font-medium lg:sticky lg:right-0 lg:bg-white dark:lg:bg-neutral-900 lg:z-10 lg:hover:z-20 lg:focus-within:z-20">
