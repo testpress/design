@@ -1,7 +1,7 @@
-<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
-<script id="chart-dates-data" type="application/json">["2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01"]</script>
-<script id="chart-wasted-hours-data" type="application/json">[12, 15, 14, 18, 10]</script>
+<script id="chart-dates-data" type="application/json">["2026-07-23", "2026-07-24", "2026-07-25", "2026-07-26", "2026-07-27", "2026-07-28", "2026-07-29", "2026-07-30", "2026-07-31", "2026-08-01"]</script>
+<script id="chart-wasted-hours-data" type="application/json">[20, 25, 22, 30, 28, 12, 15, 14, 18, 10]</script>
 
 <script>
   window.addEventListener('load', () => {
@@ -23,140 +23,155 @@
     const activeTab = document.getElementById('active-anomalies-tab');
     const resolvedTab = document.getElementById('historical-orphans-tab');
 
-    // 1 & 4. Reset logic
+    let chartInstance = null;
+
+    // 1. Reset logic
     const resetTableAndBadge = () => {
       rows.forEach(row => row.style.display = '');
       if (clearFilterBadge) {
         clearFilterBadge.classList.add('hidden');
         clearFilterBadge.style.display = '';
       }
+      if (chartInstance) {
+        chartInstance.updateSeries([{ name: 'Wasted Hours', data: chartData }]);
+      }
     };
 
-    // 2. Chart Click (Filter by Date)
-    const chartDom = document.getElementById('hs-single-area-chart');
-    if (chartDom) {
-      const myChart = echarts.init(chartDom);
-      const option = {
-        tooltip: {
-          trigger: 'axis',
-          backgroundColor: 'transparent',
-          borderWidth: 0,
-          padding: 0,
-          extraCssText: 'box-shadow: none;',
-          formatter: function (params) {
-            let item = params[0];
-            let val = item.value;
-            let formattedVal = val >= 1000 ? (val / 1000) + 'k' : val;
-            let dateStr = item.name;
-            const dateObj = new Date(dateStr);
-            if (!isNaN(dateObj)) {
-               dateStr = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
-            }
-            return `
-              <div class="px-3 py-2 min-w-32 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 shadow-sm rounded-xl text-sm">
-                <div class="font-medium text-gray-800 dark:text-neutral-200 mb-1.5">${dateStr}</div>
-                <div class="flex items-center gap-x-2">
-                  <span class="size-2 rounded-sm bg-blue-600"></span>
-                  <span class="text-gray-500 dark:text-neutral-400">Wasted Hours:</span>
-                  <span class="font-medium text-gray-800 dark:text-neutral-200 ml-auto">${formattedVal}</span>
-                </div>
-              </div>
-            `;
-          }
-        },
-        grid: {
-          top: 15,
-          left: '3%',
-          right: '4%',
-          bottom: '3%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'category',
-          boundaryGap: false,
-          data: chartDates,
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: '#94a3b8',
-            margin: 15,
-            formatter: function (value) {
-              const d = new Date(value);
-              if (!isNaN(d)) {
-                return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    // 2. ApexCharts Single Series Bar Chart
+    const buildChartOptions = () => ({
+      chart: {
+        type: 'bar',
+        height: 250,
+        toolbar: { show: false },
+        zoom: { enabled: false },
+        events: {
+          dataPointSelection: function(event, chartContext, config) {
+            const dateClicked = chartDates[config.dataPointIndex];
+            if (dateClicked) {
+              let filterText = dateClicked;
+              const parts = dateClicked.split('-');
+              if (parts.length === 3) {
+                filterText = `${parts[2]}-${parts[1]}-${parts[0]}`;
               }
-              return value;
+              if (clearFilterText) {
+                clearFilterText.textContent = filterText;
+              }
+              if (clearFilterBadge) {
+                clearFilterBadge.classList.remove('hidden');
+                clearFilterBadge.style.display = 'inline-flex';
+              }
+              rows.forEach(row => {
+                row.style.display = row.getAttribute('data-date') === dateClicked ? '' : 'none';
+              });
             }
-          }
-        },
-        yAxis: {
-          type: 'value',
-          splitLine: {
-            lineStyle: {
-              type: 'dashed',
-              color: '#e2e8f0'
-            }
-          },
-          axisLabel: {
-            color: '#94a3b8',
-            formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
-          }
-        },
-        series: [
-          {
-            name: 'Wasted Hours',
-            type: 'line',
-            smooth: true,
-            symbol: 'circle',
-            showSymbol: false,
-            symbolSize: 8,
-            itemStyle: {
-              color: '#2563eb'
-            },
-            lineStyle: {
-              width: 2
-            },
-            areaStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: 'rgba(37, 99, 235, 0.5)' },
-                { offset: 1, color: 'rgba(37, 99, 235, 0)' }
-              ])
-            },
-            data: chartData
-          }
-        ]
-      };
-
-      myChart.setOption(option);
-      
-      myChart.getZr().on('click', function(params) {
-        const pointInPixel = [params.offsetX, params.offsetY];
-        if (myChart.containPixel('grid', pointInPixel)) {
-          const xIndex = Math.round(myChart.convertFromPixel({seriesIndex: 0}, pointInPixel)[0]);
-          const dateClicked = chartDates[xIndex];
-          if (dateClicked) {
-            let filterText = dateClicked;
-            const parts = dateClicked.split('-');
-            if (parts.length === 3) {
-              filterText = `${parts[2]}-${parts[1]}-${parts[0]}`;
-            }
-            if (clearFilterText) {
-              clearFilterText.textContent = filterText;
-            }
-            if (clearFilterBadge) {
-              clearFilterBadge.classList.remove('hidden');
-              clearFilterBadge.style.display = 'inline-flex';
-            }
-            rows.forEach(row => {
-              row.style.display = row.getAttribute('data-date') === dateClicked ? '' : 'none';
-            });
           }
         }
-      });
-      
-      window.addEventListener('resize', function() {
-        myChart.resize();
-      });
+      },
+      series: [
+        {
+          name: 'Wasted Hours',
+          data: chartData
+        }
+      ],
+      plotOptions: {
+        bar: {
+          horizontal: false,
+          columnWidth: '25%',
+          borderRadius: 4
+        }
+      },
+      dataLabels: {
+        enabled: false
+      },
+      stroke: {
+        show: true,
+        width: 4,
+        colors: ['transparent']
+      },
+      xaxis: {
+        categories: chartDates,
+        axisBorder: { show: false },
+        axisTicks: { show: false },
+        labels: {
+          style: {
+            colors: '#9ca3af',
+            fontSize: '13px',
+            fontFamily: 'Inter, ui-sans-serif, system-ui',
+            fontWeight: 400
+          },
+          formatter: function (value) {
+            const d = new Date(value);
+            if (!isNaN(d)) {
+              return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+            return value;
+          }
+        }
+      },
+      yaxis: {
+        labels: {
+          align: 'left',
+          style: {
+            colors: '#9ca3af',
+            fontSize: '13px',
+            fontFamily: 'Inter, ui-sans-serif, system-ui',
+            fontWeight: 400
+          },
+          formatter: (value) => value >= 1000 ? `${value / 1000}k` : value
+        }
+      },
+      states: {
+        hover: {
+          filter: {
+            type: 'darken',
+            value: 0.9
+          }
+        }
+      },
+      tooltip: {
+        y: {
+          formatter: (value) => `${value} hrs`
+        },
+        custom: function ({series, seriesIndex, dataPointIndex, w}) {
+          let dateStr = chartDates[dataPointIndex];
+          const dateObj = new Date(dateStr);
+          if (!isNaN(dateObj)) {
+            dateStr = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+          }
+          const val = series[seriesIndex][dataPointIndex];
+          let formattedVal = val >= 1000 ? (val / 1000) + 'k' : val;
+          return `
+            <div class="px-2 py-1">
+              <div class="text-sm font-medium text-gray-800 dark:text-neutral-200 mb-1.5">${dateStr}</div>
+              <div class="flex items-center gap-x-2 text-sm">
+                <span class="size-2 rounded-sm bg-blue-600"></span>
+                <span class="text-gray-500 dark:text-neutral-400">Wasted Hours:</span>
+                <span class="font-medium text-gray-800 dark:text-neutral-200 ml-auto">${formattedVal}</span>
+              </div>
+            </div>
+          `;
+        }
+      },
+      fill: {
+        opacity: 1
+      },
+      colors: ['#2563eb'],
+      grid: {
+        strokeDashArray: 4,
+        borderColor: '#e5e7eb',
+        padding: {
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 10
+        }
+      }
+    });
+
+    const chartDom = document.querySelector('#hs-single-bar-chart');
+    if (chartDom) {
+      chartInstance = new ApexCharts(chartDom, buildChartOptions());
+      chartInstance.render();
     }
 
     // 3. Leaderboard Click (Filter by Org)
@@ -172,9 +187,23 @@
             clearFilterBadge.classList.remove('hidden');
             clearFilterBadge.style.display = 'inline-flex';
           }
+          
           rows.forEach(row => {
             row.style.display = row.getAttribute('data-org') === orgName ? '' : 'none';
           });
+          
+          if (chartInstance) {
+            const newChartData = chartDates.map(dateKey => {
+               let sum = 0;
+               rows.forEach(row => {
+                 if (row.getAttribute('data-org') === orgName && row.getAttribute('data-date') === dateKey) {
+                   sum += parseInt(row.getAttribute('data-hours') || '0', 10);
+                 }
+               });
+               return sum;
+            });
+            chartInstance.updateSeries([{ name: 'Wasted Hours', data: newChartData }]);
+          }
         }
       });
     });
