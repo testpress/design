@@ -1,0 +1,186 @@
+<script>
+  function payoutRunCutoffPicker() {
+    const pad = (n) => String(n).padStart(2, '0');
+
+    const now = new Date();
+
+    const toDateInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    return {
+      open: false,
+
+      // calendar state
+      year: now.getFullYear(),
+      month: now.getMonth(), // 0-11
+      years: [now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1],
+      weekDays: ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'],
+      weeks: [],
+
+      // selection state
+      selectedDate: toDateInput(now),
+      hour12: String(((now.getHours() + 11) % 12) + 1).padStart(2, '0'),
+      minute: pad(now.getMinutes()),
+      meridiem: now.getHours() >= 12 ? 'PM' : 'AM',
+
+      // derived / form state
+      combinedIso: '',
+      displayValue: '',
+      error: '',
+
+      hoursOptions: Array.from({ length: 12 }, (_, i) => pad(i + 1)),
+      minutesOptions: Array.from({ length: 60 }, (_, i) => pad(i)),
+
+      get monthLabel() {
+        return new Date(this.year, this.month, 1).toLocaleString('en-US', { month: 'long' });
+      },
+
+      buildCalendar() {
+        const firstDay = new Date(this.year, this.month, 1);
+        const startWeekday = (firstDay.getDay() + 6) % 7; // Monday=0
+        const daysInMonth = new Date(this.year, this.month + 1, 0).getDate();
+
+        const cells = [];
+        for (let i = 0; i < startWeekday; i++) {
+          cells.push(null);
+        }
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateObj = new Date(this.year, this.month, d);
+          const iso = toDateInput(dateObj);
+          const isToday =
+            dateObj.getFullYear() === now.getFullYear() &&
+            dateObj.getMonth() === now.getMonth() &&
+            dateObj.getDate() === now.getDate();
+          const isFuture = dateObj > now;
+          cells.push({
+            key: iso,
+            label: d,
+            iso,
+            isToday,
+            isDisabled: isFuture,
+          });
+        }
+
+        const weeks = [];
+        for (let i = 0; i < cells.length; i += 7) {
+          const row = cells.slice(i, i + 7);
+          while (row.length < 7) {
+            row.push(null);
+          }
+          weeks.push(
+            row.map((cell, idx) =>
+              cell
+                ? {
+                    ...cell,
+                    isSelected: cell.iso === this.selectedDate,
+                  }
+                : {
+                    key: `empty-${i}-${idx}`,
+                    label: '',
+                    iso: null,
+                    isToday: false,
+                    isDisabled: true,
+                    isSelected: false,
+                  },
+            ),
+          );
+        }
+        this.weeks = weeks;
+      },
+
+      prevMonth() {
+        if (this.month === 0) {
+          this.month = 11;
+          this.year -= 1;
+        } else {
+          this.month -= 1;
+        }
+        if (this.year > now.getFullYear() || (this.year === now.getFullYear() && this.month > now.getMonth())) {
+          this.year = now.getFullYear();
+          this.month = now.getMonth();
+        }
+        this.buildCalendar();
+      },
+
+      nextMonth() {
+        if (this.year > now.getFullYear() || (this.year === now.getFullYear() && this.month >= now.getMonth())) {
+          return;
+        }
+        if (this.month === 11) {
+          this.month = 0;
+          this.year += 1;
+        } else {
+          this.month += 1;
+        }
+        if (this.year > now.getFullYear() || (this.year === now.getFullYear() && this.month > now.getMonth())) {
+          this.year = now.getFullYear();
+          this.month = now.getMonth();
+        }
+        this.buildCalendar();
+      },
+
+      onMonthYearChange() {
+        // clamp future months/years
+        if (this.year > now.getFullYear()) {
+          this.year = now.getFullYear();
+        }
+        if (this.year === now.getFullYear() && this.month > now.getMonth()) {
+          this.month = now.getMonth();
+        }
+        this.buildCalendar();
+      },
+
+      selectDay(day) {
+        if (!day || day.isDisabled || !day.iso) return;
+        this.selectedDate = day.iso;
+        this.buildCalendar();
+        this.update();
+      },
+
+      updateTime() {
+        this.update();
+      },
+
+      update() {
+        if (!this.selectedDate || !this.hour12 || !this.minute || !this.meridiem) {
+          this.error = 'Cutoff time is required.';
+          this.combinedIso = '';
+          this.displayValue = '';
+          return;
+        }
+
+        let hours = parseInt(this.hour12, 10) % 12;
+        if (this.meridiem === 'PM') {
+          hours += 12;
+        }
+
+        const candidate = new Date(`${this.selectedDate}T${pad(hours)}:${this.minute}:00`);
+        const nowLocal = new Date();
+
+        if (candidate > nowLocal) {
+          this.error = 'Cutoff time cannot be in the future.';
+          this.combinedIso = '';
+          this.displayValue = '';
+          return;
+        }
+
+        this.error = '';
+        this.combinedIso = candidate.toISOString();
+
+        this.displayValue = candidate.toLocaleString('en-US', {
+          month: 'long',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        });
+      },
+
+      init() {
+        this.buildCalendar();
+        this.update();
+      },
+    };
+  }
+</script>
+
