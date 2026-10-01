@@ -1,0 +1,278 @@
+<!-- Preline Pro Modal: Upload Audio Track -->
+<!-- Preline Docs: https://preline.co/docs/overlay.html -->
+<div x-show="showUploadModal" class="relative z-50" aria-labelledby="upload-modal-title" role="dialog" aria-modal="true" x-cloak>
+  <!-- Backdrop Blur -->
+  <div x-show="showUploadModal" 
+    x-transition:enter="ease-out duration-300" 
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100" 
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100" 
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm transition-opacity"></div>
+
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+      <div x-show="showUploadModal" 
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100 sm:scale-100"
+        x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        @click.away="if(!isUploading) showUploadModal = false"
+        class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-2xl border border-gray-100">
+        
+        <div x-data="{ 
+          selectedFile: null, 
+          fileName: '', 
+          fileSizeFormatted: '',
+          fileInput: null,
+          language: '',
+          trackName: '',
+          isDefault: false,
+          isDragging: false,
+          resetForm() {
+            this.selectedFile = null;
+            this.fileName = '';
+            this.fileSizeFormatted = '';
+            this.language = '';
+            this.trackName = '';
+            this.isDefault = false;
+            this.isDragging = false;
+            if (this.fileInput) this.fileInput.value = '';
+          }
+        }">
+          
+          <!-- Modal Header -->
+          <div class="flex items-center justify-between border-b border-gray-100 px-6 py-4">
+            <div>
+              <h3 class="text-base font-semibold text-gray-900" id="upload-modal-title">Upload Audio Track</h3>
+              <p class="mt-0.5 text-xs text-gray-500">Add audio tracks in different languages to this video.</p>
+            </div>
+            <button type="button" @click="if (!isUploading) { resetForm(); showUploadModal = false; }" :disabled="isUploading"
+              class="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition focus:outline-none">
+              <span class="sr-only">Close</span>
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Modal Body -->
+          <div class="px-6 py-5 space-y-5">
+            
+            <!-- Grid: Language (Required First) & Track Name (Optional Second) -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label for="audio-language" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Language <span class="text-red-500">*</span>
+                </label>
+                <select id="audio-language" x-model="language"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <option value="" disabled selected>Select Language</option>
+                  <option value="English">English</option>
+                  <option value="Spanish">Spanish</option>
+                  <option value="Tamil">Tamil</option>
+                  <option value="Hindi">Hindi</option>
+                  <option value="Malayalam">Malayalam</option>
+                  <option value="French">French</option>
+                  <option value="German">German</option>
+                  <option value="Arabic">Arabic</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Portuguese">Portuguese</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="track-name" class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                  Track Label / Name <span class="text-gray-400 font-normal lowercase">(optional)</span>
+                </label>
+                <input type="text" id="track-name" x-model="trackName" :placeholder="language ? language : 'e.g., Director\'s Commentary'"
+                  class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- Drag & Drop Audio Upload Zone (Preline Pattern) -->
+            <div>
+              <label class="block text-xs font-semibold text-gray-700 uppercase tracking-wider mb-1.5">
+                Audio File <span class="text-red-500">*</span>
+              </label>
+
+              <!-- State 1: Dropzone (No File Selected) -->
+              <div x-show="!selectedFile"
+                @dragover.prevent="isDragging = true"
+                @dragleave.prevent="isDragging = false"
+                @drop.prevent="
+                  isDragging = false;
+                  if ($event.dataTransfer.files.length) {
+                    selectedFile = $event.dataTransfer.files[0];
+                    fileName = selectedFile.name;
+                    fileSizeFormatted = (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB';
+                    if (!trackName && language) trackName = language;
+                  }
+                "
+                :class="isDragging ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20' : 'border-gray-300 bg-gray-50/60 hover:bg-gray-50 hover:border-gray-400'"
+                class="relative border-2 border-dashed rounded-xl p-6 transition flex flex-col items-center justify-center text-center cursor-pointer group">
+                
+                <input type="file" id="audioFilePicker" accept=".mp3,.aac,.m4a,.wav,audio/*"
+                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  x-on:change="
+                    if ($event.target.files.length) {
+                      selectedFile = $event.target.files[0];
+                      fileName = selectedFile.name;
+                      fileSizeFormatted = (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB';
+                      fileInput = $event.target;
+                      if (!trackName && language) trackName = language;
+                    }
+                  ">
+                
+                <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+                  <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                  </svg>
+                </div>
+                <p class="text-sm font-medium text-gray-700">
+                  <span class="text-blue-600 font-semibold group-hover:underline">Click to upload</span> or drag and drop
+                </p>
+                <p class="text-xs text-gray-500 mt-1">
+                  Supported formats: MP3, AAC, M4A, WAV (Max 500MB)
+                </p>
+              </div>
+
+              <!-- State 2: Attached File Card (Preline Attached File Component) -->
+              <div x-show="selectedFile" x-cloak
+                class="flex items-center justify-between p-3.5 bg-gray-50 border border-gray-200 rounded-xl">
+                <div class="flex items-center gap-x-3 min-w-0">
+                  <div class="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                    <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="m9 9 10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z" />
+                    </svg>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-gray-900 truncate" x-text="fileName"></p>
+                    <div class="flex items-center gap-x-2 text-xs text-gray-500 mt-0.5">
+                      <span x-text="fileSizeFormatted"></span>
+                      <span>&bull;</span>
+                      <span class="inline-flex items-center text-emerald-600 font-medium">
+                        <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                        </svg>
+                        Ready for upload
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" 
+                  x-on:click="
+                    selectedFile = null;
+                    fileName = '';
+                    fileSizeFormatted = '';
+                    if (fileInput) fileInput.value = '';
+                  "
+                  class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition shrink-0"
+                  title="Remove file">
+                  <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+            </div>
+
+            <!-- Set as Default Setting (Accessible Toggle Switch) -->
+            <div class="flex items-center justify-between p-3.5 bg-gray-50/70 border border-gray-200 rounded-xl cursor-pointer" @click="isDefault = !isDefault">
+              <div>
+                <span class="block text-sm font-medium text-gray-900">Set as default audio track</span>
+                <span class="block text-xs text-gray-500">Will automatically play for viewers who haven't selected an alternate language.</span>
+              </div>
+              <button type="button" 
+                @click.stop="isDefault = !isDefault"
+                :class="isDefault ? 'bg-blue-600' : 'bg-gray-300'"
+                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 ml-4"
+                role="switch" :aria-checked="isDefault">
+                <span class="sr-only">Set as default audio track</span>
+                <span 
+                  :class="isDefault ? 'translate-x-5' : 'translate-x-0'"
+                  class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out">
+                </span>
+              </button>
+            </div>
+
+            <!-- Upload Progress Bar (When Uploading) -->
+            <div x-show="isUploading" class="space-y-2 pt-1" x-cloak>
+              <div class="flex items-center justify-between text-xs font-semibold">
+                <span class="text-blue-600 flex items-center gap-1.5">
+                  <svg class="animate-spin h-3.5 w-3.5 text-blue-600" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Uploading audio track...
+                </span>
+                <span class="text-gray-700" x-text="uploadProgress + '%'"></span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div class="bg-blue-600 h-2 rounded-full transition-all duration-300" :style="'width: ' + uploadProgress + '%'"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="flex items-center justify-end gap-x-3 border-t border-gray-100 px-6 py-4 bg-gray-50/50 rounded-b-2xl">
+            <button type="button" @click="resetForm(); showUploadModal = false;" :disabled="isUploading"
+              class="py-2 px-4 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none transition">
+              Cancel
+            </button>
+            <button type="button" 
+              @click="
+                if (!selectedFile || !language) {
+                  alert('Please select an audio file and language.');
+                  return;
+                }
+                isUploading = true;
+                uploadProgress = 20;
+                let interval = setInterval(() => {
+                  uploadProgress = Math.min(100, uploadProgress + 25);
+                  if (uploadProgress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                      if (isDefault) {
+                        tracks.forEach(t => t.is_default = false);
+                      }
+                      tracks.unshift({
+                        id: 'trk_' + Date.now(),
+                        name: trackName || language,
+                        language: language,
+                        lang_code: language.toLowerCase().slice(0, 2),
+                        status: 'processing',
+                        is_default: isDefault,
+                        is_active: true,
+                        size: (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB',
+                        duration: '04:32'
+                      });
+                      resetForm();
+                      isUploading = false;
+                      uploadProgress = 0;
+                      showUploadModal = false;
+                    }, 400);
+                  }
+                }, 250);
+              "
+              :disabled="isUploading || !selectedFile || !language"
+              class="py-2 px-4 text-sm font-semibold rounded-lg bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition disabled:opacity-50 flex items-center gap-1.5">
+              <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Upload Audio Track
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
