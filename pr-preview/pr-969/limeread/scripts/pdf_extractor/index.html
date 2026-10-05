@@ -1,0 +1,97 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+    // Set worker source for PDF.js
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    window.extractPdfMetadata = async function(file) {
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+            const pdf = await loadingTask.promise;
+            
+            // 1. Get standard metadata
+            const metadata = await pdf.getMetadata();
+            const info = metadata.info || {};
+            console.log('PDF Raw Metadata:', info);
+            
+            // 2. Extract Text from first 3 pages for ISBN and Edition
+            let combinedText = '';
+            const maxPages = Math.min(pdf.numPages, 3);
+            for (let i = 1; i <= maxPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                combinedText += textContent.items.map(item => item.str).join(' ') + ' ';
+            }
+            console.log('PDF Extracted Text Sample (First 3 pages):', combinedText.substring(0, 1000) + '...');
+
+            // 3. Clean and Validate Title
+            let rawTitle = info.Title || file.name.replace(/\.[^/.]+$/, "");
+            
+            // Remove common junk patterns
+            let cleanTitle = rawTitle
+                .replace(/\(\s*PDFDrive\s*(?:\.com)?\s*\)/gi, '')
+                .replace(/\(\s*Z-Library\s*\)/gi, '')
+                .replace(/\(\s*PDF-Drive\s*(?:\.com)?\s*\)/gi, '')
+                .replace(/\[\s*.*?\.com\s*\]/gi, '')
+                .replace(/\{.*?\}/g, '')
+                .replace(/_/g, ' ') // Replace underscores with spaces
+                .replace(/\.pdf/gi, '') // Double check for .pdf in the string
+                .replace(/\s\s+/g, ' ') // Remove double spaces
+                .trim();
+
+            // Validation: Only reject if it's completely empty or looks like just random numbers/symbols
+            const isInvalid = cleanTitle.length < 2 || /^[0-9-_.\s]+$/.test(cleanTitle);
+            
+            const finalTitle = isInvalid ? '' : cleanTitle;
+
+            // 4. Render first page for cover image
+            const firstPage = await pdf.getPage(1);
+            const viewport = firstPage.getViewport({ scale: 0.5 }); // Low res for thumbnail
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            await firstPage.render({
+                canvasContext: context,
+                viewport: viewport
+            }).promise;
+
+            const coverDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            // 5. Regex for ISBN (10 or 13 digits)
+            const isbnRegex = /(?:ISBN(?:-13|:)?\s+)?(?=.{13}$|(?:\d[\ |-]?){10}$)(?:97[89][\ |-]?)?\d{1,5}[\ |-]?\d{1,7}[\ |-]?\d{1,7}[\ |-]?[\dX]/gi;
+            const isbnMatch = combinedText.match(isbnRegex);
+            const detectedIsbn = isbnMatch ? isbnMatch[0].replace(/[^0-9X]/gi, '') : '';
+
+            // 6. Detect Edition from text
+            const editionMatch = combinedText.match(/(\d+(st|nd|rd|th)\s+Edition|Revised\s+Edition|Special\s+Edition)/i);
+            const detectedEdition = editionMatch ? editionMatch[0] : '';
+
+            return {
+                title: finalTitle,
+                author: info.Author || '',
+                publisher: info.Producer || info.Creator || '',
+                subject: info.Subject || '',
+                isbn: detectedIsbn,
+                edition: detectedEdition,
+                publication_year: info.CreationDate ? parsePdfDate(info.CreationDate) : '',
+                description: info.Subject || '',
+                cover: coverDataUrl
+            };
+
+        } catch (error) {
+            console.error('PDF Extraction Error:', error);
+            throw error;
+        }
+    };
+
+    function parsePdfDate(pdfDate) {
+        // PDF dates are often in format D:YYYYMMDDHHmmSS...
+        if (pdfDate.startsWith('D:')) {
+            return pdfDate.substring(2, 6);
+        }
+        const date = new Date(pdfDate);
+        return !isNaN(date.getFullYear()) ? date.getFullYear().toString() : '';
+    }
+</script>
