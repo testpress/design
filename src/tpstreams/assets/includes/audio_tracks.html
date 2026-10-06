@@ -1,0 +1,156 @@
+<!-- Audio Tracks Management Tab Container -->
+<!-- Styled to match TPStreams core UI conventions and typography -->
+<div class="max-w-3xl pb-16" x-show="!disableAnalytics" x-data="{
+  showUploadModal: false,
+  showEditModal: false,
+  showDeleteModal: false,
+  isUploading: false,
+  uploadProgress: 0,
+  editingTrack: null,
+  deletingTrack: null,
+
+  tracks: [
+    {
+      id: 'trk_1',
+      name: 'English (Original Audio)',
+      language: 'English',
+      lang_code: 'en',
+      status: 'completed',
+      is_default: true,
+      size: '22.4 MB',
+      duration: '04:32'
+    },
+    {
+      id: 'trk_2',
+      name: 'Spanish (Latin America Dub)',
+      language: 'Spanish',
+      lang_code: 'es',
+      status: 'completed',
+      is_default: false,
+      size: '21.8 MB',
+      duration: '04:32'
+    },
+    {
+      id: 'trk_3',
+      name: 'Hindi Dub',
+      language: 'Hindi',
+      lang_code: 'hi',
+      status: 'processing',
+      is_default: false,
+      size: '19.6 MB',
+      duration: '04:32'
+    },
+    {
+      id: 'trk_4',
+      name: 'French Commentary',
+      language: 'French',
+      lang_code: 'fr',
+      status: 'completed',
+      is_default: false,
+      size: '20.1 MB',
+      duration: '04:32'
+    }
+  ],
+
+  get activeTrackCount() {
+    return this.tracks.filter(t => t.status === 'completed').length;
+  },
+
+  setAsDefault(targetTrack) {
+    if (targetTrack.status !== 'completed') return;
+    this.tracks.forEach(t => {
+      t.is_default = (t.id === targetTrack.id);
+    });
+  },
+
+  openEditModal(track) {
+    this.editingTrack = JSON.parse(JSON.stringify(track));
+    this.showEditModal = true;
+  },
+
+  saveTrackEdit() {
+    if (!this.editingTrack) return;
+    const index = this.tracks.findIndex(t => t.id === this.editingTrack.id);
+    if (index !== -1) {
+      if (this.editingTrack.is_default) {
+        this.tracks.forEach(t => t.is_default = false);
+      }
+      this.tracks[index] = {
+        ...this.tracks[index],
+        name: this.editingTrack.name,
+        language: this.editingTrack.language,
+        lang_code: this.editingTrack.lang_code,
+        is_default: this.editingTrack.is_default
+      };
+    }
+  },
+
+  openDeleteModal(track) {
+    this.deletingTrack = track;
+    this.showDeleteModal = true;
+  },
+
+  confirmDeleteTrack() {
+    if (!this.deletingTrack) return;
+    this.tracks = this.tracks.filter(t => t.id !== this.deletingTrack.id);
+    this.deletingTrack = null;
+  }
+}">
+
+  <!-- Processing In Progress Alert (TPStreams Pattern) -->
+  <template x-if="tracks.some(t => t.status === 'processing')">
+    <div class="rounded-md bg-blue-50 p-4 mt-2">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-blue-400 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-blue-800">Audio track processing</h3>
+          <div class="mt-1 text-sm text-blue-700">
+            <p>New audio tracks are being processed and will be available in the player shortly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Empty State (When no tracks exist) -->
+  <template x-if="tracks.length === 0">
+    <div class="mt-4">
+      {% include "./audio_track_empty.html" %}
+    </div>
+  </template>
+
+  <!-- Audio Tracks List Section -->
+  <div class="relative mt-4" x-show="tracks.length > 0">
+    <div class="flex justify-between items-center">
+      <h2 class="text-sm font-semibold leading-7 text-gray-900">Audio Tracks</h2>
+      <div class="flex items-center gap-4">
+        <button type="button" @click="showUploadModal = true"
+          class="text-sm font-semibold leading-6 text-blue-600 hover:text-blue-500 inline-flex items-center">
+          <span aria-hidden="true" class="mr-1 text-base font-bold">+</span>
+          Upload Audio Track
+        </button>
+      </div>
+    </div>
+
+    <!-- Tracks List (Matching TPStreams rounded-md border border-gray-200) -->
+    <div class="mt-2 text-sm text-gray-900 sm:col-span-2">
+      <ul role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
+        <template x-for="track in tracks" :key="track.id">
+          {% include "./audio_track_item.html" %}
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  {% include "./upload_audio_track_modal.html" %}
+  {% include "./edit_audio_track_modal.html" %}
+  {% include "./delete_audio_track_modal.html" %}
+
+</div>
+
