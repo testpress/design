@@ -1,0 +1,197 @@
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/dayjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dayjs@1.11.10/plugin/isBetween.js"></script>
+
+<script>
+  dayjs.extend(dayjs_plugin_isBetween);
+  function report_users_app() {
+    return {
+      showSuggestions: false,
+      reportersCount: 42,
+      currentOrdering: '',
+      months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+
+      today: dayjs(),
+      currentMonth: dayjs().month(),
+      currentYear: dayjs().year(),
+
+      fromDate: "",
+      toDate: "",
+
+      init() {
+        const params = new URLSearchParams(window.location.search);
+
+        this.fromDate = params.get("date_from") || "";
+        this.toDate = params.get("date_to") || "";
+
+        if (this.fromDate) {
+          const from = dayjs(this.fromDate);
+          this.currentMonth = from.month();
+          this.currentYear = from.year();
+        }
+      },
+
+      makeDate(day, month, year) {
+        return dayjs().year(year).month(month).date(day);
+      },
+
+      getMonthObj(offset = 0) {
+        return dayjs().year(this.currentYear).month(this.currentMonth).add(offset, "month");
+      },
+
+      get nextMonthObj() {
+        return this.getMonthObj(1);
+      },
+
+      get monthName() {
+        return dayjs().month(this.currentMonth).format("MMMM");
+      },
+
+      get nextMonthName() {
+        return this.nextMonthObj.format("MMMM");
+      },
+
+      get nextCalendarMonth() {
+        return this.nextMonthObj.month();
+      },
+
+      get nextCalendarYear() {
+        return this.nextMonthObj.year();
+      },
+
+      get years() {
+        const now = dayjs().year();
+        return Array.from({ length: 101 }, (_, i) => now - 50 + i);
+      },
+
+      generateCalendarDays(year, month) {
+        const start = dayjs().year(year).month(month).startOf("month");
+        const firstWeekday = start.day() === 0 ? 7 : start.day();
+        const gridStart = start.subtract(firstWeekday - 1, "day");
+
+        return Array.from({ length: 42 }, (_, i) => {
+          const d = gridStart.add(i, "day");
+
+          return {
+            day: d.date(),
+            month: d.month(),
+            year: d.year(),
+            isCurrentMonth: d.month() === month,
+            isToday: d.isSame(this.today, "day"),
+            isLastDayOfPrevMonth: d.isSame(start.subtract(1, "day"), "day"),
+            isFirstDayOfNextMonth: d.isSame(start.add(1, "month"), "day"),
+          };
+        });
+      },
+
+      get calendarDays() {
+        return this.generateCalendarDays(this.currentYear, this.currentMonth);
+      },
+
+      get calendarDays2() {
+        return this.generateCalendarDays(this.nextCalendarYear, this.nextCalendarMonth);
+      },
+
+      prevMonth() {
+        const d = this.getMonthObj(-1);
+        this.currentMonth = d.month();
+        this.currentYear = d.year();
+      },
+
+      nextMonth() {
+        const d = this.getMonthObj(1);
+        this.currentMonth = d.month();
+        this.currentYear = d.year();
+      },
+
+      selectDate(day, month, year) {
+        const picked = this.makeDate(day, month, year).format("YYYY-MM-DD");
+
+        if (!this.fromDate || (this.fromDate && this.toDate)) {
+          this.fromDate = picked;
+          this.toDate = "";
+          return;
+        }
+
+        this.toDate = picked;
+
+        if (dayjs(this.fromDate).isAfter(this.toDate)) {
+          [this.fromDate, this.toDate] = [this.toDate, this.fromDate];
+        }
+      },
+
+      isDateInRange(day, month, year) {
+        if (!this.fromDate || !this.toDate) return false;
+        return this.makeDate(day, month, year).isBetween(this.fromDate, this.toDate, "day", "[]");
+      },
+
+      isRangeStart(day, month, year) {
+        return this.fromDate &&
+          this.makeDate(day, month, year).isSame(this.fromDate, "day");
+      },
+
+      isRangeEnd(day, month, year) {
+        return this.toDate &&
+          this.makeDate(day, month, year).isSame(this.toDate, "day");
+      },
+
+      applySearch(eventOrValue) {
+        const q = typeof eventOrValue === "string"
+          ? eventOrValue.trim()
+          : eventOrValue.target.querySelector('input[name="search"]').value.trim();
+
+        const params = new URLSearchParams(window.location.search);
+
+        q ? params.set("search", q) : params.delete("search");
+        params.delete("page");
+
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      },
+
+      applyOrdering(ordering) {
+        const params = new URLSearchParams(window.location.search);
+        params.set("o", ordering);
+        params.delete("page");
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      },
+
+      applyFiltersToExport(path, extraParams = {}) {
+        const params = new URLSearchParams(window.location.search);
+
+        this.fromDate ? params.set("date_from", this.fromDate) : params.delete("date_from");
+        this.toDate ? params.set("date_to", this.toDate) : params.delete("date_to");
+
+        Object.entries(extraParams).forEach(([k, v]) => {
+          if (v !== null && v !== undefined) params.set(k, v);
+        });
+
+        window.location.href = `${path}?${params.toString()}`;
+      },
+
+      handleDateChange() {
+        const params = new URLSearchParams(window.location.search);
+
+        this.fromDate ? params.set("date_from", this.fromDate) : params.delete("date_from");
+        this.toDate ? params.set("date_to", this.toDate) : params.delete("date_to");
+
+        params.delete("page");
+
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      },
+
+      resetFilters() {
+        window.location.href = `${window.location.pathname}`;
+      },
+
+      calculateActiveFilterCount() {
+        const params = new URLSearchParams(window.location.search);
+        return ["search", "date_from", "date_to"].filter(k => params.get(k)).length;
+      },
+
+      apply_pagination(page) {
+        const params = new URLSearchParams(window.location.search);
+        params.set("page", page);
+        window.location.href = `${window.location.pathname}?${params.toString()}`;
+      },
+    };
+  }
+</script>
