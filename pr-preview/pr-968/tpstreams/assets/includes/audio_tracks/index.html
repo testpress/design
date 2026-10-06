@@ -17,7 +17,6 @@
       lang_code: 'en',
       status: 'completed',
       is_default: true,
-      is_active: true,
       size: '22.4 MB',
       duration: '04:32'
     },
@@ -28,7 +27,6 @@
       lang_code: 'es',
       status: 'completed',
       is_default: false,
-      is_active: true,
       size: '21.8 MB',
       duration: '04:32'
     },
@@ -39,7 +37,6 @@
       lang_code: 'hi',
       status: 'processing',
       is_default: false,
-      is_active: true,
       size: '19.6 MB',
       duration: '04:32'
     },
@@ -50,29 +47,20 @@
       lang_code: 'fr',
       status: 'completed',
       is_default: false,
-      is_active: false,
       size: '20.1 MB',
       duration: '04:32'
     }
   ],
 
   get activeTrackCount() {
-    return this.tracks.filter(t => t.is_active && t.status === 'completed').length;
+    return this.tracks.filter(t => t.status === 'completed').length;
   },
 
   setAsDefault(targetTrack) {
-    if (!targetTrack.is_active || targetTrack.status !== 'completed') return;
+    if (targetTrack.status !== 'completed') return;
     this.tracks.forEach(t => {
       t.is_default = (t.id === targetTrack.id);
     });
-  },
-
-  toggleTrackStatus(targetTrack) {
-    // Cannot disable the default active track directly
-    if (targetTrack.is_default && targetTrack.is_active) {
-      return;
-    }
-    targetTrack.is_active = !targetTrack.is_active;
   },
 
   openEditModal(track) {
@@ -92,8 +80,7 @@
         name: this.editingTrack.name,
         language: this.editingTrack.language,
         lang_code: this.editingTrack.lang_code,
-        is_default: this.editingTrack.is_default,
-        is_active: this.editingTrack.is_default ? true : this.tracks[index].is_active
+        is_default: this.editingTrack.is_default
       };
     }
   },
@@ -160,7 +147,7 @@
     </div>
   </template>
 
-  <!-- Active Audio Tracks Section -->
+  <!-- Audio Tracks List Section -->
   <div class="relative mt-4" x-show="tracks.length > 0">
     <div class="flex justify-between items-center">
       <h2 class="text-sm font-semibold leading-7 text-gray-900">Audio Tracks</h2>
@@ -173,10 +160,10 @@
       </div>
     </div>
 
-    <!-- Active Tracks List (Matching TPStreams rounded-md border border-gray-200) -->
+    <!-- Tracks List (Matching TPStreams rounded-md border border-gray-200) -->
     <div class="mt-2 text-sm text-gray-900 sm:col-span-2">
       <ul role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
-        <template x-for="track in tracks.filter(t => t.is_active)" :key="track.id">
+        <template x-for="track in tracks" :key="track.id">
           <li class="flex items-center justify-between py-4 pl-4 pr-5 text-sm leading-6 hover:bg-gray-50/50">
   <div class="flex w-0 flex-1 items-center">
     
@@ -237,7 +224,7 @@
         
         <!-- Standard Actions -->
         <button type="button" @click="setAsDefault(track); showMenu = false;"
-          :disabled="track.is_default || !track.is_active || track.status !== 'completed'"
+          :disabled="track.is_default || track.status !== 'completed'"
           class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-normal text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition"
           role="menuitem">
           <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -254,149 +241,6 @@
             <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
           </svg>
           Edit track
-        </button>
-
-        <button type="button" @click="toggleTrackStatus(track); showMenu = false;"
-          :disabled="track.status === 'processing' || (track.is_default && track.is_active)"
-          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-normal text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition"
-          role="menuitem">
-          <!-- Disable icon: Circle with slash (when active) -->
-          <svg x-show="track.is_active" class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/>
-          </svg>
-          <!-- Enable icon: Circle with checkmark (when disabled) -->
-          <svg x-show="!track.is_active" class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>
-          </svg>
-          <span x-text="track.is_active ? 'Disable track' : 'Enable track'"></span>
-        </button>
-
-        <!-- Divider -->
-        <div class="my-1 border-t border-gray-100"></div>
-
-        <!-- Destructive Delete Action -->
-        <button type="button" @click="openDeleteModal(track); showMenu = false;"
-          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition"
-          role="menuitem">
-          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line>
-          </svg>
-          Delete track
-        </button>
-      </div>
-    </div>
-  </div>
-</li>
-
-
-        </template>
-        <template x-if="tracks.filter(t => t.is_active).length === 0">
-          <li class="py-6 text-center text-sm text-gray-500">
-            No active audio tracks available.
-          </li>
-        </template>
-      </ul>
-    </div>
-  </div>
-
-  <!-- Disabled Audio Tracks Section (Matching TPStreams Captions Disabled pattern) -->
-  <div class="relative mt-6" x-show="tracks.some(t => !t.is_active)">
-    <h2 class="text-sm font-semibold leading-6 text-gray-900">Disabled</h2>
-    <div class="mt-2 text-sm text-gray-900 sm:col-span-2">
-      <ul role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
-        <template x-for="track in tracks.filter(t => !t.is_active)" :key="track.id">
-          <li class="flex items-center justify-between py-4 pl-4 pr-5 text-sm leading-6 hover:bg-gray-50/50">
-  <div class="flex w-0 flex-1 items-center">
-    
-    <!-- Audio Icon -->
-    <svg class="h-5 w-5 flex-shrink-0 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" d="m9 9 10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z" />
-    </svg>
-
-    <!-- Track Label, Language Badge, Format & Size Info -->
-    <div class="ml-4 flex min-w-0 flex-1 items-center gap-2">
-      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-600 border border-gray-200" x-text="track.lang_code"></span>
-      <span class="truncate font-medium text-gray-900" x-text="track.name"></span>
-      
-      <!-- Processing Tag -->
-      <span x-show="track.status === 'processing'" class="text-xs text-blue-600 font-medium inline-flex items-center gap-1">
-        <svg class="animate-spin h-3 w-3 text-blue-600" fill="none" viewBox="0 0 24 24">
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        (processing...)
-      </span>
-
-      <!-- Default Tag -->
-      <span x-show="track.is_default" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-        Default
-      </span>
-
-      <span class="flex-shrink-0 text-gray-400" x-text="track.size"></span>
-      <span class="flex-shrink-0 text-gray-400 hidden sm:inline" x-text="'(' + track.duration + ')'"></span>
-    </div>
-  </div>
-
-  <!-- Action Menu Dropdown (Preline Pro Block: action-menu-with-destructive-action) -->
-  <div class="ml-4 flex-shrink-0 flex">
-    <div class="relative inline-flex" x-data="{ showMenu: false, openUpward: false }">
-      <!-- 3-dot Trigger Button -->
-      <button type="button" 
-        @click="openUpward = ($event.clientY + 200 > window.innerHeight); showMenu = !showMenu;" 
-        @click.away="showMenu = false"
-        class="size-8 inline-flex justify-center items-center rounded-lg border border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none transition"
-        aria-haspopup="menu" :aria-expanded="showMenu" aria-label="Audio track actions">
-        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
-        </svg>
-      </button>
-
-      <!-- Dropdown Menu Panel -->
-      <div x-cloak x-show="showMenu"
-        :class="openUpward ? 'bottom-full mb-1.5 origin-bottom-right' : 'top-full mt-1.5 origin-top-right'"
-        class="absolute right-0 z-50 w-44 bg-white border border-gray-200 rounded-xl shadow-xl p-1"
-        role="menu" aria-orientation="vertical"
-        x-transition:enter="transition ease-out duration-100" 
-        x-transition:enter-start="transform opacity-0 scale-95"
-        x-transition:enter-end="transform opacity-100 scale-100" 
-        x-transition:leave="transition ease-in duration-75"
-        x-transition:leave-start="transform opacity-100 scale-100"
-        x-transition:leave-end="transform opacity-0 scale-95">
-        
-        <!-- Standard Actions -->
-        <button type="button" @click="setAsDefault(track); showMenu = false;"
-          :disabled="track.is_default || !track.is_active || track.status !== 'completed'"
-          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-normal text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition"
-          role="menuitem">
-          <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Set as default
-        </button>
-
-        <button type="button" @click="openEditModal(track); showMenu = false;"
-          :disabled="track.status === 'processing'"
-          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-normal text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition"
-          role="menuitem">
-          <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
-          </svg>
-          Edit track
-        </button>
-
-        <button type="button" @click="toggleTrackStatus(track); showMenu = false;"
-          :disabled="track.status === 'processing' || (track.is_default && track.is_active)"
-          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-normal text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition"
-          role="menuitem">
-          <!-- Disable icon: Circle with slash (when active) -->
-          <svg x-show="track.is_active" class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 4.24 4.24"/><path d="m14.83 14.83 4.24 4.24"/>
-          </svg>
-          <!-- Enable icon: Circle with checkmark (when disabled) -->
-          <svg x-show="!track.is_active" class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>
-          </svg>
-          <span x-text="track.is_active ? 'Disable track' : 'Enable track'"></span>
         </button>
 
         <!-- Divider -->
@@ -751,7 +595,6 @@
                         lang_code: language.toLowerCase().slice(0, 2),
                         status: 'processing',
                         is_default: isDefault,
-                        is_active: true,
                         size: (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB',
                         duration: '04:32'
                       });
@@ -943,15 +786,13 @@
               <div class="relative flex items-start gap-x-3 pt-1">
                 <div class="flex h-6 items-center">
                   <input id="edit-set-default-audio" type="checkbox" x-model="editingTrack.is_default"
-                    :disabled="!editingTrack.is_active"
-                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 cursor-pointer">
                 </div>
                 <div class="text-sm leading-6">
-                  <label for="edit-set-default-audio" class="font-medium text-gray-800 cursor-pointer select-none"
-                    :class="!editingTrack.is_active ? 'opacity-60 cursor-not-allowed' : ''">
+                  <label for="edit-set-default-audio" class="font-medium text-gray-800 cursor-pointer select-none">
                     Set as default audio track
                   </label>
-                  <p class="text-xs text-gray-500" x-text="editingTrack.is_active ? 'Plays by default when a viewer starts the video.' : 'Track must be enabled before setting as default.'"></p>
+                  <p class="text-xs text-gray-500">Plays by default when a viewer starts the video.</p>
                 </div>
               </div>
 
