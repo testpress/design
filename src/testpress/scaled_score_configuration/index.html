@@ -1,0 +1,139 @@
+{% extends "layouts/admin_base.html" %}
+
+{% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../ui-system/components/badge.html" import badge %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+  <div class="max-w-7xl mx-auto py-10 lg:px-8 px-4 sm:px-6 space-y-5">
+    <div class="space-y-2">
+      {{ breadcrumb(options={
+        "items": [
+          {"label": "Exams", "href": "#"},
+          {"label": "SAT", "href": "#"},
+          {"label": "Scaled scoring"}
+        ]
+      }) }}
+
+      {% set header_actions %}
+        {{ button(text="Add score", variant="primary", icon="plus", href="add_score_v2.html") }}
+      {% endset %}
+
+      {{ page_header(
+        title="Scaled scoring",
+        description="Define the scores students will see and how they are calculated from this exam.",
+        actions=header_actions
+      ) }}
+    </div>
+
+    {% set theader %}
+      {{ table_th(text="") }}
+      {{ table_th(text="Score name") }}
+      {{ table_th(text="Based on") }}
+      {{ table_th(text="Score range") }}
+      {{ table_th(text="Actions", class="text-end") }}
+    {% endset %}
+
+    <div x-data="{
+      dragging: null,
+      dropping: null,
+      items: [
+        { id: 1, name: 'Reading & Writing', desc: 'Student-facing score for Reading and Writing section.', basedOn: 'Module 1 + Module 2', range: '100 - 800' },
+        { id: 2, name: 'Mathematics', desc: 'Student-facing score for Mathematics section.', basedOn: 'Mathematics Module', range: '100 - 800' },
+        { id: 3, name: 'Average Score', desc: 'Average score from section scores.', basedOn: 'Reading & Writing + Mathematics', range: '100 - 800' },
+        { id: 4, name: 'Overall Score', desc: 'Combined score from section scores.', basedOn: 'Reading & Writing + Mathematics', range: '200 - 1600' }
+      ],
+      dragStart(event, index) {
+        this.dragging = index;
+        event.dataTransfer.effectAllowed = 'move';
+        // Need to set data to allow dragging in Firefox
+        event.dataTransfer.setData('text/plain', index);
+      },
+      dragEnter(event, index) {
+        if (index !== this.dragging) {
+          this.dropping = index;
+        }
+      },
+      dragLeave(event, index) {
+        if (this.dropping === index) {
+          this.dropping = null;
+        }
+      },
+      drop(event, index) {
+        if (this.dragging !== null && this.dragging !== index) {
+          const item = this.items.splice(this.dragging, 1)[0];
+          this.items.splice(index, 0, item);
+          this.$nextTick(() => {
+            if (window.lucide) {
+              window.lucide.createIcons();
+            }
+          });
+        }
+        this.dragging = null;
+        this.dropping = null;
+      },
+      dragEnd() {
+        this.dragging = null;
+        this.dropping = null;
+      }
+    }">
+      {% call table(table_header=theader) %}
+        <template x-for="(item, index) in items" :key="item.id">
+          <tr 
+            draggable="true"
+            @dragstart="dragStart($event, index)"
+            @dragenter.prevent="dragEnter($event, index)"
+            @dragover.prevent
+            @dragleave="dragLeave($event, index)"
+            @drop="drop($event, index)"
+            @dragend="dragEnd()"
+            :class="{
+              'opacity-50 bg-gray-50 dark:bg-neutral-800/50': dragging === index,
+              'bg-gray-100 dark:bg-neutral-800': dropping === index,
+              'bg-white dark:bg-neutral-900': dragging !== index && dropping !== index
+            }"
+            class="transition-colors group"
+          >
+            <td class="px-5 py-3 whitespace-nowrap align-middle text-sm w-10">
+              <div class="cursor-grab active:cursor-grabbing text-gray-400 hover:text-gray-600 dark:hover:text-neutral-300">
+                <i data-lucide="grip-vertical" class="size-4"></i>
+              </div>
+            </td>
+            <td class="px-5 py-3 whitespace-nowrap align-middle text-sm">
+              <div class="flex flex-col gap-y-1">
+                <div class="flex items-center gap-x-2">
+                  <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="item.name"></span>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="item.desc"></span>
+              </div>
+            </td>
+            <td class="px-5 py-3 whitespace-nowrap align-middle text-sm">
+              <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="item.basedOn"></span>
+            </td>
+            <td class="px-5 py-3 whitespace-nowrap align-middle text-sm">
+              <div class="flex flex-col gap-y-1">
+                <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="item.range"></span>
+                <span class="text-xs text-gray-500 dark:text-neutral-400">(Min - Max student score)</span>
+              </div>
+            </td>
+            <td class="px-5 py-3 whitespace-nowrap align-middle text-sm text-end">
+              <div class="flex items-center justify-end gap-x-3">
+                <button type="button" class="text-gray-400 hover:text-gray-800 dark:hover:text-neutral-200 focus:outline-none" aria-label="Edit">
+                  <i data-lucide="edit-2" class="size-4"></i>
+                </button>
+                <button type="button" class="text-gray-400 hover:text-red-600 focus:outline-none" aria-label="Delete">
+                  <i data-lucide="trash-2" class="size-4"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </template>
+      {% endcall %}
+    </div>
+
+  </div>
+{% endblock %}

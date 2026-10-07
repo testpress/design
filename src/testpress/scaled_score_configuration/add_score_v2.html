@@ -12,6 +12,39 @@
 {% block content %}
   <div class="max-w-7xl mx-auto py-10 lg:px-8 px-4 sm:px-6 space-y-5" x-data="{ 
     scoreName: '',
+    scoreBasis: 'sections',
+    availableExistingScores: [
+      { name: 'Reading & Writing', range: '200 - 800' },
+      { name: 'Mathematics', range: '200 - 800' },
+      { name: 'Verbal Score', range: '100 - 400' }
+    ],
+    selectedExistingScores: [],
+    existingScoresCombineMethod: 'Add',
+
+    getExistingScoresCombinedPreview() {
+      let total = 0;
+      let count = 0;
+      this.selectedExistingScores.forEach(sec => {
+        let val = parseFloat(this.previewInputs[sec]);
+        if (isNaN(val)) {
+           const scoreObj = this.availableExistingScores.find(s => s.name === sec);
+           if (scoreObj) {
+              val = parseFloat(scoreObj.range.split(' ')[0]);
+           }
+        }
+        if (!isNaN(val)) {
+          total += val;
+          count++;
+        }
+      });
+      if (count === 0) return '-';
+      if (this.existingScoresCombineMethod === 'Average') {
+        const avg = total / count;
+        return Number.isInteger(avg) ? avg : avg.toFixed(1);
+      }
+      return total;
+    },
+
     hasContinued: false,
     availableSections: ['Reading & Writing - Module 1', 'Reading & Writing - Module 2', 'Mathematics - Module 1', 'Mathematics - Module 2'],
     selectedSections: [],
@@ -74,6 +107,9 @@
     },
 
     hasValidMapping() {
+      if (this.scoreBasis === 'existing') {
+        return this.selectedExistingScores.length > 0;
+      }
       const validRows = this.scoreMappings.filter(m => String(m.input).trim() !== '' && !isNaN(parseFloat(m.input)));
       if (validRows.length === 0) return false;
       
@@ -138,6 +174,34 @@
         return Number.isInteger(avg) ? avg : avg.toFixed(1);
       }
       return total;
+    },
+    getCombinedRawScore() {
+      let total = 0;
+      this.selectedSections.forEach(sec => {
+        let val = parseFloat(this.previewInputs[sec]);
+        if (!isNaN(val)) total += val;
+      });
+      return total;
+    },
+    getPreviewMappedCombinedScore() {
+      const val = this.getCombinedRawScore();
+      if (isNaN(val)) return '-';
+      
+      let validMappings = this.scoreMappings.filter(m => String(m.input).trim() !== '' && !isNaN(parseFloat(m.input)));
+      if (validMappings.length === 0) return '-';
+      
+      validMappings.sort((a, b) => parseFloat(a.input) - parseFloat(b.input));
+      
+      let matchedMapping = validMappings[0];
+      if (val >= parseFloat(validMappings[0].input)) {
+        for (let i = 0; i < validMappings.length; i++) {
+          if (val >= parseFloat(validMappings[i].input)) {
+            matchedMapping = validMappings[i];
+          }
+        }
+      }
+      if (matchedMapping.score === undefined || String(matchedMapping.score).trim() === '') return '-';
+      return matchedMapping.score;
     }
   }">
     <div class="space-y-2">
@@ -187,9 +251,79 @@
         </div>
 
         <!-- Sections Selection (Shows after Continue) -->
-        <div x-show="hasContinued" x-cloak class="mt-5">
+        <div x-show="hasContinued" x-cloak class="mt-5 space-y-8">
           
-          <div class="flex items-center justify-between">
+          <!-- Score Basis Selection -->
+          <div>
+            <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+              What should this score be based on?
+            </p>
+            <div class="grid sm:grid-cols-2 gap-3">
+              <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': scoreBasis === 'sections'}">
+                <input type="radio" name="scoreBasis" value="sections" x-model="scoreBasis" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                <div class="flex flex-col ms-3">
+                  <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Exam sections or modules</span>
+                  <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Create this score from the exam’s sections or modules.</span>
+                </div>
+              </label>
+              <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': scoreBasis === 'existing'}">
+                <input type="radio" name="scoreBasis" value="existing" x-model="scoreBasis" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                <div class="flex flex-col ms-3">
+                  <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Existing scores</span>
+                  <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Create this score using scores that have already been configured.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Existing Scores Selection -->
+          <div x-show="scoreBasis === 'existing'" x-cloak x-transition>
+            <div class="flex items-center justify-between">
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                Which scores contribute to this score?
+              </p>
+            </div>
+            <div class="relative">
+              <button type="button" @click="$dispatch('open-modal-existing-picker')" class="w-full py-3 px-4 inline-flex justify-between items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <span x-text="selectedExistingScores.length === 0 ? 'Select existing scores' : selectedExistingScores.length + ' scores selected'"></span>
+                <svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- How should these scores be combined? -->
+          <div x-show="scoreBasis === 'existing' && selectedExistingScores.length > 1" x-cloak x-transition>
+            <div class="flex items-center justify-between">
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                How should these scores be combined?
+              </p>
+            </div>
+            {% call dropdown(trigger="How should these scores be combined?", placement="bottom-start", extra_classes="w-full") %}
+              <button @click="existingScoresCombineMethod = 'Add'" class="w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300">
+                <div class="flex flex-col text-left">
+                  <span class="font-medium" :class="existingScoresCombineMethod === 'Add' ? 'text-emerald-600 dark:text-emerald-500' : ''">Add</span>
+                  <span class="text-xs text-gray-500 dark:text-neutral-500">Add the selected scores together.</span>
+                </div>
+              </button>
+              <button @click="existingScoresCombineMethod = 'Average'" class="w-full flex items-center gap-x-3.5 py-2 px-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-300">
+                <div class="flex flex-col text-left">
+                  <span class="font-medium" :class="existingScoresCombineMethod === 'Average' ? 'text-emerald-600 dark:text-emerald-500' : ''">Average</span>
+                  <span class="text-xs text-gray-500 dark:text-neutral-500">Calculate the average of the selected scores.</span>
+                </div>
+              </button>
+            {% endcall %}
+            <script>
+              document.querySelectorAll('.hs-dropdown-toggle').forEach(btn => {
+                if(btn.innerText.includes('How should these scores be combined?')) {
+                  btn.setAttribute('x-text', 'existingScoresCombineMethod');
+                }
+              });
+            </script>
+          </div>
+
+          <div x-show="scoreBasis === 'sections'" x-cloak x-transition class="space-y-8">
+            <div>
+              <div class="flex items-center justify-between">
             <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200">
               Which sections or modules contribute to this score?
             </p>
@@ -500,12 +634,12 @@
                         <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">
                           Section score cutoff
                         </th>
-                        <template x-if="selectedSections.length <= 1 || combineMethod === 'Create one scaled score'">
+                        <template x-if="scoreBasis === 'sections' && (selectedSections.length <= 1 || combineMethod === 'Create one scaled score')">
                           <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
                             Scaled score
                           </th>
                         </template>
-                        <template x-if="selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
+                        <template x-if="scoreBasis === 'sections' && selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
                           <template x-for="section in selectedSections" :key="section">
                             <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 min-w-32" x-text="section">
                             </th>
@@ -527,7 +661,7 @@
                               </div>
                             </div>
                           </td>
-                          <template x-if="selectedSections.length <= 1 || combineMethod === 'Create one scaled score'">
+                          <template x-if="scoreBasis === 'sections' && (selectedSections.length <= 1 || combineMethod === 'Create one scaled score')">
                             <td class="size-px whitespace-nowrap">
                               <div class="py-2 px-3 sm:px-5">
                                 <div class="w-20">
@@ -536,7 +670,7 @@
                               </div>
                             </td>
                           </template>
-                          <template x-if="selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
+                          <template x-if="scoreBasis === 'sections' && selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
                             <template x-for="section in selectedSections" :key="section">
                               <td class="size-px whitespace-nowrap">
                                 <div class="py-2 px-3 sm:px-5">
@@ -666,11 +800,46 @@
           <!-- Populated State -->
           <div x-show="hasValidMapping()" x-cloak x-transition>
 
+
+            <!-- Existing Scores Preview -->
+            <template x-if="scoreBasis === 'existing'">
+              <div>
+                <div class="p-5 space-y-4">
+                  <template x-for="scoreNameItem in selectedExistingScores" :key="scoreNameItem">
+                    <div class="flex justify-between items-center">
+                      <div class="flex flex-col gap-y-1">
+                        <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 truncate" :title="scoreNameItem" x-text="scoreNameItem"></span>
+                        <span class="text-[10px] text-gray-400 dark:text-neutral-500" x-text="availableExistingScores.find(s => s.name === scoreNameItem).range"></span>
+                      </div>
+                      <div class="text-end">
+                        <label class="text-sm text-gray-800 dark:text-neutral-200 flex items-center">
+                          <span class="sr-only">Score:</span>
+                          <input type="number" x-model="previewInputs[scoreNameItem]" class="w-20 px-2 py-1 text-sm font-semibold text-gray-800 dark:text-neutral-200 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md focus:ring-emerald-500 focus:border-emerald-500" :placeholder="availableExistingScores.find(s => s.name === scoreNameItem).range.split(' ')[0]" :min="availableExistingScores.find(s => s.name === scoreNameItem).range.split(' ')[0]" :max="availableExistingScores.find(s => s.name === scoreNameItem).range.split(' ')[2]">
+                        </label>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                
+                <div class="p-5 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800/50">
+                  <div class="flex justify-between items-center">
+                    <div class="flex flex-col gap-y-1">
+                      <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500" x-text="scoreName ? scoreName : 'Combined Score'"></span>
+                      <span x-show="selectedExistingScores.length > 1" class="text-xs text-gray-500 dark:text-neutral-400" x-text="existingScoresCombineMethod === 'Average' ? '(Average)' : '(Sum)'"></span>
+                    </div>
+                    <div class="text-end">
+                      <span class="block text-2xl font-bold text-emerald-600 dark:text-emerald-500" x-text="getExistingScoresCombinedPreview()"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
             <!-- Content for one section or one combined score -->
-            <template x-if="selectedSections.length <= 1 || combineMethod === 'Create one scaled score'">
+            <template x-if="scoreBasis === 'sections' && (selectedSections.length <= 1 || combineMethod === 'Create one scaled score')">
               <div class="p-5 flex justify-between items-center">
                 <div class="flex flex-col gap-y-1 w-2/3">
-                  <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500" x-text="selectedSections.length === 1 ? selectedSections[0] : 'Combined section'"></span>
+                  <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 truncate" :title="selectedSections.length === 1 ? selectedSections[0] : (scoreName ? scoreName : 'Combined section')" x-text="selectedSections.length === 1 ? selectedSections[0] : (scoreName ? scoreName : 'Combined section')"></span>
                   <label class="text-sm text-gray-800 dark:text-neutral-200 mt-1 flex items-center gap-2">
                     <span x-text="conversionType === 'Percentage' ? 'Percentage:' : 'Section score:'"></span>
                     <input type="number" x-model="previewInputs[selectedSections.length === 1 ? selectedSections[0] : 'Combined']" class="w-16 px-2 py-1 text-sm font-semibold text-gray-800 dark:text-neutral-200 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md focus:ring-emerald-500 focus:border-emerald-500" placeholder="0">
@@ -678,14 +847,14 @@
                   </label>
                 </div>
                 <div class="text-end">
-                  <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 block mb-1">Mapped</span>
+                  <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 block mb-1" x-text="scoreName ? scoreName : 'Mapped'"></span>
                   <span class="block text-2xl font-bold text-gray-800 dark:text-neutral-200" x-text="getPreviewMappedScore(selectedSections.length === 1 ? selectedSections[0] : 'Combined')"></span>
                 </div>
               </div>
             </template>
 
             <!-- Content for multiple sections (Create separate scaled scores) -->
-            <template x-if="selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
+            <template x-if="scoreBasis === 'sections' && selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
               <div>
                 <div class="p-5 space-y-4">
                   <template x-for="section in selectedSections" :key="section">

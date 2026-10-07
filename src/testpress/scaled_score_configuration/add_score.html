@@ -3,10 +3,177 @@
 {% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
 {% from "../../ui-system/components/page-header.html" import page_header %}
 {% from "../../ui-system/components/input.html" import input %}
+{% from "../../ui-system/components/card.html" import card %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../ui-system/components/modal.html" import modal %}
 
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock body_class %}
 {% block content %}
-  <div class="max-w-7xl mx-auto py-10 lg:px-8 px-4 sm:px-6 space-y-5">
+  <div class="max-w-7xl mx-auto py-10 lg:px-8 px-4 sm:px-6 space-y-5" x-data="{ 
+    scoreName: '',
+    scoreBasis: 'sections',
+    availableExistingScores: [
+      { name: 'Reading & Writing', range: '200 - 800' },
+      { name: 'Mathematics', range: '200 - 800' },
+      { name: 'Verbal Score', range: '100 - 400' }
+    ],
+    selectedExistingScores: [],
+    existingScoresCombineMethod: 'Add',
+
+    getExistingScoresCombinedPreview() {
+      let total = 0;
+      let count = 0;
+      this.selectedExistingScores.forEach(sec => {
+        let val = parseFloat(this.previewInputs[sec]);
+        if (isNaN(val)) {
+           const scoreObj = this.availableExistingScores.find(s => s.name === sec);
+           if (scoreObj) {
+              val = parseFloat(scoreObj.range.split(' ')[0]);
+           }
+        }
+        if (!isNaN(val)) {
+          total += val;
+          count++;
+        }
+      });
+      if (count === 0) return '-';
+      if (this.existingScoresCombineMethod === 'Average') {
+        const avg = total / count;
+        return Number.isInteger(avg) ? avg : avg.toFixed(1);
+      }
+      return total;
+    },
+
+    availableSections: ['Reading & Writing - Module 1', 'Reading & Writing - Module 2', 'Mathematics - Module 1', 'Mathematics - Module 2'],
+    selectedSections: [],
+    conversionType: 'Raw score',
+    combineMethod: 'Create one scaled score',
+    combineScaledScoresMethod: 'Add',
+    previewInputs: {},
+    scoreMappings: [
+      { input: '0', score: '', scores: {} },
+      { input: '', score: '', scores: {} },
+      { input: '', score: '', scores: {} }
+    ],
+    
+    insertMapping(index, position) {
+      let insertIndex = position === 'above' ? index : index + 1;
+      this.scoreMappings.splice(insertIndex, 0, {
+        input: '',
+        score: '',
+        scores: {}
+      });
+      setTimeout(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      }, 50);
+    },
+
+    deleteMapping(index) {
+      if (index === 0) return;
+      this.scoreMappings.splice(index, 1);
+    },
+
+    hasValidMapping() {
+      if (this.scoreBasis === 'existing') {
+        return this.selectedExistingScores.length > 0;
+      }
+      const validRows = this.scoreMappings.filter(m => String(m.input).trim() !== '' && !isNaN(parseFloat(m.input)));
+      if (validRows.length === 0) return false;
+      
+      if (this.selectedSections.length <= 1 || this.combineMethod === 'Create one scaled score') {
+         return validRows.some(m => String(m.score).trim() !== '');
+      } else {
+         if (!this.combineScaledScoresMethod) return false;
+         return validRows.some(m => this.selectedSections.some(sec => m.scores[sec] && String(m.scores[sec]).trim() !== ''));
+      }
+    },
+
+    getPreviewMappedScore(section) {
+      let inputValue = this.previewInputs[section];
+      if (inputValue === undefined || inputValue === '') inputValue = 0;
+      const val = parseFloat(inputValue);
+      if (isNaN(val)) return '-';
+      
+      let validMappings = this.scoreMappings.filter(m => String(m.input).trim() !== '' && !isNaN(parseFloat(m.input)));
+      if (validMappings.length === 0) return '-';
+      
+      validMappings.sort((a, b) => parseFloat(a.input) - parseFloat(b.input));
+      
+      let matchedMapping = validMappings[0];
+      if (val >= parseFloat(validMappings[0].input)) {
+        for (let i = 0; i < validMappings.length; i++) {
+          if (val >= parseFloat(validMappings[i].input)) {
+            matchedMapping = validMappings[i];
+          }
+        }
+      }
+      
+      let scoreStr = '';
+      if (this.selectedSections.length <= 1 || this.combineMethod === 'Create one scaled score') {
+         scoreStr = matchedMapping.score;
+      } else {
+         scoreStr = matchedMapping.scores[section];
+      }
+      
+      if (scoreStr === undefined || String(scoreStr).trim() === '') return '-';
+      return scoreStr;
+    },
+    
+    calculatePreviewFinalScore() {
+      let total = 0;
+      let count = 0;
+      
+      this.selectedSections.forEach(sec => {
+        const scoreStr = this.getPreviewMappedScore(sec);
+        if (scoreStr !== '-') {
+          const val = parseFloat(scoreStr);
+          if (!isNaN(val)) {
+            total += val;
+            count++;
+          }
+        }
+      });
+      
+      if (count === 0) return '-';
+      
+      if (this.combineScaledScoresMethod === 'Average') {
+        const avg = total / count;
+        return Number.isInteger(avg) ? avg : avg.toFixed(1);
+      }
+      return total;
+    },
+    getCombinedRawScore() {
+      let total = 0;
+      this.selectedSections.forEach(sec => {
+        let val = parseFloat(this.previewInputs[sec]);
+        if (!isNaN(val)) total += val;
+      });
+      return total;
+    },
+    getPreviewMappedCombinedScore() {
+      const val = this.getCombinedRawScore();
+      if (isNaN(val)) return '-';
+      
+      let validMappings = this.scoreMappings.filter(m => String(m.input).trim() !== '' && !isNaN(parseFloat(m.input)));
+      if (validMappings.length === 0) return '-';
+      
+      validMappings.sort((a, b) => parseFloat(a.input) - parseFloat(b.input));
+      
+      let matchedMapping = validMappings[0];
+      if (val >= parseFloat(validMappings[0].input)) {
+        for (let i = 0; i < validMappings.length; i++) {
+          if (val >= parseFloat(validMappings[i].input)) {
+            matchedMapping = validMappings[i];
+          }
+        }
+      }
+      if (matchedMapping.score === undefined || String(matchedMapping.score).trim() === '') return '-';
+      return matchedMapping.score;
+    }
+  }">
     <div class="space-y-2">
       {{ breadcrumb(options={
         "items": [
@@ -23,81 +190,482 @@
       ) }}
     </div>
 
-    <div class="grid grid-cols-1 lg:grid-cols-6 gap-5" x-data="{ 
-      scoreName: '', 
-      selectedSections: ['Reading & Writing - Module 1'], 
-      hasContinued: false,
-      combineMethod: 'Combine then convert',
-      finalCombineMethod: 'Add',
-      isModalOpen: false,
-      activeModalModuleTitle: null,
-      
-      configurations: {},
-      
-      initModuleConfig(title) {
-        if (!this.configurations[title]) {
-          this.configurations[title] = {
-            scoringMethod: 'Raw Score',
-            mockData: [{raw: '', scaled: ''}]
-          };
-        }
-      },
-
-      isConfigured(title) {
-        const config = this.configurations[title];
-        if (!config) return false;
-        return config.mockData.some(row => row.raw !== '' && row.scaled !== '');
-      },
-      
-      getValidMappingsCount(title) {
-        const config = this.configurations[title];
-        if (!config) return 0;
-        return config.mockData.filter(row => row.raw !== '' && row.scaled !== '').length;
-      },
-      
-      sectionMaxScores: {
-        'Reading & Writing - Module 1': 27,
-        'Reading & Writing - Module 2': 27,
-        'Maths - Module 1': 22,
-        'Maths - Module 2': 22
-      },
-      getCombinedMaxScore() {
-        return this.selectedSections.reduce((sum, section) => sum + (this.sectionMaxScores[section] || 0), 0);
-      },
-      getModulesToConfigure() {
-        if (this.selectedSections.length <= 1 || this.combineMethod === 'Combine then convert') {
-          return [{
-            title: this.selectedSections.join(', '),
-            maxScore: this.getCombinedMaxScore()
-          }];
-        } else {
-          return this.selectedSections.map(section => ({
-            title: section,
-            maxScore: this.sectionMaxScores[section] || 0
-          }));
-        }
-      }
-    }">
+    <div class="grid grid-cols-1 lg:grid-cols-6 gap-5">
       <!-- Main Panel (Left) -->
-      <div class="lg:col-span-4 space-y-4">
-        {% include "./score_name.html" %}
-        {% include "./section_selector.html" %}
-        
-        <div x-show="hasContinued" x-transition x-cloak class="space-y-4">
-          {% include "./select_result_calculated.html" %}
-        </div>
+      <div class="lg:col-span-4">
+        {% call card(padding="p-0 sm:p-0", extra_classes="max-w-3xl") %}
+          <div class="p-5 sm:p-7 space-y-8">
+            
+            <!-- Title Input -->
+            <div>
+              <input 
+                type="text" 
+                x-model="scoreName"
+                placeholder="Name this score" 
+                class="w-full text-2xl font-bold text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-neutral-500 bg-transparent border-0 focus:ring-0 p-0"
+                autofocus
+              >
+              <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+                The name students will see in their exam results. e.g. "Reading &amp; Writing", "Mathematics", or "Overall Score"
+              </p>
+            </div>
 
-        <div class="flex justify-end pt-2" x-show="!hasContinued">
-          <button type="button" @click="hasContinued = true" class="py-2.5 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:ring-2 focus:ring-emerald-500" :disabled="scoreName.trim() === '' || selectedSections.length === 0">
-            Continue
-          </button>
-        </div>
+            <hr class="border-gray-200 dark:border-neutral-700">
+
+            <!-- Score Basis Selection -->
+            <div>
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                What should this score be based on?
+              </p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': scoreBasis === 'sections'}">
+                  <input type="radio" name="scoreBasis" value="sections" x-model="scoreBasis" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Exam sections or modules</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Create this score from the exam’s sections or modules.</span>
+                  </div>
+                </label>
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': scoreBasis === 'existing'}">
+                  <input type="radio" name="scoreBasis" value="existing" x-model="scoreBasis" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Existing scores</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Create this score using scores that have already been configured.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+
+
+            <!-- Existing Scores Selection -->
+            <div x-show="scoreBasis === 'existing'" x-cloak x-transition>
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                Which scores contribute to this score?
+              </p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <template x-for="score in availableExistingScores" :key="score.name">
+                  <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="selectedExistingScores.includes(score.name) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500' : ''">
+                    <input type="checkbox" :value="score.name" x-model="selectedExistingScores" class="shrink-0 mt-0.5 border-gray-200 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                    <div class="flex flex-col ms-3">
+                      <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="score.name"></span>
+                      <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5" x-text="`Score range: ${score.range}`"></span>
+                    </div>
+                  </label>
+                </template>
+              </div>
+            </div>
+
+            <!-- How should these scores be combined? -->
+            <div x-show="scoreBasis === 'existing' && selectedExistingScores.length > 1" x-cloak x-transition>
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                How should these scores be combined?
+              </p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': existingScoresCombineMethod === 'Add'}">
+                  <input type="radio" name="existingScoresCombineMethod" value="Add" x-model="existingScoresCombineMethod" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Add</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Add the selected scores together.</span>
+                  </div>
+                </label>
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': existingScoresCombineMethod === 'Average'}">
+                  <input type="radio" name="existingScoresCombineMethod" value="Average" x-model="existingScoresCombineMethod" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Average</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Calculate the average of the selected scores.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Sections Selection -->
+            <div x-show="scoreBasis === 'sections'" x-cloak x-transition>
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                Which sections or modules contribute to this score?
+              </p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <template x-for="section in availableSections" :key="section">
+                  <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="selectedSections.includes(section) ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500' : ''">
+                    <input type="checkbox" :value="section" x-model="selectedSections" class="shrink-0 mt-0.5 border-gray-200 rounded text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                    <div class="flex flex-col ms-3">
+                      <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="section"></span>
+                      <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5" x-text="`Max raw score: ${section.includes('Mathematics') ? 22 : 27}`"></span>
+                    </div>
+                  </label>
+                </template>
+              </div>
+            </div>
+
+            <!-- Conversion Type Selection -->
+            <div x-show="scoreBasis === 'sections' && selectedSections.length > 0" x-cloak x-transition>
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                How should this score be converted?
+              </p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': conversionType === 'Raw score'}">
+                  <input type="radio" name="conversionType" value="Raw score" x-model="conversionType" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Raw score</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Use the score earned in the section, such as 18 out of 27.</span>
+                  </div>
+                </label>
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': conversionType === 'Percentage'}">
+                  <input type="radio" name="conversionType" value="Percentage" x-model="conversionType" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Percentage</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Convert the section result to a percentage, such as 67%.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Combine Method Selection -->
+            <div x-show="scoreBasis === 'sections' && selectedSections.length > 1" x-cloak x-transition>
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                How should these sections be scored?
+              </p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': combineMethod === 'Create one scaled score'}">
+                  <input type="radio" name="combineMethod" value="Create one scaled score" x-model="combineMethod" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Create one scaled score</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Use the selected sections together to calculate one scaled score.</span>
+                  </div>
+                </label>
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': combineMethod === 'Create separate scaled scores'}">
+                  <input type="radio" name="combineMethod" value="Create separate scaled scores" x-model="combineMethod" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Create separate scaled scores</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Calculate a scaled score for each selected section.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- How should the scaled scores be combined? -->
+            <div x-show="scoreBasis === 'sections' && selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'" x-cloak x-transition>
+              <p class="block text-sm font-medium text-gray-800 dark:text-neutral-200 mb-3">
+                How should the scaled scores be combined?
+              </p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': combineScaledScoresMethod === 'Add'}">
+                  <input type="radio" name="combineScaledScoresMethod" value="Add" x-model="combineScaledScoresMethod" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Add</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Add the scaled scores from the selected sections.</span>
+                  </div>
+                </label>
+                <label class="flex p-3 w-full bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-emerald-500 focus-within:ring-emerald-500 hover:bg-gray-50 dark:bg-neutral-900 dark:border-neutral-700 dark:hover:bg-neutral-800 transition-colors" :class="{'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 dark:border-emerald-500': combineScaledScoresMethod === 'Average'}">
+                  <input type="radio" name="combineScaledScoresMethod" value="Average" x-model="combineScaledScoresMethod" class="shrink-0 mt-0.5 border-gray-200 rounded-full text-emerald-600 focus:ring-emerald-500 dark:bg-neutral-800 dark:border-neutral-700 dark:checked:bg-emerald-500 dark:checked:border-emerald-500 dark:focus:ring-offset-gray-800">
+                  <div class="flex flex-col ms-3">
+                    <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Average</span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-500 mt-0.5">Calculate the average of the scaled scores from the selected sections.</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Set Score Mapping -->
+            <div x-show="scoreBasis === 'sections' && selectedSections.length > 0" x-cloak x-transition>
+              <div class="flex items-center justify-between">
+                <p class="flex items-center gap-x-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+                  Set score mapping
+                  <button type="button" @click="$dispatch('open-modal-score-mapping')" class="text-gray-400 hover:text-gray-500 focus:outline-none">
+                    <i data-lucide="help-circle" class="size-4"></i>
+                  </button>
+                </p>
+              </div>
+              
+              <div class="mt-4">
+                <div class="flex flex-col bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 shadow-none sm:rounded-lg overflow-hidden">
+                  <div class="overflow-x-auto">
+                    <div class="min-w-full inline-block align-middle">
+                      <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700 border-t border-gray-200 dark:border-neutral-700">
+                        <thead class="bg-gray-100 dark:bg-neutral-700">
+                          <tr>
+                            <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400">
+                              Section score cutoff
+                            </th>
+                            <template x-if="scoreBasis === 'sections' && (selectedSections.length <= 1 || combineMethod === 'Create one scaled score')">
+                              <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap">
+                                Scaled score
+                              </th>
+                            </template>
+                            <template x-if="scoreBasis === 'sections' && selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
+                              <template x-for="section in selectedSections" :key="section">
+                                <th scope="col" class="px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:text-neutral-400 min-w-32" x-text="section">
+                                </th>
+                              </template>
+                            </template>
+                            <th scope="col" class="px-5 py-2.5 text-end text-sm font-normal text-gray-500 dark:text-neutral-400 whitespace-nowrap sticky right-0 z-50 bg-gray-100 dark:bg-neutral-700">
+                              <span class="sr-only">Actions</span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+                          <template x-for="(mapping, index) in scoreMappings" :key="index">
+                            <tr>
+                              <td class="size-px whitespace-nowrap">
+                                <div class="py-2 px-3 sm:px-5">
+                                  <div class="relative w-20">
+                                    {{ input("", x_model="mapping.input", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500 pr-6", extra_attrs="placeholder='Min' @input='mapping.input = mapping.input.replace(/[^0-9]/g, \"\")'", padding_class="py-1.5 sm:py-2") }}
+                                    <span x-show="conversionType === 'Percentage'" class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500 dark:text-neutral-400 text-sm">%</span>
+                                  </div>
+                                </div>
+                              </td>
+                              <template x-if="scoreBasis === 'sections' && (selectedSections.length <= 1 || combineMethod === 'Create one scaled score')">
+                                <td class="size-px whitespace-nowrap">
+                                  <div class="py-2 px-3 sm:px-5">
+                                    <div class="w-20">
+                                      {{ input("", x_model="mapping.score", extra_classes="focus:!border-emerald-500 focus:!ring-emerald-500", padding_class="py-1.5 sm:py-2") }}
+                                    </div>
+                                  </div>
+                                </td>
+                              </template>
+                              <template x-if="scoreBasis === 'sections' && selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
+                                <template x-for="section in selectedSections" :key="section">
+                                  <td class="size-px whitespace-nowrap">
+                                    <div class="py-2 px-3 sm:px-5">
+                                      <div class="w-20">
+                                        <input type="text" x-model="mapping.scores[section]" class="py-1.5 sm:py-2 px-3 block w-full border-gray-200 rounded-lg text-sm focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-400 dark:placeholder-neutral-500 dark:focus:ring-emerald-500">
+                                      </div>
+                                    </div>
+                                  </td>
+                                </template>
+                              </template>
+                              <td class="size-px whitespace-nowrap sticky right-0 bg-white dark:bg-neutral-900" :style="'z-index: ' + (50 - index)">
+                                <div class="py-2 px-3 sm:px-5 flex justify-end">
+                                  {% call dropdown(trigger="ellipsis-vertical", placement="bottom-end") %}
+                                    <button x-show="index !== 0" @click="insertMapping(index, 'above')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800">
+                                      <i data-lucide="arrow-up-to-line" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
+                                      Insert Above
+                                    </button>
+                                    <button @click="insertMapping(index, 'below')" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-gray-800 dark:text-neutral-200 hover:bg-gray-100 dark:hover:bg-neutral-800 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-800">
+                                      <i data-lucide="arrow-down-to-line" class="shrink-0 size-4 text-gray-500 dark:text-neutral-400"></i>
+                                      Insert Below
+                                    </button>
+                                    <div x-show="index !== 0" class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+                                    <button x-show="index !== 0" @click="deleteMapping(index)" class="w-full flex items-center py-1.5 gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start text-red-500 hover:bg-red-600/10 focus:outline-hidden focus:bg-red-600/10">
+                                      <i data-lucide="trash-2" class="shrink-0 size-4 text-red-500 dark:text-red-500"></i>
+                                      Delete
+                                    </button>
+                                  {% endcall %}
+                                </div>
+                              </td>
+                            </tr>
+                          </template>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="mt-4">
+                  <button type="button" @click="insertMapping(scoreMappings.length - 1, 'below')" class="inline-flex items-center gap-x-1 text-sm font-medium text-gray-500 hover:text-gray-700 underline underline-offset-2 dark:text-neutral-400 dark:hover:text-neutral-300 outline-none">
+                    <i data-lucide="plus" class="shrink-0 size-4"></i>
+                    Add row
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Footer Save Actions -->
+            <div class="pt-5 border-t border-gray-200 dark:border-neutral-700 flex justify-end gap-x-3">
+              {{ button(text="Cancel", variant="secondary") }}
+              {{ button(text="Save score", variant="primary", extra_attrs=":disabled='!hasValidMapping() || scoreName.trim() === \"\"'") }}
+            </div>
+
+          </div>
+
+          <!-- Score Mapping Help Modal -->
+          {% call modal(
+              id="score-mapping",
+              title="About score mappings",
+              size="md",
+              show_cancel=false,
+              confirm_text="Got it"
+          ) %}
+            <div class="text-sm text-gray-600 dark:text-neutral-400 space-y-4">
+              <div class="space-y-2">
+                <h3 class="font-semibold text-gray-800 dark:text-neutral-200">1. <span x-text="conversionType === 'Percentage' ? 'Percentage' : 'Raw score'"></span></h3>
+                <p>The <span x-text="conversionType === 'Percentage' ? 'percentage' : 'raw score'"></span> is the score earned in the selected section or module.</p>
+              </div>
+              <div class="space-y-2">
+                <h3 class="font-semibold text-gray-800 dark:text-neutral-200">2. Scaled score</h3>
+                <p>The scaled score is the score reported to students after applying your mapping.</p>
+              </div>
+              <div class="space-y-2">
+                <h3 class="font-semibold text-gray-800 dark:text-neutral-200">3. Add score mappings</h3>
+                <p>For each <span x-text="conversionType === 'Percentage' ? 'percentage point' : 'raw-score point'"></span> you want to define, enter the corresponding scaled score.</p>
+              </div>
+              <div class="space-y-2 mt-4">
+                <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Example</h3>
+                <div class="border border-gray-200 dark:border-neutral-700 rounded-lg overflow-hidden mt-2">
+                  <table class="min-w-full divide-y divide-gray-200 dark:divide-neutral-700">
+                    <thead class="bg-gray-50 dark:bg-neutral-800">
+                      <tr>
+                        <th scope="col" class="px-4 py-2 text-start text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="conversionType === 'Percentage' ? 'Percentage' : 'Raw score'"></th>
+                        <th scope="col" class="px-4 py-2 text-start text-sm font-medium text-gray-800 dark:text-neutral-200">Scaled score</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-neutral-700 bg-white dark:bg-neutral-900">
+                      <tr>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400" x-text="conversionType === 'Percentage' ? '0%' : '0'"></td>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400">200</td>
+                      </tr>
+                      <tr>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400" x-text="conversionType === 'Percentage' ? '50%' : '10'"></td>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400" x-text="conversionType === 'Percentage' ? '500' : '400'"></td>
+                      </tr>
+                      <tr>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400" x-text="conversionType === 'Percentage' ? '75%' : '18'"></td>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400" x-text="conversionType === 'Percentage' ? '650' : '600'"></td>
+                      </tr>
+                      <tr>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400" x-text="conversionType === 'Percentage' ? '100%' : '27'"></td>
+                        <td class="px-4 py-2 text-start text-sm text-gray-600 dark:text-neutral-400">800</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div class="p-3 bg-gray-50 dark:bg-neutral-800/50 rounded-lg text-xs space-y-2 mt-3">
+                  <p>A student who earns <strong x-text="conversionType === 'Percentage' ? '75%' : '18'"></strong> receives <strong x-text="conversionType === 'Percentage' ? '650' : '600'"></strong>.</p>
+                  <p>A student who earns <strong x-text="conversionType === 'Percentage' ? '80%' : '20'"></strong> uses the mapping at <strong x-text="conversionType === 'Percentage' ? '75%' : '18'"></strong>, because it is the highest configured <span x-text="conversionType === 'Percentage' ? 'percentage' : 'raw score'"></span> that does not exceed <span x-text="conversionType === 'Percentage' ? '80%' : '20'"></span>.</p>
+                </div>
+              </div>
+            </div>
+          {% endcall %}
+        {% endcall %}
       </div>
-
+      
       <!-- Side Panel (Right Sticky) -->
       <div class="lg:col-span-2">
         <div class="lg:sticky lg:top-20 space-y-4">
-          <!-- Sidebar content will go here -->
+          {% call card(padding="p-0 overflow-hidden") %}
+          <div class="p-4 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+            <h2 class="text-base font-semibold text-gray-800 dark:text-neutral-200">Preview</h2>
+          </div>
+          
+          <!-- Empty State -->
+          <div x-show="!hasValidMapping()" x-transition class="p-8 flex flex-col justify-center items-center text-center">
+            <svg class="w-8 h-8 text-gray-400 dark:text-neutral-500 mb-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 7h10"/><path d="M7 12h10"/><path d="M7 17h10"/></svg>
+            <p class="text-sm text-gray-500 dark:text-neutral-400">Complete the score mappings to see an example result.</p>
+          </div>
+
+          <!-- Populated State -->
+          <div x-show="hasValidMapping()" x-cloak x-transition>
+
+
+            <!-- Existing Scores Preview -->
+            <template x-if="scoreBasis === 'existing'">
+              <div>
+                <div class="p-5 space-y-4">
+                  <template x-for="scoreNameItem in selectedExistingScores" :key="scoreNameItem">
+                    <div class="flex justify-between items-center">
+                      <div class="flex flex-col gap-y-1">
+                        <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 truncate" :title="scoreNameItem" x-text="scoreNameItem"></span>
+                        <span class="text-[10px] text-gray-400 dark:text-neutral-500" x-text="availableExistingScores.find(s => s.name === scoreNameItem).range"></span>
+                      </div>
+                      <div class="text-end">
+                        <label class="text-sm text-gray-800 dark:text-neutral-200 flex items-center">
+                          <span class="sr-only">Score:</span>
+                          <input type="number" x-model="previewInputs[scoreNameItem]" class="w-20 px-2 py-1 text-sm font-semibold text-gray-800 dark:text-neutral-200 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md focus:ring-emerald-500 focus:border-emerald-500" :placeholder="availableExistingScores.find(s => s.name === scoreNameItem).range.split(' ')[0]" :min="availableExistingScores.find(s => s.name === scoreNameItem).range.split(' ')[0]" :max="availableExistingScores.find(s => s.name === scoreNameItem).range.split(' ')[2]">
+                        </label>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                
+                <div class="p-5 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800/50">
+                  <div class="flex justify-between items-center">
+                    <div class="flex flex-col gap-y-1">
+                      <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500" x-text="scoreName ? scoreName : 'Combined Score'"></span>
+                      <span x-show="selectedExistingScores.length > 1" class="text-xs text-gray-500 dark:text-neutral-400" x-text="existingScoresCombineMethod === 'Average' ? '(Average)' : '(Sum)'"></span>
+                    </div>
+                    <div class="text-end">
+                      <span class="block text-2xl font-bold text-emerald-600 dark:text-emerald-500" x-text="getExistingScoresCombinedPreview()"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Content for one section or one combined score -->
+            <template x-if="scoreBasis === 'sections' && (selectedSections.length <= 1 || combineMethod === 'Create one scaled score')">
+              <div class="p-5 flex justify-between items-center">
+                <div class="flex flex-col gap-y-1 w-2/3">
+                  <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 truncate" :title="selectedSections.length === 1 ? selectedSections[0] : (scoreName ? scoreName : 'Combined section')" x-text="selectedSections.length === 1 ? selectedSections[0] : (scoreName ? scoreName : 'Combined section')"></span>
+                  <label class="text-sm text-gray-800 dark:text-neutral-200 mt-1 flex items-center gap-2">
+                    <span x-text="conversionType === 'Percentage' ? 'Percentage:' : 'Section score:'"></span>
+                    <input type="number" x-model="previewInputs[selectedSections.length === 1 ? selectedSections[0] : 'Combined']" class="w-16 px-2 py-1 text-sm font-semibold text-gray-800 dark:text-neutral-200 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md focus:ring-emerald-500 focus:border-emerald-500" placeholder="0">
+                    <span x-show="conversionType === 'Percentage'" class="text-sm font-semibold text-gray-800 dark:text-neutral-200">%</span>
+                  </label>
+                </div>
+                <div class="text-end">
+                  <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 block mb-1" x-text="scoreName ? scoreName : 'Mapped'"></span>
+                  <span class="block text-2xl font-bold text-gray-800 dark:text-neutral-200" x-text="getPreviewMappedScore(selectedSections.length === 1 ? selectedSections[0] : 'Combined')"></span>
+                </div>
+              </div>
+            </template>
+
+            <!-- Content for multiple sections (Create separate scaled scores) -->
+            <template x-if="scoreBasis === 'sections' && selectedSections.length > 1 && combineMethod === 'Create separate scaled scores'">
+              <div>
+                <div class="p-5 space-y-4">
+                  <template x-for="section in selectedSections" :key="section">
+                    <div class="flex justify-between items-center">
+                      <div class="flex flex-col gap-y-1 w-2/3">
+                        <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500 truncate" :title="section" x-text="section"></span>
+                        <label class="text-sm text-gray-800 dark:text-neutral-200 mt-1 flex items-center gap-2">
+                          <span x-text="conversionType === 'Percentage' ? 'Percentage:' : 'Section score:'"></span>
+                          <input type="number" x-model="previewInputs[section]" class="w-16 px-2 py-1 text-sm font-semibold text-gray-800 dark:text-neutral-200 bg-white dark:bg-neutral-900 border border-gray-200 dark:border-neutral-700 rounded-md focus:ring-emerald-500 focus:border-emerald-500" placeholder="0">
+                          <span x-show="conversionType === 'Percentage'" class="text-sm font-semibold text-gray-800 dark:text-neutral-200">%</span>
+                        </label>
+                      </div>
+                      <div class="text-end">
+                        <span class="text-2xl font-bold text-gray-800 dark:text-neutral-200" x-text="getPreviewMappedScore(section)"></span>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+                
+                <div class="p-5 border-t border-gray-200 dark:border-neutral-700 bg-gray-50 dark:bg-neutral-800/50">
+                  <div class="flex justify-between items-center">
+                    <div class="flex flex-col gap-y-1">
+                      <span class="text-[10px] font-semibold text-gray-500 uppercase dark:text-neutral-500">Combined Scaled Score</span>
+                      <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="combineScaledScoresMethod === 'Average' ? '(Average of sections)' : '(Sum of sections)'"></span>
+                    </div>
+                    <div class="text-end">
+                      <span class="block text-2xl font-bold text-emerald-600 dark:text-emerald-500" x-text="calculatePreviewFinalScore()"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+            
+          </div>
+          {% endcall %}
+
+          <!-- How It Works Card -->
+          {% call card(padding="p-0 overflow-hidden") %}
+          <div class="p-4 border-b border-gray-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+            <h2 class="text-base font-semibold text-gray-800 dark:text-neutral-200">How it works</h2>
+          </div>
+          <div class="p-5">
+            <ul class="text-sm text-gray-600 dark:text-neutral-400 space-y-1.5 mb-4 list-disc ps-4">
+              <li>Define the score students should see in their exam results.</li>
+              <li>Choose the exam sections or modules that contribute to that score.</li>
+              <li>Decide whether those sections produce one score or separate scores.</li>
+              <li>Convert the exam results into the student score using a score mapping.</li>
+              <li>If there are multiple scores, combine them by adding or averaging them.</li>
+            </ul>
+            <button type="button" @click="$dispatch('open-modal-score-mapping')" class="text-sm font-medium text-gray-800 dark:text-neutral-200 hover:underline inline-flex items-center">
+              Learn about score mapping
+              <svg class="w-4 h-4 ms-1" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+          </div>
+          {% endcall %}
+
         </div>
       </div>
     </div>
