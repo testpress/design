@@ -105,8 +105,18 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     const active = i === index
     if (mode.type === 'rename' && mode.key === r.key)
       return `<div class="lib-row is-active"><input class="lib-rename" aria-label="Rename" value="${esc(kind === 'tags' ? r.key : r.label)}"></div>`
-    if (mode.type === 'confirm' && mode.key === r.key)
-      return `<div class="lib-row is-active lib-confirm" role="group" aria-label="Confirm delete"><span>${kind === 'folder' ? `Delete “${esc(r.label)}”? Its notes are kept.` : `Remove ${esc(r.label)} from ${r.count} note${r.count === 1 ? '' : 's'}?`}</span><button type="button" data-confirm="yes" class="lib-yes">Delete</button><button type="button" data-confirm="no" class="lib-no">Cancel</button></div>`
+    if (mode.type === 'confirm' && mode.key === r.key) {
+      const isFolder = kind === 'folder'
+      const n = r.count
+      const title = isFolder ? `Delete “${esc(r.label)}”?` : `Remove ${esc(r.label)}?`
+      const note = isFolder
+        ? n ? `Its ${n} note${n === 1 ? '' : 's'} will stay, unfiled.` : 'This folder is empty.'
+        : n ? `It will be taken off ${n} note${n === 1 ? '' : 's'}. The notes stay.` : 'No notes use this tag.'
+      return `<div class="lib-confirm" role="group" aria-label="Confirm delete">
+        <div class="lib-confirm__text"><strong>${title}</strong><span>${note}</span></div>
+        <div class="lib-confirm__btns"><button type="button" data-confirm="no" class="lib-no">Cancel</button><button type="button" data-confirm="yes" class="lib-yes">${isFolder ? 'Delete' : 'Remove'}</button></div>
+      </div>`
+    }
     const manage = r.fixed ? '' : `<span class="lib-actions"><button type="button" tabindex="-1" data-act="rename" data-k="${esc(r.key)}" aria-label="Rename ${esc(r.label)}"><i data-lucide="pencil" class="size-3.5"></i></button><button type="button" tabindex="-1" data-act="delete" data-k="${esc(r.key)}" aria-label="Delete ${esc(r.label)}"><i data-lucide="trash-2" class="size-3.5"></i></button></span>`
     const check = kind === 'tags' ? `<span class="lib-check ${r.on ? 'is-on' : ''}" aria-hidden="true">${r.on ? '✓' : ''}</span>` : ''
     return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</div>`
