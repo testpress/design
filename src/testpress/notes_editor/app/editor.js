@@ -39,7 +39,7 @@ function caretToTitleEnd(editor) {
   return true
 }
 
-// Title/body boundary behaviour: Enter leaves the title; Backspace/Delete never merge the two.
+// Title/body boundary behaviour: Enter or Tab leaves the title; Backspace/Delete never merge the two.
 const TitleKeys = Extension.create({
   name: 'titleKeys',
   priority: 1000,
@@ -47,6 +47,7 @@ const TitleKeys = Extension.create({
     return {
       Enter: ({ editor }) => (inTitle(editor.state) ? caretToBody(editor) : false),
       'Shift-Enter': ({ editor }) => (inTitle(editor.state) ? caretToBody(editor) : false),
+      Tab: ({ editor }) => (inTitle(editor.state) ? caretToBody(editor) : false),
       Delete: ({ editor }) => {
         const { selection } = editor.state
         if (!selection.empty || !inTitle(editor.state)) return false
