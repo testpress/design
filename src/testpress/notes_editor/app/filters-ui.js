@@ -83,7 +83,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
       <div class="meta-pop__head">${title}${kind === 'tags' ? '<span class="lib-hint"> · notes must have all selected</span>' : ''}</div>
       <input type="text" autocomplete="off" spellcheck="false" class="meta-pop__input" role="combobox" aria-expanded="true" aria-controls="lib-list" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" value="${esc(query)}">
       <div id="lib-list" class="meta-pop__list" role="listbox" ${kind === 'tags' ? 'aria-multiselectable="true"' : ''}>${body}</div>
-      <div class="meta-pop__foot">${kind === 'folder' ? '↑ ↓ · Enter open · F2 rename · Del delete' : '↑ ↓ · Enter toggle · F2 rename · Del remove'}</div>`
+      <div class="meta-pop__foot">${kind === 'folder' ? 'Enter open · F2 rename · Del delete' : 'Enter toggle · F2 rename · Del remove'}</div>`
     refreshIcons(pop)
     const el = pop.querySelector('input')
     if (focusInput && mode.type === 'browse') {
@@ -97,7 +97,8 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     }
     if (mode.type === 'confirm') pop.querySelector('[data-confirm="yes"]')?.focus()
     el.setAttribute('aria-activedescendant', rows.length ? 'lib-o' + index : '')
-    pop.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' })
+    // keep the confirmation card (or the highlighted row) fully inside the scrolling list
+    ;(pop.querySelector('.lib-confirm') || pop.querySelector('.is-active'))?.scrollIntoView({ block: 'nearest' })
     position()
   }
 
