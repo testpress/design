@@ -2,18 +2,18 @@
 // Everything runs through the editor instance; nothing here knows about the DOM chrome.
 
 export const BLOCKS = [
-  { id: 'paragraph', label: 'Text', hint: '', icon: 'type', keywords: 'text paragraph plain', active: (e) => e.isActive('paragraph') && !e.isActive('bulletList') && !e.isActive('orderedList') && !e.isActive('taskList') && !e.isActive('blockquote') },
-  { id: 'h1', label: 'Heading 1', hint: '#', icon: 'heading-1', keywords: 'h1 heading title large', active: (e) => e.isActive('heading', { level: 1 }) },
-  { id: 'h2', label: 'Heading 2', hint: '##', icon: 'heading-2', keywords: 'h2 heading subtitle', active: (e) => e.isActive('heading', { level: 2 }) },
-  { id: 'h3', label: 'Heading 3', hint: '###', icon: 'heading-3', keywords: 'h3 heading small', active: (e) => e.isActive('heading', { level: 3 }) },
-  { id: 'bullet', label: 'Bulleted list', hint: '-', icon: 'list', keywords: 'bullet list ul unordered', active: (e) => e.isActive('bulletList') },
-  { id: 'ordered', label: 'Numbered list', hint: '1.', icon: 'list-ordered', keywords: 'number ordered list ol', active: (e) => e.isActive('orderedList') },
-  { id: 'task', label: 'Checklist', hint: '[ ]', icon: 'list-checks', keywords: 'todo task checkbox checklist', active: (e) => e.isActive('taskList') },
-  { id: 'quote', label: 'Quote', hint: '>', icon: 'text-quote', keywords: 'quote blockquote callout', active: (e) => e.isActive('blockquote') },
-  { id: 'code', label: 'Code block', hint: '```', icon: 'code-xml', keywords: 'code snippet pre', active: (e) => e.isActive('codeBlock') },
+  { id: 'paragraph', desc: 'Just start writing with plain text', sample: '<p>To be the <em>foremost</em> driver of change, start with a plain sentence.</p>', label: 'Text', hint: '', icon: 'type', keywords: 'text paragraph plain', active: (e) => e.isActive('paragraph') && !e.isActive('bulletList') && !e.isActive('orderedList') && !e.isActive('taskList') && !e.isActive('blockquote') },
+  { id: 'h1', desc: 'Big section heading', sample: '<h1>Section title</h1><p>Text under a big heading.</p>', label: 'Heading 1', hint: '#', icon: 'heading-1', keywords: 'h1 heading title large', active: (e) => e.isActive('heading', { level: 1 }) },
+  { id: 'h2', desc: 'Medium section heading', sample: '<h2>Section title</h2><p>Text under a medium heading.</p>', label: 'Heading 2', hint: '##', icon: 'heading-2', keywords: 'h2 heading subtitle', active: (e) => e.isActive('heading', { level: 2 }) },
+  { id: 'h3', desc: 'Small section heading', sample: '<h3>Section title</h3><p>Text under a small heading.</p>', label: 'Heading 3', hint: '###', icon: 'heading-3', keywords: 'h3 heading small', active: (e) => e.isActive('heading', { level: 3 }) },
+  { id: 'bullet', desc: 'Create a simple bulleted list', sample: '<ul><li>First point</li><li>Second point</li><li>Third point</li></ul>', label: 'Bulleted list', hint: '-', icon: 'list', keywords: 'bullet list ul unordered', active: (e) => e.isActive('bulletList') },
+  { id: 'ordered', desc: 'Create a list with numbering', sample: '<ol><li>First step</li><li>Second step</li><li>Third step</li></ol>', label: 'Numbered list', hint: '1.', icon: 'list-ordered', keywords: 'number ordered list ol', active: (e) => e.isActive('orderedList') },
+  { id: 'task', desc: 'Track tasks with a checklist', sample: "<div class='pv-task'><span class='pv-box on'></span>Read chapter 4</div><div class='pv-task'><span class='pv-box'></span>Solve DPP 3</div><div class='pv-task'><span class='pv-box'></span>Revise notes</div>", label: 'Checklist', hint: '[ ]', icon: 'list-checks', keywords: 'todo task checkbox checklist', active: (e) => e.isActive('taskList') },
+  { id: 'quote', desc: 'Capture a quote', sample: '<blockquote>Slow down on the first read.</blockquote>', label: 'Quote', hint: '>', icon: 'text-quote', keywords: 'quote blockquote callout', active: (e) => e.isActive('blockquote') },
+  { id: 'code', desc: 'Capture a code snippet', sample: '<pre>E = m * c ** 2</pre>', label: 'Code block', hint: '```', icon: 'code-xml', keywords: 'code snippet pre', active: (e) => e.isActive('codeBlock') },
 ]
 
-export const DIVIDER = { id: 'divider', label: 'Divider', hint: '---', icon: 'minus', keywords: 'divider rule hr line separator' }
+export const DIVIDER = { id: 'divider', desc: 'Visually divide blocks', sample: '<p>Above the line</p><hr><p>Below the line</p>', label: 'Divider', hint: '---', icon: 'minus', keywords: 'divider rule hr line separator' }
 
 const TOGGLES = {
   h1: (c) => c.toggleHeading({ level: 1 }),

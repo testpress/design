@@ -128,7 +128,7 @@ function runSlash(editor, range, item) {
 }
 
 function slashRenderer() {
-  let el, items = [], index = 0, command, lastPointer = null
+  let el, items = [], index = 0, command, lastPointer = null, preview = null
 
   // Full render only when the item list changes (typing). Arrow keys just move the highlight, so
   // a resting mouse pointer can't be re-triggered by replaced DOM and yank the selection back.
@@ -141,6 +141,7 @@ function slashRenderer() {
           )
           .join('')
       : '<div class="slash-empty">No matching blocks</div>'
+    el.insertAdjacentHTML('beforeend', '<div class="slash-foot" aria-hidden="true">Close menu<kbd>esc</kbd></div>')
     refreshIcons(el)
     highlightIndex(false)
   }
@@ -156,6 +157,37 @@ function slashRenderer() {
     // the editor keeps DOM focus, so announce the active option through it
     if (active) editorDom?.setAttribute('aria-activedescendant', active.id)
     else editorDom?.removeAttribute('aria-activedescendant')
+    updatePreview(active)
+  }
+
+  // Mini window beside the menu that shows what the highlighted block looks like (decorative:
+  // the option label is what assistive tech announces).
+  const updatePreview = (active) => {
+    if (!preview) return
+    const item = items[index]
+    if (!active || !item?.sample) {
+      preview.style.display = 'none'
+      return
+    }
+    preview.innerHTML = `<div class="slash-preview__page note-mini">${item.sample}</div><div class="slash-preview__cap">${item.desc || item.label}</div>`
+    preview.style.display = 'block'
+    const m = el.getBoundingClientRect()
+    const a = active.getBoundingClientRect()
+    const vv = window.visualViewport
+    const vw = vv ? vv.width : innerWidth
+    const vh = vv ? vv.height : innerHeight
+    const top0 = vv ? vv.offsetTop : 0
+    const w = preview.offsetWidth
+    const h = preview.offsetHeight
+    let left = m.right + 8
+    if (left + w > vw - 8) left = m.left - w - 8 // no room on the right -> put it on the left
+    if (left < 8) {
+      preview.style.display = 'none' // phones: not enough room beside the menu
+      return
+    }
+    const top = Math.min(Math.max(a.top - 8, top0 + 8), top0 + vh - h - 8)
+    preview.style.left = left + 'px'
+    preview.style.top = top + 'px'
   }
 
   let editorDom = null
@@ -205,7 +237,11 @@ function slashRenderer() {
           highlightIndex(false)
         }
       })
-      document.body.appendChild(el)
+      preview = document.createElement('div')
+      preview.className = 'slash-preview'
+      preview.setAttribute('aria-hidden', 'true')
+      preview.style.display = 'none'
+      document.body.append(el, preview)
       this.onUpdate(props)
     },
     onUpdate(props) {
@@ -216,10 +252,12 @@ function slashRenderer() {
       index = Math.min(index, Math.max(0, items.length - 1))
       render()
       place(props.clientRect?.())
+      updatePreview(el.querySelector('.is-active'))
     },
     onKeyDown({ event }) {
       if (event.key === 'Escape') {
         el?.remove()
+        preview?.remove()
         return true
       }
       if (!items.length) return false
@@ -239,6 +277,8 @@ function slashRenderer() {
     },
     onExit() {
       el?.remove()
+      preview?.remove()
+      preview = null
       el = null
       index = 0
       lastPointer = null
