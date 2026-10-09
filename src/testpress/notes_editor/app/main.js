@@ -34,6 +34,10 @@ let query = ''
 let editorFocused = false
 const stateCache = new Map()
 let savedFlash = null
+let selectMode = false
+const selected = new Set()
+let anchorId = null
+let pendingDelete = null // { ids, timer } while the Undo toast is showing
 
 // Folder / tag browsing above the list. `filters.matches(note)` is the single source of truth.
 const filters = createFiltersUI({
@@ -85,12 +89,22 @@ function highlight(text, q) {
 
 function rowHTML(n) {
   const active = n.id === currentId
+  const picked = selected.has(n.id)
   const st = queue.stateOf(n.id)
   const warn = st === 'error' ? `<span class="row-warn" title="Not saved yet">${icon('alert-triangle', 'size-3')}</span>` : ''
   const sub = [filters.state.folder ? null : n.folder, n.snippet].filter(Boolean).join(' · ')
-  return `<button type="button" role="option" aria-selected="${active}" data-id="${n.id}" class="note-row ${active ? 'is-active' : ''}">
-    <span class="note-row__top"><span class="note-row__title ${n.derived ? 'is-derived' : ''}">${highlight(n.title, query)}</span>${warn}<span class="note-row__time">${relTime(n.updatedAt)}</span></span>
+  const check = selectMode ? `<span class="note-row__check ${picked ? 'is-on' : ''}" aria-hidden="true">${picked ? '✓' : ''}</span>` : ''
+  return `<button type="button" role="option" aria-selected="${selectMode ? picked : active}" data-id="${n.id}" class="note-row ${active && !selectMode ? 'is-active' : ''} ${picked ? 'is-selected' : ''} ${selectMode ? 'has-check' : ''}">
+    <span class="note-row__top">${check}<span class="note-row__title ${n.derived ? 'is-derived' : ''}">${highlight(n.title, query)}</span>${warn}<span class="note-row__time">${relTime(n.updatedAt)}</span></span>
     <span class="note-row__sub">${highlight(sub, query)}</span></button>`
+}
+
+// Notes that pass the folder/tag filters and the search box, in list order.
+function visibleIds() {
+  return order.filter((id) => {
+    const n = store.get(id)
+    return n && filters.matches(n) && (!query || n.title.toLowerCase().includes(query) || n.text.includes(query))
+  })
 }
 
 function renderList() {
@@ -98,7 +112,7 @@ function renderList() {
     const n = store.get(id)
     return n && filters.matches(n)
   }
-  const ids = order.filter((id) => matches(id) && (!query || store.get(id).title.toLowerCase().includes(query) || store.get(id).text.includes(query)))
+  const ids = visibleIds()
   $('#notes-count').textContent = order.filter(matches).length
   if (!ids.length) {
     const scoped = filters.scoped()
@@ -123,9 +137,13 @@ function renderList() {
   })
   const scroller = $('#notes-list-scroll')
   const top = scroller.scrollTop
+  // the list is rebuilt on every change: keep keyboard focus on the same row
+  const focusedId = document.activeElement?.closest?.('.note-row')?.dataset.id
   listEl.innerHTML = html
   scroller.scrollTop = top
+  if (focusedId) listEl.querySelector(`[data-id="${focusedId}"]`)?.focus({ preventScroll: true })
   refreshIcons(listEl)
+  if (selectMode) renderSelectBar()
 }
 
 let rowRaf = 0
@@ -146,6 +164,27 @@ listEl.addEventListener('keydown', (e) => {
   const rows = [...listEl.querySelectorAll('.note-row')]
   const i = rows.indexOf(document.activeElement)
   if (i < 0) return
+  const id = rows[i].dataset.id
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    // delete the picked notes in select mode, otherwise the focused one; Undo covers slips
+    e.preventDefault()
+    const ids = selectMode && selected.size ? [...selected] : [id]
+    deleteNotes(ids, { focusNext: rows[Math.min(i + 1, rows.length - 1)] === rows[i] ? rows[Math.max(i - 1, 0)]?.dataset.id : rows[i + 1]?.dataset.id })
+    return
+  }
+  if (selectMode && (e.key === ' ' || e.key === 'Enter')) {
+    e.preventDefault()
+    return toggleSelected(id, e.shiftKey)
+  }
+  if (selectMode && e.key === 'Escape') {
+    e.preventDefault()
+    return setSelectMode(false)
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault()
+    if (!selectMode) setSelectMode(true)
+    return selectAll(true)
+  }
   if (e.key === 'ArrowUp' && i === 0) {
     e.preventDefault()
     searchEl.focus()
@@ -189,6 +228,179 @@ searchEl.addEventListener('keydown', (e) => {
     e.preventDefault()
     listEl.querySelector('.note-row')?.click() // open the top result and move into the editor
   }
+})
+
+// ---- Select, delete, undo --------------------------------------------------------------------
+const selectBar = $('#select-bar')
+
+function renderSelectBar() {
+  selectBar.hidden = !selectMode
+  $('.list-pane__head').hidden = selectMode
+  $('#select-mode').setAttribute('aria-pressed', String(selectMode))
+  const n = selected.size
+  $('#select-count').textContent = n ? `${n} selected` : 'Select notes'
+  $('#select-delete').disabled = n === 0
+  const all = visibleIds()
+  $('#select-all').textContent = all.length && all.every((id) => selected.has(id)) ? 'Clear' : 'Select all'
+}
+
+function setSelectMode(on) {
+  selectMode = on
+  if (!on) {
+    selected.clear()
+    anchorId = null
+  }
+  renderSelectBar()
+  renderList()
+}
+
+function toggleSelected(id, range = false) {
+  const vis = visibleIds()
+  if (range && anchorId && vis.includes(anchorId)) {
+    const a = vis.indexOf(anchorId)
+    const b = vis.indexOf(id)
+    for (let i = Math.min(a, b); i <= Math.max(a, b); i++) selected.add(vis[i])
+  } else {
+    selected.has(id) ? selected.delete(id) : selected.add(id)
+    anchorId = id
+  }
+  renderSelectBar()
+  renderList()
+  listEl.querySelector(`[data-id="${id}"]`)?.focus()
+}
+
+function selectAll(on) {
+  const vis = visibleIds()
+  if (on && !vis.every((id) => selected.has(id))) vis.forEach((id) => selected.add(id))
+  else selected.clear()
+  renderSelectBar()
+  renderList()
+}
+
+$('#select-mode').addEventListener('click', () => setSelectMode(!selectMode))
+$('#select-cancel').addEventListener('click', () => setSelectMode(false))
+$('#select-all').addEventListener('click', () => selectAll(true))
+$('#select-delete').addEventListener('click', () => deleteNotes([...selected]))
+
+const undoToast = $('#undo-toast')
+const UNDO_MS = 8000
+
+// A delete is only final once the Undo window closes; a second delete settles the first.
+function finalizePending() {
+  if (!pendingDelete) return
+  clearTimeout(pendingDelete.timer)
+  store.finalizeDelete(pendingDelete.ids)
+  pendingDelete.ids.forEach((id) => serverSim.remove(id))
+  pendingDelete = null
+  undoToast.hidden = true
+}
+
+function showUndo(ids) {
+  clearTimeout(pendingDelete?.timer)
+  pendingDelete = { ids, timer: setTimeout(finalizePending, UNDO_MS) }
+  $('#undo-text').textContent = ids.length === 1 ? 'Note deleted' : `${ids.length} notes deleted`
+  undoToast.hidden = false
+}
+undoToast.addEventListener('mouseenter', () => pendingDelete && clearTimeout(pendingDelete.timer))
+undoToast.addEventListener('mouseleave', () => pendingDelete && (pendingDelete.timer = setTimeout(finalizePending, 3000)))
+
+function undoDelete() {
+  if (!pendingDelete) return
+  clearTimeout(pendingDelete.timer)
+  const { ids } = pendingDelete
+  pendingDelete = null
+  undoToast.hidden = true
+  store.restore(ids)
+  ids.forEach((id) => store.isDirty(id) && queue.schedule(id))
+  reorder()
+  renderList()
+  if (!currentId && !isMobile()) openNote(ids[0])
+}
+$('#undo-btn').addEventListener('click', undoDelete)
+
+function showEmptyEditor() {
+  currentId = null
+  editorFocused = false
+  app.dataset.view = 'list'
+  $('#editor-empty').hidden = false
+  $('#editor-body').hidden = true
+  history.replaceState(null, '', location.pathname)
+  editor.view.updateState(stateForDoc(editor, { type: 'doc', content: [{ type: 'title' }, { type: 'paragraph' }] }))
+  renderMobileBar()
+  renderStatus()
+}
+
+function deleteNotes(ids, { focusNext } = {}) {
+  ids = ids.filter((id) => store.get(id))
+  if (!ids.length) return
+  finalizePending()
+  const wasCurrent = ids.includes(currentId)
+  let next = null
+  if (wasCurrent) {
+    const vis = visibleIds()
+    const i = vis.indexOf(currentId)
+    next = [...vis.slice(i + 1), ...vis.slice(0, Math.max(i, 0)).reverse()].find((x) => !ids.includes(x)) || null
+  }
+  ids.forEach((id) => stateCache.delete(id))
+  const hadListFocus = listEl.contains(document.activeElement)
+  store.softDelete(ids)
+  if (selectMode) setSelectMode(false)
+  if (wasCurrent) {
+    if (next && !isMobile()) {
+      currentId = null // already deleted: nothing to leave behind
+      openNote(next)
+    } else showEmptyEditor()
+  }
+  reorder()
+  renderList()
+  renderStatus()
+  showUndo(ids)
+  if (hadListFocus) (listEl.querySelector(`[data-id="${focusNext || next}"]`) || listEl.querySelector('.note-row'))?.focus()
+}
+$('#delete-note').addEventListener('click', () => currentId && deleteNotes([currentId]))
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !selectMode || e.defaultPrevented) return
+  if (document.querySelector('.lib-pop:not([hidden]), .meta-pop:not([hidden])')) return // a popover owns Esc
+  e.preventDefault()
+  setSelectMode(false)
+})
+
+// Cmd/Ctrl+Z puts notes back while the toast is up (only when you are not typing somewhere).
+document.addEventListener('keydown', (e) => {
+  if (!pendingDelete || !(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z' || e.shiftKey) return
+  if (editor.view.hasFocus() || /INPUT|TEXTAREA/.test(document.activeElement?.tagName)) return
+  e.preventDefault()
+  undoDelete()
+})
+
+// Trash icon that appears over the hovered row (an overlay, so the row never changes size).
+const rowDel = document.createElement('button')
+rowDel.type = 'button'
+rowDel.className = 'row-del'
+rowDel.setAttribute('aria-label', 'Delete note')
+rowDel.tabIndex = -1
+rowDel.innerHTML = icon('trash-2', 'size-3.5')
+rowDel.hidden = true
+$('#notes-list-scroll').appendChild(rowDel)
+let rowDelId = null
+function placeRowDel(row) {
+  if (!row || selectMode) return (rowDel.hidden = true)
+  const sc = $('#notes-list-scroll')
+  const r = row.getBoundingClientRect()
+  const s = sc.getBoundingClientRect()
+  rowDelId = row.dataset.id
+  rowDel.style.top = r.top - s.top + sc.scrollTop + r.height / 2 - 13 + 'px'
+  rowDel.hidden = false
+  refreshIcons(rowDel)
+}
+listEl.addEventListener('mouseover', (e) => placeRowDel(e.target.closest('.note-row')))
+$('#notes-list-scroll').addEventListener('mouseleave', () => (rowDel.hidden = true))
+$('#notes-list-scroll').addEventListener('scroll', () => (rowDel.hidden = true), { passive: true })
+rowDel.addEventListener('mousedown', (e) => e.preventDefault())
+rowDel.addEventListener('click', () => {
+  rowDel.hidden = true
+  deleteNotes([rowDelId])
 })
 
 // ---- Save status -----------------------------------------------------------------------------
@@ -364,6 +576,11 @@ listEl.addEventListener('click', (e) => {
   if (e.target.closest('[data-clear-filters]')) return filters.clear()
   const row = e.target.closest('[data-id]')
   if (!row) return
+  // select mode, or Cmd/Ctrl/Shift-click: pick notes instead of opening them
+  if (selectMode || e.metaKey || e.ctrlKey || e.shiftKey) {
+    if (!selectMode) setSelectMode(true)
+    return toggleSelected(row.dataset.id, e.shiftKey)
+  }
   if (row.dataset.id === currentId) return openNote(currentId, { focus: 'resume' })
   guardedLeave().then((ok) => ok && openNote(row.dataset.id, { focus: 'resume' }))
 })

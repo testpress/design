@@ -8,6 +8,9 @@ export const serverSim = {
   update(patch) {
     storage.set('sim', { ...this.settings(), ...patch })
   },
+  remove(id) {
+    storage.remove('server:' + id) // simulated server-side delete
+  },
   save(note) {
     const { fail, latency } = this.settings()
     return new Promise((resolve, reject) => {

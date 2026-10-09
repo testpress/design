@@ -11,10 +11,17 @@ export class NotesStore {
     this.listeners = new Set()
     this.persistTimers = new Map()
     this.restored = [] // ids whose unsaved edits were recovered on load
+    this.trash = new Map() // deleted notes kept in memory until the Undo window closes
     this.#load()
   }
 
   #load() {
+    // a delete whose Undo window was still open when the page closed is final
+    storage.get('pendingDelete', []).forEach((id) => {
+      storage.remove('note:' + id)
+      storage.remove('server:' + id)
+    })
+    storage.set('pendingDelete', [])
     if (!storage.get('seeded')) {
       const seed = seedNotes()
       seed.forEach((s) => this.#put({ ...s, rev: 1, savedRev: 1, createdThisSession: false }))
@@ -167,6 +174,43 @@ export class NotesStore {
     if (!n || !n.createdThisSession || !isEmptyDoc(n.doc)) return false
     this.remove(id)
     return true
+  }
+
+  // Delete with Undo: notes leave the list at once but are only purged when the Undo window closes.
+  softDelete(ids) {
+    ids.forEach((id) => {
+      const n = this.notes.get(id)
+      if (!n) return
+      clearTimeout(this.persistTimers.get(id))
+      this.persistTimers.delete(id)
+      this.trash.set(id, n)
+      this.notes.delete(id)
+    })
+    storage.set('index', [...this.notes.keys()])
+    storage.set('pendingDelete', [...this.trash.keys()])
+    this.#emit(null, 'delete')
+  }
+
+  restore(ids) {
+    ids.forEach((id) => {
+      const n = this.trash.get(id)
+      if (!n) return
+      this.notes.set(id, n)
+      this.trash.delete(id)
+      this.#persistNow(id)
+    })
+    storage.set('index', [...this.notes.keys()])
+    storage.set('pendingDelete', [...this.trash.keys()])
+    this.#emit(null, 'restore')
+  }
+
+  finalizeDelete(ids) {
+    ids.forEach((id) => {
+      this.trash.delete(id)
+      storage.remove('note:' + id)
+      storage.remove('server:' + id)
+    })
+    storage.set('pendingDelete', [...this.trash.keys()])
   }
 
   remove(id) {
