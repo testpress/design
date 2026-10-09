@@ -1,0 +1,218 @@
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+    <script>
+        // Global helper for getting a comprehensive language list
+        window.getLanguageList = function() {
+            const codes = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'tr', 'vi', 'th', 'nl', 'pl', 'sv', 'da', 'fi', 'no', 'cs', 'el', 'hu', 'ro', 'sk', 'id', 'ms', 'bn', 'pa', 'ta', 'te', 'mr', 'gu', 'kn', 'ml', 'uk', 'he', 'fa', 'ur'];
+            const displayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+            return codes.map(code => ({
+                id: code,
+                name: displayNames.of(code)
+            })).sort((a, b) => a.name.localeCompare(b.name));
+        };
+
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('epubUpload', () => ({
+                status: 'idle', // idle, uploading, extracting, success, error
+                statusMessage: '',
+                fileName: '',
+                progress: 0,
+                currentStep: 0,
+                fileSize: '',
+                steps: [
+                    'Uploading file',
+                    'Validating EPUB structure',
+                    'Extracting metadata',
+                    'Detecting cover image',
+                    'Generating preview',
+                    'Security scanning',
+                    'Preparing reader assets'
+                ],
+                metadata: {
+                    title: '',
+                    author: '',
+                    isbn: '',
+                    publisher: '',
+                    language: '',
+                    publication_year: '',
+                    edition: '',
+                    subjects: [],
+                    description: '',
+                    cover: null
+                },
+                detectedMetadata: {
+                    publisher: '',
+                    language: '',
+                    subject: ''
+                },
+
+                async handleFileSelect(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    this.fileName = file.name;
+                    
+                    // Format file size
+                    const bytes = file.size;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    if (bytes === 0) this.fileSize = '0 Byte';
+                    const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+                    this.fileSize = Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+
+                    const ext = file.name.toLowerCase().split('.').pop();
+                    if (ext !== 'epub' && ext !== 'pdf') {
+                        this.status = 'error';
+                        this.statusMessage = 'Please select a valid .epub or .pdf file';
+                        return;
+                    }
+
+                    this.status = 'uploading';
+                    this.progress = 0;
+                    this.currentStep = 0;
+
+                    // Simulate steps and progress
+                    const stepDuration = 500; // ms per step
+                    for (let step = 0; step < this.steps.length; step++) {
+                        this.currentStep = step;
+                        // Sub-steps for percentage increment
+                        for (let p = 0; p < 14; p++) {
+                            this.progress = Math.min(100, Math.floor((step / this.steps.length) * 100) + p);
+                            await new Promise(resolve => setTimeout(resolve, 30));
+                        }
+                    }
+                    this.progress = 100;
+                    this.status = 'extracting';
+
+                    try {
+                        // Check for ePub library (handling different potential global names)
+                        const epubLib = window.ePub || (window.epubjs ? window.epubjs.ePub : null);
+                        let extractedData = {};
+                        
+                        if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+                            // PDF Extraction
+                            extractedData = await window.extractPdfMetadata(file);
+                            
+                            this.metadata.title = extractedData.title;
+                            this.metadata.author = extractedData.author;
+                            this.metadata.isbn = extractedData.isbn;
+                            this.metadata.publication_year = extractedData.publication_year;
+                            this.metadata.edition = extractedData.edition;
+                            this.metadata.description = extractedData.description;
+                            this.metadata.cover = extractedData.cover;
+                            
+                            this.detectedMetadata.publisher = extractedData.publisher;
+                            this.detectedMetadata.subject = extractedData.subject;
+                            
+                        } else {
+                            // Existing EPUB Extraction
+                            const arrayBuffer = await file.arrayBuffer();
+                            const book = ePub(arrayBuffer);
+                            const metadata = await book.loaded.metadata;
+
+                            this.metadata.title = metadata.title || '';
+                            this.metadata.author = metadata.creator || '';
+                            this.detectedMetadata.publisher = metadata.publisher || '';
+                            
+                            // Extract Subjects (can be array or string)
+                            if (metadata.subject) {
+                                const subjects = Array.isArray(metadata.subject) ? metadata.subject : [metadata.subject];
+                                this.detectedMetadata.subject = subjects[0] || ''; // Take first primary subject
+                            }
+
+                            // Convert language code to primary readable name
+                            if (metadata.language) {
+                                try {
+                                    const primaryCode = metadata.language.split('-')[0].split('_')[0];
+                                    const displayNames = new Intl.DisplayNames(['en'], { type: 'language' });
+                                    const normalizedName = displayNames.of(primaryCode) || primaryCode;
+                                    
+                                    this.metadata.language = normalizedName;
+                                    this.detectedMetadata.language = normalizedName;
+                                } catch (e) {
+                                    this.metadata.language = metadata.language;
+                                    this.detectedMetadata.language = metadata.language;
+                                }
+                            }
+
+                            this.metadata.description = metadata.description || '';
+                            
+                            // Try to extract Edition
+                            let detectedEdition = '';
+                            if (metadata.edition) {
+                                detectedEdition = metadata.edition;
+                            } else {
+                                const editionMatch = this.metadata.title.match(/(\d+(st|nd|rd|th)\s+Edition|Revised\s+Edition|Special\s+Edition)/i);
+                                if (editionMatch) detectedEdition = editionMatch[0];
+                            }
+                            this.metadata.edition = detectedEdition;
+
+                            if (metadata.pubdate || metadata.date) {
+                                const date = new Date(metadata.pubdate || metadata.date);
+                                if (!isNaN(date.getFullYear())) {
+                                    this.metadata.publication_year = date.getFullYear().toString();
+                                }
+                            }
+                            
+                            if (metadata.identifier) {
+                                const ids = Array.isArray(metadata.identifier) ? metadata.identifier : [metadata.identifier];
+                                const isbnId = ids.find(id => {
+                                    const val = (typeof id === 'string' ? id : id.value) || '';
+                                    const digits = val.replace(/[^0-9]/g, '');
+                                    return digits.length === 10 || digits.length === 13;
+                                });
+
+                                if (isbnId) {
+                                    const raw = typeof isbnId === 'string' ? isbnId : isbnId.value;
+                                    this.metadata.isbn = raw.replace(/[^0-9X]/gi, '').trim();
+                                }
+                            }
+
+                            // Handle Cover Image for EPUB
+                            const coverUrl = await book.coverUrl();
+                            if (coverUrl) {
+                                const response = await fetch(coverUrl);
+                                const blob = await response.blob();
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                    this.metadata.cover = reader.result;
+                                };
+                                reader.readAsDataURL(blob);
+                            }
+                        }
+
+                        this.status = 'ready';
+                    } catch (error) {
+                        console.error('Extraction error:', error);
+                        this.status = 'error';
+                        this.statusMessage = error.message || 'Failed to extract metadata';
+                    }
+                },
+
+                reset() {
+                    this.status = 'idle';
+                    this.statusMessage = '';
+                    this.fileName = '';
+                    this.fileSize = '';
+                    this.progress = 0;
+                    this.currentStep = 0;
+                    this.metadata = {
+                        title: '',
+                        author: '',
+                        isbn: '',
+                        publisher: '',
+                        language: '',
+                        publication_year: '',
+                        edition: '',
+                        subjects: [],
+                        description: '',
+                        cover: null
+                    };
+                    this.detectedMetadata = {
+                        publisher: '',
+                        language: '',
+                        subject: ''
+                    };
+                }
+            }));
+        });
+    </script>
