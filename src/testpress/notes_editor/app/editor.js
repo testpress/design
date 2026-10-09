@@ -158,6 +158,26 @@ function runSlash(editor, range, item) {
   else turnInto(editor, item.id)
 }
 
+// While the block menu is open the note behind it must not scroll (the menu is anchored to the
+// caret). Hide the scroller's overflow and pad by the scrollbar's width so the text doesn't shift.
+// Programmatic scrolling still works, so typing keeps the caret in view. Desktop only.
+const phone = window.matchMedia('(max-width: 1023px)')
+let scrollLocked = null
+function lockPageScroll() {
+  if (scrollLocked || phone.matches) return
+  const sc = document.getElementById('editor-scroll')
+  if (!sc) return
+  sc.style.setProperty('--sbw', sc.offsetWidth - sc.clientWidth + 'px')
+  sc.classList.add('is-scroll-locked')
+  scrollLocked = sc
+}
+function unlockPageScroll() {
+  if (!scrollLocked) return
+  scrollLocked.classList.remove('is-scroll-locked')
+  scrollLocked.style.removeProperty('--sbw')
+  scrollLocked = null
+}
+
 function slashRenderer() {
   let el, items = [], index = 0, command, lastPointer = null, preview = null
 
@@ -273,6 +293,7 @@ function slashRenderer() {
       preview.setAttribute('aria-hidden', 'true')
       preview.style.display = 'none'
       document.body.append(el, preview)
+      lockPageScroll()
       this.onUpdate(props)
     },
     onUpdate(props) {
@@ -289,6 +310,7 @@ function slashRenderer() {
       if (event.key === 'Escape') {
         el?.remove()
         preview?.remove()
+        unlockPageScroll()
         return true
       }
       if (!items.length) return false
@@ -307,6 +329,7 @@ function slashRenderer() {
       return false
     },
     onExit() {
+      unlockPageScroll()
       el?.remove()
       preview?.remove()
       preview = null
