@@ -1,4 +1,5 @@
 import { TableMap, addRow, addColumn, CellSelection } from '@tiptap/pm/tables'
+import { TextSelection } from '@tiptap/pm/state'
 import { refreshIcons } from './icons.js'
 
 // Notion-style table editing. No floating toolbar: while the caret is in a table we show
@@ -35,20 +36,35 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
   host.appendChild(menu)
   const buttons = [colGrip, rowGrip, addRowBtn, addColBtn]
 
+  let tableDom = null
   let info = null // { tablePos, tableNode, tableStart, cellPos, row, col }
   let openKind = null
+  let gripSelected = false // the cell selection came from clicking a grip, not from the user dragging
   let raf = 0
 
   // ---- where is the caret in the table? ------------------------------------------------------
   function locate() {
     const { state } = editor
     const sel = state.selection
-    if (sel instanceof CellSelection) return null // multi-cell selection: leave the cells alone
-    const $from = sel.$from
-    let cellDepth = -1
     let tableDepth = -1
-    for (let d = $from.depth; d > 0; d--) {
-      const n = $from.node(d).type.name
+    let $ref
+    if (sel instanceof CellSelection) {
+      // several cells selected (drag, Shift+arrows, or a grip): controls act on the whole range
+      $ref = sel.$anchorCell
+      for (let d = $ref.depth; d > 0; d--) if ($ref.node(d).type.name === 'table') { tableDepth = d; break }
+      if (tableDepth < 0) return null
+      const tableNode = $ref.node(tableDepth)
+      const tableStart = $ref.start(tableDepth)
+      const map = TableMap.get(tableNode)
+      const a = map.findCell(sel.$anchorCell.pos - tableStart)
+      const h = map.findCell(sel.$headCell.pos - tableStart)
+      const range = { left: Math.min(a.left, h.left), right: Math.max(a.right, h.right), top: Math.min(a.top, h.top), bottom: Math.max(a.bottom, h.bottom) }
+      return { tablePos: $ref.before(tableDepth), tableNode, tableStart, map, range, multi: true, cellPos: sel.$anchorCell.pos }
+    }
+    $ref = sel.$from
+    let cellDepth = -1
+    for (let d = $ref.depth; d > 0; d--) {
+      const n = $ref.node(d).type.name
       if (cellDepth < 0 && (n === 'tableCell' || n === 'tableHeader')) cellDepth = d
       if (n === 'table') {
         tableDepth = d
@@ -56,13 +72,12 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
       }
     }
     if (tableDepth < 0 || cellDepth < 0) return null
-    const tableNode = $from.node(tableDepth)
-    const tableStart = $from.start(tableDepth)
-    const cellPos = $from.before(cellDepth)
+    const tableNode = $ref.node(tableDepth)
+    const tableStart = $ref.start(tableDepth)
+    const cellPos = $ref.before(cellDepth)
     const map = TableMap.get(tableNode)
-    const rel = cellPos - tableStart
-    const rect = map.findCell(rel)
-    return { tablePos: $from.before(tableDepth), tableNode, tableStart, cellPos, map, row: rect.top, col: rect.left }
+    const r = map.findCell(cellPos - tableStart)
+    return { tablePos: $ref.before(tableDepth), tableNode, tableStart, map, cellPos, multi: false, range: { left: r.left, right: r.right, top: r.top, bottom: r.bottom } }
   }
 
   const place = (el, x, y, w, h) => {
@@ -74,6 +89,8 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
 
   function hideAll() {
     buttons.forEach((b) => (b.hidden = true))
+    tableDom = null
+    setNear(false, false)
     closeMenu()
     info = null
   }
@@ -92,17 +109,24 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     if (!info) return hideAll()
     const dom = editor.view.nodeDOM(info.tablePos)
     const table = dom && (dom.tagName === 'TABLE' ? dom : dom.querySelector('table'))
-    const cell = editor.view.nodeDOM(info.cellPos)
-    if (!table || !cell) return hideAll()
+    const { map, range } = info
+    const w = map.width
+    const cellAt = (r, c) => editor.view.nodeDOM(info.tableStart + map.map[r * w + c])
+    const first = cellAt(range.top, range.left)
+    const last = cellAt(range.bottom - 1, range.right - 1)
+    if (!table || !first || !last) return hideAll()
+    tableDom = table
     const t = table.getBoundingClientRect()
-    const c = cell.getBoundingClientRect()
+    const f = first.getBoundingClientRect()
+    const l = last.getBoundingClientRect()
+    const sel = { left: f.left, right: l.right, top: f.top, bottom: l.bottom }
     const s = scroller.getBoundingClientRect()
     if (t.bottom < s.top + 4 || t.top > s.bottom - 4) return hideAll() // scrolled out of view
     buttons.forEach((b) => (b.hidden = false))
     const topVisible = t.top - 18 >= s.top
     colGrip.hidden = !topVisible
-    place(colGrip, c.left + c.width / 2 - 14, t.top - 17, 28, 14)
-    place(rowGrip, t.left - 19, c.top + c.height / 2 - 14, 14, 28)
+    place(colGrip, (sel.left + sel.right) / 2 - 14, t.top - 17, 28, 14)
+    place(rowGrip, t.left - 19, (sel.top + sel.bottom) / 2 - 14, 14, 28)
     place(addRowBtn, t.left, t.bottom + 3, t.width, 14)
     // keep the column strip inside the editor area even when the table fills the whole width
     place(addColBtn, Math.min(t.right + 3, s.right - 17), t.top, 14, t.height)
@@ -125,11 +149,11 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     view.dispatch(tr)
   }
 
-  const cellsOf = (kind) => {
-    const { map } = info
+  // Offsets (relative to the table) of every cell in the current range, optionally one axis only.
+  const rangeCells = () => {
+    const { map, range } = info
     const out = []
-    if (kind === 'col') for (let r = 0; r < map.height; r++) out.push(map.map[r * map.width + info.col])
-    else for (let c = 0; c < map.width; c++) out.push(map.map[info.row * map.width + c])
+    for (let r = range.top; r < range.bottom; r++) for (let c = range.left; c < range.right; c++) out.push(map.map[r * map.width + c])
     return out
   }
 
@@ -141,26 +165,58 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     editor.view.focus()
   }
 
-  const ACTIONS = {
-    col: [
-      { label: 'Insert left', icon: 'arrow-left', run: () => editor.chain().focus().addColumnBefore().run() },
-      { label: 'Insert right', icon: 'arrow-right', run: () => editor.chain().focus().addColumnAfter().run() },
-      { label: 'Clear contents', icon: 'circle-x', run: () => clearCells(cellsOf('col')) },
-      { label: 'Delete column', icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteColumn().run() },
-    ],
-    row: [
+  // Menu contents depend on how much is selected: "Delete column" vs "Delete 3 columns".
+  function actionsFor(kind) {
+    const { range } = info
+    const nCols = range.right - range.left
+    const nRows = range.bottom - range.top
+    const plural = (n, w) => (n === 1 ? `Delete ${w}` : `Delete ${n} ${w}s`)
+    const userRange = info.multi && !gripSelected
+    const clear = { label: userRange ? 'Clear selected cells' : 'Clear contents', icon: 'circle-x', run: () => clearCells(userRange ? rangeCells() : kindCells(kind)) }
+    const delTable = { label: 'Delete table', icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteTable().run() }
+    if (kind === 'col')
+      return [
+        { label: 'Insert left', icon: 'arrow-left', run: () => editor.chain().focus().addColumnBefore().run() },
+        { label: 'Insert right', icon: 'arrow-right', run: () => editor.chain().focus().addColumnAfter().run() },
+        clear,
+        { label: plural(nCols, 'column'), icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteColumn().run() },
+        delTable,
+      ]
+    return [
       { label: 'Insert above', icon: 'arrow-up', run: () => editor.chain().focus().addRowBefore().run() },
       { label: 'Insert below', icon: 'arrow-down', run: () => editor.chain().focus().addRowAfter().run() },
-      { label: 'Clear contents', icon: 'circle-x', run: () => clearCells(cellsOf('row')) },
-      { label: 'Delete row', icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteRow().run() },
-    ],
+      clear,
+      { label: plural(nRows, 'row'), icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteRow().run() },
+      delTable,
+    ]
   }
-  const ICON_DELETE_TABLE = { label: 'Delete table', icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteTable().run() }
+
+  // single-cell caret: "Clear contents" means the whole column / row the grip belongs to
+  const kindCells = (kind) => {
+    const { map, range } = info
+    const out = []
+    if (kind === 'col') for (let r = 0; r < map.height; r++) out.push(map.map[r * map.width + range.left])
+    else for (let c = 0; c < map.width; c++) out.push(map.map[range.top * map.width + c])
+    return out
+  }
+
+  // Clicking a grip selects the whole column / row (like Notion) so the action is unambiguous.
+  function selectWhole(kind) {
+    if (info.multi) return // keep the user's own selection
+    const { state, view } = editor
+    const $cell = state.doc.resolve(info.cellPos)
+    const sel = kind === 'col' ? CellSelection.colSelection($cell) : CellSelection.rowSelection($cell)
+    view.dispatch(state.tr.setSelection(sel))
+    info = locate()
+  }
 
   function openMenu(kind, fromKeyboard) {
     if (!info) return
     openKind = kind
-    const items = [...ACTIONS[kind], ICON_DELETE_TABLE]
+    const wasMulti = info.multi
+    selectWhole(kind)
+    gripSelected = !wasMulti
+    const items = actionsFor(kind)
     menu.innerHTML = items
       .map((a, i) => `<button type="button" role="menuitem" tabindex="-1" data-i="${i}" class="tbl-item ${a.danger ? 'is-danger' : ''}"><i data-lucide="${a.icon}" class="size-4"></i><span>${a.label}</span></button>`)
       .join('')
@@ -186,10 +242,19 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     place(menu, left, top)
   }
 
+  // After an action, drop any leftover multi-cell selection so the next grip click starts clean.
+  function collapseToCaret() {
+    const { state, view } = editor
+    if (!(state.selection instanceof CellSelection)) return
+    const pos = Math.min(state.selection.from, state.doc.content.size)
+    view.dispatch(state.tr.setSelection(TextSelection.near(state.doc.resolve(pos))))
+  }
+
   function closeMenu(refocus) {
     if (menu.hidden) return
     menu.hidden = true
     openKind = null
+    gripSelected = false
     colGrip.setAttribute('aria-expanded', 'false')
     rowGrip.setAttribute('aria-expanded', 'false')
     if (refocus) editor.view.focus()
@@ -214,6 +279,7 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     const act = menu._items[+b.dataset.i]
     closeMenu()
     act.run()
+    collapseToCaret()
     update()
   })
   document.addEventListener('mousedown', (e) => {
@@ -256,6 +322,26 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
       }
     })
   )
+  // The "+" strips only show while the pointer is near the matching table edge (or when they have
+  // keyboard focus). Zones are measured live so scrolling and resizing can't leave them stale.
+  let nearRow = false
+  let nearCol = false
+  function setNear(row, col) {
+    if (row !== nearRow) addRowBtn.classList.toggle('is-near', (nearRow = row))
+    if (col !== nearCol) addColBtn.classList.toggle('is-near', (nearCol = col))
+  }
+  let moveRaf = 0
+  document.addEventListener('mousemove', (e) => {
+    if (!tableDom || !info) return
+    cancelAnimationFrame(moveRaf)
+    moveRaf = requestAnimationFrame(() => {
+      if (!tableDom) return setNear(false, false)
+      const t = tableDom.getBoundingClientRect()
+      const inX = e.clientX >= t.left && e.clientX <= t.right + 22
+      const inY = e.clientY >= t.top && e.clientY <= t.bottom + 22
+      setNear(inX && e.clientY >= t.bottom - 14 && e.clientY <= t.bottom + 22, inY && e.clientX >= t.right - 14 && e.clientX <= t.right + 22)
+    })
+  })
   scroller.addEventListener('scroll', update, { passive: true })
   window.addEventListener('resize', update)
   window.visualViewport?.addEventListener('resize', update)

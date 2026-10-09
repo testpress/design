@@ -1,6 +1,7 @@
 import { NotesStore } from './store.js'
 import { refreshIcons } from './icons.js'
 import { createTableUI } from './table-ui.js'
+import { CellSelection } from '@tiptap/pm/tables'
 import { SaveQueue, serverSim } from './save-queue.js'
 import { createNotesEditor, stateForDoc } from './editor.js'
 import { BLOCKS, DIVIDER, TABLE, turnInto, insertDivider, insertTable, currentBlockLabel, applyLink, MARKS, indentList, inList } from './blocks.js'
@@ -201,6 +202,7 @@ const editor = createNotesEditor({
   shouldShowBubble: ({ editor: ed, view, state, from, to, element }) => {
     if (isMobile() || !ed.isEditable || !currentId) return false
     const sel = state.selection
+    if (sel instanceof CellSelection) return false // selected cells get the table menus, not text formatting
     if (sel.empty || sel.$from.parent.type.name === 'title' || sel.$to.parent.type.name === 'title') return false
     if (!state.doc.textBetween(from, to, ' ').trim()) return false
     return view.hasFocus() || element.contains(document.activeElement)
@@ -718,13 +720,14 @@ syncViewport()
 // ---- Global keyboard + page lifecycle --------------------------------------------------------
 document.addEventListener('keydown', (e) => {
   const mod = e.metaKey || e.ctrlKey
-  if (e.key === 'F10' && !isMobile() && !editor.state.selection.empty && editor.view.hasFocus()) {
+  const inCells = editor.state.selection instanceof CellSelection
+  if (e.key === 'F10' && !isMobile() && !inCells && !editor.state.selection.empty && editor.view.hasFocus()) {
     // Move keyboard focus into the selection toolbar (ARIA toolbar convention).
     e.preventDefault()
     bubble.kbd = true
     bubble.focusAct = null
     setBubbleMode('main')
-  } else if (e.key === 'F10' && !isMobile() && editor.state.selection.empty && editor.view.hasFocus() && tableUI?.inTable()) {
+  } else if (e.key === 'F10' && !isMobile() && (inCells || editor.state.selection.empty) && editor.view.hasFocus() && tableUI?.inTable()) {
     e.preventDefault()
     tableUI.focusControls()
   } else if (mod && e.key === '/') {
@@ -786,6 +789,7 @@ const SHORTCUTS = [
     ['Quote', `${MOD}${S}B`],
     ['Move between table cells (adds a row at the end)', `Tab  ${S}Tab`],
     ['Table column / row menus (caret in a table)', 'F10  then  Enter'],
+    ['Select several table cells', `Drag  or  ${S}← → ↑ ↓`],
     ['Code block', `${MOD}${A}C`],
     ['Divider', `${MOD}${A}D`],
   ]],
