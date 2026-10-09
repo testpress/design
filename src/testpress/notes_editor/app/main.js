@@ -721,13 +721,15 @@ syncViewport()
 document.addEventListener('keydown', (e) => {
   const mod = e.metaKey || e.ctrlKey
   const inCells = editor.state.selection instanceof CellSelection
-  if (e.key === 'F10' && !isMobile() && !inCells && !editor.state.selection.empty && editor.view.hasFocus()) {
+  // F10 is the Mute key on Mac keyboards, so Cmd/Ctrl+Alt+M does the same thing everywhere.
+  const menuKey = e.key === 'F10' || (mod && e.altKey && e.code === 'KeyM')
+  if (menuKey && !isMobile() && !inCells && !editor.state.selection.empty && editor.view.hasFocus()) {
     // Move keyboard focus into the selection toolbar (ARIA toolbar convention).
     e.preventDefault()
     bubble.kbd = true
     bubble.focusAct = null
     setBubbleMode('main')
-  } else if (e.key === 'F10' && !isMobile() && (inCells || editor.state.selection.empty) && editor.view.hasFocus() && tableUI?.inTable()) {
+  } else if (menuKey && !isMobile() && (inCells || editor.state.selection.empty) && editor.view.hasFocus() && tableUI?.inTable()) {
     e.preventDefault()
     tableUI.focusControls()
   } else if (mod && e.key === '/') {
@@ -788,7 +790,9 @@ const SHORTCUTS = [
     ['Bulleted / numbered / checklist', `${MOD}${S}8  7  9`],
     ['Quote', `${MOD}${S}B`],
     ['Move between table cells (adds a row at the end)', `Tab  ${S}Tab`],
-    ['Table column / row menus (caret in a table)', 'F10  then  Enter'],
+    ['Table: open the column / row menus', `${MOD}${A}M  or  F10`],
+    ['Table: delete the current row', `${MOD}${A}⌫`],
+    ['Table: delete the current column', `${MOD}${A}−`],
     ['Select several table cells', `Drag  or  ${S}← → ↑ ↓`],
     ['Code block', `${MOD}${A}C`],
     ['Divider', `${MOD}${A}D`],
@@ -798,7 +802,7 @@ const SHORTCUTS = [
     ['Highlight', `${MOD}${S}H`],
     ['Strikethrough / inline code', `${MOD}${S}S  ${MOD}E`],
     ['Link the selection', `${MOD}${S}L`],
-    ['Move into the selection toolbar', 'F10'],
+    ['Move into the selection toolbar', `${MOD}${A}M  or  F10`],
     ['Toolbar: move / activate / close', '← →  Enter  Esc'],
   ]],
 ]

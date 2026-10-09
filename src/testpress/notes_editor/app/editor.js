@@ -109,6 +109,9 @@ function keyboardExtras({ onLinkShortcut }) {
         'Mod-Shift-l': () => onLinkShortcut(),
         // dividers / blocks have no markdown trigger on a keypress; Mod-Alt-d inserts a divider
         'Mod-Alt-d': ({ editor }) => insertDivider(editor),
+        // table: delete the current row / column (or every selected one) without opening a menu
+        'Mod-Alt-Backspace': ({ editor }) => (editor.isActive('table') ? editor.commands.deleteRow() : false),
+        'Mod-Alt--': ({ editor }) => (editor.isActive('table') ? editor.commands.deleteColumn() : false),
       }
     },
   })

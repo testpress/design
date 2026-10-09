@@ -12,6 +12,10 @@ const DOTS_H = '<svg width="14" height="6" viewBox="0 0 14 6" fill="currentColor
 const DOTS_V = '<svg width="6" height="14" viewBox="0 0 6 14" fill="currentColor" aria-hidden="true"><circle cx="3" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/></svg>'
 const PLUS = '<svg width="10" height="10" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9"/></svg>'
 
+const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform)
+const SC_DELETE_ROW = IS_MAC ? '⌘⌥⌫' : 'Ctrl+Alt+⌫'
+const SC_DELETE_COL = IS_MAC ? '⌘⌥−' : 'Ctrl+Alt+−'
+
 export function createTableUI({ editor, host, scroller, isMobile }) {
   const mk = (cls, html, label, extra = {}) => {
     const b = document.createElement('button')
@@ -185,14 +189,14 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
         { label: 'Insert left', icon: 'arrow-left', run: () => editor.chain().focus().addColumnBefore().run() },
         { label: 'Insert right', icon: 'arrow-right', run: () => editor.chain().focus().addColumnAfter().run() },
         clear,
-        { label: plural(nCols, 'column'), icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteColumn().run() },
+        { label: plural(nCols, 'column'), icon: 'trash-2', danger: true, hint: SC_DELETE_COL, run: () => editor.chain().focus().deleteColumn().run() },
         delTable,
       ]
     return [
       { label: 'Insert above', icon: 'arrow-up', run: () => editor.chain().focus().addRowBefore().run() },
       { label: 'Insert below', icon: 'arrow-down', run: () => editor.chain().focus().addRowAfter().run() },
       clear,
-      { label: plural(nRows, 'row'), icon: 'trash-2', danger: true, run: () => editor.chain().focus().deleteRow().run() },
+      { label: plural(nRows, 'row'), icon: 'trash-2', danger: true, hint: SC_DELETE_ROW, run: () => editor.chain().focus().deleteRow().run() },
       delTable,
     ]
   }
@@ -224,7 +228,7 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     gripSelected = !wasMulti
     const items = actionsFor(kind)
     menu.innerHTML = items
-      .map((a, i) => `<button type="button" role="menuitem" tabindex="-1" data-i="${i}" class="tbl-item ${a.danger ? 'is-danger' : ''}"><i data-lucide="${a.icon}" class="size-4"></i><span>${a.label}</span></button>`)
+      .map((a, i) => `<button type="button" role="menuitem" tabindex="-1" data-i="${i}" class="tbl-item ${a.danger ? 'is-danger' : ''}"><i data-lucide="${a.icon}" class="size-4"></i><span>${a.label}</span>${a.hint ? `<kbd class="tbl-item__hint">${a.hint}</kbd>` : ''}</button>`)
       .join('')
     menu._items = items
     refreshIcons(menu)
