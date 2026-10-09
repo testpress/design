@@ -367,7 +367,7 @@ leaveDlg.addEventListener('keydown', (e) => {
 })
 
 // ---- Desktop bubble menu ---------------------------------------------------------------------
-const bubble = { mode: 'main', kbd: false, focusAct: null }
+const bubble = { mode: 'main', kbd: false, focusAct: null, rendering: false }
 
 function btn(act, ic, label, active = false, extra = '') {
   return `<button type="button" data-act="${act}" class="bm-btn ${active ? 'is-on' : ''}" aria-label="${label}" aria-pressed="${active}" ${extra}>${icon(ic)}</button>`
@@ -403,7 +403,9 @@ function renderBubble(force = false) {
       ${href ? `<button type="button" data-act="unlink" class="bm-btn" aria-label="Remove link">${icon('unlink')}</button>` : ''}</form>`
   }
   if (bubbleEl.dataset.html !== html) {
+    bubble.rendering = true // replacing the focused button fires focusout; that is not the user leaving
     bubbleEl.innerHTML = html
+    bubble.rendering = false
     bubbleEl.dataset.html = html
     refreshIcons(bubbleEl)
     // Buttons are reached with arrow keys (roving), never with Tab.
@@ -457,7 +459,7 @@ bubbleEl.addEventListener('click', (e) => {
 })
 bubbleEl.addEventListener('focusout', (e) => {
   // focus left the bubble for somewhere else (not into the editor) -> drop keyboard mode
-  if (!bubbleEl.contains(e.relatedTarget)) bubble.kbd = false
+  if (!bubble.rendering && !bubbleEl.contains(e.relatedTarget)) bubble.kbd = false
 })
 bubbleEl.addEventListener('submit', (e) => {
   e.preventDefault()
