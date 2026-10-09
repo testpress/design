@@ -1,0 +1,191 @@
+---
+tags: tpstreams
+title: Mobile SDK Release Notifications | TPStreams
+date: 2026-10-09
+permalink: tpstreams/settings/sdk_notifications/
+---
+
+{% extends "src/tpstreams/settings/base.html" %}
+
+{% block settings %}
+
+<script id="sdk-subscriptions-data" type="application/json">
+  {{ (sdk_notifications | dump | safe) if sdk_notifications else '[]' }}
+</script>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('sdkNotificationManager', () => ({
+      subscriptions: JSON.parse(
+        document.getElementById('sdk-subscriptions-data').textContent
+      ),
+      maxLimit: 5,
+      newEmail: '',
+      newPlatform: 'android',
+      errorMessage: '',
+      itemToDelete: null,
+
+      get hasSubscriptions() {
+        return this.subscriptions && this.subscriptions.length > 0;
+      },
+
+      get isLimitReached() {
+        return this.subscriptions && this.subscriptions.length >= this.maxLimit;
+      },
+
+      get platformLabels() {
+        return {
+          android: 'Android',
+          ios: 'iOS',
+          flutter: 'Flutter',
+          react_native: 'React Native'
+        };
+      },
+
+      previewItem: {
+        email: 'alex.dev@acme.org',
+        platform: 'android',
+        platform_label: 'Android'
+      },
+
+      openEmailPreview(item) {
+        if (item) {
+          this.previewItem = { ...item };
+        } else if (this.subscriptions && this.subscriptions.length > 0) {
+          this.previewItem = { ...this.subscriptions[0] };
+        }
+        if (window.HSOverlay) {
+          window.HSOverlay.open('#preview-email-modal');
+        }
+      },
+
+      promptDelete(item) {
+        this.itemToDelete = item;
+        if (window.HSOverlay) {
+          window.HSOverlay.open('#confirm_delete_modal');
+        }
+      },
+
+      deleteSubscription() {
+        if (!this.itemToDelete) return;
+        this.subscriptions = this.subscriptions.filter(
+          (sub) => sub.id !== this.itemToDelete.id
+        );
+        this.itemToDelete = null;
+        if (window.HSOverlay) {
+          window.HSOverlay.close('#confirm_delete_modal');
+        }
+      },
+
+      createSubscription() {
+        const email = (this.newEmail || '').trim().toLowerCase();
+        const platform = this.newPlatform;
+
+        // Basic email format check
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email || !emailRegex.test(email)) {
+          this.errorMessage = 'Please enter a valid email address.';
+          return;
+        }
+
+        // Limit check
+        if (this.isLimitReached) {
+          this.errorMessage = `Maximum capacity reached (${this.maxLimit} active subscriptions). Please remove an existing subscription first.`;
+          return;
+        }
+
+        // Duplicate check (email + platform)
+        const isDuplicate = this.subscriptions.some(
+          (sub) => sub.email.toLowerCase() === email && sub.platform === platform
+        );
+
+        if (isDuplicate) {
+          const platformLabel = this.platformLabels[platform] || platform;
+          this.errorMessage = `"${email}" is already subscribed to ${platformLabel} SDK release notifications.`;
+          return;
+        }
+
+        // Add new record
+        const today = new Date();
+        const formattedDate = today.toLocaleDateString('en-US', {
+          month: 'short',
+          day: '2-digit',
+          year: 'numeric'
+        });
+
+        const newRecord = {
+          id: Date.now(),
+          email: email,
+          platform: platform,
+          platform_label: this.platformLabels[platform] || platform,
+          created_at: formattedDate,
+          status: 'Active'
+        };
+
+        this.subscriptions.unshift(newRecord);
+
+        // Reset form
+        this.newEmail = '';
+        this.errorMessage = '';
+
+        if (window.HSOverlay) {
+          window.HSOverlay.close('#add-subscription-modal');
+        }
+      }
+    }));
+  });
+</script>
+
+<div class="space-y-5" x-data="sdkNotificationManager">
+
+  <!-- Header & Actions -->
+  <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center mt-5 gap-y-3">
+    <div>
+      <h2 class="text-xl font-semibold text-gray-800">Mobile SDK Release Notifications</h2>
+      <p class="text-sm text-gray-600">
+        Register developer emails to automatically deliver release notes and upgrade links when SDKs are published (up to 5 subscriptions).
+      </p>
+    </div>
+
+    <div class="flex items-center gap-x-2.5">
+      <button
+        type="button"
+        @click="openEmailPreview()"
+        class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 shadow-2xs focus:outline-none transition"
+      >
+        <svg class="size-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+        </svg>
+        <span>Preview Email</span>
+      </button>
+
+      <button
+        type="button"
+        data-hs-overlay="#add-subscription-modal"
+        :disabled="isLimitReached"
+        class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-semibold rounded-lg border border-transparent bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none transition"
+      >
+        <svg
+          class="shrink-0 size-4"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+        </svg>
+        Add Subscription
+      </button>
+    </div>
+  </div>
+
+  <!-- Subscriptions Table & Modals -->
+  {% include "./includes/subscriptions_list.html" %}
+  {% include "./includes/add_subscription_modal.html" %}
+  {% include "./includes/confirm_delete_modal.html" %}
+  {% include "./includes/preview_email_modal.html" %}
+
+</div>
+
+{% endblock %}
