@@ -220,6 +220,18 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
       activate(rows[index])
     }
   })
+  // Hovering moves the one highlight (like the block menu) so mouse and keyboard never show two rows.
+  // Only a real pointer movement counts, so re-rendered rows under a resting pointer don't steal it.
+  let lastPtr = null
+  pop.addEventListener('mousemove', (e) => {
+    if (lastPtr && lastPtr.x === e.clientX && lastPtr.y === e.clientY) return
+    lastPtr = { x: e.clientX, y: e.clientY }
+    const row = e.target.closest('[data-i]')
+    if (!row || mode.type !== 'browse' || +row.dataset.i === index) return
+    index = +row.dataset.i
+    pop.querySelectorAll('.lib-row[data-i]').forEach((n) => n.classList.toggle('is-active', +n.dataset.i === index))
+    pop.querySelector('input')?.setAttribute('aria-activedescendant', 'lib-o' + index)
+  })
   pop.addEventListener('input', (e) => {
     if (e.target.classList.contains('lib-rename')) return
     index = 0
