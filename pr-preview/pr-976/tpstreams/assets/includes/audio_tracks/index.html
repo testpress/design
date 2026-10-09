@@ -1,0 +1,926 @@
+<!-- Audio Tracks Management Tab Container -->
+<!-- Styled to match TPStreams core UI conventions and typography -->
+<div class="max-w-3xl pb-16" x-show="!disableAnalytics" x-data="{
+  showUploadModal: false,
+  showEditModal: false,
+  showDeleteModal: false,
+  isUploading: false,
+  uploadProgress: 0,
+  editingTrack: null,
+  deletingTrack: null,
+
+  tracks: [
+    {
+      id: 'trk_1',
+      name: 'English (Original Audio)',
+      language: 'English',
+      lang_code: 'en',
+      status: 'completed',
+      is_default: true,
+      size: '22.4 MB',
+      duration: '04:32'
+    },
+    {
+      id: 'trk_2',
+      name: 'Spanish (Latin America Dub)',
+      language: 'Spanish',
+      lang_code: 'es',
+      status: 'completed',
+      is_default: false,
+      size: '21.8 MB',
+      duration: '04:32'
+    },
+    {
+      id: 'trk_3',
+      name: 'Hindi Dub',
+      language: 'Hindi',
+      lang_code: 'hi',
+      status: 'processing',
+      is_default: false,
+      size: '19.6 MB',
+      duration: '04:32'
+    },
+    {
+      id: 'trk_4',
+      name: 'French Commentary',
+      language: 'French',
+      lang_code: 'fr',
+      status: 'completed',
+      is_default: false,
+      size: '20.1 MB',
+      duration: '04:32'
+    }
+  ],
+
+  get activeTrackCount() {
+    return this.tracks.filter(t => t.status === 'completed').length;
+  },
+
+  setAsDefault(targetTrack) {
+    if (targetTrack.status !== 'completed') return;
+    this.tracks.forEach(t => {
+      t.is_default = (t.id === targetTrack.id);
+    });
+  },
+
+  openEditModal(track) {
+    this.editingTrack = JSON.parse(JSON.stringify(track));
+    this.showEditModal = true;
+  },
+
+  saveTrackEdit() {
+    if (!this.editingTrack) return;
+    const index = this.tracks.findIndex(t => t.id === this.editingTrack.id);
+    if (index !== -1) {
+      if (this.editingTrack.is_default) {
+        this.tracks.forEach(t => t.is_default = false);
+      }
+      this.tracks[index] = {
+        ...this.tracks[index],
+        name: this.editingTrack.name,
+        language: this.editingTrack.language,
+        lang_code: this.editingTrack.lang_code,
+        is_default: this.editingTrack.is_default
+      };
+    }
+  },
+
+  openDeleteModal(track) {
+    this.deletingTrack = track;
+    this.showDeleteModal = true;
+  },
+
+  confirmDeleteTrack() {
+    if (!this.deletingTrack) return;
+    this.tracks = this.tracks.filter(t => t.id !== this.deletingTrack.id);
+    this.deletingTrack = null;
+  }
+}">
+
+  <!-- Processing In Progress Alert (TPStreams Pattern) -->
+  <template x-if="tracks.some(t => t.status === 'processing')">
+    <div class="rounded-md bg-blue-50 p-4 mt-2">
+      <div class="flex">
+        <div class="flex-shrink-0">
+          <svg class="h-5 w-5 text-blue-400 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <div class="ml-3">
+          <h3 class="text-sm font-medium text-blue-800">Audio track processing</h3>
+          <div class="mt-1 text-sm text-blue-700">
+            <p>New audio tracks are being processed and will be available in the player shortly.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Empty State (When no tracks exist) -->
+  <template x-if="tracks.length === 0">
+    <div class="mt-4">
+      <!-- Preline Pro Empty State Component -->
+<!-- Preline Docs: https://preline.co/docs/card.html -->
+<div class="text-center py-12 px-4 sm:px-6 lg:px-8 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/60">
+  <!-- Empty Audio Waves Illustration -->
+  <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100 shadow-sm mb-4">
+    <svg class="w-7 h-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M19.114 5.636a9 9 0 0 1 0 12.728M16.463 8.288a5.25 5.25 0 0 1 0 7.424M6.75 8.25l4.72-4.72a.75.75 0 0 1 1.28.53v15.88a.75.75 0 0 1-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.009 9.009 0 0 1 2.25 12c0-.83.112-1.633.322-2.396C2.806 8.757 3.63 8.25 4.51 8.25H6.75Z" />
+    </svg>
+  </div>
+  <h3 class="text-base font-semibold text-gray-900">No secondary audio tracks found</h3>
+  <p class="mt-1.5 text-sm text-gray-500 max-w-md mx-auto">
+    Attach translated dubs, commentary, or localized audio tracks to provide multilingual playback for your audience.
+  </p>
+  <div class="mt-5">
+    <button type="button" @click="showUploadModal = true"
+      class="inline-flex items-center gap-x-2 py-2.5 px-4 text-sm font-semibold rounded-xl border border-transparent bg-blue-600 text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition">
+      <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      </svg>
+      Add Audio Track
+    </button>
+  </div>
+</div>
+
+    </div>
+  </template>
+
+  <!-- Audio Tracks List Section -->
+  <div class="relative mt-4" x-show="tracks.length > 0">
+    <div class="flex justify-between items-center">
+      <h2 class="text-sm font-semibold leading-7 text-gray-900">Audio Tracks</h2>
+      <div class="flex items-center gap-4">
+        <button type="button" @click="showUploadModal = true"
+          class="text-sm font-semibold leading-6 text-blue-600 hover:text-blue-500 inline-flex items-center">
+          <span aria-hidden="true" class="mr-1 text-base font-bold">+</span>
+          Upload Audio Track
+        </button>
+      </div>
+    </div>
+
+    <!-- Tracks List (Matching TPStreams rounded-md border border-gray-200) -->
+    <div class="mt-2 text-sm text-gray-900 sm:col-span-2">
+      <ul role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
+        <template x-for="track in tracks" :key="track.id">
+          <li class="flex items-center justify-between py-4 pl-4 pr-5 text-sm leading-6 hover:bg-gray-50/50">
+  <div class="flex w-0 flex-1 items-center">
+    
+    <!-- Audio Icon -->
+    <svg class="h-5 w-5 flex-shrink-0 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m9 9 10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z" />
+    </svg>
+
+    <!-- Track Label, Language Badge, Format & Size Info -->
+    <div class="ml-4 flex min-w-0 flex-1 items-center gap-2">
+      <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-600 border border-gray-200" x-text="track.lang_code"></span>
+      <span class="truncate font-medium text-gray-900" x-text="track.name"></span>
+      
+      <!-- Processing Tag -->
+      <span x-show="track.status === 'processing'" class="text-xs text-blue-600 font-medium inline-flex items-center gap-1">
+        <svg class="animate-spin h-3 w-3 text-blue-600" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        (processing...)
+      </span>
+
+      <!-- Default Tag -->
+      <span x-show="track.is_default" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+        Default
+      </span>
+
+      <span class="flex-shrink-0 text-gray-400" x-text="track.size"></span>
+      <span class="flex-shrink-0 text-gray-400 hidden sm:inline" x-text="'(' + track.duration + ')'"></span>
+    </div>
+  </div>
+
+  <!-- Action Menu Dropdown (Preline Pro Block: action-menu-with-destructive-action) -->
+  <div class="ml-4 flex-shrink-0 flex">
+    <div class="relative inline-flex" x-data="{ showMenu: false, openUpward: false }">
+      <!-- 3-dot Trigger Button -->
+      <button type="button" 
+        @click="openUpward = ($event.clientY + 200 > window.innerHeight); showMenu = !showMenu;" 
+        @click.away="showMenu = false"
+        class="size-8 inline-flex justify-center items-center rounded-lg border border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none transition"
+        aria-haspopup="menu" :aria-expanded="showMenu" aria-label="Audio track actions">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+        </svg>
+      </button>
+
+      <!-- Dropdown Menu Panel -->
+      <div x-cloak x-show="showMenu"
+        :class="openUpward ? 'bottom-full mb-1.5 origin-bottom-right' : 'top-full mt-1.5 origin-top-right'"
+        class="absolute right-0 z-50 w-44 bg-white border border-gray-200 rounded-xl shadow-xl p-1"
+        role="menu" aria-orientation="vertical"
+        x-transition:enter="transition ease-out duration-100" 
+        x-transition:enter-start="transform opacity-0 scale-95"
+        x-transition:enter-end="transform opacity-100 scale-100" 
+        x-transition:leave="transition ease-in duration-75"
+        x-transition:leave-start="transform opacity-100 scale-100"
+        x-transition:leave-end="transform opacity-0 scale-95">
+        
+        <!-- Standard Actions -->
+        <button type="button" @click="setAsDefault(track); showMenu = false;"
+          :disabled="track.is_default || track.status !== 'completed'"
+          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-normal text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition"
+          role="menuitem">
+          <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Set as default
+        </button>
+
+        <button type="button" @click="openEditModal(track); showMenu = false;"
+          :disabled="track.status === 'processing'"
+          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-normal text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition"
+          role="menuitem">
+          <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/>
+          </svg>
+          Edit track
+        </button>
+
+        <!-- Divider -->
+        <div class="my-1 border-t border-gray-100"></div>
+
+        <!-- Destructive Delete Action -->
+        <button type="button" @click="openDeleteModal(track); showMenu = false;"
+          class="w-full flex items-center gap-x-2.5 py-1.5 px-2.5 rounded-lg text-[13px] font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition"
+          role="menuitem">
+          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line>
+          </svg>
+          Delete track
+        </button>
+      </div>
+    </div>
+  </div>
+</li>
+
+
+        </template>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <!-- Preline Pro Modal: Upload Audio Track -->
+<!-- Preline Docs: https://preline.co/docs/overlay.html -->
+<div x-show="showUploadModal" class="relative z-50" aria-labelledby="upload-modal-title" role="dialog" aria-modal="true" x-cloak>
+  <!-- Backdrop Overlay -->
+  <div x-show="showUploadModal" 
+    x-transition:enter="ease-out duration-300" 
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100" 
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100" 
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-gray-500/75 transition-opacity"></div>
+
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+      <div x-show="showUploadModal" 
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100 sm:scale-100"
+        x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        @click.away="if(!isUploading) showUploadModal = false"
+        class="w-full sm:max-w-xl bg-white border border-gray-200 rounded-xl pointer-events-auto shadow-xl transition-all text-left">
+        
+        <div x-data="{ 
+          selectedFile: null, 
+          fileName: '', 
+          fileSizeFormatted: '',
+          fileInput: null,
+          language: '',
+          trackName: '',
+          isDefault: false,
+          isDragging: false,
+          
+          resetForm() {
+            this.selectedFile = null;
+            this.fileName = '';
+            this.fileSizeFormatted = '';
+            this.language = '';
+            this.trackName = '';
+            this.isDefault = false;
+            this.isDragging = false;
+            if (this.fileInput) this.fileInput.value = '';
+          }
+        }">
+          
+          <!-- Header -->
+          <div class="py-2.5 px-4 flex justify-between items-center border-b border-gray-200">
+            <h2 id="upload-modal-title" class="font-medium text-gray-800 text-base">
+              Upload audio track
+            </h2>
+            <button type="button" @click="if (!isUploading) { resetForm(); showUploadModal = false; }" :disabled="isUploading"
+              class="size-8 shrink-0 flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-200" aria-label="Close">
+              <span class="sr-only">Close</span>
+              <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+          <!-- End Header -->
+
+          <!-- Body -->
+          <div class="p-4 space-y-4">
+            
+            <!-- Grid: Language & Track Name -->
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <!-- Language Select (Reusable Preline Component) -->
+              <!-- Reusable Preline Searchable Language Select Component (Exact Preline Advanced Select Styling) -->
+<div class="relative" x-data="{
+  open: false,
+  search: '',
+  languages: [
+    { name: 'English', code: 'en' },
+    { name: 'Spanish', code: 'es' },
+    { name: 'Tamil', code: 'ta' },
+    { name: 'Hindi', code: 'hi' },
+    { name: 'Telugu', code: 'te' },
+    { name: 'Malayalam', code: 'ml' },
+    { name: 'Kannada', code: 'kn' },
+    { name: 'Marathi', code: 'mr' },
+    { name: 'Bengali', code: 'bn' },
+    { name: 'French', code: 'fr' },
+    { name: 'German', code: 'de' },
+    { name: 'Arabic', code: 'ar' },
+    { name: 'Japanese', code: 'ja' },
+    { name: 'Portuguese', code: 'pt' },
+    { name: 'Russian', code: 'ru' },
+    { name: 'Chinese', code: 'zh' }
+  ],
+  get selectedLang() {
+    return (typeof editingTrack !== 'undefined' && editingTrack) ? editingTrack.language : language;
+  },
+  get filteredLanguages() {
+    if (!this.search) return this.languages;
+    return this.languages.filter(l => l.name.toLowerCase().includes(this.search.toLowerCase()));
+  },
+  select(lang) {
+    if (typeof editingTrack !== 'undefined' && editingTrack) {
+      editingTrack.language = lang.name;
+      editingTrack.lang_code = lang.code;
+    } else {
+      language = lang.name;
+      if (!trackName) trackName = lang.name;
+    }
+    this.open = false;
+    this.search = '';
+  }
+}" @click.away="open = false">
+  
+  <label class="block mb-1.5 text-sm font-medium text-gray-800">
+    Language <span class="text-red-500">*</span>
+  </label>
+
+  <!-- Trigger Button (Exact Preline style, properly aligned) -->
+  <button type="button" 
+    @click="open = !open; if (open) $nextTick(() => $refs.searchInput.focus());"
+    :disabled="typeof isUploading !== 'undefined' && isUploading"
+    class="relative py-2 px-3 pe-9 flex items-center justify-between w-full cursor-pointer bg-white border border-gray-200 text-gray-800 rounded-lg text-start text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-xs"
+    aria-haspopup="listbox" :aria-expanded="open">
+    <span x-text="selectedLang || 'Select language...'" :class="!selectedLang ? 'text-gray-400' : 'text-gray-800'" class="truncate text-sm"></span>
+    <div class="absolute top-1/2 end-3 -translate-y-1/2 pointer-events-none flex items-center">
+      <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>
+      </svg>
+    </div>
+  </button>
+
+  <!-- Dropdown Menu Panel (Exact Preline dropdownClasses) -->
+  <div x-show="open" x-cloak
+    x-transition:enter="transition ease-out duration-100"
+    x-transition:enter-start="transform opacity-0 scale-95"
+    x-transition:enter-end="transform opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-75"
+    x-transition:leave-start="transform opacity-100 scale-100"
+    x-transition:leave-end="transform opacity-0 scale-95"
+    class="mt-2 max-h-72 pb-1 px-1 space-y-0.5 z-20 w-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden overflow-y-auto focus:outline-hidden absolute [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300">
+    
+    <!-- Search Input Wrapper (Exact Preline searchWrapperClasses & searchClasses) -->
+    <div class="bg-white p-2 -mx-1 sticky top-0">
+      <input type="text" x-ref="searchInput" x-model="search" placeholder="Search..."
+        class="block w-full sm:text-sm bg-transparent border border-gray-200 rounded-lg text-gray-800 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500 py-1.5 sm:py-2 px-3">
+    </div>
+
+    <!-- Options List (Exact Preline optionClasses & optionTemplate - NO checkmark) -->
+    <template x-for="lang in filteredLanguages" :key="lang.name">
+      <button type="button" @click="select(lang)"
+        class="py-2 px-4 w-full text-sm text-gray-800 cursor-pointer hover:bg-gray-100 rounded-lg focus:outline-hidden focus:bg-gray-100 text-start flex items-center"
+        :class="selectedLang === lang.name ? 'bg-gray-100 font-medium' : ''"
+        role="option" :aria-selected="selectedLang === lang.name">
+        <span class="text-gray-800" x-text="lang.name"></span>
+      </button>
+    </template>
+    
+    <template x-if="filteredLanguages.length === 0">
+      <div class="py-3 px-4 text-center text-xs text-gray-400">
+        No matching results
+      </div>
+    </template>
+  </div>
+</div>
+
+
+              <!-- Track Label / Name Input -->
+              <div>
+                <label for="track-name" class="block mb-1.5 text-sm font-medium text-gray-800">
+                  Track Label / Name <span class="text-gray-400 font-normal lowercase">(optional)</span>
+                </label>
+                <input type="text" id="track-name" x-model="trackName" :placeholder="language ? language : 'e.g., Director\'s Commentary'"
+                  class="py-2 px-3 block w-full bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <!-- Preline Drag & Drop Audio Upload Zone -->
+            <div>
+              <label class="block mb-1.5 text-sm font-medium text-gray-800">
+                Audio File <span class="text-red-500">*</span>
+              </label>
+
+              <!-- State 1: Dropzone (No File Selected) -->
+              <div x-show="!selectedFile"
+                @dragover.prevent="isDragging = true"
+                @dragleave.prevent="isDragging = false"
+                @drop.prevent="
+                  isDragging = false;
+                  if ($event.dataTransfer.files.length) {
+                    selectedFile = $event.dataTransfer.files[0];
+                    fileName = selectedFile.name;
+                    fileSizeFormatted = (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB';
+                    if (!trackName && language) trackName = language;
+                  }
+                "
+                :class="isDragging ? 'border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20' : 'border-gray-200 bg-white hover:bg-gray-50 hover:border-gray-300'"
+                class="relative border border-dashed rounded-xl p-6 sm:p-8 transition flex flex-col items-center justify-center text-center cursor-pointer group">
+                
+                <!-- Full-area invisible input so clicking anywhere triggers file selection -->
+                <input type="file" id="audioFilePicker" accept=".mp3,.aac,.m4a,.wav,audio/*"
+                  class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  x-on:change="
+                    if ($event.target.files.length) {
+                      selectedFile = $event.target.files[0];
+                      fileName = selectedFile.name;
+                      fileSizeFormatted = (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB';
+                      fileInput = $event.target;
+                      if (!trackName && language) trackName = language;
+                    }
+                  ">
+                
+                <div class="size-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
+                  <svg class="size-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0 3 3m-3-3-3 3M6.75 19.5a4.5 4.5 0 0 1-1.41-8.775 5.25 5.25 0 0 1 10.233-2.33 3 3 0 0 1 3.758 3.848A3.752 3.752 0 0 1 18 19.5H6.75Z" />
+                  </svg>
+                </div>
+                <div class="flex flex-wrap justify-center text-sm leading-6 text-gray-600">
+                  <span class="pe-1 font-medium text-gray-800">
+                    Drop your files here or
+                  </span>
+                  <span class="font-semibold text-blue-600 group-hover:underline">
+                    browse
+                  </span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">
+                  Supported formats: MP3, AAC, M4A, WAV (Max 500MB)
+                </p>
+              </div>
+
+              <!-- State 2: Attached File Card with Preline In-Card Progress -->
+              <div x-show="selectedFile" x-cloak
+                class="p-3.5 bg-gray-50 border border-gray-200 rounded-xl space-y-2.5">
+                
+                <div class="flex items-center justify-between gap-x-3">
+                  <div class="flex items-center gap-x-3 min-w-0">
+                    <div class="size-9 rounded-lg bg-blue-50 border border-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                      <svg class="w-5 h-5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m9 9 10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z" />
+                      </svg>
+                    </div>
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-gray-800 truncate" x-text="fileName"></p>
+                      <div class="flex items-center gap-x-2 text-xs text-gray-500 mt-0.5">
+                        <span x-text="fileSizeFormatted"></span>
+                        <span>&bull;</span>
+                        <span x-show="!isUploading" class="inline-flex items-center text-emerald-600 font-medium">
+                          <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clip-rule="evenodd" />
+                          </svg>
+                          Ready for upload
+                        </span>
+                        <span x-show="isUploading" class="inline-flex items-center text-blue-600 font-medium" x-cloak>
+                          Uploading...
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Remove Action (hidden during active upload) -->
+                  <button x-show="!isUploading" type="button" 
+                    x-on:click="
+                      selectedFile = null;
+                      fileName = '';
+                      fileSizeFormatted = '';
+                      if (fileInput) fileInput.value = '';
+                    "
+                    class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition shrink-0"
+                    title="Remove file">
+                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- Preline In-Card Progress Bar -->
+                <div x-show="isUploading" class="flex items-center gap-x-3 whitespace-nowrap pt-1" x-cloak>
+                  <div class="flex w-full h-2 bg-gray-200 rounded-full overflow-hidden" role="progressbar" :aria-valuenow="uploadProgress" aria-valuemin="0" aria-valuemax="100">
+                    <div class="flex flex-col justify-center rounded-full overflow-hidden bg-blue-600 text-xs text-white text-center whitespace-nowrap transition-all duration-300 ease-out"
+                      :style="'width: ' + uploadProgress + '%'"></div>
+                  </div>
+                  <div class="w-10 text-end">
+                    <span class="text-xs font-semibold text-gray-700" x-text="uploadProgress + '%'"></span>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+
+            <!-- Default Track Setting (TPStreams Checkbox Pattern) -->
+            <div class="relative flex items-start gap-x-3 pt-1">
+              <div class="flex h-6 items-center">
+                <input id="set-default-audio" type="checkbox" x-model="isDefault" :disabled="isUploading"
+                  class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+              </div>
+              <div class="text-sm leading-6">
+                <label for="set-default-audio" class="font-medium text-gray-800 cursor-pointer select-none" :class="isUploading ? 'opacity-50 cursor-not-allowed' : ''">Set as default audio track</label>
+                <p class="text-xs text-gray-500">Plays by default when a viewer starts the video.</p>
+              </div>
+            </div>
+
+          </div>
+          <!-- End Body -->
+
+          <!-- Footer -->
+          <div class="p-4 flex justify-end items-center gap-x-2 border-t border-gray-200">
+            <button type="button" @click="resetForm(); showUploadModal = false;" :disabled="isUploading"
+              class="py-2 px-3 inline-flex justify-center items-center text-center bg-white border border-gray-200 text-gray-800 text-sm font-medium rounded-lg shadow-2xs hover:bg-gray-50 focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
+              Cancel
+            </button>
+            <button type="button" 
+              @click="
+                if (!selectedFile || !language) {
+                  alert('Please select an audio file and language.');
+                  return;
+                }
+                isUploading = true;
+                uploadProgress = 15;
+                let interval = setInterval(() => {
+                  uploadProgress = Math.min(100, uploadProgress + 25);
+                  if (uploadProgress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                      if (isDefault) {
+                        tracks.forEach(t => t.is_default = false);
+                      }
+                      tracks.unshift({
+                        id: 'trk_' + Date.now(),
+                        name: trackName || language,
+                        language: language,
+                        lang_code: language.toLowerCase().slice(0, 2),
+                        status: 'processing',
+                        is_default: isDefault,
+                        size: (selectedFile.size / (1024 * 1024)).toFixed(1) + ' MB',
+                        duration: '04:32'
+                      });
+                      resetForm();
+                      isUploading = false;
+                      uploadProgress = 0;
+                      showUploadModal = false;
+                    }, 400);
+                  }
+                }, 250);
+              "
+              :disabled="isUploading || !selectedFile || !language"
+              class="py-2 px-3 inline-flex justify-center items-center gap-x-2 text-center bg-blue-600 border border-transparent text-white text-sm font-medium rounded-lg shadow-2xs hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none">
+              <template x-if="isUploading">
+                <span class="inline-flex items-center gap-1.5">
+                  <svg class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Uploading...
+                </span>
+              </template>
+              <template x-if="!isUploading">
+                <span>Upload audio track</span>
+              </template>
+            </button>
+          </div>
+          <!-- End Footer -->
+
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+  <!-- Preline Pro Modal: Edit Audio Track -->
+<!-- Preline Docs: https://preline.co/docs/overlay.html -->
+<div x-show="showEditModal" class="relative z-50" aria-labelledby="edit-modal-title" role="dialog" aria-modal="true" x-cloak>
+  <!-- Backdrop Overlay -->
+  <div x-show="showEditModal" 
+    x-transition:enter="ease-out duration-300" 
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100" 
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100" 
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-gray-500/75 transition-opacity"></div>
+
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+      <div x-show="showEditModal" 
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100 sm:scale-100"
+        x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        @click.away="showEditModal = false"
+        class="w-full sm:max-w-xl bg-white border border-gray-200 rounded-xl pointer-events-auto shadow-xl transition-all text-left">
+        
+        <template x-if="editingTrack">
+          <div>
+            <!-- Header -->
+            <div class="py-2.5 px-4 flex justify-between items-center border-b border-gray-200">
+              <h2 id="edit-modal-title" class="font-medium text-gray-800 text-base">
+                Edit audio track
+              </h2>
+              <button type="button" @click="showEditModal = false"
+                class="size-8 shrink-0 flex justify-center items-center gap-x-2 rounded-full border border-transparent bg-gray-100 text-gray-800 hover:bg-gray-200 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-200" aria-label="Close">
+                <span class="sr-only">Close</span>
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+              </button>
+            </div>
+            <!-- End Header -->
+
+            <!-- Body -->
+            <div class="p-4 space-y-4">
+              
+              <!-- Language Select (Reusable Preline Component) -->
+              <!-- Reusable Preline Searchable Language Select Component (Exact Preline Advanced Select Styling) -->
+<div class="relative" x-data="{
+  open: false,
+  search: '',
+  languages: [
+    { name: 'English', code: 'en' },
+    { name: 'Spanish', code: 'es' },
+    { name: 'Tamil', code: 'ta' },
+    { name: 'Hindi', code: 'hi' },
+    { name: 'Telugu', code: 'te' },
+    { name: 'Malayalam', code: 'ml' },
+    { name: 'Kannada', code: 'kn' },
+    { name: 'Marathi', code: 'mr' },
+    { name: 'Bengali', code: 'bn' },
+    { name: 'French', code: 'fr' },
+    { name: 'German', code: 'de' },
+    { name: 'Arabic', code: 'ar' },
+    { name: 'Japanese', code: 'ja' },
+    { name: 'Portuguese', code: 'pt' },
+    { name: 'Russian', code: 'ru' },
+    { name: 'Chinese', code: 'zh' }
+  ],
+  get selectedLang() {
+    return (typeof editingTrack !== 'undefined' && editingTrack) ? editingTrack.language : language;
+  },
+  get filteredLanguages() {
+    if (!this.search) return this.languages;
+    return this.languages.filter(l => l.name.toLowerCase().includes(this.search.toLowerCase()));
+  },
+  select(lang) {
+    if (typeof editingTrack !== 'undefined' && editingTrack) {
+      editingTrack.language = lang.name;
+      editingTrack.lang_code = lang.code;
+    } else {
+      language = lang.name;
+      if (!trackName) trackName = lang.name;
+    }
+    this.open = false;
+    this.search = '';
+  }
+}" @click.away="open = false">
+  
+  <label class="block mb-1.5 text-sm font-medium text-gray-800">
+    Language <span class="text-red-500">*</span>
+  </label>
+
+  <!-- Trigger Button (Exact Preline style, properly aligned) -->
+  <button type="button" 
+    @click="open = !open; if (open) $nextTick(() => $refs.searchInput.focus());"
+    :disabled="typeof isUploading !== 'undefined' && isUploading"
+    class="relative py-2 px-3 pe-9 flex items-center justify-between w-full cursor-pointer bg-white border border-gray-200 text-gray-800 rounded-lg text-start text-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-xs"
+    aria-haspopup="listbox" :aria-expanded="open">
+    <span x-text="selectedLang || 'Select language...'" :class="!selectedLang ? 'text-gray-400' : 'text-gray-800'" class="truncate text-sm"></span>
+    <div class="absolute top-1/2 end-3 -translate-y-1/2 pointer-events-none flex items-center">
+      <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>
+      </svg>
+    </div>
+  </button>
+
+  <!-- Dropdown Menu Panel (Exact Preline dropdownClasses) -->
+  <div x-show="open" x-cloak
+    x-transition:enter="transition ease-out duration-100"
+    x-transition:enter-start="transform opacity-0 scale-95"
+    x-transition:enter-end="transform opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-75"
+    x-transition:leave-start="transform opacity-100 scale-100"
+    x-transition:leave-end="transform opacity-0 scale-95"
+    class="mt-2 max-h-72 pb-1 px-1 space-y-0.5 z-20 w-full bg-white border border-gray-200 rounded-lg shadow-xl overflow-hidden overflow-y-auto focus:outline-hidden absolute [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 [&::-webkit-scrollbar-thumb]:bg-gray-300">
+    
+    <!-- Search Input Wrapper (Exact Preline searchWrapperClasses & searchClasses) -->
+    <div class="bg-white p-2 -mx-1 sticky top-0">
+      <input type="text" x-ref="searchInput" x-model="search" placeholder="Search..."
+        class="block w-full sm:text-sm bg-transparent border border-gray-200 rounded-lg text-gray-800 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500 py-1.5 sm:py-2 px-3">
+    </div>
+
+    <!-- Options List (Exact Preline optionClasses & optionTemplate - NO checkmark) -->
+    <template x-for="lang in filteredLanguages" :key="lang.name">
+      <button type="button" @click="select(lang)"
+        class="py-2 px-4 w-full text-sm text-gray-800 cursor-pointer hover:bg-gray-100 rounded-lg focus:outline-hidden focus:bg-gray-100 text-start flex items-center"
+        :class="selectedLang === lang.name ? 'bg-gray-100 font-medium' : ''"
+        role="option" :aria-selected="selectedLang === lang.name">
+        <span class="text-gray-800" x-text="lang.name"></span>
+      </button>
+    </template>
+    
+    <template x-if="filteredLanguages.length === 0">
+      <div class="py-3 px-4 text-center text-xs text-gray-400">
+        No matching results
+      </div>
+    </template>
+  </div>
+</div>
+
+
+              <!-- Track Label / Name Input -->
+              <div>
+                <label for="edit-track-name" class="block mb-1.5 text-sm font-medium text-gray-800">
+                  Track Label / Name <span class="text-gray-400 font-normal lowercase">(optional)</span>
+                </label>
+                <input type="text" id="edit-track-name" x-model="editingTrack.name" placeholder="e.g., Director's Commentary"
+                  class="py-2 px-3 block w-full bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+              </div>
+
+              <!-- Default Track Setting (TPStreams Checkbox Pattern) -->
+              <div class="relative flex items-start gap-x-3 pt-1">
+                <div class="flex h-6 items-center">
+                  <input id="edit-set-default-audio" type="checkbox" x-model="editingTrack.is_default"
+                    class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-600 cursor-pointer">
+                </div>
+                <div class="text-sm leading-6">
+                  <label for="edit-set-default-audio" class="font-medium text-gray-800 cursor-pointer select-none">
+                    Set as default audio track
+                  </label>
+                  <p class="text-xs text-gray-500">Plays by default when a viewer starts the video.</p>
+                </div>
+              </div>
+
+            </div>
+            <!-- End Body -->
+
+            <!-- Footer -->
+            <div class="p-4 flex justify-end items-center gap-x-2 border-t border-gray-200">
+              <button type="button" @click="showEditModal = false"
+                class="py-2 px-3 inline-flex justify-center items-center text-center bg-white border border-gray-200 text-gray-800 text-sm font-medium rounded-lg shadow-2xs hover:bg-gray-50 focus:outline-none disabled:opacity-50 disabled:pointer-events-none">
+                Cancel
+              </button>
+              <button type="button" 
+                @click="
+                  saveTrackEdit();
+                  showEditModal = false;
+                "
+                class="py-2 px-3 inline-flex justify-center items-center gap-x-2 text-center bg-blue-600 border border-transparent text-white text-sm font-medium rounded-lg shadow-2xs hover:bg-blue-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none">
+                Save changes
+              </button>
+            </div>
+            <!-- End Footer -->
+
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+  <!-- Preline Modal: Delete Audio Track -->
+<!-- Preline Docs: https://preline.co/docs/overlay.html -->
+<div x-show="showDeleteModal" class="relative z-50" aria-labelledby="delete-modal-title" role="dialog" aria-modal="true" x-cloak>
+  <!-- Backdrop Overlay -->
+  <div x-show="showDeleteModal" 
+    x-transition:enter="ease-out duration-300" 
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100" 
+    x-transition:leave="ease-in duration-200"
+    x-transition:leave-start="opacity-100" 
+    x-transition:leave-end="opacity-0"
+    class="fixed inset-0 bg-gray-500/75 transition-opacity"></div>
+
+  <div class="fixed inset-0 z-10 w-screen overflow-y-auto">
+    <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+      <!-- Modal Panel -->
+      <div x-show="showDeleteModal" 
+        x-transition:enter="ease-out duration-300"
+        x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100" 
+        x-transition:leave="ease-in duration-200"
+        x-transition:leave-start="opacity-100 sm:scale-100"
+        x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+        @click.away="showDeleteModal = false"
+        class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-md border border-gray-100">
+        
+        <template x-if="deletingTrack">
+          <div class="p-6 text-center">
+            
+            <!-- Guard: When trying to delete the only active track -->
+            <template x-if="activeTrackCount <= 1 && deletingTrack.is_active">
+              <div>
+                <!-- Warning Amber Badge -->
+                <div class="flex items-center justify-center w-12 h-12 mx-auto rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 shadow-sm mb-4">
+                  <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                  </svg>
+                </div>
+                
+                <h3 class="text-base font-semibold text-gray-900" id="delete-modal-title">Cannot Delete Audio Track</h3>
+                <p class="mt-2 text-sm text-gray-600">
+                  <span class="font-semibold text-gray-900" x-text="deletingTrack.name"></span> is the only active audio track. A video must always retain at least one active audio track.
+                </p>
+
+                <div class="mt-6 flex items-center justify-center">
+                  <button type="button" @click="showDeleteModal = false"
+                    class="py-2 px-5 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none transition">
+                    Got it
+                  </button>
+                </div>
+              </div>
+            </template>
+
+            <!-- Standard Deletion Confirmation -->
+            <template x-if="activeTrackCount > 1 || !deletingTrack.is_active">
+              <div>
+                <!-- Trash Red Badge -->
+                <div class="flex items-center justify-center w-12 h-12 mx-auto rounded-2xl bg-red-50 text-red-600 border border-red-200 shadow-sm mb-4">
+                  <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                  </svg>
+                </div>
+                
+                <h3 class="text-base font-semibold text-gray-900" id="delete-modal-title">Delete Audio Track?</h3>
+                <p class="mt-2 text-sm text-gray-600">
+                  Are you sure you want to delete <span class="font-semibold text-gray-900" x-text="deletingTrack.name"></span>? This will permanently remove this audio track from player playback.
+                </p>
+
+                <div class="mt-6 flex items-center justify-center gap-x-3">
+                  <button type="button" @click="showDeleteModal = false"
+                    class="py-2 px-4 text-sm font-medium rounded-lg border border-gray-300 bg-white text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none transition">
+                    Cancel
+                  </button>
+                  <button type="button" 
+                    @click="
+                      confirmDeleteTrack();
+                      showDeleteModal = false;
+                    "
+                    class="py-2 px-4 text-sm font-semibold rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition">
+                    Delete Track
+                  </button>
+                </div>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+</div>
+
