@@ -115,8 +115,11 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     const first = cellAt(range.top, range.left)
     const last = cellAt(range.bottom - 1, range.right - 1)
     if (!table || !first || !last) return hideAll()
-    tableDom = table
-    const t = table.getBoundingClientRect()
+    // Anchor everything to the *visible* box (the scrolling wrapper), not the full table width:
+    // a wide table is wider than the editor and scrolls sideways inside its wrapper.
+    const wrap = table.closest('.tableWrapper') || table
+    tableDom = wrap
+    const t = wrap.getBoundingClientRect()
     const f = first.getBoundingClientRect()
     const l = last.getBoundingClientRect()
     const sel = { left: f.left, right: l.right, top: f.top, bottom: l.bottom }
@@ -124,9 +127,12 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     if (t.bottom < s.top + 4 || t.top > s.bottom - 4) return hideAll() // scrolled out of view
     buttons.forEach((b) => (b.hidden = false))
     const topVisible = t.top - 18 >= s.top
-    colGrip.hidden = !topVisible
-    place(colGrip, (sel.left + sel.right) / 2 - 14, t.top - 17, 28, 14)
-    place(rowGrip, t.left - 19, (sel.top + sel.bottom) / 2 - 14, 14, 28)
+    // column grip: centred over the selection, kept inside the visible part; hidden if scrolled out
+    const cx = (Math.max(sel.left, t.left) + Math.min(sel.right, t.right)) / 2
+    colGrip.hidden = !topVisible || sel.right < t.left + 8 || sel.left > t.right - 8
+    place(colGrip, Math.min(Math.max(cx - 14, t.left), t.right - 28), t.top - 17, 28, 14)
+    const cy = (Math.max(sel.top, t.top) + Math.min(sel.bottom, t.bottom)) / 2
+    place(rowGrip, t.left - 19, Math.min(Math.max(cy - 14, t.top), t.bottom - 28), 14, 28)
     place(addRowBtn, t.left, t.bottom + 3, t.width, 14)
     // keep the column strip inside the editor area even when the table fills the whole width
     place(addColBtn, Math.min(t.right + 3, s.right - 17), t.top, 14, t.height)
