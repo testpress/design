@@ -136,6 +136,33 @@
   .dark .lib-confirm__text strong { color: #fecaca; } .dark .lib-confirm__text span { color: #fca5a5; }
   .dark .lib-no { background: #333; border-color: #444; color: #e5e7eb; }
   .lib-yes:focus-visible, .lib-no:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
+  /* select mode, bulk delete, per-row delete, undo */
+  .list-pane__head[hidden], .select-bar[hidden] { display: none; }
+  .icon-btn { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: #6b7280; }
+  .icon-btn:hover, .icon-btn[aria-pressed="true"] { background: #eceff2; color: #111827; }
+  .icon-btn:focus-visible, .editor-top__icon:focus-visible, .row-del:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
+  .select-bar { display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 10px; }
+  .select-bar__count { font-size: 14px; font-weight: 600; color: #111827; flex: 1; }
+  .select-bar__link { font-size: 13px; color: var(--p700); font-weight: 600; padding: 4px 6px; border-radius: 6px; }
+  .select-bar__link:hover { background: var(--p50); }
+  .select-bar__delete { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px; background: #dc2626; color: #fff; font-size: 13px; font-weight: 600; }
+  .select-bar__delete:hover:not(:disabled) { background: #b91c1c; }
+  .select-bar__delete:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
+  .select-bar__link:focus-visible, .select-bar__delete:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
+  .note-row__check { width: 16px; height: 16px; margin-inline-end: 8px; flex: none; border: 1.5px solid #cbd0d6; border-radius: 5px; display: grid; place-items: center; font-size: 11px; line-height: 1; color: #fff; align-self: center; }
+  .note-row__check.is-on { background: var(--p600); border-color: var(--p600); }
+  .note-row.has-check .note-row__sub { padding-inline-start: 24px; }
+  .note-row.is-selected { background: var(--p50); }
+  .row-del { position: absolute; right: 12px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: #6b7280; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,.06); z-index: 3; }
+  .row-del:hover { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  .row-del[hidden] { display: none; }
+  .list-pane__scroll { position: relative; }
+  .editor-top__icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #9ca3af; }
+  .editor-top__icon:hover { background: #fef2f2; color: #b91c1c; }
+  .undo-toast { display: flex; align-items: center; gap: 14px; z-index: 96; bottom: 24px; padding: 8px 8px 8px 16px; }
+  .undo-toast[hidden] { display: none; }
+  .undo-toast__btn { height: 28px; padding: 0 12px; border-radius: 6px; background: rgba(255,255,255,.14); color: #fff; font-weight: 600; font-size: 13px; }
+  .undo-toast__btn:hover, .undo-toast__btn:focus-visible { background: rgba(255,255,255,.26); outline: none; }
   .list-pane__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; }
   .list-pane__foot { display: flex; align-items: center; gap: 6px; padding: 10px 16px; font-size: 12px; color: #9ca3af; border-top: 1px solid #eee; }
   .list-group { padding: 14px 10px 4px; font-size: 12px; font-weight: 500; color: #9ca3af; }
@@ -533,7 +560,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-9962">
+         aria-describedby="tooltip-1261">
       
           <button type="button" @click="$dispatch('open-drawer-student-chat-drawer')" class="relative shrink-0 h-8 w-8 inline-flex justify-center items-center border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:bg-gray-100 dark:focus:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none" aria-label="Messages">
             <i data-lucide="message-circle" class="shrink-0 size-4"></i>
@@ -551,7 +578,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-9962"
+         id="tooltip-1261"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -995,9 +1022,18 @@
         <h1 class="text-base font-semibold text-gray-900 dark:text-white">My Notes</h1>
         <span id="notes-count" class="text-sm text-gray-400">0</span>
       </div>
-      <button id="new-note" type="button" class="btn-new">
-        <i data-lucide="square-pen" class="size-4"></i>New note
-      </button>
+      <div class="flex items-center gap-1.5">
+        <button id="select-mode" type="button" class="icon-btn" aria-pressed="false" aria-label="Select notes" title="Select notes"><i data-lucide="list-checks" class="size-4"></i></button>
+        <button id="new-note" type="button" class="btn-new">
+          <i data-lucide="square-pen" class="size-4"></i>New note
+        </button>
+      </div>
+    </div>
+    <div id="select-bar" class="select-bar" hidden>
+      <button id="select-cancel" type="button" class="icon-btn" aria-label="Cancel selection"><i data-lucide="x" class="size-4"></i></button>
+      <span id="select-count" class="select-bar__count" role="status" aria-live="polite">0 selected</span>
+      <button id="select-all" type="button" class="select-bar__link">Select all</button>
+      <button id="select-delete" type="button" class="select-bar__delete" disabled><i data-lucide="trash-2" class="size-4"></i>Delete</button>
     </div>
     <div class="px-3 pb-2">
       <label class="search">
@@ -1036,6 +1072,7 @@
         <span class="flex-1"></span>
         <button id="help-open" type="button" class="editor-top__help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts"><i data-lucide="keyboard" class="size-4"></i><kbd>⌘/</kbd></button>
         <div id="save-status" class="save-status" role="status" aria-live="polite"></div>
+        <button id="delete-note" type="button" class="editor-top__icon" aria-label="Delete note" title="Delete note"><i data-lucide="trash-2" class="size-4"></i></button>
         <button id="new-note-m" type="button" class="editor-top__new" aria-label="New note"><i data-lucide="square-pen" class="size-5"></i></button>
       </header>
 
@@ -1061,6 +1098,9 @@
     <div id="mobile-tray" class="mbar__tray" hidden></div>
     <div id="mobile-row" class="mbar__row"></div>
   </div>
+
+  <!-- Undo toast for deletes: lives at app level so it also shows on the phone's list screen -->
+  <div id="undo-toast" class="toast undo-toast" role="status" hidden><span id="undo-text"></span><button id="undo-btn" type="button" class="undo-toast__btn">Undo</button></div>
 
   <!-- Leave sheet when a save failed -->
   <div id="leave-dialog" class="sheet" hidden>
