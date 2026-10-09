@@ -1,4 +1,5 @@
 import { NotesStore } from './store.js'
+import { refreshIcons } from './icons.js'
 import { SaveQueue, serverSim } from './save-queue.js'
 import { createNotesEditor, stateForDoc } from './editor.js'
 import { BLOCKS, DIVIDER, turnInto, insertDivider, currentBlockLabel, applyLink, MARKS, indentList, inList } from './blocks.js'
@@ -7,7 +8,6 @@ import { TextSelection, Selection } from '@tiptap/pm/state'
 const $ = (sel, root = document) => root.querySelector(sel)
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const icon = (name, cls = 'size-4') => `<i data-lucide="${name}" class="${cls}"></i>`
-const refreshIcons = (root) => window.lucide && window.lucide.createIcons(root ? { nodes: [root] } : undefined)
 const mq = window.matchMedia('(max-width: 1023px)')
 const isMobile = () => mq.matches
 const isMac = /Mac|iPhone|iPad/.test(navigator.platform)
@@ -380,28 +380,33 @@ function renderBubble(force = false) {
   }
   if (bubble.mode === 'link' && !force) return
   const ed = editor
-  let html = ''
-  if (bubble.mode === 'main') {
-    html = `<button type="button" data-act="turn" class="bm-btn bm-btn--text" aria-haspopup="menu">${esc(currentBlockLabel(ed))}${icon('chevron-down', 'size-3.5')}</button>
+  // The toolbar row is always rendered; "Turn into", "More" and the link field open as a panel
+  // *below* it, so Bold/Italic/Highlight/Link stay visible while a menu is open.
+  const open = bubble.mode
+  const bar = `<div class="bm-bar">
+      <button type="button" data-act="turn" class="bm-btn bm-btn--text ${open === 'turn' ? 'is-open' : ''}" aria-haspopup="menu" aria-expanded="${open === 'turn'}">${esc(currentBlockLabel(ed))}${icon('chevron-down', 'size-3.5')}</button>
       <span class="bm-sep"></span>
       ${btn('bold', 'bold', 'Bold', MARKS.bold.active(ed))}
       ${btn('italic', 'italic', 'Italic', MARKS.italic.active(ed))}
       ${btn('highlight', 'highlighter', 'Highlight', MARKS.highlight.active(ed))}
-      ${btn('link', 'link', 'Link', ed.isActive('link'))}
-      ${btn('more', 'ellipsis', 'More', false)}`
-  } else if (bubble.mode === 'turn') {
-    html = `<div class="bm-menu" role="menu">${BLOCKS.map((b) => `<button type="button" role="menuitem" data-turn="${b.id}" class="bm-item ${b.active(ed) ? 'is-on' : ''}">${icon(b.icon)}<span>${b.label}</span>${b.active(ed) ? icon('check', 'size-3.5 ms-auto') : ''}</button>`).join('')}</div>`
-  } else if (bubble.mode === 'more') {
-    html = `<div class="bm-menu" role="menu">
+      ${btn('link', 'link', 'Link', ed.isActive('link') || open === 'link')}
+      ${btn('more', 'ellipsis', 'More', open === 'more')}
+    </div>`
+  let pop = ''
+  if (open === 'turn') {
+    pop = `<div class="bm-pop bm-menu" role="menu">${BLOCKS.map((b) => `<button type="button" role="menuitem" data-turn="${b.id}" class="bm-item ${b.active(ed) ? 'is-on' : ''}">${icon(b.icon)}<span>${b.label}</span>${b.active(ed) ? icon('check', 'size-3.5 ms-auto') : ''}</button>`).join('')}</div>`
+  } else if (open === 'more') {
+    pop = `<div class="bm-pop bm-menu" role="menu">
       <button type="button" role="menuitem" data-act="strike" class="bm-item ${MARKS.strike.active(ed) ? 'is-on' : ''}">${icon('strikethrough')}<span>Strikethrough</span></button>
       <button type="button" role="menuitem" data-act="code" class="bm-item ${MARKS.code.active(ed) ? 'is-on' : ''}">${icon('code')}<span>Inline code</span></button></div>`
-  } else if (bubble.mode === 'link') {
+  } else if (open === 'link') {
     const href = ed.getAttributes('link').href || ''
-    html = `<form class="bm-link" data-link-form>${icon('link', 'size-4 text-gray-400')}
+    pop = `<form class="bm-pop bm-link" data-link-form>${icon('link', 'size-4 text-gray-400')}
       <input type="text" inputmode="url" autocomplete="off" aria-label="Link address" placeholder="Paste or type a link" value="${esc(href)}" class="bm-input">
       <button type="submit" class="bm-apply">Apply</button>
       ${href ? `<button type="button" data-act="unlink" class="bm-btn" aria-label="Remove link">${icon('unlink')}</button>` : ''}</form>`
   }
+  const html = bar + pop
   if (bubbleEl.dataset.html !== html) {
     bubble.rendering = true // replacing the focused button fires focusout; that is not the user leaving
     bubbleEl.innerHTML = html
@@ -414,8 +419,8 @@ function renderBubble(force = false) {
     else if (bubble.kbd) {
       const target =
         bubble.mode === 'main'
-          ? (bubble.focusAct && bubbleEl.querySelector(`[data-act="${bubble.focusAct}"]`)) || bubbleEl.querySelector('.bm-btn')
-          : bubbleEl.querySelector('.bm-item.is-on') || bubbleEl.querySelector('.bm-item')
+          ? (bubble.focusAct && bubbleEl.querySelector(`.bm-bar [data-act="${bubble.focusAct}"]`)) || bubbleEl.querySelector('.bm-bar .bm-btn')
+          : bubbleEl.querySelector('.bm-pop .bm-item.is-on') || bubbleEl.querySelector('.bm-pop .bm-item')
       target?.focus()
     }
     // size changed -> reposition
@@ -474,11 +479,12 @@ bubbleEl.addEventListener('keydown', (e) => {
     editor.commands.focus()
     return
   }
-  if (bubble.mode === 'link') return // the address field uses normal text editing keys
-  const items = [...bubbleEl.querySelectorAll(bubble.mode === 'main' ? '.bm-btn' : '.bm-item')]
+  if (document.activeElement?.tagName === 'INPUT') return // the address field uses normal text editing keys
+  const inPop = !!document.activeElement?.closest('.bm-pop')
+  const items = [...bubbleEl.querySelectorAll(inPop ? '.bm-pop .bm-item' : '.bm-bar .bm-btn')]
   const i = items.indexOf(document.activeElement)
   if (i < 0) return
-  const horizontal = bubble.mode === 'main'
+  const horizontal = !inPop
   const go = (n) => {
     e.preventDefault()
     items[(n + items.length) % items.length].focus()
@@ -488,10 +494,16 @@ bubbleEl.addEventListener('keydown', (e) => {
   else if (e.key === 'Home') go(0)
   else if (e.key === 'End') go(items.length - 1)
   else if (!horizontal && e.key === 'ArrowLeft') {
-    // leave the sub-menu, landing back on the button that opened it
+    // leave the panel, landing back on the button that opened it
     e.preventDefault()
     bubble.kbd = true
     setBubbleMode('main')
+  } else if (horizontal && e.key === 'ArrowDown' && (document.activeElement.dataset.act === 'turn' || document.activeElement.dataset.act === 'more')) {
+    // open the menu under the focused button
+    e.preventDefault()
+    bubble.kbd = true
+    bubble.focusAct = document.activeElement.dataset.act
+    setBubbleMode(document.activeElement.dataset.act)
   } else if (e.key === 'Tab') {
     e.preventDefault()
     bubble.kbd = false

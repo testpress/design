@@ -9,6 +9,7 @@ import Suggestion, { SuggestionPluginKey } from '@tiptap/suggestion'
 import { Plugin, PluginKey, TextSelection, EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { BLOCKS, DIVIDER, turnInto, insertDivider } from './blocks.js'
+import { refreshIcons } from './icons.js'
 
 // ---- Document shape: one title line + blocks, in a single editing surface. -------------------
 const Doc = Node.create({ name: 'doc', topNode: true, content: 'title block+' })
@@ -106,7 +107,7 @@ function metaPlugin(getMeta) {
               if (meta.folder) parts.push(`<span class="note-meta__folder"><i data-lucide="folder" class="size-3.5"></i>${meta.folder}</span>`)
               meta.tags.forEach((t) => parts.push(`<span class="note-meta__tag">#${t}</span>`))
               el.innerHTML = parts.join('')
-              if (window.lucide) window.lucide.createIcons({ nodes: [el] })
+              refreshIcons(el)
               return el
             }
             return DecorationSet.create(state.doc, [Decoration.widget(state.doc.firstChild.nodeSize, widget, { key, side: -1, ignoreSelection: true })])
@@ -140,7 +141,7 @@ function slashRenderer() {
           )
           .join('')
       : '<div class="slash-empty">No matching blocks</div>'
-    if (window.lucide) window.lucide.createIcons({ nodes: [el] })
+    refreshIcons(el)
     highlightIndex(false)
   }
 
