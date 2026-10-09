@@ -90,6 +90,15 @@ export function buildDoc(title, blocks) {
       })
     else if (kind === 'quote') content.push({ type: 'blockquote', content: [para(val)] })
     else if (kind === 'hr') content.push({ type: 'horizontalRule' })
+    else if (kind === 'callout') content.push({ type: 'callout', content: [para(val)] })
+    else if (kind === 'table')
+      content.push({
+        type: 'table',
+        content: val.map((row, r) => ({
+          type: 'tableRow',
+          content: row.map((cell) => ({ type: r === 0 ? 'tableHeader' : 'tableCell', attrs: { colspan: 1, rowspan: 1, colwidth: null }, content: [para(cell)] })),
+        })),
+      })
   })
   if (content.length === 1) content.push({ type: 'paragraph' })
   return { type: 'doc', content }

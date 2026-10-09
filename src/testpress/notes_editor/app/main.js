@@ -4,6 +4,7 @@ import { createTableUI } from './table-ui.js'
 import { createMetaUI } from './meta-ui.js'
 import { createFiltersUI } from './filters-ui.js'
 import { createNavUI } from './nav-ui.js'
+import { sharedNotes } from './shared.js'
 import { CellSelection } from '@tiptap/pm/tables'
 import { SaveQueue, serverSim } from './save-queue.js'
 import { createNotesEditor, stateForDoc } from './editor.js'
@@ -35,6 +36,11 @@ let query = ''
 let editorFocused = false
 const stateCache = new Map()
 let savedFlash = null
+let space = 'mine' // 'mine' | 'shared'
+let currentShared = null
+let lastMineId = null
+const SHARED = sharedNotes()
+const sharedStates = new Map()
 let selectMode = false
 const selected = new Set()
 let anchorId = null
@@ -126,7 +132,34 @@ function visibleIds() {
   })
 }
 
+const sharedDate = (ts) => new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short' })
+
+function sharedVisible() {
+  return SHARED.filter((s) => !query || s.title.toLowerCase().includes(query) || s.from.toLowerCase().includes(query)).sort((a, b) => b.sharedAt - a.sharedAt)
+}
+
+function renderSharedList() {
+  const ids = sharedVisible()
+  $('#notes-count').textContent = SHARED.length
+  if (!ids.length) {
+    listEl.innerHTML = query
+      ? `<div class="list-empty"><p class="font-medium text-gray-800">No shared notes match “${esc(query)}”</p><p class="text-gray-500">Search covers titles and who shared them.</p></div>`
+      : '<div class="list-empty"><p class="font-medium text-gray-800">Nothing shared with you yet</p><p class="text-gray-500">When a mentor shares a note, it shows up here.</p></div>'
+    return
+  }
+  const focusedId = document.activeElement?.closest?.('.note-row')?.dataset.id
+  listEl.innerHTML = ids
+    .map(
+      (s) => `<button type="button" role="option" aria-selected="${s.id === currentShared}" data-id="${s.id}" class="note-row ${s.id === currentShared ? 'is-active' : ''}">
+        <span class="note-row__top"><span class="note-row__title">${highlight(s.title, query)}</span><span class="note-row__time">${sharedDate(s.sharedAt)}</span></span>
+        <span class="note-row__sub">${highlight(s.from, query)} · ${esc(s.role)}</span></button>`
+    )
+    .join('')
+  if (focusedId) listEl.querySelector(`[data-id="${focusedId}"]`)?.focus({ preventScroll: true })
+}
+
 function renderList() {
+  if (space === 'shared') return renderSharedList()
   const matches = (id) => {
     const n = store.get(id)
     return n && filters.matches(n)
@@ -187,6 +220,7 @@ listEl.addEventListener('keydown', (e) => {
   const i = rows.indexOf(document.activeElement)
   if (i < 0) return
   const id = rows[i].dataset.id
+  if (space === 'shared' && (e.key === 'Delete' || e.key === 'Backspace' || (e.metaKey || e.ctrlKey))) return // read-only space
   if (e.key === 'Delete' || e.key === 'Backspace') {
     // delete the picked notes in select mode, otherwise the focused one; Undo covers slips
     e.preventDefault()
@@ -410,7 +444,7 @@ rowDel.hidden = true
 $('#notes-list-scroll').appendChild(rowDel)
 let rowDelId = null
 function placeRowDel(row) {
-  if (!row || selectMode) return (rowDel.hidden = true)
+  if (!row || selectMode || space === 'shared') return (rowDel.hidden = true) // shared notes are read-only
   const sc = $('#notes-list-scroll')
   const r = row.getBoundingClientRect()
   const s = sc.getBoundingClientRect()
@@ -493,10 +527,18 @@ new ResizeObserver(() => applyStage()).observe(app)
 function renderListHeader() {
   const s = Number(app.dataset.stage || 1)
   const f = filters.state.folder
+  const shared = space === 'shared'
   $('#list-title').hidden = s >= 2
   $('#space-switch').hidden = s === 1
-  $('#list-title-text').textContent = f || (filters.state.tags.size ? 'Filtered notes' : 'All notes')
-  $('#space-switch-text').textContent = 'My Notes'
+  $('#list-title-text').textContent = shared ? 'Shared with Me' : f || (filters.state.tags.size ? 'Filtered notes' : 'All notes')
+  $('#space-switch-text').textContent = shared ? 'Shared with Me' : 'My Notes'
+  app.dataset.space = space
+  $('#space-mine').classList.toggle('is-active', !shared)
+  $('#space-shared').classList.toggle('is-active', shared)
+  $('#space-mine').toggleAttribute('aria-current', !shared)
+  $('#space-shared').toggleAttribute('aria-current', shared)
+  $('#nav-foot-text').textContent = shared ? 'Shared by mentors · read-only' : 'Only you can see your notes'
+  searchEl.placeholder = shared ? 'Search shared notes' : 'Search notes'
 }
 
 // ---- tiny popup menus (sort, space, note options)
@@ -557,7 +599,7 @@ $('#sort-menu').addEventListener('click', (e) => {
   listEl.querySelector('[data-sort-btn]')?.focus()
 })
 $('#note-menu-btn').addEventListener('click', () => (miniMenu === $('#note-menu') ? closeMiniMenu(true) : openMiniMenu($('#note-menu'), $('#note-menu-btn'), 'end')))
-$('#space-switch').addEventListener('click', () => (miniMenu === $('#space-menu') ? closeMiniMenu(true) : openMiniMenu($('#space-menu'), $('#space-switch'), 'start', () => 'mine')))
+$('#space-switch').addEventListener('click', () => (miniMenu === $('#space-menu') ? closeMiniMenu(true) : openMiniMenu($('#space-menu'), $('#space-switch'), 'start', () => space)))
 $('#space-menu').addEventListener('click', (e) => {
   const b = e.target.closest('[data-space]')
   if (b && !b.disabled) {
@@ -565,10 +607,75 @@ $('#space-menu').addEventListener('click', (e) => {
     switchSpace(b.dataset.space)
   }
 })
-// spaces: My Notes is the only one until Shared with Me lands
-function switchSpace() {}
+// ---- Spaces: My Notes (editable) and Shared with Me (read-only) never share a list or editor state
+async function switchSpace(which) {
+  if (which === space) return
+  if (which === 'shared') {
+    if (!(await guardedLeave())) return
+    if (currentId) {
+      lastMineId = currentId
+      leaveCurrent()
+    }
+    currentId = null
+    space = 'shared'
+    query = ''
+    searchEl.value = ''
+    setSelectMode(false)
+    renderListHeader()
+    renderList()
+    if (!isMobile() && SHARED.length) openShared(sharedVisible()[0].id)
+    else showEmptyEditor()
+  } else {
+    leaveShared()
+    space = 'mine'
+    query = ''
+    searchEl.value = ''
+    renderListHeader()
+    reorder()
+    renderList()
+    const back = lastMineId && store.get(lastMineId) ? lastMineId : order[0]
+    if (!isMobile() && back) openNote(back)
+    else showEmptyEditor()
+  }
+}
+
+function openShared(id) {
+  const s = SHARED.find((x) => x.id === id)
+  if (!s) return
+  currentShared = id
+  let st = sharedStates.get(id)
+  if (!st) {
+    st = stateForDoc(editor, s.doc)
+    sharedStates.set(id, st)
+  }
+  editor.setEditable(false, false) // read-only: no caret, no formatting UI
+  editor.view.updateState(st)
+  showEditorView()
+  renderListHeader()
+  renderStatus()
+  renderList()
+  refreshMetaLine()
+  $('#editor-scroll').scrollTop = 0
+  history.replaceState(null, '', location.pathname + '#' + id)
+}
+
+function leaveShared() {
+  if (space !== 'shared') return
+  currentShared = null
+  editor.setEditable(true, false)
+}
+
+// links in a read-only note open normally (in the editor they are edited, not followed)
+$('#editor-mount').addEventListener('click', (e) => {
+  const a = e.target.closest('a[href]')
+  if (a && space === 'shared') {
+    e.preventDefault()
+    window.open(a.href, '_blank', 'noopener')
+  }
+})
 $('#space-mine').addEventListener('click', () => switchSpace('mine'))
 $('#space-shared').addEventListener('click', () => switchSpace('shared'))
+$('#space-menu').addEventListener('keydown', () => {})
 
 // folders + tags in the nav pane
 navUI = createNavUI({ store, filters, foldersEl: $('#nav-folders'), tagsEl: $('#nav-tags'), newFolderBtn: $('#nav-new-folder'), tagsMenuBtn: $('#nav-tags-menu') })
@@ -578,6 +685,11 @@ document.querySelectorAll('#stage-switch [data-stage]').forEach((b) => b.addEven
 
 // ---- Save status -----------------------------------------------------------------------------
 function renderStatus() {
+  if (space === 'shared') {
+    statusEl.innerHTML = ''
+    strip.hidden = true
+    return
+  }
   const st = currentId ? queue.stateOf(currentId) : 'idle'
   const text = { saving: 'Saving…', still: 'Still saving…', error: 'Not saved', idle: savedFlash === currentId ? 'Saved' : '' }[st]
   statusEl.dataset.state = st
@@ -610,6 +722,10 @@ const editor = createNotesEditor({
   bubbleEl,
   isMobile,
   getMeta: () => {
+    if (space === 'shared') {
+      const s = SHARED.find((x) => x.id === currentShared)
+      return s ? { id: s.id, folder: null, tags: [], shared: { from: s.from, role: s.role, date: sharedDate(s.sharedAt) } } : null
+    }
     const n = currentId && store.get(currentId)
     return n ? { id: n.id, folder: n.folder, tags: n.tags || [] } : null
   },
@@ -738,7 +854,8 @@ async function guardedLeave() {
   return choice === 'leave'
 }
 
-function newNote() {
+async function newNote() {
+  if (space === 'shared') await switchSpace('mine')
   guardedLeave().then((ok) => {
     if (!ok) return
     const id = store.create({ folder: filters.state.folder, tags: [...filters.state.tags] })
@@ -750,6 +867,10 @@ $('#new-note').addEventListener('click', newNote)
 $('#new-note-m')?.addEventListener('click', newNote)
 
 listEl.addEventListener('click', (e) => {
+  if (space === 'shared') {
+    const r = e.target.closest('[data-id]')
+    return r && openShared(r.dataset.id)
+  }
   if (e.target.closest('[data-clear-filters]')) return filters.clear()
   const sortBtn = e.target.closest('[data-sort-btn]')
   if (sortBtn) return openMiniMenu($('#sort-menu'), sortBtn, 'start', () => sortBy)
@@ -771,6 +892,12 @@ function showEditorView() {
 }
 
 $('#back-to-list').addEventListener('click', async () => {
+  if (space === 'shared') {
+    currentShared = null
+    showEmptyEditor()
+    renderList()
+    return
+  }
   if (!(await guardedLeave())) return
   const id = currentId
   if (id) {
@@ -1325,6 +1452,11 @@ if (store.restored.length) {
   setTimeout(() => (toast.hidden = true), 6000)
 }
 const hash = location.hash.slice(1)
-if (!isMobile()) openNote(store.get(hash) ? hash : order[0])
+if (SHARED.some((s) => s.id === hash)) {
+  space = 'shared'
+  renderListHeader()
+  renderList()
+  openShared(hash)
+} else if (!isMobile()) openNote(store.get(hash) ? hash : order[0])
 else if (store.get(hash)) openNote(hash)
 else app.dataset.view = 'list'

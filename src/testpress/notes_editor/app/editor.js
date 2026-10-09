@@ -131,9 +131,18 @@ function metaPlugin(getMeta) {
           decorations(state) {
             const meta = getMeta()
             if (!meta) return null
-            const key = `meta:${meta.id}:${meta.folder}:${meta.tags.join(',')}`
+            const key = `meta:${meta.id}:${meta.shared ? 's' : ''}${meta.folder}:${meta.tags.join(',')}`
             const widget = () => {
               const el = document.createElement('div')
+              if (meta.shared) {
+                // Shared with Me: who shared it, plus a quiet Read-only label. Nothing here is editable.
+                const el = document.createElement('div')
+                el.className = 'note-meta note-meta--shared'
+                el.setAttribute('contenteditable', 'false')
+                el.innerHTML = `<span class="note-meta__from">Shared by ${esc(meta.shared.from)} · ${esc(meta.shared.role)} · ${esc(meta.shared.date)}</span><span class="note-meta__ro"><i data-lucide="lock" class="size-3"></i>Read-only</span>`
+                refreshIcons(el)
+                return el
+              }
               const empty = !meta.folder && !meta.tags.length
               el.className = 'note-meta' + (empty ? ' note-meta--empty' : '')
               el.setAttribute('contenteditable', 'false')
