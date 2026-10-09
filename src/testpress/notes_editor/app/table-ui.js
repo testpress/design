@@ -9,7 +9,7 @@ import { refreshIcons } from './icons.js'
 
 const DOTS_H = '<svg width="14" height="6" viewBox="0 0 14 6" fill="currentColor" aria-hidden="true"><circle cx="2" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/><circle cx="12" cy="3" r="1.2"/></svg>'
 const DOTS_V = '<svg width="6" height="14" viewBox="0 0 6 14" fill="currentColor" aria-hidden="true"><circle cx="3" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/></svg>'
-const PLUS = '<svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9"/></svg>'
+const PLUS = '<svg width="10" height="10" viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M6 1.5v9M1.5 6h9"/></svg>'
 
 export function createTableUI({ editor, host, scroller, isMobile }) {
   const mk = (cls, html, label, extra = {}) => {
@@ -103,9 +103,10 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     colGrip.hidden = !topVisible
     place(colGrip, c.left + c.width / 2 - 14, t.top - 17, 28, 14)
     place(rowGrip, t.left - 19, c.top + c.height / 2 - 14, 14, 28)
-    place(addRowBtn, t.left, t.bottom + 4, t.width, 20)
-    place(addColBtn, t.right + 4, t.top, 20, t.height)
-    addRowBtn.hidden = t.bottom + 24 > s.bottom
+    place(addRowBtn, t.left, t.bottom + 3, t.width, 14)
+    // keep the column strip inside the editor area even when the table fills the whole width
+    place(addColBtn, Math.min(t.right + 3, s.right - 17), t.top, 14, t.height)
+    addRowBtn.hidden = t.bottom + 18 > s.bottom
     if (openKind) positionMenu()
   }
 
