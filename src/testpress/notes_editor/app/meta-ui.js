@@ -59,7 +59,7 @@ export function createMetaUI({ editor, store, getCurrentId, onChange }) {
       opts = all.filter((t) => !typed || t.includes(typed)).map((t) => ({ id: 't:' + t, label: '#' + t, value: t }))
       if (typed && !have.has(typed) && !all.includes(typed)) opts.push({ id: 'new', label: `Create “#${typed}”`, value: typed, create: true })
     }
-    index = Math.min(index, Math.max(0, opts.length - 1))
+    index = Math.min(index, opts.length - 1) // -1 = nothing highlighted yet
     return opts
   }
 
@@ -86,7 +86,7 @@ export function createMetaUI({ editor, store, getCurrentId, onChange }) {
       input.focus()
       input.setSelectionRange(input.value.length, input.value.length)
     }
-    input.setAttribute('aria-activedescendant', opts.length ? 'meta-o' + index : '')
+    input.setAttribute('aria-activedescendant', index >= 0 && opts.length ? 'meta-o' + index : '')
     pop.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' })
     position()
   }
@@ -96,7 +96,7 @@ export function createMetaUI({ editor, store, getCurrentId, onChange }) {
     if (kind === which && anchor === el && !pop.hidden) return close(true)
     kind = which
     anchor = el
-    index = 0
+    index = -1
     pop.hidden = false
     pop.innerHTML = ''
     paint()
@@ -122,7 +122,7 @@ export function createMetaUI({ editor, store, getCurrentId, onChange }) {
       store.setMeta(id, { tags: [...(n.tags || []), o.value] })
       onChange(id)
       pop.querySelector('input').value = ''
-      index = 0
+      index = -1
       anchor = document.querySelector('.note-meta__add') || anchor
       paint()
     }
@@ -160,7 +160,7 @@ export function createMetaUI({ editor, store, getCurrentId, onChange }) {
     if (o) choose(opts[+o.dataset.i])
   })
   pop.addEventListener('input', () => {
-    index = 0
+    index = pop.querySelector('input').value.trim() ? 0 : -1
     const keep = pop.querySelector('input').value
     paint()
     pop.querySelector('input').value = keep
@@ -175,7 +175,7 @@ export function createMetaUI({ editor, store, getCurrentId, onChange }) {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault()
       if (!opts.length) return
-      index = (index + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length
+      index = index < 0 ? (e.key === 'ArrowDown' ? 0 : opts.length - 1) : (index + (e.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length
       pop.querySelectorAll('.meta-opt').forEach((n, i) => {
         n.classList.toggle('is-active', i === index)
         n.setAttribute('aria-selected', i === index)

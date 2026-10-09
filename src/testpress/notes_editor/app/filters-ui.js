@@ -73,7 +73,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     const input = pop.querySelector('input')
     const query = keepQuery && input ? input.value : ''
     rows = build(query)
-    index = Math.min(index, Math.max(0, rows.length - 1))
+    index = Math.min(index, rows.length - 1) // -1 = nothing highlighted yet
     const title = kind === 'folder' ? 'Folders' : 'Tags'
     pop.setAttribute('aria-label', title)
     const body = rows.length
@@ -96,7 +96,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
       r?.select()
     }
     if (mode.type === 'confirm') pop.querySelector('[data-confirm="yes"]')?.focus()
-    el.setAttribute('aria-activedescendant', rows.length ? 'lib-o' + index : '')
+    el.setAttribute('aria-activedescendant', index >= 0 && rows.length ? 'lib-o' + index : '')
     // keep the confirmation card (or the highlighted row) fully inside the scrolling list
     ;(pop.querySelector('.lib-confirm') || pop.querySelector('.is-active'))?.scrollIntoView({ block: 'nearest' })
     position()
@@ -173,7 +173,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     if (!pop.hidden && kind === which) return close(true)
     kind = which
     anchor = el
-    index = 0
+    index = -1 // nothing is highlighted until you hover, press an arrow key or type
     mode = { type: 'browse' }
     pop.hidden = false
     el.setAttribute('aria-expanded', 'true')
@@ -234,7 +234,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
   })
   pop.addEventListener('input', (e) => {
     if (e.target.classList.contains('lib-rename')) return
-    index = 0
+    index = pop.querySelector('input').value.trim() ? 0 : -1 // searching: first match, so Enter works
     paint()
   })
   pop.addEventListener('keydown', (e) => {
@@ -275,7 +275,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault()
       if (!rows.length) return
-      index = (index + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length
+      index = index < 0 ? (e.key === 'ArrowDown' ? 0 : rows.length - 1) : (index + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length
       pop.querySelectorAll('.lib-row').forEach((n, i) => {
         n.classList.toggle('is-active', i === index)
       })
@@ -283,7 +283,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
       pop.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' })
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      activate(rows[index])
+      if (index >= 0) activate(rows[index])
     } else if (e.key === 'F2' && rows[index] && !rows[index].fixed) {
       e.preventDefault()
       mode = { type: 'rename', key: rows[index].key }
