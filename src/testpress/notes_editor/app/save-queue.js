@@ -13,7 +13,7 @@ export const serverSim = {
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         if (this.settings().fail) return reject(new Error('Simulated network failure'))
-        storage.set('server:' + note.id, { id: note.id, doc: note.doc, rev: note.rev, at: Date.now() })
+        storage.set('server:' + note.id, { id: note.id, doc: note.doc, folder: note.folder, tags: note.tags, rev: note.rev, at: Date.now() })
         resolve({ rev: note.rev })
       }, latency * (0.6 + Math.random() * 0.8))
     })
@@ -89,7 +89,7 @@ export class SaveQueue {
     clearTimeout(e.slowTimer)
     e.slowTimer = setTimeout(() => e.inflight && this.#set(id, 'still'), STILL_SAVING_MS)
     try {
-      const res = await serverSim.save({ id, doc: note.doc, rev: note.rev })
+      const res = await serverSim.save({ id, doc: note.doc, folder: note.folder, tags: note.tags, rev: note.rev })
       this.store.markSaved(id, res.rev)
       e.attempts = 0
     } catch (err) {

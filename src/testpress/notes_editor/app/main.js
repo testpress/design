@@ -1,6 +1,8 @@
 import { NotesStore } from './store.js'
 import { refreshIcons } from './icons.js'
 import { createTableUI } from './table-ui.js'
+import { createMetaUI } from './meta-ui.js'
+import { createFiltersUI } from './filters-ui.js'
 import { CellSelection } from '@tiptap/pm/tables'
 import { SaveQueue, serverSim } from './save-queue.js'
 import { createNotesEditor, stateForDoc } from './editor.js'
@@ -32,6 +34,15 @@ let query = ''
 let editorFocused = false
 const stateCache = new Map()
 let savedFlash = null
+
+// Folder / tag browsing above the list. `filters.matches(note)` is the single source of truth.
+const filters = createFiltersUI({
+  store,
+  folderBtn: $('#filter-folder'),
+  tagsBtn: $('#filter-tags'),
+  clearBtn: $('#filter-clear'),
+  onChange: () => renderList(),
+})
 
 const queue = new SaveQueue(store, (id, state) => {
   if (id === currentId) renderStatus()
@@ -76,19 +87,27 @@ function rowHTML(n) {
   const active = n.id === currentId
   const st = queue.stateOf(n.id)
   const warn = st === 'error' ? `<span class="row-warn" title="Not saved yet">${icon('alert-triangle', 'size-3')}</span>` : ''
-  const sub = [n.folder, n.snippet].filter(Boolean).join(' · ')
+  const sub = [filters.state.folder ? null : n.folder, n.snippet].filter(Boolean).join(' · ')
   return `<button type="button" role="option" aria-selected="${active}" data-id="${n.id}" class="note-row ${active ? 'is-active' : ''}">
     <span class="note-row__top"><span class="note-row__title ${n.derived ? 'is-derived' : ''}">${highlight(n.title, query)}</span>${warn}<span class="note-row__time">${relTime(n.updatedAt)}</span></span>
     <span class="note-row__sub">${highlight(sub, query)}</span></button>`
 }
 
 function renderList() {
-  const ids = order.filter((id) => store.get(id) && (!query || store.get(id).title.toLowerCase().includes(query) || store.get(id).text.includes(query)))
-  $('#notes-count').textContent = store.notes.size
+  const matches = (id) => {
+    const n = store.get(id)
+    return n && filters.matches(n)
+  }
+  const ids = order.filter((id) => matches(id) && (!query || store.get(id).title.toLowerCase().includes(query) || store.get(id).text.includes(query)))
+  $('#notes-count').textContent = order.filter(matches).length
   if (!ids.length) {
+    const scoped = filters.scoped()
+    const where = filters.state.folder ? `“${esc(filters.state.folder)}”` : 'these tags'
     listEl.innerHTML = query
-      ? `<div class="list-empty"><p class="font-medium text-gray-800">No notes match “${esc(query)}”</p><p class="text-gray-500">Search covers titles and note text.</p></div>`
-      : `<div class="list-empty"><p class="font-medium text-gray-800">No notes yet</p><p class="text-gray-500">Start one with “New note”.</p></div>`
+      ? `<div class="list-empty"><p class="font-medium text-gray-800">No notes match “${esc(query)}”</p><p class="text-gray-500">Search covers titles and note text${scoped ? ' in the current folder/tags' : ''}.</p>${scoped ? '<button type="button" data-clear-filters class="list-empty__btn">Search all notes</button>' : ''}</div>`
+      : scoped
+        ? `<div class="list-empty"><p class="font-medium text-gray-800">No notes in ${where} yet</p><p class="text-gray-500">New notes you create here are filed automatically.</p><button type="button" data-clear-filters class="list-empty__btn">Show all notes</button></div>`
+        : `<div class="list-empty"><p class="font-medium text-gray-800">No notes yet</p><p class="text-gray-500">Start one with “New note”.</p></div>`
     return
   }
   let html = ''
@@ -182,6 +201,11 @@ function renderStatus() {
 }
 
 store.onChange((id, kind) => {
+  if (kind === 'meta' && id) {
+    queue.schedule(id)
+    if (id === currentId) refreshMetaLine()
+    renderRowStatus()
+  }
   if (id === currentId && kind === 'saved' && !store.isDirty(id)) {
     savedFlash = id
     renderStatus()
@@ -190,6 +214,7 @@ store.onChange((id, kind) => {
 $('#save-retry').addEventListener('click', () => currentId && queue.retryNow(currentId))
 
 // ---- Editor ----------------------------------------------------------------------------------
+let metaUI = null
 let tableUI = null // created right after the editor (callbacks can fire during editor setup)
 const editor = createNotesEditor({
   element: $('#editor-mount'),
@@ -245,6 +270,21 @@ const editor = createNotesEditor({
   },
 })
 let focusTimer = 0
+// Folder / tag chips under the title (rendered by editor.js as a widget; clicks land here).
+const refreshMetaLine = () => editor.view.dispatch(editor.state.tr.setMeta('noteMeta', 'refresh'))
+metaUI = createMetaUI({
+  editor,
+  store,
+  getCurrentId: () => currentId,
+  onChange: (id) => {
+    queue.schedule(id)
+    savedFlash = null
+    refreshMetaLine()
+    renderStatus()
+    renderList()
+  },
+})
+$('#editor-mount').addEventListener('click', (e) => metaUI.handleClick(e))
 tableUI = createTableUI({ editor, host: $('#notes-app'), scroller: $('#editor-scroll'), isMobile })
 window.__notesEditor = editor // handy for debugging in the preview
 window.__notesStore = store
@@ -256,6 +296,7 @@ function openNote(id, { focus = false, fromCreate = false } = {}) {
     return
   }
   const leaving = currentId
+  metaUI?.close(false)
   if (leaving) leaveCurrent()
   currentId = id
   const note = store.get(id)
@@ -311,7 +352,7 @@ async function guardedLeave() {
 function newNote() {
   guardedLeave().then((ok) => {
     if (!ok) return
-    const id = store.create()
+    const id = store.create({ folder: filters.state.folder, tags: [...filters.state.tags] })
     reorder()
     openNote(id, { focus: true, fromCreate: true })
   })
@@ -320,6 +361,7 @@ $('#new-note').addEventListener('click', newNote)
 $('#new-note-m')?.addEventListener('click', newNote)
 
 listEl.addEventListener('click', (e) => {
+  if (e.target.closest('[data-clear-filters]')) return filters.clear()
   const row = e.target.closest('[data-id]')
   if (!row) return
   if (row.dataset.id === currentId) return openNote(currentId, { focus: 'resume' })
@@ -732,6 +774,12 @@ document.addEventListener('keydown', (e) => {
   } else if (menuKey && !isMobile() && (inCells || editor.state.selection.empty) && editor.view.hasFocus() && tableUI?.inTable()) {
     e.preventDefault()
     tableUI.focusControls()
+  } else if (mod && e.altKey && e.code === 'KeyF' && currentId && !isMobile()) {
+    e.preventDefault()
+    metaUI.openFolderFromKeyboard()
+  } else if (mod && e.altKey && e.code === 'KeyT' && currentId && !isMobile()) {
+    e.preventDefault()
+    metaUI.openTagsFromKeyboard()
   } else if (mod && e.key === '/') {
     e.preventDefault()
     toggleHelp()
@@ -775,6 +823,8 @@ const SHORTCUTS = [
     ['Open the selected note', 'Enter'],
     ['Back to the list from the editor', 'Esc'],
     ['Back to the editor from the list', '→  or  Esc'],
+    ['Set the note\'s folder', `${MOD}${A}F`],
+    ['Add or remove tags', `${MOD}${A}T`],
   ]],
   ['Writing', [
     ['Leave the title for the body', 'Enter'],

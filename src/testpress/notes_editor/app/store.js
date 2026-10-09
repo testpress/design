@@ -80,6 +80,69 @@ export class NotesStore {
     this.#emit(id, 'edit')
   }
 
+  // Folder (one or none) and tags (any number) live beside the document, not inside it.
+  setMeta(id, patch) {
+    const n = this.notes.get(id)
+    if (!n) return
+    const next = { ...n }
+    if ('folder' in patch) next.folder = patch.folder || null
+    if ('tags' in patch) next.tags = [...new Set(patch.tags)]
+    next.rev = n.rev + 1
+    next.updatedAt = Date.now()
+    this.#put(next)
+    this.#persistNow(id)
+    this.#emit(id, 'meta')
+  }
+
+  // Folders exist because a note uses them OR because the student created them empty.
+  folders() {
+    const used = [...this.notes.values()].map((n) => n.folder).filter(Boolean)
+    return [...new Set([...used, ...storage.get('folders', [])])].sort((a, b) => a.localeCompare(b))
+  }
+
+  createFolder(name) {
+    const list = storage.get('folders', [])
+    if (!list.includes(name)) storage.set('folders', [...list, name])
+    this.#emit(null, 'folders')
+  }
+
+  folderCounts() {
+    const m = new Map()
+    this.notes.forEach((n) => n.folder && m.set(n.folder, (m.get(n.folder) || 0) + 1))
+    return m
+  }
+
+  tagCounts() {
+    const m = new Map()
+    this.notes.forEach((n) => (n.tags || []).forEach((t) => m.set(t, (m.get(t) || 0) + 1)))
+    return m
+  }
+
+  // Renaming/deleting a folder keeps its notes; deleting a tag only removes the label.
+  renameFolder(from, to) {
+    storage.set('folders', storage.get('folders', []).map((f) => (f === from ? to : f)))
+    this.notes.forEach((n) => n.folder === from && this.setMeta(n.id, { folder: to }))
+    this.#emit(null, 'folders')
+  }
+
+  deleteFolder(name) {
+    storage.set('folders', storage.get('folders', []).filter((f) => f !== name))
+    this.notes.forEach((n) => n.folder === name && this.setMeta(n.id, { folder: null }))
+    this.#emit(null, 'folders')
+  }
+
+  renameTag(from, to) {
+    this.notes.forEach((n) => (n.tags || []).includes(from) && this.setMeta(n.id, { tags: n.tags.map((t) => (t === from ? to : t)) }))
+  }
+
+  deleteTag(name) {
+    this.notes.forEach((n) => (n.tags || []).includes(name) && this.setMeta(n.id, { tags: n.tags.filter((t) => t !== name) }))
+  }
+
+  tags() {
+    return [...new Set([...this.notes.values()].flatMap((n) => n.tags || []))].sort((a, b) => a.localeCompare(b))
+  }
+
   flushLocal(id) {
     if (id) this.#persistNow(id)
     else [...this.persistTimers.keys()].forEach((k) => this.#persistNow(k))

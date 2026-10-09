@@ -121,6 +121,7 @@ function keyboardExtras({ onLinkShortcut }) {
 
 // Metadata line (folder · #tags) rendered as a widget between title and body.
 function metaPlugin(getMeta) {
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   return Extension.create({
     name: 'noteMeta',
     addProseMirrorPlugins: () => [
@@ -129,20 +130,31 @@ function metaPlugin(getMeta) {
         props: {
           decorations(state) {
             const meta = getMeta()
-            if (!meta || (!meta.folder && !meta.tags.length)) return null
+            if (!meta) return null
             const key = `meta:${meta.id}:${meta.folder}:${meta.tags.join(',')}`
             const widget = () => {
               const el = document.createElement('div')
-              el.className = 'note-meta'
+              const empty = !meta.folder && !meta.tags.length
+              el.className = 'note-meta' + (empty ? ' note-meta--empty' : '')
               el.setAttribute('contenteditable', 'false')
               const parts = []
-              if (meta.folder) parts.push(`<span class="note-meta__folder"><i data-lucide="folder" class="size-3.5"></i>${meta.folder}</span>`)
-              meta.tags.forEach((t) => parts.push(`<span class="note-meta__tag">#${t}</span>`))
+              if (empty) {
+                parts.push('<button type="button" data-meta="folder" class="note-meta__hint" aria-haspopup="dialog">Add folder</button><span class="note-meta__dot" aria-hidden="true">or</span><button type="button" data-meta="tags" class="note-meta__hint" aria-haspopup="dialog">tags</button>')
+              } else {
+                parts.push(
+                  `<button type="button" data-meta="folder" class="note-meta__folder${meta.folder ? '' : ' is-unset'}" aria-haspopup="dialog" aria-label="Folder: ${meta.folder ? esc(meta.folder) : 'none'}"><i data-lucide="folder" class="size-3.5"></i>${meta.folder ? esc(meta.folder) : 'Add folder'}</button>`
+                )
+                meta.tags.forEach((t) =>
+                  parts.push(`<span class="note-meta__tag"><span>#${esc(t)}</span><button type="button" data-meta="remove-tag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}">&times;</button></span>`)
+                )
+                parts.push('<button type="button" data-meta="tags" class="note-meta__add" aria-haspopup="dialog" aria-label="Add tag">+ Tag</button>')
+              }
               el.innerHTML = parts.join('')
               refreshIcons(el)
               return el
             }
-            return DecorationSet.create(state.doc, [Decoration.widget(state.doc.firstChild.nodeSize, widget, { key, side: -1, ignoreSelection: true })])
+            // stopEvent: clicks/keys on the chips belong to the page, not to ProseMirror
+            return DecorationSet.create(state.doc, [Decoration.widget(state.doc.firstChild.nodeSize, widget, { key, side: -1, ignoreSelection: true, stopEvent: () => true })])
           },
         },
       }),
