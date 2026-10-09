@@ -357,7 +357,58 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     const inside = best > from && best < end
     return { to: inside ? from : best, pos: bs[inside ? from : best], noop: inside || best === from || best === end }
   }
+  // Translucent copy of what is being moved that travels with the pointer (locked to its axis, so
+  // it slides along the table instead of wandering over the note).
+  let ghost = null
+  function buildGhost(kind) {
+    const { map, tableStart, range } = info
+    const cellAt = (r, c) => editor.view.nodeDOM(tableStart + map.map[r * map.width + c])
+    const [r0, r1] = kind === 'col' ? [0, map.height] : [range.top, range.bottom]
+    const [c0, c1] = kind === 'col' ? [range.left, range.right] : [0, map.width]
+    const el = document.createElement('div')
+    el.className = 'tbl-ghost'
+    for (let r = r0; r < r1; r++) {
+      const row = document.createElement('div')
+      row.className = 'tbl-ghost__row'
+      for (let c = c0; c < c1; c++) {
+        const dom = cellAt(r, c)
+        const rect = dom.getBoundingClientRect()
+        const cell = document.createElement('div')
+        cell.className = 'tbl-ghost__cell' + (dom.tagName === 'TH' ? ' is-head' : '')
+        cell.style.width = rect.width + 'px'
+        cell.style.height = rect.height + 'px'
+        cell.textContent = dom.textContent
+        row.appendChild(cell)
+      }
+      el.appendChild(row)
+    }
+    host.appendChild(el)
+    ghost = { el, w: el.offsetWidth, h: el.offsetHeight }
+  }
+  function moveGhost(e) {
+    if (!ghost) return
+    const w = tableDom.getBoundingClientRect()
+    if (drag.kind === 'col') place(ghost.el, e.clientX - ghost.w / 2, w.top - 4)
+    else place(ghost.el, w.left - 4, e.clientY - ghost.h / 2)
+  }
+  // Esc while dragging: stop the drag visually now; the pointer-up that follows then moves nothing.
+  const onDragKey = (e) => {
+    if (e.key !== 'Escape' || !drag?.active) return
+    e.preventDefault()
+    e.stopPropagation()
+    drag.canceled = true
+    removeGhost()
+    dropLine.hidden = true
+    document.body.classList.remove('tbl-dragging')
+  }
+
+  function removeGhost() {
+    ghost?.el.remove()
+    ghost = null
+  }
+
   function showDrop(e) {
+    moveGhost(e)
     const { pos, noop } = dragTarget(e)
     const w = tableDom.getBoundingClientRect()
     dropLine.hidden = noop
@@ -379,9 +430,11 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
         closeMenu()
         if (!info.multi) selectWhole(kind) // highlight what is being moved
         g.classList.add('is-dragging')
+        buildGhost(kind)
+        document.addEventListener('keydown', onDragKey, true)
         document.body.classList.add('tbl-dragging')
       }
-      showDrop(e)
+      if (!drag.canceled) showDrop(e)
     })
     const end = (e, cancel) => {
       if (!drag || drag.kind !== kind) return
@@ -390,11 +443,13 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
       g.classList.remove('is-dragging')
       document.body.classList.remove('tbl-dragging')
       dropLine.hidden = true
+      removeGhost()
+      document.removeEventListener('keydown', onDragKey, true)
       if (g.hasPointerCapture?.(e.pointerId)) g.releasePointerCapture(e.pointerId)
       if (!was.active) return // plain click: the click handler opens the menu
       justDragged = true
       setTimeout(() => (justDragged = false), 0)
-      if (!cancel) {
+      if (!cancel && !was.canceled) {
         const { to, noop } = dragTarget(e, kind)
         if (!noop) moveBlock(kind, to)
       }
@@ -402,9 +457,6 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     }
     g.addEventListener('pointerup', (e) => end(e, false))
     g.addEventListener('pointercancel', (e) => end(e, true))
-    g.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && drag?.active) { e.stopPropagation(); end(e, true) }
-    })
   })
 
   ;[colGrip, rowGrip].forEach((g) =>
