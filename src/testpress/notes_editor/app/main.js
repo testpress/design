@@ -113,13 +113,34 @@ function renderRowStatus() {
   rowRaf = requestAnimationFrame(renderList)
 }
 
+function focusActiveRow() {
+  const row = listEl.querySelector('.note-row.is-active') || listEl.querySelector('.note-row')
+  if (row) row.focus()
+  else searchEl.focus()
+}
+
+// List is a keyboard-navigable listbox: arrows/Home/End move, Enter opens (native click),
+// Right arrow or Escape go back to the editor, "/" or typing a letter jumps to search.
 listEl.addEventListener('keydown', (e) => {
-  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
   const rows = [...listEl.querySelectorAll('.note-row')]
   const i = rows.indexOf(document.activeElement)
   if (i < 0) return
-  e.preventDefault()
-  rows[Math.min(rows.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))].focus()
+  if (e.key === 'ArrowUp' && i === 0) {
+    e.preventDefault()
+    searchEl.focus()
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    rows[Math.min(rows.length - 1, Math.max(0, i + (e.key === 'ArrowDown' ? 1 : -1)))].focus()
+  } else if (e.key === 'Home' || e.key === 'End') {
+    e.preventDefault()
+    rows[e.key === 'Home' ? 0 : rows.length - 1].focus()
+  } else if ((e.key === 'ArrowRight' || e.key === 'Escape') && !isMobile() && currentId) {
+    e.preventDefault()
+    editor.view.focus()
+  } else if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+    e.preventDefault()
+    searchEl.focus()
+  }
 })
 
 searchEl.addEventListener('input', () => {
@@ -142,6 +163,10 @@ searchEl.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowDown') {
     e.preventDefault()
     listEl.querySelector('.note-row')?.focus()
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    listEl.querySelector('.note-row')?.click() // open the top result and move into the editor
   }
 })
 
@@ -194,6 +219,24 @@ const editor = createNotesEditor({
     editorFocused = f
     clearTimeout(focusTimer)
     focusTimer = setTimeout(renderMobileBar, f ? 0 : 140)
+  },
+  // Mod-Shift-L: link the current selection without touching the mouse.
+  onLinkShortcut: () => {
+    if (editor.state.selection.empty) return true
+    if (isMobile()) {
+      mobile.mode = 'link'
+      renderMobileBar()
+    } else {
+      bubble.kbd = true
+      setBubbleMode('link')
+    }
+    return true
+  },
+  // Escape with nothing to dismiss hands focus to the note list (desktop) so you can move between notes.
+  onEscape: () => {
+    if (isMobile()) return false
+    focusActiveRow()
+    return true
   },
 })
 let focusTimer = 0
@@ -324,7 +367,7 @@ leaveDlg.addEventListener('keydown', (e) => {
 })
 
 // ---- Desktop bubble menu ---------------------------------------------------------------------
-const bubble = { mode: 'main' }
+const bubble = { mode: 'main', kbd: false, focusAct: null }
 
 function btn(act, ic, label, active = false, extra = '') {
   return `<button type="button" data-act="${act}" class="bm-btn ${active ? 'is-on' : ''}" aria-label="${label}" aria-pressed="${active}" ${extra}>${icon(ic)}</button>`
@@ -363,7 +406,16 @@ function renderBubble(force = false) {
     bubbleEl.innerHTML = html
     bubbleEl.dataset.html = html
     refreshIcons(bubbleEl)
+    // Buttons are reached with arrow keys (roving), never with Tab.
+    bubbleEl.querySelectorAll('button').forEach((b) => (b.tabIndex = -1))
     if (bubble.mode === 'link') bubbleEl.querySelector('input')?.focus()
+    else if (bubble.kbd) {
+      const target =
+        bubble.mode === 'main'
+          ? (bubble.focusAct && bubbleEl.querySelector(`[data-act="${bubble.focusAct}"]`)) || bubbleEl.querySelector('.bm-btn')
+          : bubbleEl.querySelector('.bm-item.is-on') || bubbleEl.querySelector('.bm-item')
+      target?.focus()
+    }
     // size changed -> reposition
     editor.view.dispatch(editor.state.tr.setMeta('bubbleMenu$', 'updatePosition'))
   }
@@ -381,20 +433,31 @@ bubbleEl.addEventListener('mousedown', (e) => {
 bubbleEl.addEventListener('click', (e) => {
   const t = e.target.closest('[data-act],[data-turn]')
   if (!t) return
+  bubble.kbd = e.detail === 0 // detail 0 = activated from the keyboard (Enter/Space)
   if (t.dataset.turn) {
+    bubble.kbd = false // action done: focus returns to the text
     turnInto(editor, t.dataset.turn)
     return setBubbleMode('main')
   }
   const act = t.dataset.act
-  if (act === 'turn' || act === 'more') return setBubbleMode(bubble.mode === act ? 'main' : act)
+  if (act === 'turn' || act === 'more') {
+    bubble.focusAct = act
+    return setBubbleMode(bubble.mode === act ? 'main' : act)
+  }
   if (act === 'link') return setBubbleMode('link')
   if (act === 'unlink') {
+    bubble.kbd = false
     applyLink(editor, '')
     return setBubbleMode('main')
   }
+  bubble.kbd = false
   MARKS[act]?.run(editor)
   if (bubble.mode !== 'main') setBubbleMode('main')
   else renderBubble()
+})
+bubbleEl.addEventListener('focusout', (e) => {
+  // focus left the bubble for somewhere else (not into the editor) -> drop keyboard mode
+  if (!bubbleEl.contains(e.relatedTarget)) bubble.kbd = false
 })
 bubbleEl.addEventListener('submit', (e) => {
   e.preventDefault()
@@ -404,6 +467,32 @@ bubbleEl.addEventListener('submit', (e) => {
 bubbleEl.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     e.preventDefault()
+    bubble.kbd = false
+    setBubbleMode('main')
+    editor.commands.focus()
+    return
+  }
+  if (bubble.mode === 'link') return // the address field uses normal text editing keys
+  const items = [...bubbleEl.querySelectorAll(bubble.mode === 'main' ? '.bm-btn' : '.bm-item')]
+  const i = items.indexOf(document.activeElement)
+  if (i < 0) return
+  const horizontal = bubble.mode === 'main'
+  const go = (n) => {
+    e.preventDefault()
+    items[(n + items.length) % items.length].focus()
+  }
+  if (e.key === (horizontal ? 'ArrowRight' : 'ArrowDown')) go(i + 1)
+  else if (e.key === (horizontal ? 'ArrowLeft' : 'ArrowUp')) go(i - 1)
+  else if (e.key === 'Home') go(0)
+  else if (e.key === 'End') go(items.length - 1)
+  else if (!horizontal && e.key === 'ArrowLeft') {
+    // leave the sub-menu, landing back on the button that opened it
+    e.preventDefault()
+    bubble.kbd = true
+    setBubbleMode('main')
+  } else if (e.key === 'Tab') {
+    e.preventDefault()
+    bubble.kbd = false
     setBubbleMode('main')
     editor.commands.focus()
   }
@@ -588,7 +677,16 @@ syncViewport()
 // ---- Global keyboard + page lifecycle --------------------------------------------------------
 document.addEventListener('keydown', (e) => {
   const mod = e.metaKey || e.ctrlKey
-  if (mod && e.key.toLowerCase() === 'k') {
+  if (e.key === 'F10' && !isMobile() && !editor.state.selection.empty && editor.view.hasFocus()) {
+    // Move keyboard focus into the selection toolbar (ARIA toolbar convention).
+    e.preventDefault()
+    bubble.kbd = true
+    bubble.focusAct = null
+    setBubbleMode('main')
+  } else if (mod && e.key === '/') {
+    e.preventDefault()
+    toggleHelp()
+  } else if (mod && e.key.toLowerCase() === 'k') {
     e.preventDefault()
     if (isMobile() && app.dataset.view === 'editor') return
     searchEl.focus()
@@ -614,6 +712,76 @@ window.addEventListener('beforeunload', (e) => {
   }
 })
 
+// ---- Keyboard shortcuts dialog ---------------------------------------------------------------
+const helpDlg = $('#help-dialog')
+let helpReturn = null
+const A = isMac ? '⌥' : 'Alt+'
+const S = isMac ? '⇧' : 'Shift+'
+const SHORTCUTS = [
+  ['Notes', [
+    ['New note', `${MOD}${A}N`],
+    ['Search notes', `${MOD}K`],
+    ['Open top search result', 'Enter in search'],
+    ['Move through the list', '↑ ↓  Home  End'],
+    ['Open the selected note', 'Enter'],
+    ['Back to the list from the editor', 'Esc'],
+    ['Back to the editor from the list', '→  or  Esc'],
+  ]],
+  ['Writing', [
+    ['Leave the title for the body', 'Enter'],
+    ['Undo / redo', `${MOD}Z  ${MOD}${S}Z`],
+    ['Indent / outdent list item', `Tab  ${S}Tab`],
+    ['Tick a checklist item', `${MOD}Enter`],
+  ]],
+  ['Blocks', [
+    ['Open the block menu', '/'],
+    ['Choose in the block menu', '↑ ↓  Enter  Esc'],
+    ['Heading 1 / 2 / 3', `${MOD}${A}1  2  3`],
+    ['Plain text', `${MOD}${A}0`],
+    ['Bulleted / numbered / checklist', `${MOD}${S}8  7  9`],
+    ['Quote', `${MOD}${S}B`],
+    ['Code block', `${MOD}${A}C`],
+    ['Divider', `${MOD}${A}D`],
+  ]],
+  ['Formatting', [
+    ['Bold / italic', `${MOD}B  ${MOD}I`],
+    ['Highlight', `${MOD}${S}H`],
+    ['Strikethrough / inline code', `${MOD}${S}S  ${MOD}E`],
+    ['Link the selection', `${MOD}${S}L`],
+    ['Move into the selection toolbar', 'F10'],
+    ['Toolbar: move / activate / close', '← →  Enter  Esc'],
+  ]],
+]
+$('#help-body').innerHTML = SHORTCUTS.map(
+  ([h, rows]) => `<section><h3>${h}</h3><dl>${rows.map(([l, k]) => `<div><dt>${l}</dt><dd>${k.split('  ').map((x) => `<kbd>${x}</kbd>`).join('')}</dd></div>`).join('')}</dl></section>`
+).join('')
+function toggleHelp(force) {
+  const open = force ?? helpDlg.hidden
+  if (open) {
+    helpReturn = document.activeElement
+    helpDlg.hidden = false
+    $('#help-close').focus()
+  } else {
+    helpDlg.hidden = true
+    ;(helpReturn && document.contains(helpReturn) ? helpReturn : editor.view.dom).focus?.()
+  }
+}
+$('#help-open').addEventListener('click', () => toggleHelp(true))
+$('#help-close').addEventListener('click', () => toggleHelp(false))
+helpDlg.addEventListener('click', (e) => e.target === helpDlg && toggleHelp(false))
+helpDlg.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    toggleHelp(false)
+  } else if (e.key === 'Tab') {
+    // trap focus inside the dialog
+    const f = [...helpDlg.querySelectorAll('button')]
+    if (!f.length) return
+    e.preventDefault()
+    f[0].focus()
+  }
+})
+
 // ---- Prototype tools (not part of the product UI) --------------------------------------------
 const tools = $('#proto-tools')
 const toolsBtn = $('#proto-tools-btn')
@@ -634,7 +802,7 @@ $('#sim-latency-val').textContent = latBox.value + ' ms'
 $('#sim-reset').addEventListener('click', () => {
   if (confirm('Reset all demo notes and settings on this device?')) store.reset()
 })
-$('#sim-shortcuts').textContent = `${MOD}K search · ${MOD}${isMac ? '⌥' : 'Alt+'}N new note`
+$('#sim-shortcuts').textContent = `${MOD}/ shows all keyboard shortcuts`
 
 // ---- Boot ------------------------------------------------------------------------------------
 reorder()

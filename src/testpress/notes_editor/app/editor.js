@@ -5,7 +5,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Highlight from '@tiptap/extension-highlight'
 import BubbleMenu from '@tiptap/extension-bubble-menu'
-import Suggestion from '@tiptap/suggestion'
+import Suggestion, { SuggestionPluginKey } from '@tiptap/suggestion'
 import { Plugin, PluginKey, TextSelection, EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { BLOCKS, DIVIDER, turnInto, insertDivider } from './blocks.js'
@@ -65,6 +65,26 @@ const TitleKeys = Extension.create({
   },
 })
 
+// Extra shortcuts so nothing in the editor needs a mouse.
+function keyboardExtras({ onLinkShortcut }) {
+  return Extension.create({
+    name: 'keyboardExtras',
+    addKeyboardShortcuts() {
+      return {
+        // toggle the checklist item under the caret
+        'Mod-Enter': ({ editor }) => {
+          if (!editor.isActive('taskItem')) return false
+          const checked = editor.getAttributes('taskItem').checked
+          return editor.commands.updateAttributes('taskItem', { checked: !checked })
+        },
+        'Mod-Shift-l': () => onLinkShortcut(),
+        // dividers / blocks have no markdown trigger on a keypress; Mod-Alt-d inserts a divider
+        'Mod-Alt-d': ({ editor }) => insertDivider(editor),
+      }
+    },
+  })
+}
+
 // Metadata line (folder · #tags) rendered as a widget between title and body.
 function metaPlugin(getMeta) {
   return Extension.create({
@@ -106,20 +126,37 @@ function runSlash(editor, range, item) {
 }
 
 function slashRenderer() {
-  let el, items = [], index = 0, command
+  let el, items = [], index = 0, command, lastPointer = null
 
-  const paint = () => {
+  // Full render only when the item list changes (typing). Arrow keys just move the highlight, so
+  // a resting mouse pointer can't be re-triggered by replaced DOM and yank the selection back.
+  const render = () => {
     el.innerHTML = items.length
       ? items
           .map(
-            (it, i) => `<button type="button" role="option" aria-selected="${i === index}" data-i="${i}" class="slash-item ${i === index ? 'is-active' : ''}">
+            (it, i) => `<button type="button" id="slash-opt-${i}" role="option" tabindex="-1" aria-selected="false" data-i="${i}" class="slash-item">
               <i data-lucide="${it.icon}" class="size-4"></i><span class="slash-item__label">${it.label}</span><kbd class="slash-item__hint">${it.hint}</kbd></button>`
           )
           .join('')
       : '<div class="slash-empty">No matching blocks</div>'
     if (window.lucide) window.lucide.createIcons({ nodes: [el] })
-    el.querySelector('.is-active')?.scrollIntoView({ block: 'nearest' })
+    highlightIndex(false)
   }
+
+  const highlightIndex = (scroll = true) => {
+    el.querySelectorAll('.slash-item').forEach((n, i) => {
+      const on = i === index
+      n.classList.toggle('is-active', on)
+      n.setAttribute('aria-selected', on)
+      if (on && scroll) n.scrollIntoView({ block: 'nearest' })
+    })
+    const active = el.querySelector('.is-active')
+    // the editor keeps DOM focus, so announce the active option through it
+    if (active) editorDom?.setAttribute('aria-activedescendant', active.id)
+    else editorDom?.removeAttribute('aria-activedescendant')
+  }
+
+  let editorDom = null
 
   const place = (rect) => {
     if (!rect) return
@@ -136,36 +173,46 @@ function slashRenderer() {
     el.style.top = top + 'px'
   }
 
+  const move = (delta) => {
+    index = (index + delta + items.length) % items.length
+    highlightIndex()
+  }
+
   return {
     onStart(props) {
+      editorDom = props.editor.view.dom
       el = document.createElement('div')
       el.className = 'slash-menu'
+      el.id = 'slash-menu'
       el.setAttribute('role', 'listbox')
       el.setAttribute('aria-label', 'Insert block')
+      editorDom.setAttribute('aria-controls', 'slash-menu')
       // keep editor focus + selection when clicking the menu
       el.addEventListener('mousedown', (e) => e.preventDefault())
       el.addEventListener('click', (e) => {
         const b = e.target.closest('[data-i]')
         if (b) command(items[+b.dataset.i])
       })
-      el.addEventListener('mouseover', (e) => {
+      // Hover only counts when the pointer really moved, never when content moved under it.
+      el.addEventListener('mousemove', (e) => {
+        if (lastPointer && lastPointer.x === e.clientX && lastPointer.y === e.clientY) return
+        lastPointer = { x: e.clientX, y: e.clientY }
         const b = e.target.closest('[data-i]')
         if (b && +b.dataset.i !== index) {
           index = +b.dataset.i
-          el.querySelectorAll('.slash-item').forEach((n, i) => {
-            n.classList.toggle('is-active', i === index)
-            n.setAttribute('aria-selected', i === index)
-          })
+          highlightIndex(false)
         }
       })
       document.body.appendChild(el)
       this.onUpdate(props)
     },
     onUpdate(props) {
+      const prev = items.map((i) => i.id).join()
       items = props.items
       command = props.command
+      if (items.map((i) => i.id).join() !== prev) index = 0 // new result set -> first match
       index = Math.min(index, Math.max(0, items.length - 1))
-      paint()
+      render()
       place(props.clientRect?.())
     },
     onKeyDown({ event }) {
@@ -174,12 +221,15 @@ function slashRenderer() {
         return true
       }
       if (!items.length) return false
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        index = (index + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length
-        paint()
-        return true
-      }
+      const mod = event.metaKey || event.ctrlKey || event.altKey
+      if (event.key === 'ArrowDown' || (event.ctrlKey && event.key === 'n')) return move(1), true
+      if (event.key === 'ArrowUp' || (event.ctrlKey && event.key === 'p')) return move(-1), true
+      if (event.key === 'PageDown') return move(Math.min(4, items.length - 1 - index) || 1), true
+      if (event.key === 'PageUp') return move(-Math.min(4, index) || -1), true
+      if (event.key === 'Home' && !mod) return (index = 0), highlightIndex(), true
+      if (event.key === 'End' && !mod) return (index = items.length - 1), highlightIndex(), true
       if (event.key === 'Enter' || event.key === 'Tab') {
+        event.preventDefault()
         command(items[index])
         return true
       }
@@ -189,6 +239,9 @@ function slashRenderer() {
       el?.remove()
       el = null
       index = 0
+      lastPointer = null
+      editorDom?.removeAttribute('aria-activedescendant')
+      editorDom?.removeAttribute('aria-controls')
     },
   }
 }
@@ -214,7 +267,7 @@ const SlashCommands = Extension.create({
 })
 
 // ---- Editor factory --------------------------------------------------------------------------
-export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta, isMobile, onDocChange, onSelection, onFocusChange }) {
+export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta, isMobile, onDocChange, onSelection, onFocusChange, onLinkShortcut, onEscape }) {
   const editor = new Editor({
     element,
     extensions: [
@@ -240,6 +293,7 @@ export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta
       TaskItem.configure({ nested: true }),
       Highlight,
       TitleKeys,
+      keyboardExtras({ onLinkShortcut }),
       SlashCommands,
       metaPlugin(getMeta),
       BubbleMenu.configure({
@@ -253,13 +307,15 @@ export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta
       scrollMargin: { top: 24, bottom: 140, left: 0, right: 0 },
       scrollThreshold: { top: 24, bottom: 140, left: 0, right: 0 },
       handleKeyDown: (view, e) => {
-        // Escape clears a selection so the bubble menu can be dismissed from the keyboard.
-        if (e.key === 'Escape' && !view.state.selection.empty) {
+        if (e.key !== 'Escape') return false
+        // an open slash menu owns Escape (editorProps run before plugin handlers)
+        if (SuggestionPluginKey.getState(view.state)?.active) return false
+        if (!view.state.selection.empty) {
           const { to } = view.state.selection
           view.dispatch(view.state.tr.setSelection(TextSelection.create(view.state.doc, to)))
           return true
         }
-        return false
+        return onEscape ? onEscape() : false
       },
     },
     onUpdate: ({ editor: ed, transaction }) => {
