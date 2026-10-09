@@ -794,6 +794,7 @@ const SHORTCUTS = [
     ['Table: insert a row below', `${MOD}${A}↵`],
     ['Table: delete the current row', `${MOD}${A}⌫`],
     ['Table: delete the current column', `${MOD}${A}−`],
+    ['Table: move a row / column', 'Drag its grip, or use the menu'],
     ['Select several table cells', `Drag  or  ${S}← → ↑ ↓`],
     ['Code block', `${MOD}${A}C`],
     ['Divider', `${MOD}${A}D`],

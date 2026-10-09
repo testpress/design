@@ -1,5 +1,6 @@
 import { TableMap, addRow, addColumn, CellSelection } from '@tiptap/pm/tables'
 import { TextSelection } from '@tiptap/pm/state'
+import { Fragment } from '@tiptap/pm/model'
 import { refreshIcons } from './icons.js'
 
 // Notion-style table editing. No floating toolbar: while the caret is in a table we show
@@ -39,6 +40,10 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
   menu.setAttribute('role', 'menu')
   menu.hidden = true
   host.appendChild(menu)
+  const dropLine = document.createElement('div')
+  dropLine.className = 'tbl-drop'
+  dropLine.hidden = true
+  host.appendChild(dropLine)
   const buttons = [colGrip, rowGrip, addRowBtn, addColBtn]
 
   let tableDom = null
@@ -189,6 +194,8 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
       return [
         { label: 'Insert left', icon: 'arrow-left', run: () => editor.chain().focus().addColumnBefore().run() },
         { label: 'Insert right', icon: 'arrow-right', run: () => editor.chain().focus().addColumnAfter().run() },
+        ...(range.left > 0 ? [{ label: 'Move left', icon: 'arrow-left-to-line', run: () => moveBlock('col', range.left - 1) }] : []),
+        ...(range.right < info.map.width ? [{ label: 'Move right', icon: 'arrow-right-to-line', run: () => moveBlock('col', range.right + 1) }] : []),
         clear,
         { label: plural(nCols, 'column'), icon: 'trash-2', danger: true, hint: SC_DELETE_COL, run: () => editor.chain().focus().deleteColumn().run() },
         delTable,
@@ -196,10 +203,58 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     return [
       { label: 'Insert above', icon: 'arrow-up', run: () => editor.chain().focus().addRowBefore().run() },
       { label: 'Insert below', icon: 'arrow-down', hint: SC_ROW_BELOW, run: () => editor.chain().focus().addRowAfter().run() },
+      ...(range.top > 0 ? [{ label: 'Move up', icon: 'arrow-up-to-line', run: () => moveBlock('row', range.top - 1) }] : []),
+      ...(range.bottom < info.map.height ? [{ label: 'Move down', icon: 'arrow-down-to-line', run: () => moveBlock('row', range.bottom + 1) }] : []),
       clear,
       { label: plural(nRows, 'row'), icon: 'trash-2', danger: true, hint: SC_DELETE_ROW, run: () => editor.chain().focus().deleteRow().run() },
       delTable,
     ]
+  }
+
+  // Move the selected rows/columns so they start at boundary `to` (0..count, in the ORIGINAL order).
+  // Works on whole blocks; header styling stays on the top row; refuses tables with merged cells.
+  function moveBlock(kind, to) {
+    if (!info) return false
+    const { state, view } = editor
+    const { tablePos, tableNode, range } = info
+    const rows = []
+    tableNode.forEach((r) => rows.push(r))
+    if (rows.some((r) => { let bad = false; r.forEach((c) => { if ((c.attrs.colspan || 1) !== 1 || (c.attrs.rowspan || 1) !== 1) bad = true }); return bad })) return false
+    const [from, end] = kind === 'row' ? [range.top, range.bottom] : [range.left, range.right]
+    const size = end - from
+    if (to > from && to < end) return false // dropped inside itself
+    const at = to <= from ? to : to - size // index of the block's first row/column after the move
+    if (at === from) return false
+    const shuffle = (list) => {
+      const block = list.slice(from, end)
+      const rest = list.filter((_, i) => i < from || i >= end)
+      return [...rest.slice(0, at), ...block, ...rest.slice(at)]
+    }
+    const hadHeader = (() => { let all = true; rows[0].forEach((c) => { if (c.type.name !== 'tableHeader') all = false }); return all })()
+    let newRows
+    if (kind === 'row') newRows = shuffle(rows)
+    else
+      newRows = rows.map((r) => {
+        const cells = []
+        r.forEach((c) => cells.push(c))
+        return r.copy(Fragment.from(shuffle(cells)))
+      })
+    const { tableCell, tableHeader } = state.schema.nodes
+    // re-apply "first row is the header" by position, so moving rows never leaves th cells mid-table
+    newRows = newRows.map((r, i) => {
+      const want = hadHeader && i === 0 ? tableHeader : tableCell
+      const cells = []
+      r.forEach((c) => cells.push(c.type === want ? c : want.create(c.attrs, c.content, c.marks)))
+      return r.copy(Fragment.from(cells))
+    })
+    const newTable = tableNode.copy(Fragment.from(newRows))
+    const tr = state.tr.replaceWith(tablePos, tablePos + tableNode.nodeSize, newTable)
+    const m = TableMap.get(newTable)
+    const start = tablePos + 1
+    const [a0, a1] = kind === 'row' ? [[at, 0], [at + size - 1, m.width - 1]] : [[0, at], [m.height - 1, at + size - 1]]
+    tr.setSelection(new CellSelection(tr.doc.resolve(start + m.map[a0[0] * m.width + a0[1]]), tr.doc.resolve(start + m.map[a1[0] * m.width + a1[1]])))
+    view.dispatch(tr)
+    return true
   }
 
   // single-cell caret: "Clear contents" means the whole column / row the grip belongs to
@@ -277,8 +332,84 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
   })
   addRowBtn.addEventListener('click', () => addAtEnd('row'))
   addColBtn.addEventListener('click', () => addAtEnd('col'))
+  // ---- drag a grip to move the column / row(s) it controls ---------------------------------------
+  let drag = null
+  let justDragged = false
+  const boundaries = (kind) => {
+    const { map, tableStart } = info
+    const cellAt = (r, c) => editor.view.nodeDOM(tableStart + map.map[r * map.width + c])
+    const out = []
+    if (kind === 'col') {
+      for (let c = 0; c < map.width; c++) out.push(cellAt(0, c).getBoundingClientRect().left)
+      out.push(cellAt(0, map.width - 1).getBoundingClientRect().right)
+    } else {
+      for (let r = 0; r < map.height; r++) out.push(cellAt(r, 0).getBoundingClientRect().top)
+      out.push(cellAt(map.height - 1, 0).getBoundingClientRect().bottom)
+    }
+    return out
+  }
+  function dragTarget(e, kind = drag.kind) {
+    const bs = boundaries(kind)
+    const p = kind === 'col' ? e.clientX : e.clientY
+    let best = 0
+    bs.forEach((b, i) => { if (Math.abs(b - p) < Math.abs(bs[best] - p)) best = i })
+    const [from, end] = kind === 'col' ? [info.range.left, info.range.right] : [info.range.top, info.range.bottom]
+    const inside = best > from && best < end
+    return { to: inside ? from : best, pos: bs[inside ? from : best], noop: inside || best === from || best === end }
+  }
+  function showDrop(e) {
+    const { pos, noop } = dragTarget(e)
+    const w = tableDom.getBoundingClientRect()
+    dropLine.hidden = noop
+    if (drag.kind === 'col') place(dropLine, pos - 1.5, w.top, 3, w.height)
+    else place(dropLine, w.left, pos - 1.5, w.width, 3)
+  }
+  ;[colGrip, rowGrip].forEach((g) => {
+    const kind = g === colGrip ? 'col' : 'row'
+    g.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || !info) return
+      drag = { kind, x: e.clientX, y: e.clientY, active: false }
+      g.setPointerCapture(e.pointerId)
+    })
+    g.addEventListener('pointermove', (e) => {
+      if (!drag || drag.kind !== kind) return
+      if (!drag.active) {
+        if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 5) return
+        drag.active = true // past the click threshold: this is a drag, not a click
+        closeMenu()
+        if (!info.multi) selectWhole(kind) // highlight what is being moved
+        g.classList.add('is-dragging')
+        document.body.classList.add('tbl-dragging')
+      }
+      showDrop(e)
+    })
+    const end = (e, cancel) => {
+      if (!drag || drag.kind !== kind) return
+      const was = drag
+      drag = null
+      g.classList.remove('is-dragging')
+      document.body.classList.remove('tbl-dragging')
+      dropLine.hidden = true
+      if (g.hasPointerCapture?.(e.pointerId)) g.releasePointerCapture(e.pointerId)
+      if (!was.active) return // plain click: the click handler opens the menu
+      justDragged = true
+      setTimeout(() => (justDragged = false), 0)
+      if (!cancel) {
+        const { to, noop } = dragTarget(e, kind)
+        if (!noop) moveBlock(kind, to)
+      }
+      update()
+    }
+    g.addEventListener('pointerup', (e) => end(e, false))
+    g.addEventListener('pointercancel', (e) => end(e, true))
+    g.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drag?.active) { e.stopPropagation(); end(e, true) }
+    })
+  })
+
   ;[colGrip, rowGrip].forEach((g) =>
     g.addEventListener('click', (e) => {
+      if (justDragged) return
       const kind = g === colGrip ? 'col' : 'row'
       if (openKind === kind) return closeMenu(true)
       openMenu(kind, e.detail === 0)
