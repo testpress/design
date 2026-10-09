@@ -15,6 +15,7 @@ const PLUS = '<svg width="10" height="10" viewBox="0 0 12 12" stroke="currentCol
 const IS_MAC = /Mac|iPhone|iPad/.test(navigator.platform)
 const SC_DELETE_ROW = IS_MAC ? '⌘⌥⌫' : 'Ctrl+Alt+⌫'
 const SC_DELETE_COL = IS_MAC ? '⌘⌥−' : 'Ctrl+Alt+−'
+const SC_ROW_BELOW = IS_MAC ? '⌘⌥↵' : 'Ctrl+Alt+↵'
 
 export function createTableUI({ editor, host, scroller, isMobile }) {
   const mk = (cls, html, label, extra = {}) => {
@@ -194,7 +195,7 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
       ]
     return [
       { label: 'Insert above', icon: 'arrow-up', run: () => editor.chain().focus().addRowBefore().run() },
-      { label: 'Insert below', icon: 'arrow-down', run: () => editor.chain().focus().addRowAfter().run() },
+      { label: 'Insert below', icon: 'arrow-down', hint: SC_ROW_BELOW, run: () => editor.chain().focus().addRowAfter().run() },
       clear,
       { label: plural(nRows, 'row'), icon: 'trash-2', danger: true, hint: SC_DELETE_ROW, run: () => editor.chain().focus().deleteRow().run() },
       delTable,

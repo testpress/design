@@ -791,6 +791,7 @@ const SHORTCUTS = [
     ['Quote', `${MOD}${S}B`],
     ['Move between table cells (adds a row at the end)', `Tab  ${S}Tab`],
     ['Table: open the column / row menus', `${MOD}${A}M  or  F10`],
+    ['Table: insert a row below', `${MOD}${A}↵`],
     ['Table: delete the current row', `${MOD}${A}⌫`],
     ['Table: delete the current column', `${MOD}${A}−`],
     ['Select several table cells', `Drag  or  ${S}← → ↑ ↓`],
