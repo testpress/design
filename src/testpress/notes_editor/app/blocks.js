@@ -9,13 +9,27 @@ export const BLOCKS = [
   { id: 'bullet', desc: 'Create a simple bulleted list', sample: '<ul><li>First point</li><li>Second point</li><li>Third point</li></ul>', label: 'Bulleted list', hint: '-', icon: 'list', keywords: 'bullet list ul unordered', active: (e) => e.isActive('bulletList') },
   { id: 'ordered', desc: 'Create a list with numbering', sample: '<ol><li>First step</li><li>Second step</li><li>Third step</li></ol>', label: 'Numbered list', hint: '1.', icon: 'list-ordered', keywords: 'number ordered list ol', active: (e) => e.isActive('orderedList') },
   { id: 'task', desc: 'Track tasks with a checklist', sample: "<div class='pv-task'><span class='pv-box on'></span>Read chapter 4</div><div class='pv-task'><span class='pv-box'></span>Solve DPP 3</div><div class='pv-task'><span class='pv-box'></span>Revise notes</div>", label: 'Checklist', hint: '[ ]', icon: 'list-checks', keywords: 'todo task checkbox checklist', active: (e) => e.isActive('taskList') },
-  { id: 'quote', desc: 'Capture a quote', sample: '<blockquote>Slow down on the first read.</blockquote>', label: 'Quote', hint: '>', icon: 'text-quote', keywords: 'quote blockquote callout', active: (e) => e.isActive('blockquote') },
+  { id: 'quote', desc: 'Capture a quote', sample: '<blockquote>Slow down on the first read.</blockquote>', label: 'Quote', hint: '>', icon: 'text-quote', keywords: 'quote blockquote citation', active: (e) => e.isActive('blockquote') },
+  { id: 'callout', label: 'Callout', hint: '', icon: 'lightbulb', desc: 'Make something stand out', sample: "<div class='pv-callout'><span>💡</span><p>Remember: E = 0 inside a conductor.</p></div>", keywords: 'callout note tip highlight box important', active: (e) => e.isActive('callout') },
+  { id: 'toggle', label: 'Toggle list', hint: '', icon: 'list-collapse', desc: 'Hide details inside a collapsible toggle', sample: "<div class='pv-toggle'><b>▾</b> Why does this work?</div><p class='pv-indent'>The details live inside the toggle.</p>", keywords: 'toggle collapse details fold accordion', active: (e) => e.isActive('details') },
   { id: 'code', desc: 'Capture a code snippet', sample: '<pre>E = m * c ** 2</pre>', label: 'Code block', hint: '```', icon: 'code-xml', keywords: 'code snippet pre', active: (e) => e.isActive('codeBlock') },
 ]
 
 export const DIVIDER = { id: 'divider', desc: 'Visually divide blocks', sample: '<p>Above the line</p><hr><p>Below the line</p>', label: 'Divider', hint: '---', icon: 'minus', keywords: 'divider rule hr line separator' }
 
+export const TABLE = {
+  id: 'table',
+  label: 'Table',
+  hint: '',
+  icon: 'table',
+  desc: 'Add a simple table to organise data',
+  sample: "<table class='pv-table'><tr><th>Term</th><th>Meaning</th></tr><tr><td>E</td><td>Field</td></tr><tr><td>q</td><td>Charge</td></tr></table>",
+  keywords: 'table grid rows columns cells',
+}
+
 const TOGGLES = {
+  callout: (c) => c.toggleCallout(),
+  toggle: (c) => c.setDetails().updateAttributes('details', { open: true }),
   h1: (c) => c.toggleHeading({ level: 1 }),
   h2: (c) => c.toggleHeading({ level: 2 }),
   h3: (c) => c.toggleHeading({ level: 3 }),
@@ -31,6 +45,10 @@ const TOGGLES = {
 export function turnInto(editor, id) {
   const block = BLOCKS.find((b) => b.id === id)
   if (!block) return
+  if (id === 'toggle' && block.active(editor)) {
+    editor.chain().focus().unsetDetails().run()
+    return
+  }
   if (id === 'paragraph' || block.active(editor)) {
     editor.chain().focus().clearNodes().run()
     return
@@ -38,6 +56,20 @@ export function turnInto(editor, id) {
   const chain = editor.chain().focus().clearNodes()
   TOGGLES[id](chain).run()
 }
+
+export function insertTable(editor) {
+  editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+}
+
+// Slash menu order, grouped like the reference design.
+const byId = (id) => BLOCKS.find((x) => x.id === id)
+export const SLASH_ITEMS = [
+  ...['paragraph', 'h1', 'h2', 'h3', 'bullet', 'ordered', 'task', 'quote'].map((id) => ({ ...byId(id), group: 'Basic blocks' })),
+  { ...DIVIDER, group: 'Basic blocks' },
+  ...['callout', 'toggle'].map((id) => ({ ...byId(id), group: 'Advanced' })),
+  { ...TABLE, group: 'Advanced' },
+  { ...byId('code'), group: 'Advanced' },
+]
 
 export function insertDivider(editor) {
   editor.chain().focus().setHorizontalRule().run()

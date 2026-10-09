@@ -8,7 +8,10 @@ import BubbleMenu from '@tiptap/extension-bubble-menu'
 import Suggestion, { SuggestionPluginKey } from '@tiptap/suggestion'
 import { Plugin, PluginKey, TextSelection, EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import { BLOCKS, DIVIDER, turnInto, insertDivider } from './blocks.js'
+import { SLASH_ITEMS, turnInto, insertDivider, insertTable } from './blocks.js'
+import { Callout, TrailingParagraph } from './nodes.js'
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
+import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details'
 import { refreshIcons } from './icons.js'
 
 // ---- Document shape: one title line + blocks, in a single editing surface. -------------------
@@ -67,6 +70,30 @@ const TitleKeys = Extension.create({
   },
 })
 
+// Outline the table cell the caret is in (Notion-style), via a node decoration.
+const activeCell = Extension.create({
+  name: 'activeCell',
+  addProseMirrorPlugins: () => [
+    new Plugin({
+      key: new PluginKey('activeCell'),
+      props: {
+        decorations(state) {
+          const { $from, empty } = state.selection
+          if (!empty) return null
+          for (let d = $from.depth; d > 0; d--) {
+            const n = $from.node(d)
+            if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') {
+              const pos = $from.before(d)
+              return DecorationSet.create(state.doc, [Decoration.node(pos, pos + n.nodeSize, { class: 'is-active-cell' })])
+            }
+          }
+          return null
+        },
+      },
+    }),
+  ],
+})
+
 // Extra shortcuts so nothing in the editor needs a mouse.
 function keyboardExtras({ onLinkShortcut }) {
   return Extension.create({
@@ -119,11 +146,10 @@ function metaPlugin(getMeta) {
 }
 
 // ---- Slash menu ------------------------------------------------------------------------------
-const SLASH_ITEMS = [...BLOCKS.filter((b) => b.id !== 'paragraph'), DIVIDER]
-
 function runSlash(editor, range, item) {
   editor.chain().focus().deleteRange(range).run()
   if (item.id === 'divider') insertDivider(editor)
+  else if (item.id === 'table') insertTable(editor)
   else turnInto(editor, item.id)
 }
 
@@ -136,7 +162,7 @@ function slashRenderer() {
     el.innerHTML = items.length
       ? items
           .map(
-            (it, i) => `<button type="button" id="slash-opt-${i}" role="option" tabindex="-1" aria-selected="false" data-i="${i}" class="slash-item">
+            (it, i) => `${i === 0 || it.group !== items[i - 1].group ? `<div class="slash-group" role="presentation">${it.group}</div>` : ''}<button type="button" id="slash-opt-${i}" role="option" tabindex="-1" aria-selected="false" data-i="${i}" class="slash-item">
               <i data-lucide="${it.icon}" class="size-4"></i><span class="slash-item__label">${it.label}</span><kbd class="slash-item__hint">${it.hint}</kbd></button>`
           )
           .join('')
@@ -298,7 +324,13 @@ const SlashCommands = Extension.create({
         allowSpaces: false,
         items: ({ query }) => {
           const q = query.toLowerCase().trim()
-          return SLASH_ITEMS.filter((i) => !q || (i.label + ' ' + i.keywords).toLowerCase().includes(q))
+          if (!q) return SLASH_ITEMS
+          // label starts with the query > label contains it > only a keyword matches; ties keep menu order
+          const rank = (i) => (i.label.toLowerCase().startsWith(q) ? 0 : i.label.toLowerCase().includes(q) ? 1 : i.keywords.toLowerCase().includes(q) ? 2 : 3)
+          return SLASH_ITEMS.map((i, n) => ({ i, n, r: rank(i) }))
+            .filter((x) => x.r < 3)
+            .sort((a, b) => a.r - b.r || a.n - b.n)
+            .map((x) => x.i)
         },
         allow: ({ state, range }) => state.doc.resolve(range.from).parent.type.name === 'paragraph',
         command: ({ editor, range, props }) => runSlash(editor, range, props),
@@ -325,6 +357,7 @@ export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta
         showOnlyCurrent: false,
         placeholder: ({ node, pos, editor: ed }) => {
           if (node.type.name === 'title') return 'Title'
+          if (node.type.name === 'detailsSummary') return 'Toggle title'
           const first = ed.state.doc.firstChild.nodeSize
           if (node.type.name === 'paragraph' && pos === first && ed.state.doc.childCount === 2)
             return isMobile() ? 'Start writing…' : 'Start writing, or type / for blocks'
@@ -333,8 +366,18 @@ export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta
       }),
       TaskList,
       TaskItem.configure({ nested: true }),
+      Callout,
+      TrailingParagraph,
+      Details.configure({ persist: true, HTMLAttributes: { class: 'toggle' } }),
+      DetailsSummary,
+      DetailsContent,
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Highlight,
       TitleKeys,
+      activeCell,
       keyboardExtras({ onLinkShortcut }),
       SlashCommands,
       metaPlugin(getMeta),

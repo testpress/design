@@ -44,7 +44,7 @@ export function isEmptyDoc(doc) {
   let hasContent = false
   walk(doc, (n) => {
     if (n.type === 'text' && (n.text || '').trim()) hasContent = true
-    if (n.type === 'horizontalRule' || n.type === 'taskItem') hasContent = true
+    if (n.type === 'horizontalRule' || n.type === 'taskItem' || n.type === 'table' || n.type === 'details') hasContent = true
   })
   return !hasContent
 }

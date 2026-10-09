@@ -1,8 +1,9 @@
 import { NotesStore } from './store.js'
 import { refreshIcons } from './icons.js'
+import { createTableUI } from './table-ui.js'
 import { SaveQueue, serverSim } from './save-queue.js'
 import { createNotesEditor, stateForDoc } from './editor.js'
-import { BLOCKS, DIVIDER, turnInto, insertDivider, currentBlockLabel, applyLink, MARKS, indentList, inList } from './blocks.js'
+import { BLOCKS, DIVIDER, TABLE, turnInto, insertDivider, insertTable, currentBlockLabel, applyLink, MARKS, indentList, inList } from './blocks.js'
 import { TextSelection, Selection } from '@tiptap/pm/state'
 
 const $ = (sel, root = document) => root.querySelector(sel)
@@ -188,6 +189,7 @@ store.onChange((id, kind) => {
 $('#save-retry').addEventListener('click', () => currentId && queue.retryNow(currentId))
 
 // ---- Editor ----------------------------------------------------------------------------------
+let tableUI = null // created right after the editor (callbacks can fire during editor setup)
 const editor = createNotesEditor({
   element: $('#editor-mount'),
   bubbleEl,
@@ -212,6 +214,7 @@ const editor = createNotesEditor({
     renderRowStatus()
   },
   onSelection: () => {
+    tableUI?.update()
     renderBubble()
     renderMobileBar()
   },
@@ -240,6 +243,7 @@ const editor = createNotesEditor({
   },
 })
 let focusTimer = 0
+tableUI = createTableUI({ editor, host: $('#notes-app'), scroller: $('#editor-scroll'), isMobile })
 window.__notesEditor = editor // handy for debugging in the preview
 window.__notesStore = store
 
@@ -425,7 +429,25 @@ function renderBubble(force = false) {
     }
     // size changed -> reposition
     editor.view.dispatch(editor.state.tr.setMeta('bubbleMenu$', 'updatePosition'))
+    placePanel()
   }
+}
+
+// The panel opens below the toolbar; flip it above when the window has no room underneath,
+// otherwise a selection near the bottom of the screen would push the menu out of reach.
+function placePanel() {
+  const apply = () => {
+    const pop = bubbleEl.querySelector('.bm-pop')
+    if (!pop) return
+    pop.classList.remove('bm-pop--up')
+    const vv = window.visualViewport
+    const bottom = (vv ? vv.offsetTop + vv.height : innerHeight) - 8
+    const bar = bubbleEl.querySelector('.bm-bar').getBoundingClientRect()
+    const need = pop.offsetHeight + 6
+    if (bar.bottom + need > bottom && bar.top - need > 8) pop.classList.add('bm-pop--up')
+  }
+  apply()
+  requestAnimationFrame(() => requestAnimationFrame(apply)) // again once BubbleMenu has repositioned
 }
 
 function setBubbleMode(mode) {
@@ -561,6 +583,7 @@ function renderMobileBar() {
       mb('task', 'list-checks', 'Checklist', ed.isActive('taskList')) +
       mb('bullet', 'list', 'Bulleted list', ed.isActive('bulletList')) +
       (inList(ed) ? mb('outdent', 'indent-decrease', 'Outdent') + mb('indent', 'indent-increase', 'Indent') : '') +
+      (ed.isActive('table') ? mb('addrow', 'between-horizontal-end', 'Add row') + mb('addcol', 'between-vertical-end', 'Add column') + mb('deltable', 'trash-2', 'Delete table') : '') +
       mb('undo', 'undo-2', 'Undo') +
       mb('hide', 'keyboard-off', 'Hide keyboard')
     // "Aa" is a text label chip rather than a dropdown arrow
@@ -575,7 +598,7 @@ function renderMobileBar() {
   tray.hidden = !(mobile.tray && !sel)
   if (!tray.hidden) {
     tray.innerHTML = `<div class="tray-label">Turn this line into</div><div class="tray-row">${BLOCKS.map((b) => `<button type="button" tabindex="-1" data-tray="${b.id}" class="tray-chip ${b.active(ed) ? 'is-on' : ''}" aria-pressed="${b.active(ed)}">${icon(b.icon)}<span>${b.label}</span></button>`).join('')}</div>
-      <div class="tray-label">Insert</div><div class="tray-row"><button type="button" tabindex="-1" data-tray="divider" class="tray-chip">${icon(DIVIDER.icon)}<span>${DIVIDER.label}</span></button></div>`
+      <div class="tray-label">Insert</div><div class="tray-row">${[DIVIDER, TABLE].map((x) => `<button type="button" tabindex="-1" data-tray="${x.id}" class="tray-chip">${icon(x.icon)}<span>${x.label}</span></button>`).join('')}</div>`
     refreshIcons(tray)
   }
 }
@@ -621,6 +644,7 @@ mbar.addEventListener('click', (e) => {
   const chip = e.target.closest('[data-tray]')
   if (chip) {
     if (chip.dataset.tray === 'divider') insertDivider(editor)
+    else if (chip.dataset.tray === 'table') insertTable(editor)
     else turnInto(editor, chip.dataset.tray)
     return renderMobileBar()
   }
@@ -635,6 +659,9 @@ mbar.addEventListener('click', (e) => {
   else if (m === 'bullet') editor.chain().focus().toggleBulletList().run()
   else if (m === 'indent') indentList(editor, 1)
   else if (m === 'outdent') indentList(editor, -1)
+  else if (m === 'addrow') editor.chain().focus().addRowAfter().run()
+  else if (m === 'addcol') editor.chain().focus().addColumnAfter().run()
+  else if (m === 'deltable') editor.chain().focus().deleteTable().run()
   else if (m === 'undo') editor.chain().focus().undo().run()
   else if (m === 'hide') {
     mobile.tray = false
@@ -697,6 +724,9 @@ document.addEventListener('keydown', (e) => {
     bubble.kbd = true
     bubble.focusAct = null
     setBubbleMode('main')
+  } else if (e.key === 'F10' && !isMobile() && editor.state.selection.empty && editor.view.hasFocus() && tableUI?.inTable()) {
+    e.preventDefault()
+    tableUI.focusControls()
   } else if (mod && e.key === '/') {
     e.preventDefault()
     toggleHelp()
@@ -754,6 +784,8 @@ const SHORTCUTS = [
     ['Plain text', `${MOD}${A}0`],
     ['Bulleted / numbered / checklist', `${MOD}${S}8  7  9`],
     ['Quote', `${MOD}${S}B`],
+    ['Move between table cells (adds a row at the end)', `Tab  ${S}Tab`],
+    ['Table column / row menus (caret in a table)', 'F10  then  Enter'],
     ['Code block', `${MOD}${A}C`],
     ['Divider', `${MOD}${A}D`],
   ]],
