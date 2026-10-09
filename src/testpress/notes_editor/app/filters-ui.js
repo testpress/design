@@ -298,7 +298,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     }
   })
   document.addEventListener('mousedown', (e) => {
-    if (!pop.hidden && !e.target.closest('.lib-pop, #filter-folder, #filter-tags')) close(false)
+    if (!pop.hidden && !e.target.closest('.lib-pop, #filter-folder, #filter-tags, #nav-tags-menu')) close(false)
   })
   window.addEventListener('resize', () => !pop.hidden && position())
 
@@ -315,5 +315,15 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
       changed()
     },
     refresh: renderButtons,
+    // used by the nav pane so both views drive the same state
+    setFolder: (name) => {
+      state.folder = name || null
+      changed()
+    },
+    toggleTag: (t) => {
+      state.tags.has(t) ? state.tags.delete(t) : state.tags.add(t)
+      changed()
+    },
+    openTags: (el) => open('tags', el),
   }
 }

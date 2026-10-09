@@ -479,6 +479,13 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
   document.addEventListener('mousedown', (e) => {
     if (openKind && !e.target.closest('.tbl-menu, .tbl-grip')) closeMenu()
   })
+  // Esc closes the menu even when it was opened with the mouse and focus is still in the note
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !openKind || menu.contains(document.activeElement)) return
+    e.preventDefault()
+    e.stopPropagation()
+    closeMenu(true)
+  }, true)
 
   menu.addEventListener('keydown', (e) => {
     const items = [...menu.querySelectorAll('.tbl-item')]

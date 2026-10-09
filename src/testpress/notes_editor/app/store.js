@@ -70,7 +70,7 @@ export class NotesStore {
 
   create({ folder = null, tags = [] } = {}) {
     const id = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5)
-    this.#put({ id, doc: emptyDoc(), folder, tags, updatedAt: Date.now(), rev: 1, savedRev: 0, createdThisSession: true })
+    this.#put({ id, doc: emptyDoc(), folder, tags, createdAt: Date.now(), updatedAt: Date.now(), rev: 1, savedRev: 0, createdThisSession: true })
     this.#persistNow(id)
     this.#emit(id, 'create')
     return id

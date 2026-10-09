@@ -3,6 +3,7 @@ import { refreshIcons } from './icons.js'
 import { createTableUI } from './table-ui.js'
 import { createMetaUI } from './meta-ui.js'
 import { createFiltersUI } from './filters-ui.js'
+import { createNavUI } from './nav-ui.js'
 import { CellSelection } from '@tiptap/pm/tables'
 import { SaveQueue, serverSim } from './save-queue.js'
 import { createNotesEditor, stateForDoc } from './editor.js'
@@ -45,8 +46,13 @@ const filters = createFiltersUI({
   folderBtn: $('#filter-folder'),
   tagsBtn: $('#filter-tags'),
   clearBtn: $('#filter-clear'),
-  onChange: () => renderList(),
+  onChange: () => {
+    renderList()
+    navUI?.render()
+    renderListHeader()
+  },
 })
+let navUI = null
 
 const queue = new SaveQueue(store, (id, state) => {
   if (id === currentId) renderStatus()
@@ -54,9 +60,21 @@ const queue = new SaveQueue(store, (id, state) => {
 })
 
 // ---- List ------------------------------------------------------------------------------------
+let sortBy = (() => {
+  try {
+    return localStorage.getItem('tpnotes:v1:sort') || 'modified'
+  } catch (e) {
+    return 'modified'
+  }
+})()
+const SORT_LABEL = { modified: 'Modified', created: 'Created', title: 'Title' }
+
 function reorder() {
-  order = store.all().map((n) => n.id)
-  sortStamp = new Map(order.map((id) => [id, store.get(id).updatedAt]))
+  const all = [...store.notes.values()]
+  const stamp = (n) => (sortBy === 'created' ? n.createdAt || n.updatedAt : sortBy === 'title' ? (n.title.trim()[0] || '#').toUpperCase() : n.updatedAt)
+  all.sort((a, b) => (sortBy === 'title' ? a.title.localeCompare(b.title) : stamp(b) - stamp(a)))
+  order = all.map((n) => n.id)
+  sortStamp = new Map(all.map((n) => [n.id, stamp(n)]))
 }
 
 function relTime(ts) {
@@ -71,6 +89,7 @@ function relTime(ts) {
 }
 
 function groupLabel(ts) {
+  if (typeof ts === 'string') return /[A-Z]/.test(ts) ? ts : '#' // sorted by title: one group per letter
   const t = new Date(ts)
   const today = new Date()
   const yest = new Date(today.getTime() - 864e5)
@@ -130,7 +149,10 @@ function renderList() {
     const n = store.get(id)
     const g = groupLabel(sortStamp.get(id) ?? n.updatedAt)
     if (g !== last) {
-      html += `<div class="list-group" role="presentation">${g}</div>`
+      // the first group header carries the sort control, as in the handoff ("Today ........ Modified v")
+      html += last === ''
+        ? `<div class="list-group list-group--sort" role="presentation"><span>${g}</span><button type="button" class="list-sort" data-sort-btn aria-haspopup="menu" aria-expanded="false" aria-label="Sort by ${SORT_LABEL[sortBy]}">${SORT_LABEL[sortBy]}${icon('chevron-down', 'size-3')}</button></div>`
+        : `<div class="list-group" role="presentation">${g}</div>`
       last = g
     }
     html += rowHTML(n)
@@ -357,7 +379,10 @@ function deleteNotes(ids, { focusNext } = {}) {
   showUndo(ids)
   if (hadListFocus) (listEl.querySelector(`[data-id="${focusNext || next}"]`) || listEl.querySelector('.note-row'))?.focus()
 }
-$('#delete-note').addEventListener('click', () => currentId && deleteNotes([currentId]))
+$('#delete-note').addEventListener('click', () => {
+  closeMiniMenu(false)
+  if (currentId) deleteNotes([currentId])
+})
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || !selectMode || e.defaultPrevented) return
@@ -403,6 +428,154 @@ rowDel.addEventListener('click', () => {
   deleteNotes([rowDelId])
 })
 
+// ---- Layout stages, header, small menus -------------------------------------------------------
+// Stage 1: nav + list + editor. Stage 2: list + editor. Stage 3: editor only (focus mode).
+// A narrow window never gets stage 1, so the editor always keeps a readable width.
+const lsGet = (k, d) => {
+  try {
+    return localStorage.getItem('tpnotes:v1:' + k) ?? d
+  } catch (e) {
+    return d
+  }
+}
+const lsSet = (k, v) => {
+  try {
+    localStorage.setItem('tpnotes:v1:' + k, v)
+  } catch (e) {}
+}
+let stagePref = Number(lsGet('stage', '1')) || 1
+let lastSplit = Number(lsGet('stageSplit', '1')) === 2 ? 2 : 1
+const MIN_APP_WIDTH_FOR_NAV = 1120
+const minStage = () => (app.getBoundingClientRect().width < MIN_APP_WIDTH_FOR_NAV ? 2 : 1)
+const effectiveStage = () => (isMobile() ? 2 : Math.max(stagePref, minStage()))
+
+function applyStage() {
+  const s = effectiveStage()
+  app.dataset.stage = String(s)
+  $('#nav-expand').hidden = !(s === 2 && !isMobile() && minStage() === 1)
+  const ft = $('#focus-toggle')
+  ft.innerHTML = icon(s === 3 ? 'minimize-2' : 'maximize-2', 'size-4')
+  ft.setAttribute('aria-label', s === 3 ? 'Leave focus mode' : 'Focus mode: hide the lists')
+  ft.title = (s === 3 ? 'Leave focus mode' : 'Focus mode') + `  (${MOD}${isMac ? '⇧' : 'Shift+'}\\)`
+  refreshIcons(ft)
+  document.querySelectorAll('#stage-switch [data-stage]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.stage) === s)))
+  renderListHeader()
+}
+function setStage(n) {
+  if (n === 1 || n === 2) {
+    lastSplit = n
+    lsSet('stageSplit', String(n))
+  }
+  stagePref = n
+  lsSet('stage', String(n))
+  applyStage()
+}
+function toggleFocusMode() {
+  if (effectiveStage() === 3) setStage(lastSplit)
+  else {
+    lastSplit = effectiveStage() === 1 ? 1 : 2
+    lsSet('stageSplit', String(lastSplit))
+    setStage(3)
+    editor.view.focus()
+  }
+}
+function toggleNav() {
+  if (effectiveStage() === 3) return setStage(lastSplit)
+  if (minStage() === 2) return // too narrow for the nav pane
+  setStage(effectiveStage() === 1 ? 2 : 1)
+}
+$('#nav-collapse').addEventListener('click', () => setStage(2))
+$('#nav-expand').addEventListener('click', () => setStage(1))
+$('#focus-toggle').addEventListener('click', toggleFocusMode)
+new ResizeObserver(() => applyStage()).observe(app)
+
+// "All notes 94" in stage 1 (the folder pane shows where you are); "My Notes v" when the nav pane is hidden.
+function renderListHeader() {
+  const s = Number(app.dataset.stage || 1)
+  const f = filters.state.folder
+  $('#list-title').hidden = s >= 2
+  $('#space-switch').hidden = s === 1
+  $('#list-title-text').textContent = f || (filters.state.tags.size ? 'Filtered notes' : 'All notes')
+  $('#space-switch-text').textContent = 'My Notes'
+}
+
+// ---- tiny popup menus (sort, space, note options)
+let miniMenu = null
+let miniAnchor = null
+function openMiniMenu(menu, anchor, align = 'end', current) {
+  closeMiniMenu()
+  menu.hidden = false
+  miniMenu = menu
+  miniAnchor = anchor
+  anchor.setAttribute('aria-expanded', 'true')
+  menu.querySelectorAll('[role="menuitemradio"]').forEach((b) => b.setAttribute('aria-checked', String(!!current && (b.dataset.sort || b.dataset.space) === current())))
+  refreshIcons(menu)
+  const r = anchor.getBoundingClientRect()
+  const w = menu.offsetWidth
+  const vv = window.visualViewport
+  const vw = vv ? vv.width : innerWidth
+  const left = align === 'end' ? r.right - w : r.left
+  menu.style.left = Math.min(Math.max(8, left), vw - w - 8) + 'px'
+  menu.style.top = r.bottom + 6 + 'px'
+  ;(menu.querySelector('[aria-checked="true"]') || menu.querySelector('button:not([disabled])'))?.focus()
+}
+function closeMiniMenu(refocus = false) {
+  if (!miniMenu) return
+  miniMenu.hidden = true
+  miniAnchor?.setAttribute('aria-expanded', 'false')
+  if (refocus) miniAnchor?.focus()
+  miniMenu = null
+}
+document.addEventListener('mousedown', (e) => {
+  if (miniMenu && !e.target.closest('.mini-menu') && e.target !== miniAnchor && !miniAnchor?.contains(e.target)) closeMiniMenu()
+})
+document.addEventListener('keydown', (e) => {
+  if (!miniMenu || !miniMenu.contains(document.activeElement)) return
+  const items = [...miniMenu.querySelectorAll('button:not([disabled])')]
+  const i = items.indexOf(document.activeElement)
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    items[(i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length].focus()
+  } else if (e.key === 'Escape') {
+    e.preventDefault()
+    e.stopPropagation()
+    closeMiniMenu(true)
+  } else if (e.key === 'Tab') {
+    closeMiniMenu(true)
+    e.preventDefault()
+  }
+}, true)
+
+$('#sort-menu').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-sort]')
+  if (!b) return
+  sortBy = b.dataset.sort
+  lsSet('sort', sortBy)
+  closeMiniMenu(false)
+  reorder()
+  renderList()
+  listEl.querySelector('[data-sort-btn]')?.focus()
+})
+$('#note-menu-btn').addEventListener('click', () => (miniMenu === $('#note-menu') ? closeMiniMenu(true) : openMiniMenu($('#note-menu'), $('#note-menu-btn'), 'end')))
+$('#space-switch').addEventListener('click', () => (miniMenu === $('#space-menu') ? closeMiniMenu(true) : openMiniMenu($('#space-menu'), $('#space-switch'), 'start', () => 'mine')))
+$('#space-menu').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-space]')
+  if (b && !b.disabled) {
+    closeMiniMenu(false)
+    switchSpace(b.dataset.space)
+  }
+})
+// spaces: My Notes is the only one until Shared with Me lands
+function switchSpace() {}
+$('#space-mine').addEventListener('click', () => switchSpace('mine'))
+$('#space-shared').addEventListener('click', () => switchSpace('shared'))
+
+// folders + tags in the nav pane
+navUI = createNavUI({ store, filters, foldersEl: $('#nav-folders'), tagsEl: $('#nav-tags'), newFolderBtn: $('#nav-new-folder'), tagsMenuBtn: $('#nav-tags-menu') })
+
+// layout switch for reviewers (mirrors the handoff's "1 / 2 / 3" control)
+document.querySelectorAll('#stage-switch [data-stage]').forEach((b) => b.addEventListener('click', () => setStage(Number(b.dataset.stage))))
+
 // ---- Save status -----------------------------------------------------------------------------
 function renderStatus() {
   const st = currentId ? queue.stateOf(currentId) : 'idle'
@@ -413,6 +586,10 @@ function renderStatus() {
 }
 
 store.onChange((id, kind) => {
+  if (['meta', 'folders', 'delete', 'restore', 'create', 'remove'].includes(kind)) {
+    navUI?.render()
+    renderListHeader()
+  }
   if (kind === 'meta' && id) {
     queue.schedule(id)
     if (id === currentId) refreshMetaLine()
@@ -574,6 +751,8 @@ $('#new-note-m')?.addEventListener('click', newNote)
 
 listEl.addEventListener('click', (e) => {
   if (e.target.closest('[data-clear-filters]')) return filters.clear()
+  const sortBtn = e.target.closest('[data-sort-btn]')
+  if (sortBtn) return openMiniMenu($('#sort-menu'), sortBtn, 'start', () => sortBy)
   const row = e.target.closest('[data-id]')
   if (!row) return
   // select mode, or Cmd/Ctrl/Shift-click: pick notes instead of opening them
@@ -997,12 +1176,16 @@ document.addEventListener('keydown', (e) => {
   } else if (mod && e.altKey && e.code === 'KeyT' && currentId && !isMobile()) {
     e.preventDefault()
     metaUI.openTagsFromKeyboard()
+  } else if (mod && e.code === 'Backslash' && !isMobile()) {
+    e.preventDefault()
+    e.shiftKey ? toggleFocusMode() : toggleNav()
   } else if (mod && e.key === '/') {
     e.preventDefault()
     toggleHelp()
   } else if (mod && e.key.toLowerCase() === 'k') {
     e.preventDefault()
     if (isMobile() && app.dataset.view === 'editor') return
+    if (effectiveStage() === 3) setStage(lastSplit)
     searchEl.focus()
     searchEl.select()
   } else if (mod && e.altKey && e.code === 'KeyN') {
@@ -1036,6 +1219,8 @@ const SHORTCUTS = [
     ['New note', `${MOD}${A}N`],
     ['Search notes', `${MOD}K`],
     ['Open top search result', 'Enter in search'],
+    ['Hide / show the folders pane', `${MOD}\\`],
+    ['Focus mode (editor only)', `${MOD}${S}\\`],
     ['Move through the list', '↑ ↓  Home  End'],
     ['Open the selected note', 'Enter'],
     ['Back to the list from the editor', 'Esc'],
@@ -1128,6 +1313,7 @@ $('#sim-reset').addEventListener('click', () => {
 $('#sim-shortcuts').textContent = `${MOD}/ shows all keyboard shortcuts`
 
 // ---- Boot ------------------------------------------------------------------------------------
+applyStage()
 reorder()
 renderList()
 renderStatus()
