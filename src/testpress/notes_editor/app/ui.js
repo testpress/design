@@ -82,7 +82,7 @@ export const ui = {
   hr: 'border-0 border-t border-gray-300 [&.ProseMirror-selectednode]:border-primary-600',
   codeInline: 'rounded-[5px] bg-gray-100 px-[.35em] py-[.1em] text-[.88em] font-medium [font-family:ui-monospace,SFMono-Regular,Menlo,monospace] dark:bg-[#2a2a2a]',
   codeBlock: 'overflow-x-auto rounded-[10px] bg-[#0f1729] px-4 py-3.5 text-[14px] leading-[1.55] text-gray-200',
-  mark: 'rounded-[3px] bg-amber-100 px-[.1em] py-[.05em] text-inherit',
+  mark: 'rounded-[3px] bg-amber-100 px-[.1em] py-[.05em] text-inherit dark:bg-amber-400/30',
   link: 'cursor-text text-primary-700 underline underline-offset-2',
   callout: "relative rounded-[10px] border border-primary-100 bg-primary-50 py-2.5 pe-3.5 ps-11 before:absolute before:left-3.5 before:top-2.5 before:leading-[1.65] before:content-['💡'] [&>*+*]:mt-[.4em] dark:border-primary-500/25 dark:bg-primary-500/[.12]",
   toggle: "toggle flex items-start gap-1.5 [&>button]:grid [&>button]:h-7 [&>button]:w-6 [&>button]:flex-none [&>button]:place-items-center [&>button]:rounded-md [&>button]:text-gray-500 [&>button:hover]:bg-gray-100 [&>button::before]:content-['▸'] [&>button::before]:text-[15px] [&>button::before]:leading-none [&>button::before]:transition-transform [&.is-open>button::before]:rotate-90 [&>div]:min-w-0 [&>div]:flex-1",
@@ -102,8 +102,8 @@ export const ui = {
   metaChip: 'inline-flex cursor-pointer items-center gap-[5px] -ms-1.5 rounded-md px-1.5 py-0.5 hover:bg-gray-100 hover:text-gray-700 focus-visible:bg-gray-100 focus-visible:text-gray-700 focus-visible:outline-none',
   metaChipDim: 'inline-flex cursor-pointer items-center gap-[5px] -ms-1.5 rounded-md px-1.5 py-0.5 opacity-70 hover:bg-gray-100 hover:text-gray-700 focus-visible:bg-gray-100 focus-visible:text-gray-700 focus-visible:outline-none',
   metaDot: 'note-meta__dot text-[#c0c5cc]',
-  metaTag: 'note-meta__tag group/tag inline-flex items-center gap-0.5 rounded-md bg-gray-100 py-px pe-1 ps-[7px] text-gray-600',
-  metaTagX: 'size-4 cursor-pointer rounded-[4px] text-center text-sm leading-[14px] text-gray-400 opacity-0 hover:bg-gray-200 hover:text-gray-700 group-hover/tag:opacity-100 group-focus-within/tag:opacity-100',
+  metaTag: 'note-meta__tag group/tag inline-flex items-center gap-0.5 rounded-md bg-gray-100 py-px pe-1 ps-[7px] text-gray-600 dark:bg-white/10 dark:text-gray-300',
+  metaTagX: 'size-4 cursor-pointer rounded-[4px] text-center text-sm leading-[14px] text-gray-400 opacity-0 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/15 dark:hover:text-gray-100 group-hover/tag:opacity-100 group-focus-within/tag:opacity-100',
 
   // ---- slash menu + preview --------------------------------------------------------------------------------
   slashMenu: 'slash-menu fixed z-[90] max-h-[min(18rem,50vh)] w-60 overflow-y-auto overscroll-contain rounded-[10px] border border-gray-200 bg-white p-1 shadow-[0_10px_30px_rgba(17,24,39,.14)] [scroll-padding-bottom:46px] [scroll-padding-top:34px] max-lg:w-[min(18rem,calc(100vw-16px))] dark:border-[#3a3a3a] dark:bg-[#262626]',
@@ -167,13 +167,13 @@ export const ui = {
   bmApply: 'bm-apply h-[30px] rounded-md bg-primary-600 px-2.5 text-[13px] font-semibold text-white focus-visible:bg-white/[.16] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white',
 
   // ---- mobile format bar, link row and block tray ---------------------------------------------------------
-  mbBtn: 'mb-btn inline-flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-lg text-gray-700 disabled:opacity-[.35] dark:text-gray-200 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700',
-  mbBtnText: 'mb-btn mb-btn--text inline-flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-lg px-2.5 text-[15px] font-semibold text-gray-700 disabled:opacity-[.35] dark:text-gray-200 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700',
+  mbBtn: 'mb-btn inline-flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-lg text-gray-700 disabled:opacity-[.35] dark:text-gray-200 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700 dark:[&.is-on]:bg-primary-500/25 dark:[&.is-on]:text-primary-200',
+  mbBtnText: 'mb-btn mb-btn--text inline-flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-lg px-2.5 text-[15px] font-semibold text-gray-700 disabled:opacity-[.35] dark:text-gray-200 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700 dark:[&.is-on]:bg-primary-500/25 dark:[&.is-on]:text-primary-200',
   mbLink: 'mb-link flex w-full items-center gap-1.5 px-2',
-  mbInput: 'bm-input h-[34px] w-auto flex-1 rounded-md border border-gray-300 bg-white px-2 text-[16px] text-gray-900 shadow-none outline-none focus:shadow-none focus:ring-0',
+  mbInput: 'bm-input h-[34px] w-auto flex-1 rounded-md border border-gray-300 bg-white px-2 text-[16px] text-gray-900 shadow-none outline-none focus:shadow-none focus:ring-0 dark:border-[#444] dark:bg-[#2a2a2a] dark:text-gray-100',
   trayLabel: 'tray-label mb-1.5 mt-0.5 text-[11px] font-semibold uppercase tracking-[.05em] text-gray-400',
   trayRow: 'tray-row flex gap-1.5 overflow-x-auto pb-1.5 [scrollbar-width:none]',
-  trayChip: `tray-chip inline-flex h-9 flex-none items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[14px] text-gray-700 [&.is-on]:border-primary-600 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700 ${ring}`,
+  trayChip: `tray-chip inline-flex h-9 flex-none items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[14px] text-gray-700 dark:border-[#444] dark:bg-[#2a2a2a] dark:text-gray-200 [&.is-on]:border-primary-600 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700 dark:[&.is-on]:bg-primary-500/25 dark:[&.is-on]:text-primary-200 ${ring}`,
 
   // ---- slash-menu preview samples (blocks.js) --------------------------------------------------------------
   pvTask: 'flex items-center gap-1.5',
