@@ -9,7 +9,15 @@ const cleanFolder = (s) => s.trim().replace(/\s+/g, ' ').slice(0, 40)
 const cleanTag = (s) => s.trim().replace(/^#+/, '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 30)
 
 export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange, onHint = () => {} }) {
-  const state = { folder: null, tags: new Set() }
+  const readMode = () => {
+    try {
+      return localStorage.getItem('tpnotes:v1:tagMode') === 'any' ? 'any' : 'all'
+    } catch (e) {
+      return 'all'
+    }
+  }
+  // tagMode: 'all' = a note needs every selected tag (default), 'any' = at least one of them
+  const state = { folder: null, tags: new Set(), tagMode: readMode() }
   const pop = document.createElement('div')
   pop.className = 'meta-pop lib-pop'
   pop.hidden = true
@@ -28,7 +36,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     folderBtn.querySelector('.filter-btn__label').textContent = labelOf()
     folderBtn.classList.toggle('is-set', !!state.folder)
     const n = state.tags.size
-    tagsBtn.querySelector('.filter-btn__label').textContent = n ? `${n} tag${n > 1 ? 's' : ''}` : 'Tags'
+    tagsBtn.querySelector('.filter-btn__label').textContent = n ? `${n} tag${n > 1 ? 's' : ''}${n > 1 ? ` · ${state.tagMode}` : ''}` : 'Tags'
     tagsBtn.classList.toggle('is-set', n > 0)
     clearBtn.hidden = !state.folder && !n
   }
@@ -83,10 +91,11 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
       ? rows.map((r, i) => rowHTML(r, i)).join('')
       : `<div class="meta-pop__empty">${kind === 'folder' ? 'No folders yet. Type a name to create one.' : 'No tags yet. Add tags from a note.'}</div>`
     pop.innerHTML = `
-      <div class="meta-pop__head">${title}${kind === 'tags' ? '<span class="lib-hint"> · notes must have all selected</span>' : ''}</div>
+      <div class="meta-pop__head">${title}</div>
+      ${kind === 'tags' ? `<div class="lib-match" role="group" aria-label="How selected tags combine"><span>Show notes with</span><button type="button" tabindex="-1" data-match="all" aria-pressed="${state.tagMode === 'all'}">all</button><button type="button" tabindex="-1" data-match="any" aria-pressed="${state.tagMode === 'any'}">any</button><span>of them</span></div>` : ''}
       <input type="text" autocomplete="off" spellcheck="false" class="meta-pop__input" role="combobox" aria-expanded="true" aria-controls="lib-list" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" value="${esc(query)}">
       <div id="lib-list" class="meta-pop__list" role="listbox" ${kind === 'tags' ? 'aria-multiselectable="true"' : ''}>${body}</div>
-      <div class="meta-pop__foot">${kind === 'folder' ? 'F2 rename · ⌥P pin · Del delete' : 'Enter toggle · F2 rename · Del remove'}</div>`
+      <div class="meta-pop__foot">${kind === 'folder' ? 'F2 rename · ⌥P pin · Del delete' : 'Enter toggle · ⌥M all/any · F2 rename'}</div>`
     refreshIcons(pop)
     const el = pop.querySelector('input')
     if (focusInput && mode.type === 'browse') {
@@ -147,6 +156,14 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
       changed()
       paint()
     }
+  }
+
+  function setTagMode(mode) {
+    state.tagMode = mode === 'any' ? 'any' : 'all'
+    try {
+      localStorage.setItem('tpnotes:v1:tagMode', state.tagMode)
+    } catch (e) {}
+    changed()
   }
 
   function togglePin(name) {
@@ -217,6 +234,11 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     if (!e.target.closest('input')) e.preventDefault()
   })
   pop.addEventListener('click', (e) => {
+    const mm = e.target.closest('[data-match]')
+    if (mm) {
+      setTagMode(mm.dataset.match)
+      return paint(true) // keep the keyboard working (focus back in the search box)
+    }
     const act = e.target.closest('[data-act]')
     if (act && act.dataset.act === 'pin') return togglePin(act.dataset.k)
     if (act) {
@@ -300,6 +322,10 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (index >= 0) activate(rows[index])
+    } else if (e.altKey && e.code === 'KeyM' && kind === 'tags') {
+      e.preventDefault()
+      setTagMode(state.tagMode === 'all' ? 'any' : 'all')
+      paint()
     } else if (e.altKey && e.code === 'KeyP' && kind === 'folder' && rows[index] && !rows[index].fixed) {
       e.preventDefault()
       togglePin(rows[index].key)
@@ -326,7 +352,12 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     state,
     close,
     // does a note pass the current folder + tag filters?
-    matches: (n) => (!state.folder || n.folder === state.folder) && [...state.tags].every((t) => (n.tags || []).includes(t)),
+    matches: (n) => {
+      if (state.folder && n.folder !== state.folder) return false
+      if (!state.tags.size) return true
+      const has = (t) => (n.tags || []).includes(t)
+      return state.tagMode === 'any' ? [...state.tags].some(has) : [...state.tags].every(has)
+    },
     scoped: () => !!state.folder || state.tags.size > 0,
     clear: () => {
       state.folder = null
@@ -341,6 +372,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
       changed()
     },
     openFolders: (el) => open('folder', el),
+    setTagMode,
     toggleTag: (t) => {
       state.tags.has(t) ? state.tags.delete(t) : state.tags.add(t)
       changed()

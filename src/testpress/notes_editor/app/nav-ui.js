@@ -63,6 +63,8 @@ export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, t
       ? keep.map((t) => `<button type="button" class="nav-tag ${filters.state.tags.has(t) ? 'is-on' : ''}" data-tag="${esc(t)}" aria-pressed="${filters.state.tags.has(t)}" title="${tagCounts.get(t)} note${tagCounts.get(t) === 1 ? '' : 's'}">#${esc(t)}</button>`).join('') +
         (hidden > 0 ? `<button type="button" class="nav-tag nav-tag--more" data-more-tags aria-haspopup="dialog">+${hidden} more</button>` : '')
       : '<span class="nav-empty">No tags yet</span>'
+    // with 2+ tags selected, say how they combine (and let the student change it)
+    if (filters.state.tags.size >= 2) tagsEl.insertAdjacentHTML('beforeend', `<div class="nav-match" role="group" aria-label="How selected tags combine"><span>Match</span><button type="button" data-match="all" aria-pressed="${filters.state.tagMode === 'all'}" title="Notes that have every selected tag">all</button><button type="button" data-match="any" aria-pressed="${filters.state.tagMode === 'any'}" title="Notes that have at least one selected tag">any</button></div>`)
     refreshIcons(foldersEl)
     const input = foldersEl.querySelector('input')
     if (input) {
@@ -187,6 +189,8 @@ export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, t
   }, true)
 
   tagsEl.addEventListener('click', (e) => {
+    const mm = e.target.closest('[data-match]')
+    if (mm) return filters.setTagMode(mm.dataset.match)
     const more = e.target.closest('[data-more-tags]')
     if (more) return filters.openTags(more)
     const b = e.target.closest('[data-tag]')
