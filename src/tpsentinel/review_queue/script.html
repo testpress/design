@@ -1,0 +1,220 @@
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('reviewQueue', (data) => ({
+      cases: data.cases,
+      total: data.total_assigned,
+      selectedId: data.cases.length ? data.cases[0].id : null,
+      search: '',
+      mobileDetail: false,
+      choice: null,
+      notes: '',
+      viewer: { open: false, title: '', items: [], index: 0 },
+      toast: null,
+      toastTimer: null,
+
+      get filtered() {
+        const q = this.search.trim().toLowerCase();
+        if (!q) return this.cases;
+        return this.cases.filter((c) =>
+          [c.candidate.name, c.id, c.workspace].some((v) => v.toLowerCase().includes(q))
+        );
+      },
+
+      get current() {
+        return this.cases.find((c) => c.id === this.selectedId) || null;
+      },
+
+      get canSubmit() {
+        if (!this.current || this.current.stale || !this.choice) return false;
+        return this.choice === 'clear' || this.notes.trim().length > 0;
+      },
+
+      get submitLabel() {
+        if (this.choice === 'clear') return 'Submit as Clear';
+        if (this.choice === 'flagged') return 'Submit as Flagged';
+        return 'Submit decision';
+      },
+
+      get submitHint() {
+        if (!this.choice) return 'Choose Clear or Flagged first.';
+        if (this.choice === 'flagged' && !this.notes.trim()) return 'Add a note to submit as Flagged.';
+        return '';
+      },
+
+      get viewerItem() {
+        return this.viewer.items[this.viewer.index] || null;
+      },
+
+      severityClass(level) {
+        if (level === 'Critical') return 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400';
+        if (level === 'High') return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400';
+        return 'bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200';
+      },
+
+      identityClass(outcome) {
+        if (outcome === 'Matched') return 'bg-teal-100 text-teal-800 dark:bg-teal-500/20 dark:text-teal-400';
+        if (outcome === 'Did not match') return 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-400';
+        return 'bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200';
+      },
+
+      timingText(t) {
+        if (t.type === 'instant') return `At ${t.at} · ${t.sessions}`;
+        if (t.type === 'continuous') return `${t.duration} · ${t.range} · ${t.sessions}`;
+        return `Repeatedly between ${t.range} · ${t.sessions}`;
+      },
+
+      mediaStateLabel(state) {
+        return {
+          processing: 'Processing.',
+          failed: 'Upload failed.',
+          retention: 'Deleted after retention period.',
+          not_expected: 'No media for this signal.',
+          missing: 'Media missing.',
+        }[state] || 'No media.';
+      },
+
+      hasGaps(c) {
+        return c.coverage.some((cv) => cv.status === 'Gap');
+      },
+
+      select(id) {
+        if (id === this.selectedId) return;
+        this.selectedId = id;
+        this.choice = null;
+        this.notes = '';
+        window.scrollTo({ top: 0 });
+        this.$nextTick(() => {
+          const el = document.getElementById('case-' + id);
+          if (el) el.scrollIntoView({ block: 'nearest' });
+        });
+      },
+
+      open(id) {
+        this.select(id);
+        this.mobileDetail = true;
+        window.scrollTo({ top: 0 });
+      },
+
+      backToList() {
+        this.mobileDetail = false;
+        this.$nextTick(() => {
+          const el = document.getElementById('case-' + this.selectedId);
+          if (el) el.scrollIntoView({ block: 'center' });
+        });
+      },
+
+      move(step) {
+        const list = this.filtered;
+        if (!list.length) return;
+        const i = list.findIndex((c) => c.id === this.selectedId);
+        const next = i === -1 ? 0 : Math.min(Math.max(i + step, 0), list.length - 1);
+        this.select(list[next].id);
+      },
+
+      choose(value) {
+        if (!this.current || this.current.stale) return;
+        this.choice = value;
+        if (value === 'flagged') this.$nextTick(() => this.$refs.notes && this.$refs.notes.focus());
+      },
+
+      submit() {
+        if (!this.canSubmit) return;
+        const entry = this.current;
+        const filteredIndex = this.filtered.indexOf(entry);
+        const index = this.cases.indexOf(entry);
+
+        this.cases.splice(index, 1);
+        this.showToast({ entry, index, choice: this.choice, notes: this.notes });
+
+        // Advance to the case that now sits where the submitted one was.
+        const list = this.filtered.length ? this.filtered : this.cases;
+        const next = list[Math.min(filteredIndex, list.length - 1)] || list[0];
+        this.selectedId = null;
+        if (next) this.select(next.id);
+        this.choice = null;
+        this.notes = '';
+        if (document.activeElement) document.activeElement.blur();
+      },
+
+      undo() {
+        if (!this.toast) return;
+        const { entry, index, choice, notes } = this.toast;
+        this.cases.splice(index, 0, entry);
+        this.dismissToast();
+        this.selectedId = null;
+        this.select(entry.id);
+        this.choice = choice;
+        this.notes = notes;
+      },
+
+      showToast(t) {
+        clearTimeout(this.toastTimer);
+        this.toast = t;
+        this.toastTimer = setTimeout(() => this.dismissToast(), 8000);
+      },
+
+      dismissToast() {
+        clearTimeout(this.toastTimer);
+        this.toast = null;
+      },
+
+      refresh() {
+        const c = this.current;
+        if (!c || !c.stale) return;
+        c.latest_session = c.stale.refreshed_session;
+        c.recordings = c.stale.refreshed_recordings.concat(c.recordings);
+        c.sessions_total += 1;
+        c.stale = null;
+      },
+
+      openViewer(anomaly, index) {
+        this.viewer = { open: true, title: anomaly.name, items: anomaly.media.items, index };
+      },
+
+      openRecording(r) {
+        const items = this.current.recordings
+          .filter((x) => x.state === 'available')
+          .map((x) => ({ ...x, label: x.session + ' · ' + x.label }));
+        const index = items.findIndex((x) => x.src === r.src && x.session + ' · ' + r.label === x.label);
+        this.viewer = { open: true, title: 'Full session recordings', items, index: Math.max(index, 0) };
+      },
+
+      closeViewer() {
+        this.viewer.open = false;
+      },
+
+      stepViewer(step) {
+        const i = this.viewer.index + step;
+        if (i >= 0 && i < this.viewer.items.length) this.viewer.index = i;
+      },
+
+      onKey(e) {
+        if (this.viewer.open) {
+          if (e.key === 'Escape') this.closeViewer();
+          if (e.key === 'ArrowLeft') this.stepViewer(-1);
+          if (e.key === 'ArrowRight') this.stepViewer(1);
+          return;
+        }
+
+        const t = e.target;
+        const typing = t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && ['text', 'search'].includes(t.type));
+        if (typing) {
+          if (e.key === 'Escape') t.blur();
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && t.tagName === 'TEXTAREA') {
+            e.preventDefault();
+            this.submit();
+          }
+          return;
+        }
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+        const key = e.key.toLowerCase();
+        if (key === 'j') this.move(1);
+        else if (key === 'k') this.move(-1);
+        else if (key === 'c') this.choose('clear');
+        else if (key === 'f') { e.preventDefault(); this.choose('flagged'); }
+        else if (e.key === 'Enter' && this.canSubmit) { e.preventDefault(); this.submit(); }
+      },
+    }));
+  });
+</script>
