@@ -479,7 +479,7 @@ const lsSet = (k, v) => {
 }
 let stagePref = Number(lsGet('stage', '1')) || 1
 let lastSplit = Number(lsGet('stageSplit', '1')) === 2 ? 2 : 1
-const MIN_APP_WIDTH_FOR_NAV = 1120
+const MIN_APP_WIDTH_FOR_NAV = 1140
 const minStage = () => (app.getBoundingClientRect().width < MIN_APP_WIDTH_FOR_NAV ? 2 : 1)
 const effectiveStage = () => (isMobile() ? 2 : Math.max(stagePref, minStage()))
 
