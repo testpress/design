@@ -1,0 +1,152 @@
+<script src="/node_modules/preline/dist/preline.js"></script>
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('portalComponent', () => ({
+            isDirty: false,
+            currentView: 'logged',
+            settings: {
+                enabled: false,
+                label: 'Portals'
+            },
+            links: [],
+            editingId: null,
+            nextId: 1,
+            deletingLink: null,
+            
+            form: {
+                name: '',
+                url: '',
+                secret: '',
+                disabled: false,
+                public: false
+            },
+
+            init() {
+                this.$watch('settings.enabled', (value) => {
+                    this.markDirty();
+                    if (value) {
+                        this.showToast('Portals enabled. Add your links.', 'success');
+                    } else {
+                        this.showToast('Portals disabled. Your links are saved.', 'info');
+                    }
+                });
+                this.$watch('settings.label', () => this.markDirty());
+            },
+
+            get visibleLinks() {
+                return this.links.filter(link => 
+                    !link.disabled && (this.currentView === 'logged' || link.public)
+                );
+            },
+
+            get previewNote() {
+                if (!this.settings.enabled) {
+                    return "The Portals dropdown is hidden while the feature is disabled.";
+                }
+                if (this.currentView === "guest") {
+                    return "Visitors only see links enabled for public access.";
+                }
+                return "Students see all enabled links in the dropdown.";
+            },
+
+            get showSsoWarning() {
+                return this.form.secret.trim() !== '' && this.form.public;
+            },
+
+            markDirty() {
+                this.isDirty = true;
+            },
+
+            showToast(message, variant = 'success') {
+                this.$dispatch('toast', {
+                    title: message,
+                    variant: variant,
+                    position: 'bottom-center',
+                    duration: 2500
+                });
+            },
+
+            enablePortals() {
+                this.settings.enabled = true;
+            },
+
+            openAddLink() {
+                this.editingId = null;
+                this.form = {
+                    name: '',
+                    url: '',
+                    secret: '',
+                    disabled: false,
+                    public: false
+                };
+                this.$dispatch('open-drawer-add-link-drawer');
+            },
+
+            editLink(id) {
+                const link = this.links.find(l => l.id === id);
+                if (!link) return;
+                
+                this.editingId = id;
+                this.form = { ...link };
+                this.$dispatch('open-drawer-add-link-drawer');
+            },
+
+            confirmDelete(id) {
+                const link = this.links.find(l => l.id === id);
+                if (!link) return;
+                
+                this.deletingLink = link;
+                this.$dispatch('open-modal-delete-link-modal');
+            },
+
+            deleteLink() {
+                if (!this.deletingLink) return;
+                
+                this.links = this.links.filter(l => l.id !== this.deletingLink.id);
+                this.deletingLink = null;
+                this.markDirty();
+                this.showToast('Link deleted.', 'info');
+            },
+
+            saveLink() {
+                const data = { ...this.form };
+                
+                if (this.editingId !== null) {
+                    const index = this.links.findIndex(l => l.id === this.editingId);
+                    if (index !== -1) {
+                        this.links[index] = data;
+                        this.showToast('Link updated.');
+                    }
+                } else {
+                    this.links.push({ id: this.nextId++, ...data });
+                    this.showToast('Link added.');
+                }
+                
+                this.markDirty();
+                this.closeDrawer('add-link-drawer');
+            },
+
+            openSsoInfo() {
+                this.$dispatch('open-drawer-sso-drawer');
+            },
+
+            closeDrawer(id) {
+                this.$dispatch(`close-drawer-${id}`);
+            },
+
+            handleEscape() {
+                const ssoDrawer = document.getElementById('sso-drawer');
+                if (ssoDrawer && ssoDrawer.style.display !== 'none') {
+                    this.closeDrawer('sso-drawer');
+                } else {
+                    this.closeDrawer('add-link-drawer');
+                }
+            },
+
+            saveChanges() {
+                this.isDirty = false;
+                this.showToast('Changes saved successfully.', 'success');
+            }
+        }));
+    });
+</script>
