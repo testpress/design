@@ -7,19 +7,24 @@ import { refreshIcons } from './icons.js'
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 const cleanFolder = (s) => s.trim().replace(/\s+/g, ' ').slice(0, 40)
 
-export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, tagsMenuBtn }) {
+const FIND_BUTTON_MIN_FOLDERS = 8 // the magnifier only appears once the list is long enough to need it
+
+export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, tagsMenuBtn, findBtn, findRow, findInput, findClear }) {
   let mode = { type: 'idle' } // idle | create | rename:<name> | confirm:<name>
+  let findQuery = ''
+  const matches = (name) => !findQuery || name.toLowerCase().includes(findQuery.toLowerCase().replace(/^#/, ''))
 
   function render() {
     const counts = store.folderCounts()
     const total = store.notes.size
     const cur = filters.state.folder
-    const rows = [
+    const folders = store.folders().filter(matches)
+    const rows = findQuery ? [] : [
       `<button type="button" class="nav-row nav-row--all ${!cur ? 'is-active' : ''}" data-folder="" aria-current="${!cur}"><i data-lucide="layers" class="size-4"></i><span class="nav-row__label">All notes</span><span class="nav-row__count">${total}</span></button>`,
     ]
     if (mode.type === 'create')
       rows.push(`<div class="nav-row-edit"><input class="nav-rename" data-create aria-label="New folder name" placeholder="Folder name" autocomplete="off"></div>`)
-    store.folders().forEach((f) => {
+    folders.forEach((f) => {
       if (mode.type === 'rename' && mode.key === f) return rows.push(`<div class="nav-row-edit"><input class="nav-rename" data-rename="${esc(f)}" aria-label="Rename folder" value="${esc(f)}" autocomplete="off"></div>`)
       if (mode.type === 'confirm' && mode.key === f) {
         const n = counts.get(f) || 0
@@ -29,15 +34,18 @@ export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, t
         <button type="button" class="nav-row__main" data-folder-btn="${esc(f)}" aria-current="${cur === f}"><i data-lucide="folder" class="size-4"></i><span class="nav-row__label">${esc(f)}</span><span class="nav-row__count">${counts.get(f) || 0}</span></button>
         <span class="nav-actions"><button type="button" data-act="rename" data-k="${esc(f)}" aria-label="Rename ${esc(f)}"><i data-lucide="pencil" class="size-3.5"></i></button><button type="button" data-act="delete" data-k="${esc(f)}" aria-label="Delete ${esc(f)}"><i data-lucide="trash-2" class="size-3.5"></i></button></span></div>`)
     })
+    if (findQuery && !folders.length) rows.push('<div class="nav-empty">No folders match</div>')
     foldersEl.innerHTML = rows.join('')
+    findBtn.hidden = store.folders().length <= FIND_BUTTON_MIN_FOLDERS && !findQuery && findRow.hidden
 
     const tagCounts = store.tagCounts()
-    tagsEl.innerHTML = store.tags().length
-      ? store.tags().map((t) => `<button type="button" class="nav-tag ${filters.state.tags.has(t) ? 'is-on' : ''}" data-tag="${esc(t)}" aria-pressed="${filters.state.tags.has(t)}" title="${tagCounts.get(t)} note${tagCounts.get(t) === 1 ? '' : 's'}">#${esc(t)}</button>`).join('')
-      : '<span class="nav-empty">No tags yet</span>'
+    const shownTags = store.tags().filter(matches)
+    tagsEl.innerHTML = shownTags.length
+      ? shownTags.map((t) => `<button type="button" class="nav-tag ${filters.state.tags.has(t) ? 'is-on' : ''}" data-tag="${esc(t)}" aria-pressed="${filters.state.tags.has(t)}" title="${tagCounts.get(t)} note${tagCounts.get(t) === 1 ? '' : 's'}">#${esc(t)}</button>`).join('')
+      : `<span class="nav-empty">${findQuery ? 'No tags match' : 'No tags yet'}</span>`
     refreshIcons(foldersEl)
     const input = foldersEl.querySelector('input')
-    if (input) {
+    if (input && document.activeElement !== findInput) {
       input.focus()
       input.select()
     }
@@ -127,6 +135,73 @@ export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, t
     e.preventDefault()
     btns[(i + (e.key === 'ArrowRight' ? 1 : -1) + btns.length) % btns.length].focus()
   })
+
+  // ---- find box (folders + tags) and type-ahead -----------------------------------------------
+  function openFind() {
+    findRow.hidden = false
+    findBtn.hidden = false
+    findBtn.setAttribute('aria-expanded', 'true')
+    findInput.focus()
+    findInput.select()
+  }
+  function closeFind(refocus) {
+    findInput.value = ''
+    findQuery = ''
+    findRow.hidden = true
+    findBtn.setAttribute('aria-expanded', 'false')
+    render()
+    if (refocus) (findBtn.hidden ? foldersEl.querySelector('.nav-row--all') : findBtn)?.focus()
+  }
+  findBtn.addEventListener('click', () => (findRow.hidden ? openFind() : closeFind(true)))
+  findClear.addEventListener('click', () => closeFind(true))
+  findInput.addEventListener('input', () => {
+    findQuery = findInput.value.trim()
+    render()
+  })
+  findInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      return closeFind(true)
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      const first = foldersEl.querySelector('[data-folder-btn]')
+      if (first) {
+        filters.setFolder(first.dataset.folderBtn) // open the first match
+        closeFind(false)
+        foldersEl.querySelector('.nav-row.is-active .nav-row__main')?.focus()
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      ;(foldersEl.querySelector('[data-folder-btn], .nav-row--all') || tagsEl.querySelector('.nav-tag'))?.focus()
+    }
+  })
+
+  // Type letters on a focused folder row to jump to the folder that starts with them (like a file list).
+  let typed = ''
+  let typedTimer = 0
+  foldersEl.addEventListener('keydown', (e) => {
+    const cur = document.activeElement
+    if (!cur?.matches?.('.nav-row__main, .nav-row--all') || e.metaKey || e.ctrlKey || e.altKey) return
+    if (e.key === '/') {
+      e.preventDefault()
+      return openFind()
+    }
+    if (e.key.length !== 1 || e.key === ' ') {
+      typed = '' // Enter, arrows, Tab... end the current word
+      return
+    }
+    e.preventDefault()
+    clearTimeout(typedTimer)
+    typed += e.key.toLowerCase()
+    typedTimer = setTimeout(() => (typed = ''), 700)
+    const btns = [...foldersEl.querySelectorAll('[data-folder-btn]')]
+    const start = btns.indexOf(cur) + 1
+    const order = [...btns.slice(start), ...btns.slice(0, start)]
+    const hit = order.find((b) => b.dataset.folderBtn.toLowerCase().startsWith(typed)) || order.find((b) => b.dataset.folderBtn.toLowerCase().includes(typed))
+    hit?.focus()
+  }, true)
 
   newFolderBtn.addEventListener('click', () => setMode({ type: 'create' }))
   tagsMenuBtn.addEventListener('click', () => filters.openTags(tagsMenuBtn))

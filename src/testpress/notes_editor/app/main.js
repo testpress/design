@@ -678,7 +678,7 @@ $('#space-shared').addEventListener('click', () => switchSpace('shared'))
 $('#space-menu').addEventListener('keydown', () => {})
 
 // folders + tags in the nav pane
-navUI = createNavUI({ store, filters, foldersEl: $('#nav-folders'), tagsEl: $('#nav-tags'), newFolderBtn: $('#nav-new-folder'), tagsMenuBtn: $('#nav-tags-menu') })
+navUI = createNavUI({ store, filters, foldersEl: $('#nav-folders'), tagsEl: $('#nav-tags'), newFolderBtn: $('#nav-new-folder'), tagsMenuBtn: $('#nav-tags-menu'), findBtn: $('#nav-find'), findRow: $('#nav-find-row'), findInput: $('#nav-find-input'), findClear: $('#nav-find-clear') })
 
 // layout switch for reviewers (mirrors the handoff's "1 / 2 / 3" control)
 document.querySelectorAll('#stage-switch [data-stage]').forEach((b) => b.addEventListener('click', () => setStage(Number(b.dataset.stage))))
