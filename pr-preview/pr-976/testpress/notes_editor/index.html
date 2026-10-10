@@ -76,138 +76,21 @@
   </script>
   
   <style>
-  /* Notes editor prototype. Structural + ProseMirror styles live here; colours come from the
-     Testpress primary scale (--color-primary-*) set in layout/base.html. */
-  /* On :root, not .notes-app: the slash menu is appended to <body> and must see these too. */
+  .lib-match { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; white-space: nowrap; padding: 0 4px 8px; }
   :root { --p600: rgb(var(--color-primary-600)); --p700: rgb(var(--color-primary-700)); --p50: rgb(var(--color-primary-50)); --p100: rgb(var(--color-primary-100)); }
-  .notes-app {
-    display: flex; height: calc(100dvh - 3.75rem); background: #fff; position: relative; color: #111827; }
-  .dark .notes-app { background: #171717; color: #e5e7eb; }
-  .notes-app [hidden], .notes-app[hidden] { display: none !important; }
-
-  /* ---- nav pane (stage 1), stages ---- */
-  .nav-pane { width: 13.5rem; flex: none; display: flex; flex-direction: column; min-height: 0; background: #fff; border-inline-end: 1px solid #eceef1; padding: 0 8px; }
-  .dark .nav-pane { background: #1a1a1a; border-color: #2e2e2e; }
-  .nav-pane__head { display: flex; align-items: center; justify-content: space-between; padding: 14px 4px 10px 8px; }
-  .nav-pane__title { font-size: 15px; font-weight: 600; color: #111827; }
-  .dark .nav-pane__title { color: #fff; }
-  .nav-spaces { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; }
-  .nav-space { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 8px; font-size: 14px; color: #4b5563; text-align: start; }
-  .nav-space:hover { background: #f3f4f6; }
-  .nav-space.is-active { background: #fff; color: #111827; font-weight: 600; box-shadow: 0 0 0 1px #e5e7eb, 0 1px 2px rgba(0,0,0,.04); }
-  .nav-space.is-active i { color: var(--p600); }
-  .nav-space:focus-visible, .nav-row:focus-visible, .nav-tag:focus-visible, .nav-plus:focus-visible { outline: 2px solid var(--p600); outline-offset: 1px; }
-  .nav-library { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 8px; }
-  .nav-section { display: flex; align-items: center; justify-content: space-between; padding: 14px 8px 6px 10px; font-size: 12px; font-weight: 500; color: #9ca3af; }
-  .nav-plus { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; color: #9ca3af; }
-  .nav-plus:hover { background: #f3f4f6; color: #374151; }
-  .nav-row { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; height: 34px; padding: 0 10px; border-radius: 8px; font-size: 14px; color: #4b5563; text-align: start; box-sizing: border-box; }
-  .nav-row:hover { background: #f3f4f6; }
-  .nav-row.is-active { background: var(--p50); color: var(--p700); font-weight: 600; }
-  .nav-row__main { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; height: 100%; padding: 0; text-align: start; color: inherit; font: inherit; border-radius: 8px; }
-  .nav-row:has(.nav-row__main) { padding: 0; }
-  .nav-row:has(.nav-row__main) .nav-row__main { padding: 0 10px; }
-  .nav-row-edit { padding: 2px 0; }
-  .nav-row__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .nav-row__count { font-size: 12px; font-weight: 400; color: #9ca3af; }
-  .nav-row.is-active .nav-row__count { color: var(--p700); opacity: .8; }
-  .nav-actions { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); display: inline-flex; gap: 2px; padding-left: 16px; opacity: 0; pointer-events: none; background: linear-gradient(to right, transparent, #f3f4f6 12px); border-radius: 0 8px 8px 0; }
-  .nav-row.is-active .nav-actions { background: linear-gradient(to right, transparent, var(--p50) 12px); }
-  .nav-row:hover .nav-actions, .nav-row:focus-within .nav-actions { opacity: 1; pointer-events: auto; }
-  .nav-row:hover .nav-row__count, .nav-row:focus-within .nav-row__count { visibility: hidden; }
-  .nav-row--all:hover .nav-row__count { visibility: visible; }
-  .nav-actions button { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; color: #6b7280; }
-  .nav-actions button:hover { background: rgba(0,0,0,.07); color: #111827; }
-  .nav-rename { width: 100%; height: 30px; border: 1px solid var(--p600); border-radius: 8px; padding: 0 8px; font-size: 14px; outline: none; box-shadow: none !important; background: #fff; }
-  .nav-find { display: flex; align-items: center; gap: 6px; margin: 0 4px 6px; padding: 0 4px 0 8px; height: 32px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
-  .nav-find[hidden] { display: none; }
-  .nav-find:focus-within { border-color: var(--p600); box-shadow: 0 0 0 3px rgb(var(--color-primary-500) / .15); }
-  .nav-find input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 13px; padding: 0; box-shadow: none !important; }
-  .nav-plus[hidden] { display: none; }
-  .nav-pin { color: var(--p600); }
-  .nav-row--more { color: #6b7280; }
-  .nav-row--more .nav-row__chev { color: #9ca3af; }
-  .nav-row--more:hover { color: #111827; }
-  .nav-tag--more { color: var(--p700); font-weight: 500; }
   .lib-lead { flex: none; color: #6b7280; }
   .lib-row.is-active .lib-lead { color: #374151; }
   .lib-row.is-create .lib-lead { color: var(--p700); }
   .lib-pin { color: var(--p600) !important; flex: none; }
-  .hint-toast { z-index: 98; bottom: 72px; max-width: min(28rem, calc(100% - 32px)); text-align: center; line-height: 1.4; }
-  .hint-toast[hidden] { display: none; }
-  .nav-match, .lib-match { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; white-space: nowrap; }
-  .nav-match { flex-basis: 100%; padding: 8px 6px 0 6px; }   /* lines up with the "Tags" label above */
   .lib-match { padding: 0 4px 8px; }
   .seg { display: inline-flex; padding: 2px; border: 1px solid #e5e7eb; border-radius: 99px; background: #f3f4f6; }
   .seg button { padding: 1px 12px; border-radius: 99px; font-size: 12px; font-weight: 500; color: #6b7280; background: transparent; border: 0; }
   .seg button:hover { color: #111827; }
   .seg button[aria-pressed="true"] { background: #fff; color: var(--p700); font-weight: 600; box-shadow: 0 0 0 1px var(--p600) inset, 0 1px 2px rgba(0,0,0,.06); }
   .seg button:focus-visible { outline: 2px solid var(--p600); outline-offset: 1px; }
-  .nav-tags { display: flex; flex-wrap: wrap; gap: 4px 4px; padding: 2px 4px; }
-  .nav-tag { padding: 2px 8px; border-radius: 6px; font-size: 13px; color: #6b7280; }
-  .nav-tag:hover { background: #f3f4f6; color: #374151; }
-  .nav-tag.is-on { background: var(--p100); color: var(--p700); font-weight: 600; }
-  .nav-empty { padding: 4px 10px; font-size: 13px; color: #9ca3af; }
-  .nav-pane__foot { display: flex; align-items: center; gap: 6px; padding: 10px 8px 12px; font-size: 12px; color: #9ca3af; border-top: 1px solid #f0f1f3; }
-  .notes-app[data-stage="2"] .nav-pane, .notes-app[data-stage="3"] .nav-pane, .notes-app[data-stage="3"] .list-pane { display: none; }
-  .notes-app[data-stage="1"] .filters { display: none; }
-  /* list header: title (+ space switch when the nav pane is hidden) */
-  .list-title { display: flex; align-items: center; gap: 4px; min-width: 0; }
-  .list-title #notes-count { flex: none; margin-inline-start: 2px; }
-  .list-title__text { flex: 0 1 auto; min-width: 0; font-size: 15px; font-weight: 600; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .dark .list-title__text { color: #fff; }
-  .list-title__switch { white-space: nowrap; min-width: 0; flex: 0 1 auto; display: inline-flex; align-items: center; gap: 4px; font-size: 15px; font-weight: 600; color: #111827; padding: 2px 6px; margin-inline-start: -6px; border-radius: 6px; }
-  .list-title__switch:hover, .list-title__switch[aria-expanded="true"] { background: #eceff2; }
-  .list-title__switch:focus-visible { outline: 2px solid var(--p600); }
-  .list-group--sort { display: flex; align-items: center; justify-content: space-between; }
-  .list-sort { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; color: #9ca3af; padding: 1px 6px; border-radius: 5px; }
-  .list-sort:hover, .list-sort[aria-expanded="true"] { background: #eceff2; color: #374151; }
-  /* Shared with Me: read-only space */
-  .notes-app[data-space="shared"] #nav-library, .notes-app[data-space="shared"] #filters, .notes-app[data-space="shared"] #select-mode,
-  .notes-app[data-space="shared"] #new-note, .notes-app[data-space="shared"] #note-menu-btn, .notes-app[data-space="shared"] #save-status,
-  .notes-app[data-space="shared"] .list-pane__head .btn-new { display: none; }
-  .notes-app[data-space="shared"] .note-prose { cursor: auto; caret-color: transparent; }
-  .notes-app[data-space="shared"] .note-prose ::selection { background: rgb(var(--color-primary-500) / .22); }
   .note-meta--shared { gap: 10px; }
   .note-meta__from { color: #6b7280; }
   .note-meta__ro { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 500; color: #6b7280; background: #f3f4f6; border-radius: 99px; padding: 1px 8px 1px 6px; }
-  .list-title[hidden], .list-title__switch[hidden], #nav-expand[hidden] { display: none; }
-  .stage-switch { display: flex; flex-direction: column; gap: 4px; }
-  .stage-switch button { text-align: start; padding: 6px 10px; border-radius: 8px; border: 1px solid #e5e7eb; font-size: 13px; color: #4b5563; }
-  .stage-switch button[aria-pressed="true"] { background: #111827; color: #fff; border-color: #111827; }
-  .nav-space:disabled { opacity: .5; cursor: not-allowed; }
-  .mini-menu__item:disabled { opacity: .45; cursor: not-allowed; }
-  .mini-menu { position: fixed; z-index: 97; min-width: 11rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 10px 30px rgba(17,24,39,.14); padding: 4px; }
-  .mini-menu[hidden] { display: none; }
-  .mini-menu__item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 6px; font-size: 14px; color: #374151; text-align: start; }
-  .mini-menu__item:hover, .mini-menu__item:focus-visible { background: #f3f4f6; outline: none; }
-  .mini-menu__item[aria-checked="true"]::after { content: '✓'; margin-inline-start: auto; color: var(--p600); font-weight: 700; }
-  .mini-menu__item.is-danger { color: #b91c1c; }
-  .mini-menu__item.is-danger:hover, .mini-menu__item.is-danger:focus-visible { background: #fef2f2; }
-
-  /* ---- list pane ---- */
-  .list-pane { width: 21rem; flex: none; display: flex; flex-direction: column; border-inline-end: 1px solid #e5e7eb; background: #fafafa; min-height: 0; }
-  .dark .list-pane { background: #1c1c1c; border-color: #2e2e2e; }
-  .list-pane__head > * { min-width: 0; }
-  .list-pane__head > :last-child { flex: none; }
-  .list-pane__head > .list-title { flex: 1 1 auto; }
-  .list-pane__head { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 10px 16px; }
-  .btn-new { white-space: nowrap; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 8px; background: var(--p600); color: #fff; font-size: 14px; font-weight: 500; white-space: nowrap; flex: none; }
-  .btn-new:hover { background: var(--p700); }
-  .btn-new:focus-visible, .note-row:focus-visible, .tray-chip:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
-  .search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; }
-  .search:focus-within { border-color: var(--p600); box-shadow: 0 0 0 3px rgb(var(--color-primary-500) / .18); }
-  .search__input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding: 0; font-size: 14px; box-shadow: none !important; }
-  .search__input::-webkit-search-cancel-button { display: none; }
-  .search__kbd { font: 500 11px/1 system-ui; color: #9ca3af; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 5px; }
-  .filters { display: flex; align-items: center; gap: 6px; padding: 0 12px 8px; flex-wrap: wrap; }
-  .filter-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 13px; color: #4b5563; max-width: 11rem; }
-  .filter-btn__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .filter-btn:hover, .filter-btn[aria-expanded="true"] { border-color: #cbd0d6; background: #f9fafb; }
-  .filter-btn.is-set { background: var(--p50); border-color: var(--p600); color: var(--p700); font-weight: 500; }
-  .filter-btn:focus-visible, .filter-clear:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
-  .filter-clear { font-size: 12px; color: #6b7280; text-decoration: underline; padding: 0 4px; }
-  .list-empty__btn { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--p700); text-decoration: underline; }
   .lib-pop { width: 18rem; }
   .lib-hint { text-transform: none; letter-spacing: 0; font-weight: 400; }
   .lib-row { display: flex; align-items: center; gap: 8px; cursor: pointer; }
@@ -215,7 +98,6 @@
   .lib-count { font-size: 12px; color: #9ca3af; }
   .lib-check { width: 16px; height: 16px; border: 1px solid #cbd0d6; border-radius: 4px; display: grid; place-items: center; font-size: 11px; color: #fff; flex: none; }
   .lib-check.is-on { background: var(--p600); border-color: var(--p600); }
-  /* Rows have a fixed height and the rename/delete buttons overlay the right edge (no layout shift on hover) */
   .lib-pop .lib-row:not(.lib-confirm) { position: relative; height: 36px; box-sizing: border-box; padding-top: 0; padding-bottom: 0; }
   .lib-actions { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: inline-flex; gap: 2px; padding-left: 18px; opacity: 0; pointer-events: none; background: linear-gradient(to right, transparent, var(--p100) 14px); border-radius: 0 6px 6px 0; }
   .lib-row:hover .lib-actions, .lib-row.is-active .lib-actions { opacity: 1; pointer-events: auto; }
@@ -223,7 +105,6 @@
   .lib-actions button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 5px; color: #6b7280; }
   .lib-actions button:hover { background: rgba(0,0,0,.07); color: #111827; }
   .lib-rename { width: 100%; height: 28px; border: 1px solid var(--p600); border-radius: 6px; padding: 0 8px; font-size: 14px; outline: none; box-shadow: none !important; }
-  /* inline delete confirmation: a small card that replaces the row */
   .meta-pop__list { scroll-padding-bottom: 8px; }
   .lib-confirm { margin: 3px 0; padding: 10px 12px 12px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; }
   .lib-confirm__text { display: flex; flex-direction: column; gap: 2px; }
@@ -239,69 +120,6 @@
   .dark .lib-confirm__text strong { color: #fecaca; } .dark .lib-confirm__text span { color: #fca5a5; }
   .dark .lib-no { background: #333; border-color: #444; color: #e5e7eb; }
   .lib-yes:focus-visible, .lib-no:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
-  /* select mode, bulk delete, per-row delete, undo */
-  .list-pane__head[hidden], .select-bar[hidden] { display: none; }
-  .icon-btn { flex: none; width: 32px; height: 34px; display: grid; place-items: center; border-radius: 8px; color: #6b7280; }
-  .icon-btn:hover, .icon-btn[aria-pressed="true"] { background: #eceff2; color: #111827; }
-  .icon-btn:focus-visible, .editor-top__icon:focus-visible, .row-del:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
-  .select-bar { display: flex; align-items: center; gap: 8px; padding: 12px 12px 10px 10px; }
-  .select-bar__count { font-size: 14px; font-weight: 600; color: #111827; flex: 1; }
-  .select-bar__link { font-size: 13px; color: var(--p700); font-weight: 600; padding: 4px 6px; border-radius: 6px; }
-  .select-bar__link:hover { background: var(--p50); }
-  .select-bar__delete { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 8px; background: #dc2626; color: #fff; font-size: 13px; font-weight: 600; }
-  .select-bar__delete:hover:not(:disabled) { background: #b91c1c; }
-  .select-bar__delete:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
-  .select-bar__link:focus-visible, .select-bar__delete:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
-  .note-row__check { width: 16px; height: 16px; margin-inline-end: 8px; flex: none; border: 1.5px solid #cbd0d6; border-radius: 5px; display: grid; place-items: center; font-size: 11px; line-height: 1; color: #fff; align-self: center; }
-  .note-row__check.is-on { background: var(--p600); border-color: var(--p600); }
-  .note-row.has-check .note-row__sub { padding-inline-start: 24px; }
-  .note-row.is-selected { background: var(--p50); }
-  .row-del { position: absolute; right: 12px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; color: #6b7280; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 1px 2px rgba(0,0,0,.06); z-index: 3; }
-  .row-del:hover { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
-  .row-del[hidden] { display: none; }
-  .list-pane__scroll { position: relative; }
-  .editor-top__icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: #9ca3af; }
-  .editor-top__icon:hover { background: #f3f4f6; color: #374151; }
-  .undo-toast { display: flex; align-items: center; gap: 14px; z-index: 96; bottom: 24px; padding: 8px 8px 8px 16px; }
-  .undo-toast[hidden] { display: none; }
-  .undo-toast__btn { height: 28px; padding: 0 12px; border-radius: 6px; background: rgba(255,255,255,.14); color: #fff; font-weight: 600; font-size: 13px; }
-  .undo-toast__btn:hover, .undo-toast__btn:focus-visible { background: rgba(255,255,255,.26); outline: none; }
-  .list-pane__scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 8px; }
-  .list-pane__foot { display: flex; align-items: center; gap: 6px; padding: 10px 16px; font-size: 12px; color: #9ca3af; border-top: 1px solid #eee; }
-  .list-group { padding: 14px 10px 4px; font-size: 12px; font-weight: 500; color: #9ca3af; }
-  .note-row { display: block; width: 100%; text-align: start; padding: 9px 10px; border-radius: 8px; margin-bottom: 1px; }
-  .note-row:hover { background: #f1f3f5; }
-  .note-row.is-active { background: var(--p50); }
-  .dark .note-row:hover { background: #262626; } .dark .note-row.is-active { background: rgb(var(--color-primary-500) / .15); }
-  .note-row__top { display: flex; align-items: baseline; gap: 8px; }
-  .note-row__title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .note-row__title.is-derived { font-weight: 500; }
-  .note-row__time { font-size: 12px; color: #9ca3af; flex: none; }
-  .note-row__sub { display: block; font-size: 13px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-  .note-row mark { background: #fde68a; color: inherit; border-radius: 2px; }
-  .row-warn { color: #d97706; display: inline-flex; }
-  .list-empty { padding: 28px 16px; font-size: 14px; text-align: center; }
-
-  /* ---- editor pane ---- */
-  .editor-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
-  .editor-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  .editor-empty { flex: 1; display: grid; place-items: center; }
-  .editor-top { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 20px; flex: none; }
-  .editor-top__back, .editor-top__new { display: none; }
-  .save-status { display: inline-flex; align-items: center; font-size: 13px; color: #9ca3af; min-height: 20px; }
-  .status-dot { width: 6px; height: 6px; border-radius: 99px; background: currentColor; margin-inline-end: 6px; }
-  .save-status[data-state="saving"] .status-dot, .save-status[data-state="still"] .status-dot { animation: pulse 1s ease-in-out infinite; }
-  .save-status[data-state="error"] { color: #b45309; font-weight: 500; }
-  .save-status[data-state="idle"] .status-dot { background: var(--p600); }
-  @keyframes pulse { 50% { opacity: .25 } }
-  .editor-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 35vh; }
-  .editor-scroll.is-scroll-locked { overflow-y: hidden; padding-right: var(--sbw, 0px); }
-  .editor-column { max-width: 46rem; margin: 0 auto; padding: 24px 40px 0; }
-  .save-strip { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: #fffbeb; color: #92400e; font-size: 13px; border-top: 1px solid #fde68a; }
-  .save-strip__retry { margin-inline-start: auto; font-weight: 600; text-decoration: underline; }
-  .toast { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); background: #111827; color: #fff; font-size: 13px; padding: 10px 14px; border-radius: 8px; max-width: 90%; z-index: 30; }
-
-  /* ---- ProseMirror content ---- */
   .note-prose { outline: none; font-size: 17px; line-height: 1.65; color: #1f2937; caret-color: var(--p600); word-break: break-word; }
   .dark .note-prose { color: #e5e7eb; }
   .note-prose > * + * { margin-top: .6em; }
@@ -318,7 +136,6 @@
   .note-prose li::marker { color: #9ca3af; }
   .note-prose ul[data-type="taskList"] { list-style: none; padding: 0; }
   .note-prose ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 10px; }
-  /* label is exactly one text line high, so the box centres on the first line and the row adds no extra height */
   .note-prose ul[data-type="taskList"] li > label { flex: none; display: flex; align-items: center; height: 1.65em; margin: 0; user-select: none; }
   .note-prose ul[data-type="taskList"] li > label input { width: 18px; height: 18px; border-radius: 5px; cursor: pointer; margin: 0; color: var(--p600); flex: none; }
   .note-prose ul[data-type="taskList"] li > div { flex: 1; min-width: 0; }
@@ -346,7 +163,6 @@
   .note-meta--empty { opacity: 0; transition: opacity .15s; }
   .note-meta--empty:hover, .note-meta--empty:focus-within, .note-prose:focus-within .note-meta--empty { opacity: 1; }
   .note-meta__dot { color: #c0c5cc; }
-  /* folder / tag popover */
   .meta-pop { position: fixed; z-index: 95; width: 17rem; max-width: calc(100vw - 16px); background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 12px 32px rgba(17,24,39,.16); padding: 8px; }
   .dark .meta-pop { background: #262626; border-color: #3a3a3a; }
   .meta-pop[hidden] { display: none; }
@@ -360,9 +176,6 @@
   .meta-opt.is-create { color: var(--p700); font-weight: 500; }
   .meta-pop__empty { padding: 10px 8px; font-size: 13px; color: #6b7280; }
   .meta-pop__foot { margin-top: 6px; padding: 6px 4px 0; border-top: 1px solid #f0f1f3; font-size: 12px; color: #9ca3af; }
-
-
-  /* ---- callout, toggle, table ---- */
   .note-prose .callout { position: relative; background: var(--p50); border: 1px solid var(--p100); border-radius: 10px; padding: 10px 14px 10px 44px; }
   .note-prose .callout::before { content: '💡'; position: absolute; left: 14px; top: 10px; line-height: 1.65; }
   .note-prose .callout > * + * { margin-top: .4em; }
@@ -377,10 +190,8 @@
   .note-prose .toggle summary::marker, .note-prose .toggle summary::-webkit-details-marker { display: none; content: ''; }
   .note-prose .toggle [data-type="detailsContent"] { padding-inline-start: 4px; margin-top: .3em; }
   .note-prose .toggle [data-type="detailsContent"] > * + * { margin-top: .5em; }
-  /* the wrapper owns the scrollbar: arrow cursor there (native scrollbar behaviour), I-beam inside the cells */
   .note-prose .tableWrapper { overflow-x: auto; margin: .8em 0; cursor: default; }
   .note-prose .tableWrapper th, .note-prose .tableWrapper td { cursor: text; }
-  /* auto layout: wide tables keep readable columns and scroll sideways inside .tableWrapper */
   .note-prose table { border-collapse: collapse; width: 100%; table-layout: auto; font-size: 15px; line-height: 1.5; }
   .note-prose th, .note-prose td { border: 1px solid #d1d5db; padding: 7px 10px; vertical-align: top; text-align: start; position: relative; min-width: 7rem; }
   .note-prose th { background: #f3f4f6; font-weight: 600; }
@@ -388,7 +199,6 @@
   .note-prose td > p, .note-prose th > p { margin: 0; }
   .note-prose .selectedCell::after { content: ''; position: absolute; inset: 0; background: rgb(var(--color-primary-500) / .18); pointer-events: none; }
   .note-prose .is-active-cell { outline: 2px solid var(--p600); outline-offset: -2px; }
-  /* in-place table controls (positioned by table-ui.js) */
   .tbl-grip, .tbl-add, .tbl-menu { position: fixed; z-index: 45; }
   .tbl-grip { display: grid; place-items: center; background: #fff; border: 1px solid #d1d5db; border-radius: 6px; color: #9ca3af; cursor: pointer; }
   .tbl-grip:hover, .tbl-grip[aria-expanded="true"], .tbl-grip:focus-visible { background: var(--p600); border-color: var(--p600); color: #fff; outline: none; }
@@ -415,21 +225,17 @@
   .tbl-menu { min-width: 15rem; }
   .dark .tbl-item__hint { color: #e5e7eb; background: #333; border-color: #444; }
   .tbl-grip[hidden], .tbl-add[hidden], .tbl-menu[hidden] { display: none !important; }
-
-  /* ---- slash menu ---- */
   .slash-menu { position: fixed; z-index: 90; width: 15rem; max-height: min(18rem, 50vh); overflow-y: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 10px 30px rgba(17,24,39,.14); padding: 4px; }
   .dark .slash-menu { background: #262626; border-color: #3a3a3a; }
   .slash-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border-radius: 6px; font-size: 14px; text-align: start; color: #374151; }
   .dark .slash-item { color: #e5e7eb; }
   .slash-item { position: relative; }
   .slash-item.is-active { background: var(--p100); color: #111827; }
-  /* accent bar is its own element: an inset box-shadow would follow the row's rounded corners and look cut */
   .slash-item.is-active::before { content: ''; position: absolute; left: 3px; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: var(--p600); }
   .slash-item.is-active .slash-item__hint { color: var(--p700); }
   .dark .slash-item.is-active { background: rgb(var(--color-primary-500) / .3); color: #fff; }
   .slash-item__label { flex: 1; }
   .slash-item__hint { font: 500 11px/1 ui-monospace, Menlo, monospace; color: #9ca3af; }
-  /* keep the highlighted row clear of the sticky footer (and below the group label) when it scrolls into view */
   .slash-menu { scroll-padding-top: 34px; scroll-padding-bottom: 46px; overscroll-behavior: contain; }
   .slash-foot { position: sticky; bottom: -4px; display: flex; justify-content: space-between; align-items: center; margin: 4px -4px -4px; padding: 8px 12px; background: #fff; border-top: 1px solid #f0f1f3; font-size: 13px; color: #6b7280; border-radius: 0 0 10px 10px; }
   .dark .slash-foot { background: #262626; border-color: #3a3a3a; }
@@ -437,7 +243,6 @@
   .slash-preview { position: fixed; z-index: 91; width: 14rem; background: #1f2937; color: #fff; border-radius: 10px; padding: 8px; box-shadow: 0 10px 30px rgba(17,24,39,.22); pointer-events: none; }
   .slash-preview__page { background: #fff; color: #374151; border-radius: 6px; padding: 10px 12px; height: 6.5rem; overflow: hidden; }
   .slash-preview__cap { font-size: 13px; padding: 8px 4px 2px; }
-  /* tiny rendition of a block, reusing the real content styles at a smaller size */
   .note-mini { font-size: 11px; line-height: 1.5; }
   .note-mini > * + * { margin-top: .4em; }
   .note-mini h1 { font-size: 17px; font-weight: 700; line-height: 1.2; } .note-mini h2 { font-size: 14px; font-weight: 700; } .note-mini h3 { font-size: 12px; font-weight: 600; }
@@ -452,10 +257,6 @@
   .pv-toggle { font-weight: 600; } .pv-indent { padding-inline-start: 14px; color: #6b7280; }
   .pv-table { border-collapse: collapse; width: 100%; } .pv-table th, .pv-table td { border: 1px solid #d1d5db; padding: 3px 6px; text-align: start; } .pv-table th { background: #f3f4f6; }
   .slash-empty { padding: 10px; font-size: 13px; color: #6b7280; }
-
-  /* ---- desktop bubble ---- */
-  /* hidden until TipTap's BubbleMenu shows it (it toggles inline visibility) */
-  .bubble { visibility: hidden; position: fixed; z-index: 80; padding: 3px; background: #111827; color: #e5e7eb; border-radius: 9px; box-shadow: 0 8px 24px rgba(0,0,0,.28); width: max-content; }
   .bm-bar { display: flex; align-items: center; gap: 2px; }
   .bm-pop.bm-pop--up { top: auto; bottom: calc(100% + 6px); }
   .bm-btn.is-open { background: rgba(255,255,255,.16); color: #fff; }
@@ -473,65 +274,9 @@
   .bm-input { width: 15rem; height: 30px; border: 0; border-radius: 6px; background: rgba(255,255,255,.1); color: #fff; font-size: 14px; padding: 0 8px; outline: none; box-shadow: none !important; }
   .bm-input:focus { background: rgba(255,255,255,.16); }
   .bm-apply { height: 30px; padding: 0 10px; border-radius: 6px; background: var(--p600); color: #fff; font-size: 13px; font-weight: 600; }
-
   .bm-btn:focus-visible, .bm-item:focus-visible, .bm-apply:focus-visible { outline: 2px solid #fff; outline-offset: -2px; background: rgba(255,255,255,.16); }
-  .editor-top__help { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 6px; color: #9ca3af; font-size: 12px; }
-  .editor-top__help:hover { background: #f3f4f6; color: #374151; }
-  .editor-top__help:focus-visible { outline: 2px solid var(--p600); }
-  .editor-top__help kbd { font: 500 11px/1 system-ui; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 5px; }
-  .help__panel { background: #fff; border-radius: 14px; padding: 18px 20px 22px; width: min(44rem, calc(100% - 32px)); max-height: calc(100% - 48px); overflow-y: auto; }
-  .dark .help__panel { background: #262626; }
-  .help__close { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: #6b7280; }
-  .help__close:hover, .help__close:focus-visible { background: #f3f4f6; outline: none; box-shadow: 0 0 0 2px var(--p600); }
-  .help__body { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 18px 28px; margin-top: 14px; }
-  .help__body h3 { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #9ca3af; margin-bottom: 6px; }
-  .help__body dl > div { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 14px; border-bottom: 1px solid #f3f4f6; }
-  .help__body dd { display: flex; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
-  .help__body kbd { font: 500 12px/1 ui-monospace, Menlo, monospace; background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 5px; padding: 3px 6px; white-space: nowrap; }
-
-  /* ---- sheet + prototype tools ---- */
-  .sheet { position: absolute; inset: 0; z-index: 100; background: rgba(17,24,39,.45); display: grid; place-items: center; }
-  .sheet__panel { background: #fff; border-radius: 14px; padding: 20px; width: min(26rem, calc(100% - 32px)); display: flex; flex-direction: column; gap: 8px; }
-  .dark .sheet__panel { background: #262626; }
-  .sheet__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
-  .sheet__primary, .sheet__secondary { height: 44px; border-radius: 10px; font-size: 15px; font-weight: 600; }
-  .sheet__primary { background: var(--p600); color: #fff; }
-  .sheet__secondary { background: #f3f4f6; color: #111827; }
-  .proto { position: absolute; right: 12px; bottom: 12px; z-index: 60; }
-  .proto__btn { width: 34px; height: 34px; border-radius: 99px; background: #fff; border: 1px solid #e5e7eb; display: grid; place-items: center; color: #6b7280; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  .proto__panel { position: absolute; right: 0; bottom: 42px; width: 16rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 10px 30px rgba(17,24,39,.14); padding: 12px; display: flex; flex-direction: column; gap: 10px; font-size: 14px; }
-  .proto__row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-  .proto__link { text-align: start; font-size: 13px; color: var(--p700); text-decoration: underline; }
-
-  /* ---- mobile: list screen -> full-screen editor, formatting bar on the keyboard ---- */
-  .mbar { display: none; }
   @media (max-width: 1023px) {
-    .notes-app { position: fixed; inset: 0 0 auto 0; z-index: 70; height: var(--vvh, 100dvh); transform: translateY(var(--vvtop, 0px)); }
-    .nav-pane { display: none; }
-    .list-pane { width: 100%; border: 0; background: #fff; }
-    .notes-app[data-stage] .list-pane { display: flex; }
-    .notes-app[data-view="editor"] .list-pane { display: none; }
-    .editor-top__icon#focus-toggle { display: none; }
-    .dark .list-pane { background: #171717; }
-    .notes-app[data-view="list"] .editor-pane { display: none; }
-    .notes-app[data-view="editor"] .list-pane { display: none; }
-    .list-pane__head { padding-top: calc(14px + env(safe-area-inset-top)); }
-    .search__kbd, .editor-top__help { display: none; }
-    .note-row { padding: 12px 10px; }
-    .editor-top { padding: 0 8px; padding-top: env(safe-area-inset-top); height: calc(48px + env(safe-area-inset-top)); }
-    .editor-top__back { display: inline-flex; align-items: center; gap: 2px; height: 44px; padding: 0 8px; color: var(--p700); font-size: 16px; font-weight: 500; }
-    .editor-top__new { display: grid; place-items: center; width: 44px; height: 44px; color: var(--p700); }
-    .editor-column { padding: 8px 20px 0; }
     .note-prose h1[data-title] { font-size: 28px; }
-    .editor-scroll { padding-bottom: 50vh; scroll-padding-bottom: 130px; }
-    .btn-new { height: 40px; }
-    .proto { bottom: 76px; }
-    .notes-app.kb-open .proto { display: none; }
-    .bubble { display: none !important; }
-    .mbar { display: block; position: absolute; left: 0; right: 0; bottom: 0; z-index: 40; background: #f9fafb; border-top: 1px solid #e5e7eb; padding-bottom: env(safe-area-inset-bottom); }
-    .mbar[hidden] { display: none; }
-    .dark .mbar { background: #1f1f1f; border-color: #333; }
-    .mbar__row { display: flex; align-items: center; justify-content: space-between; height: 44px; padding: 0 4px; }
     .mb-btn { display: inline-flex; align-items: center; justify-content: center; gap: 2px; min-width: 44px; height: 44px; border-radius: 8px; color: #374151; }
     .dark .mb-btn { color: #e5e7eb; }
     .mb-btn:disabled { opacity: .35; }
@@ -539,18 +284,15 @@
     .mb-btn--text { padding: 0 10px; font-weight: 600; font-size: 15px; }
     .mb-link { display: flex; align-items: center; gap: 6px; width: 100%; padding: 0 8px; }
     .mb-link .bm-input { flex: 1; width: auto; background: #fff; color: #111827; border: 1px solid #d1d5db; height: 34px; font-size: 16px; }
-    .mbar__tray { padding: 8px 12px 10px; border-bottom: 1px solid #e5e7eb; }
     .tray-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #9ca3af; margin: 2px 0 6px; }
     .tray-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
     .tray-chip { display: inline-flex; align-items: center; gap: 6px; flex: none; height: 36px; padding: 0 12px; border-radius: 99px; background: #fff; border: 1px solid #e5e7eb; font-size: 14px; color: #374151; }
     .tray-chip.is-on { background: var(--p100); border-color: var(--p600); color: var(--p700); }
-    .mbar__pop { position: absolute; right: 8px; bottom: 52px; background: #111827; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.28); z-index: 5; }
-    .mbar__pop[hidden] { display: none; }
+    .tray-chip:focus-visible { outline: 2px solid var(--p600); outline-offset: 2px; }
     .slash-menu { width: min(18rem, calc(100vw - 16px)); }
     .slash-preview { display: none !important; }
     .tbl-grip, .tbl-add, .tbl-menu { display: none !important; }
   }
-  @media (prefers-reduced-motion: reduce) { .save-status .status-dot { animation: none !important; } }
 </style>
 
 
@@ -667,7 +409,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-3652">
+         aria-describedby="tooltip-2088">
       
           <button type="button" @click="$dispatch('open-drawer-student-chat-drawer')" class="relative shrink-0 h-8 w-8 inline-flex justify-center items-center border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:bg-gray-100 dark:focus:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none" aria-label="Messages">
             <i data-lucide="message-circle" class="shrink-0 size-4"></i>
@@ -685,7 +427,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-3652"
+         id="tooltip-2088"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1120,172 +862,181 @@
     <main id="content" class="pt-[3.75rem] lg:ps-[16.25rem]">
       <div class="p-0">
     
-<div id="notes-app" class="notes-app" data-view="list">
+
+
+
+
+
+
+
+
+
+<div id="notes-app" data-view="list" class="notes-app group/app relative flex h-[calc(100dvh-3.75rem)] bg-white text-gray-900 dark:bg-[#171717] dark:text-gray-200 [&_[hidden]]:hidden max-lg:fixed max-lg:inset-x-0 max-lg:top-0 max-lg:z-[70] max-lg:h-[var(--vvh,100dvh)] max-lg:translate-y-[var(--vvtop,0px)]">
 
   <!-- ===== Nav pane (stage 1 only): spaces, folders, tags ===== -->
-  <nav id="notes-nav" class="nav-pane" aria-label="Notes navigation">
-    <div class="nav-pane__head">
-      <h2 class="nav-pane__title">Notes</h2>
-      <button id="nav-collapse" type="button" class="icon-btn" aria-label="Hide navigation" title="Hide navigation  (⌘\)"><i data-lucide="panel-left-close" class="size-4"></i></button>
+  <nav id="notes-nav" aria-label="Notes navigation" class="nav-pane flex min-h-0 w-[13.5rem] flex-none flex-col border-e border-[#eceef1] bg-white px-2 group-data-[stage=2]/app:hidden group-data-[stage=3]/app:hidden max-lg:hidden dark:border-[#2e2e2e] dark:bg-[#1a1a1a]">
+    <div class="nav-pane__head flex items-center justify-between pb-2.5 pe-1 ps-2 pt-3.5">
+      <h2 class="nav-pane__title text-[15px] font-semibold text-gray-900 dark:text-white">Notes</h2>
+      <button id="nav-collapse" type="button" class="icon-btn grid h-[34px] w-8 flex-none place-items-center rounded-lg text-gray-500 hover:bg-[#eceff2] hover:text-gray-900 aria-pressed:bg-[#eceff2] aria-pressed:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" aria-label="Hide navigation" title="Hide navigation  (⌘\)"><i data-lucide="panel-left-close" class="size-4"></i></button>
     </div>
-    <div class="nav-spaces">
-      <button id="space-mine" type="button" class="nav-space is-active" aria-current="true"><i data-lucide="notebook-pen" class="size-4"></i><span>My Notes</span></button>
-      <button id="space-shared" type="button" class="nav-space"><i data-lucide="inbox" class="size-4"></i><span>Shared with Me</span></button>
+    <div class="nav-spaces flex flex-col gap-0.5 pb-2">
+      <button id="space-mine" type="button" class="nav-space flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-start text-[14px] text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 [&amp;.is-active]:bg-white [&amp;.is-active]:font-semibold [&amp;.is-active]:text-gray-900 [&amp;.is-active]:shadow-[0_0_0_1px_#e5e7eb,0_1px_2px_rgba(0,0,0,.04)] [&amp;.is-active]:hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 is-active" aria-current="true"><i data-lucide="notebook-pen" class="size-4"></i><span>My Notes</span></button>
+      <button id="space-shared" type="button" class="nav-space flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-start text-[14px] text-gray-600 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 [&amp;.is-active]:bg-white [&amp;.is-active]:font-semibold [&amp;.is-active]:text-gray-900 [&amp;.is-active]:shadow-[0_0_0_1px_#e5e7eb,0_1px_2px_rgba(0,0,0,.04)] [&amp;.is-active]:hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"><i data-lucide="inbox" class="size-4"></i><span>Shared with Me</span></button>
     </div>
-    <div id="nav-library" class="nav-library">
-      <div class="nav-section"><span>Folders</span><button id="nav-new-folder" type="button" class="nav-plus" aria-label="New folder" title="New folder"><i data-lucide="plus" class="size-3.5"></i></button></div>
+    <div id="nav-library" class="nav-library min-h-0 flex-1 overflow-y-auto overscroll-contain pb-2 group-data-[space=shared]/app:hidden">
+      <div class="nav-section flex items-center justify-between pb-1.5 pe-2 ps-2.5 pt-3.5 text-[12px] font-medium text-gray-400"><span>Folders</span><button id="nav-new-folder" type="button" class="nav-plus grid size-[22px] place-items-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" aria-label="New folder" title="New folder"><i data-lucide="plus" class="size-3.5"></i></button></div>
       <div id="nav-folders" class="nav-folders" role="list" aria-label="Folders"></div>
-      <div class="nav-section"><span>Tags</span><button id="nav-tags-menu" type="button" class="nav-plus" aria-label="Manage tags" title="Manage tags" aria-haspopup="dialog"><i data-lucide="ellipsis" class="size-3.5"></i></button></div>
-      <div id="nav-tags" class="nav-tags" role="list" aria-label="Tags"></div>
+      <div class="nav-section flex items-center justify-between pb-1.5 pe-2 ps-2.5 pt-3.5 text-[12px] font-medium text-gray-400"><span>Tags</span><button id="nav-tags-menu" type="button" class="nav-plus grid size-[22px] place-items-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" aria-label="Manage tags" title="Manage tags" aria-haspopup="dialog"><i data-lucide="ellipsis" class="size-3.5"></i></button></div>
+      <div id="nav-tags" class="nav-tags flex flex-wrap gap-1 px-1 py-0.5" role="list" aria-label="Tags"></div>
     </div>
-    <p class="nav-pane__foot"><i data-lucide="lock" class="size-3.5"></i><span id="nav-foot-text">Only you can see your notes</span></p>
+    <p class="nav-pane__foot flex items-center gap-1.5 border-t border-[#f0f1f3] px-2 pb-3 pt-2.5 text-[12px] text-gray-400"><i data-lucide="lock" class="size-3.5"></i><span id="nav-foot-text">Only you can see your notes</span></p>
   </nav>
 
   <!-- ===== List pane ===== -->
-  <section id="notes-list-pane" class="list-pane" aria-label="Notes list">
-    <div class="list-pane__head">
-      <div class="list-title">
-        <button id="nav-expand" type="button" class="icon-btn" aria-label="Show navigation" title="Show navigation  (⌘\)" hidden><i data-lucide="panel-left-open" class="size-4"></i></button>
-        <h1 id="list-title" class="list-title__text"><span id="list-title-text">All notes</span></h1>
-        <button id="space-switch" type="button" class="list-title__switch" aria-haspopup="menu" aria-label="Switch between My Notes and Shared with Me" hidden><span id="space-switch-text">My Notes</span><i data-lucide="chevron-down" class="size-3.5"></i></button>
-        <span id="notes-count" class="text-sm text-gray-400">0</span>
+  <section id="notes-list-pane" aria-label="Notes list" class="list-pane flex min-h-0 w-[21rem] flex-none flex-col border-e border-gray-200 bg-[#fafafa] group-data-[stage=3]/app:hidden max-lg:w-full max-lg:border-0 max-lg:bg-white max-lg:group-data-[view=editor]/app:hidden dark:border-[#2e2e2e] dark:bg-[#1c1c1c] dark:max-lg:bg-[#171717]">
+    <div class="list-pane__head flex items-center justify-between pb-2.5 pe-3 ps-4 pt-3.5 max-lg:pt-[calc(14px+env(safe-area-inset-top))] [&>*]:min-w-0 [&>:last-child]:flex-none [&>.list-title]:flex-auto">
+      <div class="list-title flex min-w-0 items-center gap-1">
+        <button id="nav-expand" type="button" class="icon-btn grid h-[34px] w-8 flex-none place-items-center rounded-lg text-gray-500 hover:bg-[#eceff2] hover:text-gray-900 aria-pressed:bg-[#eceff2] aria-pressed:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" aria-label="Show navigation" title="Show navigation  (⌘\)" hidden><i data-lucide="panel-left-open" class="size-4"></i></button>
+        <h1 id="list-title" class="list-title__text min-w-0 flex-initial truncate text-[15px] font-semibold text-gray-900 dark:text-white"><span id="list-title-text">All notes</span></h1>
+        <button id="space-switch" type="button" class="list-title__switch -ms-1.5 inline-flex min-w-0 flex-initial items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[15px] font-semibold text-gray-900 hover:bg-[#eceff2] aria-expanded:bg-[#eceff2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600" aria-haspopup="menu" aria-label="Switch between My Notes and Shared with Me" hidden><span id="space-switch-text">My Notes</span><i data-lucide="chevron-down" class="size-3.5"></i></button>
+        <span id="notes-count" class="ms-0.5 flex-none text-sm text-gray-400">0</span>
       </div>
       <div class="flex items-center gap-1.5">
-        <button id="select-mode" type="button" class="icon-btn" aria-pressed="false" aria-label="Select notes" title="Select notes"><i data-lucide="list-checks" class="size-4"></i></button>
-        <button id="new-note" type="button" class="btn-new">
+        <button id="select-mode" type="button" class="icon-btn grid h-[34px] w-8 flex-none place-items-center rounded-lg text-gray-500 hover:bg-[#eceff2] hover:text-gray-900 aria-pressed:bg-[#eceff2] aria-pressed:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 group-data-[space=shared]/app:hidden" aria-pressed="false" aria-label="Select notes" title="Select notes"><i data-lucide="list-checks" class="size-4"></i></button>
+        <button id="new-note" type="button" class="btn-new inline-flex h-[34px] flex-none items-center gap-1.5 whitespace-nowrap rounded-lg bg-primary-600 px-3 text-[14px] font-medium text-white hover:bg-primary-700 max-lg:h-10 group-data-[space=shared]/app:hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
           <i data-lucide="square-pen" class="size-4"></i>New note
         </button>
       </div>
     </div>
-    <div id="select-bar" class="select-bar" hidden>
-      <button id="select-cancel" type="button" class="icon-btn" aria-label="Cancel selection"><i data-lucide="x" class="size-4"></i></button>
-      <span id="select-count" class="select-bar__count" role="status" aria-live="polite">0 selected</span>
-      <button id="select-all" type="button" class="select-bar__link">Select all</button>
-      <button id="select-delete" type="button" class="select-bar__delete" disabled><i data-lucide="trash-2" class="size-4"></i>Delete</button>
+    <div id="select-bar" class="select-bar flex items-center gap-2 pb-2.5 pe-3 ps-2.5 pt-3" hidden>
+      <button id="select-cancel" type="button" class="icon-btn grid h-[34px] w-8 flex-none place-items-center rounded-lg text-gray-500 hover:bg-[#eceff2] hover:text-gray-900 aria-pressed:bg-[#eceff2] aria-pressed:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" aria-label="Cancel selection"><i data-lucide="x" class="size-4"></i></button>
+      <span id="select-count" class="select-bar__count flex-1 text-[14px] font-semibold text-gray-900" role="status" aria-live="polite">0 selected</span>
+      <button id="select-all" type="button" class="select-bar__link rounded-md px-1.5 py-1 text-[13px] font-semibold text-primary-700 hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">Select all</button>
+      <button id="select-delete" type="button" class="select-bar__delete inline-flex h-8 items-center gap-1.5 rounded-lg bg-red-600 px-3 text-[13px] font-semibold text-white enabled:hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" disabled><i data-lucide="trash-2" class="size-4"></i>Delete</button>
     </div>
     <div class="px-3 pb-2">
-      <label class="search">
+      <label class="search flex h-9 items-center gap-2 rounded-lg border border-gray-200 bg-white px-2.5 focus-within:border-primary-600 focus-within:ring-[3px] focus-within:ring-primary-500/[.18]">
         <i data-lucide="search" class="size-4 text-gray-400"></i>
-        <input id="notes-search" type="search" autocomplete="off" placeholder="Search notes" aria-label="Search notes" class="search__input">
+        <input id="notes-search" type="search" autocomplete="off" placeholder="Search notes" aria-label="Search notes" class="search__input min-w-0 flex-1 border-0 bg-transparent p-0 text-[14px] shadow-none outline-none ring-0 focus:border-0 focus:shadow-none focus:outline-none focus:ring-0 [&::-webkit-search-cancel-button]:hidden">
         <button id="search-clear" type="button" hidden class="text-gray-400 hover:text-gray-600" aria-label="Clear search"><i data-lucide="x" class="size-4"></i></button>
-        <kbd class="search__kbd">⌘K</kbd>
+        <kbd class="search__kbd rounded-[4px] border border-gray-200 px-[5px] py-0.5 text-[11px] font-medium leading-none text-gray-400 [font-family:system-ui] max-lg:hidden">⌘K</kbd>
       </label>
     </div>
-    <div class="filters" id="filters">
-      <button id="filter-folder" type="button" class="filter-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="Choose folder">
-        <i data-lucide="folder" class="size-4"></i><span class="filter-btn__label">All notes</span><i data-lucide="chevron-down" class="size-3.5 opacity-60"></i>
+    <div class="filters flex flex-wrap items-center gap-1.5 px-3 pb-2 group-data-[stage=1]/app:hidden group-data-[space=shared]/app:hidden" id="filters">
+      <button id="filter-folder" type="button" class="filter-btn inline-flex h-[30px] max-w-44 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-[13px] text-gray-600 hover:border-[#cbd0d6] hover:bg-gray-50 aria-expanded:border-[#cbd0d6] aria-expanded:bg-gray-50 [&.is-set]:border-primary-600 [&.is-set]:bg-primary-50 [&.is-set]:font-medium [&.is-set]:text-primary-700 [&.is-set]:hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" aria-haspopup="dialog" aria-expanded="false" aria-label="Choose folder">
+        <i data-lucide="folder" class="size-4"></i><span class="filter-btn__label truncate">All notes</span><i data-lucide="chevron-down" class="size-3.5 opacity-60"></i>
       </button>
-      <button id="filter-tags" type="button" class="filter-btn" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by tags">
-        <i data-lucide="tag" class="size-4"></i><span class="filter-btn__label">Tags</span><i data-lucide="chevron-down" class="size-3.5 opacity-60"></i>
+      <button id="filter-tags" type="button" class="filter-btn inline-flex h-[30px] max-w-44 items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 text-[13px] text-gray-600 hover:border-[#cbd0d6] hover:bg-gray-50 aria-expanded:border-[#cbd0d6] aria-expanded:bg-gray-50 [&.is-set]:border-primary-600 [&.is-set]:bg-primary-50 [&.is-set]:font-medium [&.is-set]:text-primary-700 [&.is-set]:hover:bg-primary-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" aria-haspopup="dialog" aria-expanded="false" aria-label="Filter by tags">
+        <i data-lucide="tag" class="size-4"></i><span class="filter-btn__label truncate">Tags</span><i data-lucide="chevron-down" class="size-3.5 opacity-60"></i>
       </button>
-      <button id="filter-clear" type="button" class="filter-clear" hidden>Clear</button>
+      <button id="filter-clear" type="button" class="filter-clear px-1 text-[12px] text-gray-500 underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600" hidden>Clear</button>
     </div>
-    <div id="notes-list-scroll" class="list-pane__scroll">
+    <div id="notes-list-scroll" class="list-pane__scroll relative min-h-0 flex-1 overflow-y-auto px-2 pb-2">
       <div id="notes-list" role="listbox" aria-label="Notes"></div>
     </div>
   </section>
 
   <!-- ===== Editor pane ===== -->
-  <section id="notes-editor-pane" class="editor-pane" aria-label="Note editor">
-    <div id="editor-empty" class="editor-empty" hidden>
+  <section id="notes-editor-pane" aria-label="Note editor" class="editor-pane relative flex min-w-0 flex-1 flex-col max-lg:group-data-[view=list]/app:hidden">
+    <div id="editor-empty" class="editor-empty grid flex-1 place-items-center" hidden>
       <p class="text-gray-500">Select a note, or start a new one.</p>
     </div>
 
-    <div id="editor-body" class="editor-body">
-      <header class="editor-top">
-        <button id="back-to-list" type="button" class="editor-top__back" aria-label="Back to notes">
+    <div id="editor-body" class="editor-body flex min-h-0 flex-1 flex-col">
+      <header class="editor-top flex h-12 flex-none items-center gap-2.5 px-5 max-lg:h-[calc(48px+env(safe-area-inset-top))] max-lg:px-2 max-lg:pt-[env(safe-area-inset-top)]">
+        <button id="back-to-list" type="button" class="editor-top__back hidden h-11 items-center gap-0.5 px-2 text-[16px] font-medium text-primary-700 max-lg:inline-flex" aria-label="Back to notes">
           <i data-lucide="chevron-left" class="size-5"></i><span>Notes</span>
         </button>
-        <button id="focus-toggle" type="button" class="editor-top__icon" aria-label="Focus mode: hide the lists" title="Focus mode  (⌘⇧\)"><i data-lucide="maximize-2" class="size-4"></i></button>
+        <button id="focus-toggle" type="button" class="editor-top__icon grid size-[30px] place-items-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 max-lg:hidden" aria-label="Focus mode: hide the lists" title="Focus mode  (⌘⇧\)"><i data-lucide="maximize-2" class="size-4"></i></button>
         <span class="flex-1"></span>
-        <button id="help-open" type="button" class="editor-top__help" aria-label="Keyboard shortcuts" title="Keyboard shortcuts"><i data-lucide="keyboard" class="size-4"></i><kbd>⌘/</kbd></button>
-        <div id="save-status" class="save-status" role="status" aria-live="polite"></div>
-        <button id="note-menu-btn" type="button" class="editor-top__icon" aria-haspopup="menu" aria-expanded="false" aria-label="Note options" title="Note options"><i data-lucide="ellipsis" class="size-4"></i></button>
-        <button id="new-note-m" type="button" class="editor-top__new" aria-label="New note"><i data-lucide="square-pen" class="size-5"></i></button>
+        <button id="help-open" type="button" class="editor-top__help inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary-600 max-lg:hidden" aria-label="Keyboard shortcuts" title="Keyboard shortcuts"><i data-lucide="keyboard" class="size-4"></i><kbd class="rounded-[4px] border border-gray-200 px-[5px] py-0.5 text-[11px] font-medium leading-none [font-family:system-ui]">⌘/</kbd></button>
+        <div id="save-status" class="save-status group/st inline-flex min-h-5 items-center text-[13px] text-gray-400 data-[state=error]:font-medium data-[state=error]:text-amber-700 group-data-[space=shared]/app:hidden" role="status" aria-live="polite"></div>
+        <button id="note-menu-btn" type="button" class="editor-top__icon grid size-[30px] place-items-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 group-data-[space=shared]/app:hidden" aria-haspopup="menu" aria-expanded="false" aria-label="Note options" title="Note options"><i data-lucide="ellipsis" class="size-4"></i></button>
+        <button id="new-note-m" type="button" class="editor-top__new hidden size-11 place-items-center text-primary-700 max-lg:grid" aria-label="New note"><i data-lucide="square-pen" class="size-5"></i></button>
       </header>
 
-      <div id="editor-scroll" class="editor-scroll">
-        <div id="editor-mount" class="editor-column"></div>
+      <div id="editor-scroll" class="editor-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[35vh] max-lg:pb-[50vh] max-lg:[scroll-padding-bottom:130px] [&.is-scroll-locked]:overflow-y-hidden [&.is-scroll-locked]:pe-[var(--sbw,0px)]">
+        <div id="editor-mount" class="editor-column mx-auto max-w-[46rem] px-10 pb-0 pt-6 max-lg:px-5 max-lg:pt-2"></div>
       </div>
 
-      <div id="save-strip" class="save-strip" hidden>
+      <div id="save-strip" class="save-strip flex items-center gap-2 border-t border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-800" hidden>
         <i data-lucide="cloud-off" class="size-4"></i>
         <span>Changes not saved yet. Your edits are kept on this device.</span>
-        <button id="save-retry" type="button" class="save-strip__retry">Retry</button>
+        <button id="save-retry" type="button" class="save-strip__retry ms-auto font-semibold underline">Retry</button>
       </div>
     </div>
-    <div id="restore-toast" class="toast" role="status" hidden></div>
+    <div id="restore-toast" class="toast absolute bottom-4 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-lg bg-gray-900 px-3.5 py-2.5 text-[13px] text-white" role="status" hidden></div>
   </section>
 
-  <!-- Small menus: note options and space switch -->
-  <div id="note-menu" class="mini-menu" role="menu" hidden>
-    <button id="delete-note" type="button" role="menuitem" class="mini-menu__item is-danger"><i data-lucide="trash-2" class="size-4"></i>Delete note</button>
+  <!-- Small menus: note options, space switch, sort -->
+  <div id="note-menu" class="mini-menu fixed z-[97] min-w-44 rounded-[10px] border border-gray-200 bg-white p-1 shadow-[0_10px_30px_rgba(17,24,39,.14)]" role="menu" hidden>
+    <button id="delete-note" type="button" role="menuitem" class="mini-menu__item flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[14px] text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-[.45] aria-checked:after:ms-auto aria-checked:after:font-bold aria-checked:after:text-primary-600 aria-checked:after:content-[&#39;✓&#39;] is-danger text-red-700 hover:bg-red-50 focus-visible:bg-red-50"><i data-lucide="trash-2" class="size-4"></i>Delete note</button>
   </div>
-  <div id="space-menu" class="mini-menu" role="menu" hidden>
-    <button type="button" role="menuitemradio" data-space="mine" class="mini-menu__item"><i data-lucide="notebook-pen" class="size-4"></i>My Notes</button>
-    <button type="button" role="menuitemradio" data-space="shared" class="mini-menu__item"><i data-lucide="inbox" class="size-4"></i>Shared with Me</button>
+  <div id="space-menu" class="mini-menu fixed z-[97] min-w-44 rounded-[10px] border border-gray-200 bg-white p-1 shadow-[0_10px_30px_rgba(17,24,39,.14)]" role="menu" hidden>
+    <button type="button" role="menuitemradio" data-space="mine" class="mini-menu__item flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[14px] text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-[.45] aria-checked:after:ms-auto aria-checked:after:font-bold aria-checked:after:text-primary-600 aria-checked:after:content-[&#39;✓&#39;]"><i data-lucide="notebook-pen" class="size-4"></i>My Notes</button>
+    <button type="button" role="menuitemradio" data-space="shared" class="mini-menu__item flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[14px] text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-[.45] aria-checked:after:ms-auto aria-checked:after:font-bold aria-checked:after:text-primary-600 aria-checked:after:content-[&#39;✓&#39;]"><i data-lucide="inbox" class="size-4"></i>Shared with Me</button>
   </div>
-  <div id="sort-menu" class="mini-menu" role="menu" hidden>
-    <button type="button" role="menuitemradio" data-sort="modified" class="mini-menu__item">Modified</button>
-    <button type="button" role="menuitemradio" data-sort="created" class="mini-menu__item">Created</button>
-    <button type="button" role="menuitemradio" data-sort="title" class="mini-menu__item">Title</button>
+  <div id="sort-menu" class="mini-menu fixed z-[97] min-w-44 rounded-[10px] border border-gray-200 bg-white p-1 shadow-[0_10px_30px_rgba(17,24,39,.14)]" role="menu" hidden>
+    <button type="button" role="menuitemradio" data-sort="modified" class="mini-menu__item flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[14px] text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-[.45] aria-checked:after:ms-auto aria-checked:after:font-bold aria-checked:after:text-primary-600 aria-checked:after:content-[&#39;✓&#39;]">Modified</button>
+    <button type="button" role="menuitemradio" data-sort="created" class="mini-menu__item flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[14px] text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-[.45] aria-checked:after:ms-auto aria-checked:after:font-bold aria-checked:after:text-primary-600 aria-checked:after:content-[&#39;✓&#39;]">Created</button>
+    <button type="button" role="menuitemradio" data-sort="title" class="mini-menu__item flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-start text-[14px] text-gray-700 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-[.45] aria-checked:after:ms-auto aria-checked:after:font-bold aria-checked:after:text-primary-600 aria-checked:after:content-[&#39;✓&#39;]">Title</button>
   </div>
 
   <!-- Desktop selection bubble (TipTap BubbleMenu moves this element) -->
-  <div id="bubble-menu" class="bubble" role="toolbar" aria-label="Text formatting"></div>
+  <div id="bubble-menu" class="bubble invisible fixed z-[80] w-max rounded-[9px] bg-gray-900 p-[3px] text-gray-200 shadow-[0_8px_24px_rgba(0,0,0,.28)] max-lg:!hidden" role="toolbar" aria-label="Text formatting"></div>
 
   <!-- Mobile formatting bar: sits on the keyboard, never takes focus from the editor -->
-  <div id="mobile-bar" class="mbar" hidden role="toolbar" aria-label="Formatting">
-    <div id="mobile-pop" class="mbar__pop bm-menu" hidden role="menu"></div>
-    <div id="mobile-tray" class="mbar__tray" hidden></div>
-    <div id="mobile-row" class="mbar__row"></div>
+  <div id="mobile-bar" class="mbar hidden max-lg:absolute max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:block max-lg:border-t max-lg:border-gray-200 max-lg:bg-gray-50 max-lg:pb-[env(safe-area-inset-bottom)] max-lg:dark:border-[#333] max-lg:dark:bg-[#1f1f1f]" hidden role="toolbar" aria-label="Formatting">
+    <div id="mobile-pop" class="mbar__pop bm-menu absolute bottom-[52px] right-2 z-[5] flex min-w-[11.5rem] flex-col rounded-[10px] bg-gray-900 p-0.5 shadow-[0_8px_24px_rgba(0,0,0,.28)]" hidden role="menu"></div>
+    <div id="mobile-tray" class="mbar__tray border-b border-gray-200 px-3 pb-2.5 pt-2" hidden></div>
+    <div id="mobile-row" class="mbar__row flex h-11 items-center justify-between px-1"></div>
   </div>
 
   <!-- Undo toast for deletes: lives at app level so it also shows on the phone's list screen -->
-  <div id="undo-toast" class="toast undo-toast" role="status" hidden><span id="undo-text"></span><button id="undo-btn" type="button" class="undo-toast__btn">Undo</button></div>
+  <div id="undo-toast" class="toast undo-toast absolute bottom-6 left-1/2 z-[96] flex max-w-[90%] -translate-x-1/2 items-center gap-3.5 rounded-lg bg-gray-900 py-2 pe-2 ps-4 text-[13px] text-white" role="status" hidden><span id="undo-text"></span><button id="undo-btn" type="button" class="undo-toast__btn h-7 rounded-md bg-white/[.14] px-3 text-[13px] font-semibold text-white hover:bg-white/[.26] focus-visible:bg-white/[.26] focus-visible:outline-none">Undo</button></div>
 
-  <div id="hint-toast" class="toast hint-toast" role="status" hidden></div>
+  <div id="hint-toast" class="toast hint-toast absolute bottom-[72px] left-1/2 z-[98] max-w-[min(28rem,calc(100%-32px))] -translate-x-1/2 rounded-lg bg-gray-900 px-3.5 py-2.5 text-center text-[13px] leading-[1.4] text-white" role="status" hidden></div>
 
   <!-- Leave sheet when a save failed -->
-  <div id="leave-dialog" class="sheet" hidden>
-    <div class="sheet__panel" role="alertdialog" aria-modal="true" aria-labelledby="leave-title">
+  <div id="leave-dialog" class="sheet absolute inset-0 z-[100] grid place-items-center bg-gray-900/[.45]" hidden>
+    <div class="sheet__panel flex w-[min(26rem,calc(100%-32px))] flex-col gap-2 rounded-[14px] bg-white p-5 dark:bg-[#262626]" role="alertdialog" aria-modal="true" aria-labelledby="leave-title">
       <h2 id="leave-title" class="font-semibold text-gray-900">Your latest changes aren't saved yet</h2>
       <p class="text-sm text-gray-600">They're kept on this device. You can come back and they'll be saved when you're online.</p>
-      <div class="sheet__actions">
-        <button type="button" data-choice="retry" class="sheet__primary">Try again</button>
-        <button type="button" data-choice="leave" class="sheet__secondary">Leave, keep on this device</button>
-        <button type="button" data-choice="stay" class="sheet__secondary">Keep editing</button>
+      <div class="sheet__actions mt-2 flex flex-col gap-2">
+        <button type="button" data-choice="retry" class="sheet__primary h-11 rounded-[10px] text-[15px] font-semibold bg-primary-600 text-white">Try again</button>
+        <button type="button" data-choice="leave" class="sheet__secondary h-11 rounded-[10px] text-[15px] font-semibold bg-gray-100 text-gray-900">Leave, keep on this device</button>
+        <button type="button" data-choice="stay" class="sheet__secondary h-11 rounded-[10px] text-[15px] font-semibold bg-gray-100 text-gray-900">Keep editing</button>
       </div>
     </div>
   </div>
 
   <!-- Keyboard shortcuts -->
-  <div id="help-dialog" class="sheet help" hidden>
-    <div class="help__panel" role="dialog" aria-modal="true" aria-labelledby="help-title">
+  <div id="help-dialog" class="sheet help absolute inset-0 z-[100] grid place-items-center bg-gray-900/[.45]" hidden>
+    <div class="help__panel max-h-[calc(100%-48px)] w-[min(44rem,calc(100%-32px))] overflow-y-auto rounded-[14px] bg-white px-5 pb-[22px] pt-[18px] dark:bg-[#262626]" role="dialog" aria-modal="true" aria-labelledby="help-title">
       <div class="flex items-center justify-between">
         <h2 id="help-title" class="font-semibold text-gray-900">Keyboard shortcuts</h2>
-        <button id="help-close" type="button" class="help__close" aria-label="Close"><i data-lucide="x" class="size-5"></i></button>
+        <button id="help-close" type="button" class="help__close grid size-8 place-items-center rounded-lg text-gray-500 hover:bg-gray-100 focus-visible:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600" aria-label="Close"><i data-lucide="x" class="size-5"></i></button>
       </div>
-      <div id="help-body" class="help__body"></div>
+      <div id="help-body" class="help__body mt-3.5 grid grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] gap-x-7 gap-y-[18px] [&_dd]:flex [&_dd]:flex-wrap [&_dd]:justify-end [&_dd]:gap-1 [&_dl>div]:flex [&_dl>div]:justify-between [&_dl>div]:gap-3 [&_dl>div]:border-b [&_dl>div]:border-gray-100 [&_dl>div]:py-[5px] [&_dl>div]:text-[14px] [&_h3]:mb-1.5 [&_h3]:text-[11px] [&_h3]:font-semibold [&_h3]:uppercase [&_h3]:tracking-[.06em] [&_h3]:text-gray-400 [&_kbd]:whitespace-nowrap [&_kbd]:rounded-[5px] [&_kbd]:border [&_kbd]:border-gray-200 [&_kbd]:bg-gray-100 [&_kbd]:px-1.5 [&_kbd]:py-[3px] [&_kbd]:text-[12px] [&_kbd]:font-medium [&_kbd]:leading-none [&_kbd]:[font-family:ui-monospace,Menlo,monospace]"></div>
     </div>
   </div>
 
   <!-- Prototype tools (not part of the product UI) -->
-  <div class="proto">
-    <button id="proto-tools-btn" type="button" class="proto__btn" aria-expanded="false" aria-controls="proto-tools" title="Prototype tools"><i data-lucide="flask-conical" class="size-4"></i></button>
-    <div id="proto-tools" class="proto__panel" hidden>
+  <div class="proto absolute bottom-3 right-3 z-[60] max-lg:bottom-[76px] max-lg:group-[.kb-open]/app:hidden">
+    <button id="proto-tools-btn" type="button" class="proto__btn grid size-[34px] place-items-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-[0_1px_3px_rgba(0,0,0,.08)]" aria-expanded="false" aria-controls="proto-tools" title="Prototype tools"><i data-lucide="flask-conical" class="size-4"></i></button>
+    <div id="proto-tools" class="proto__panel absolute bottom-[42px] right-0 flex w-64 flex-col gap-2.5 rounded-[10px] border border-gray-200 bg-white p-3 text-[14px] shadow-[0_10px_30px_rgba(17,24,39,.14)]" hidden>
       <p class="font-semibold text-gray-900">Prototype tools</p>
-      <label class="proto__row"><input id="sim-fail" type="checkbox"> Make saves fail</label>
-      <div class="proto__row flex-col items-stretch"><span>Layout</span>
-        <div id="stage-switch" class="stage-switch" role="group" aria-label="Layout stage">
-          <button type="button" data-stage="1" aria-pressed="false">1 · Nav + list + editor</button>
-          <button type="button" data-stage="2" aria-pressed="false">2 · List + editor</button>
-          <button type="button" data-stage="3" aria-pressed="false">3 · Full-width editor</button>
+      <label class="proto__row flex items-center gap-2 text-[13px]"><input id="sim-fail" type="checkbox"> Make saves fail</label>
+      <div class="proto__row flex flex-col items-stretch gap-2 text-[13px]"><span>Layout</span>
+        <div id="stage-switch" class="stage-switch flex flex-col gap-1" role="group" aria-label="Layout stage">
+          <button type="button" data-stage="1" class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-start text-[13px] text-gray-600 aria-pressed:border-gray-900 aria-pressed:bg-gray-900 aria-pressed:text-white" aria-pressed="false">1 · Nav + list + editor</button>
+          <button type="button" data-stage="2" class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-start text-[13px] text-gray-600 aria-pressed:border-gray-900 aria-pressed:bg-gray-900 aria-pressed:text-white" aria-pressed="false">2 · List + editor</button>
+          <button type="button" data-stage="3" class="rounded-lg border border-gray-200 px-2.5 py-1.5 text-start text-[13px] text-gray-600 aria-pressed:border-gray-900 aria-pressed:bg-gray-900 aria-pressed:text-white" aria-pressed="false">3 · Full-width editor</button>
         </div>
       </div>
-      <label class="proto__row flex-col items-stretch"><span>Server latency <span id="sim-latency-val" class="text-gray-500"></span></span><input id="sim-latency" type="range" min="100" max="4000" step="100"></label>
-      <button id="sim-reset" type="button" class="proto__link">Reset demo notes</button>
-      <a class="proto__link" href="/pr-preview/pr-976/testpress/">All Testpress pages</a>
+      <label class="proto__row flex flex-col items-stretch gap-2 text-[13px]"><span>Server latency <span id="sim-latency-val" class="text-gray-500"></span></span><input id="sim-latency" type="range" min="100" max="4000" step="100"></label>
+      <button id="sim-reset" type="button" class="proto__link text-start text-[13px] text-primary-700 underline">Reset demo notes</button>
+      <a class="proto__link text-start text-[13px] text-primary-700 underline" href="/pr-preview/pr-976/testpress/">All Testpress pages</a>
       <p id="sim-shortcuts" class="text-xs text-gray-500"></p>
     </div>
   </div>
