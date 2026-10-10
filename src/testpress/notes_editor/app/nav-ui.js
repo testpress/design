@@ -16,15 +16,39 @@ export const NAV_TAG_CAP = 8
 export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, tagsMenuBtn, onHint = () => {} }) {
   let mode = { type: 'idle' } // idle | create | rename | confirm
 
+  // The order of the unpinned folders is frozen while you work (clicking a folder must not make it jump to the
+  // top under your cursor). It is recomputed from "recently used" on load; afterwards only these events change it:
+  // a new folder appears first, a folder opened from the full list is pulled in at the top, an unpinned folder
+  // goes back to the top of the others, and a rename keeps its place.
+  let recentOrder = null
+  const byRecency = (list) => {
+    const rec = store.folderRecency()
+    return [...list].sort((a, b) => (rec.get(b) || 0) - (rec.get(a) || 0) || a.localeCompare(b))
+  }
+
   // Which folders does the pane show? Pinned (in pin order), then recents; the open folder is always there.
   function visibleFolders() {
+    if (store.renamedFolder) {
+      const { from, to } = store.renamedFolder
+      store.renamedFolder = null
+      if (recentOrder) recentOrder = recentOrder.map((f) => (f === from ? to : f))
+    }
     const all = store.folders()
     const pinned = store.pinnedFolders()
-    const rec = store.folderRecency()
-    const others = all.filter((f) => !pinned.includes(f)).sort((a, b) => (rec.get(b) || 0) - (rec.get(a) || 0) || a.localeCompare(b))
-    const shown = [...pinned, ...others.slice(0, Math.max(0, NAV_FOLDER_CAP - pinned.length))]
+    if (!recentOrder) recentOrder = byRecency(all)
+    recentOrder = recentOrder.filter((f) => all.includes(f))
+    const fresh = byRecency(all.filter((f) => !recentOrder.includes(f))) // folders created since the last render
+    recentOrder = [...fresh, ...recentOrder]
+    const room = Math.max(0, NAV_FOLDER_CAP - pinned.length)
+    const pick = () => [...pinned, ...recentOrder.filter((f) => !pinned.includes(f)).slice(0, room)]
+    let shown = pick()
     const cur = filters.state.folder
-    if (cur && all.includes(cur) && !shown.includes(cur)) shown.push(cur)
+    if (cur && all.includes(cur) && !shown.includes(cur)) {
+      // opened from the full list: it enters the pane at the top of the recents
+      recentOrder = [cur, ...recentOrder.filter((f) => f !== cur)]
+      shown = pick()
+      if (!shown.includes(cur)) shown.push(cur) // (only when every slot is pinned)
+    }
     return { shown, total: all.length, pinned }
   }
 
@@ -80,7 +104,10 @@ export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, t
   }
 
   function togglePin(name) {
-    if (store.isPinned(name)) return store.unpinFolder(name)
+    if (store.isPinned(name)) {
+      recentOrder = [name, ...(recentOrder || []).filter((f) => f !== name)]
+      return store.unpinFolder(name)
+    }
     if (!store.pinFolder(name).ok) onHint(`You can pin up to ${MAX_PINNED_FOLDERS} folders. Unpin one to pin another.`)
   }
 

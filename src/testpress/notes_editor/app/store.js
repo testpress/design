@@ -168,6 +168,7 @@ export class NotesStore {
 
   // Renaming/deleting a folder keeps its notes; deleting a tag only removes the label.
   renameFolder(from, to) {
+    this.renamedFolder = { from, to } // lets the nav pane keep the folder's position instead of treating it as new
     storage.set('folders', storage.get('folders', []).map((f) => (f === from ? to : f)))
     storage.set('pinnedFolders', storage.get('pinnedFolders', []).map((f) => (f === from ? to : f)))
     const st = storage.get('folderStamps', {})
