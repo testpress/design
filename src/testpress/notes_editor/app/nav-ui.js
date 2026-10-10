@@ -64,7 +64,7 @@ export function createNavUI({ store, filters, foldersEl, tagsEl, newFolderBtn, t
         (hidden > 0 ? `<button type="button" class="nav-tag nav-tag--more" data-more-tags aria-haspopup="dialog">+${hidden} more</button>` : '')
       : '<span class="nav-empty">No tags yet</span>'
     // with 2+ tags selected, say how they combine (and let the student change it)
-    if (filters.state.tags.size >= 2) tagsEl.insertAdjacentHTML('beforeend', `<div class="nav-match" role="group" aria-label="How selected tags combine"><span>Match</span><button type="button" data-match="all" aria-pressed="${filters.state.tagMode === 'all'}" title="Notes that have every selected tag">all</button><button type="button" data-match="any" aria-pressed="${filters.state.tagMode === 'any'}" title="Notes that have at least one selected tag">any</button></div>`)
+    if (filters.state.tags.size >= 2) tagsEl.insertAdjacentHTML('beforeend', `<div class="nav-match" role="group" aria-label="How selected tags combine"><span class="nav-match__label">Match</span><span class="seg" role="presentation"><button type="button" data-match="all" aria-pressed="${filters.state.tagMode === 'all'}" title="Notes that have every selected tag">all</button><button type="button" data-match="any" aria-pressed="${filters.state.tagMode === 'any'}" title="Notes that have at least one selected tag">any</button></span></div>`)
     refreshIcons(foldersEl)
     const input = foldersEl.querySelector('input')
     if (input) {

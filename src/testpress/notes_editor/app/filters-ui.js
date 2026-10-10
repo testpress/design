@@ -92,7 +92,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
       : `<div class="meta-pop__empty">${kind === 'folder' ? 'No folders yet. Type a name to create one.' : 'No tags yet. Add tags from a note.'}</div>`
     pop.innerHTML = `
       <div class="meta-pop__head">${title}</div>
-      ${kind === 'tags' ? `<div class="lib-match" role="group" aria-label="How selected tags combine"><span>Show notes with</span><button type="button" tabindex="-1" data-match="all" aria-pressed="${state.tagMode === 'all'}">all</button><button type="button" tabindex="-1" data-match="any" aria-pressed="${state.tagMode === 'any'}">any</button><span>of them</span></div>` : ''}
+      ${kind === 'tags' ? `<div class="lib-match" role="group" aria-label="How selected tags combine"><span>Show notes with</span><span class="seg" role="presentation"><button type="button" tabindex="-1" data-match="all" aria-pressed="${state.tagMode === 'all'}">all</button><button type="button" tabindex="-1" data-match="any" aria-pressed="${state.tagMode === 'any'}">any</button></span><span>of the selected tags</span></div>` : ''}
       <input type="text" autocomplete="off" spellcheck="false" class="meta-pop__input" role="combobox" aria-expanded="true" aria-controls="lib-list" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" value="${esc(query)}">
       <div id="lib-list" class="meta-pop__list" role="listbox" ${kind === 'tags' ? 'aria-multiselectable="true"' : ''}>${body}</div>
       <div class="meta-pop__foot">${kind === 'folder' ? 'F2 rename · ⌥P pin · Del delete' : 'Enter toggle · ⌥M all/any · F2 rename'}</div>`
