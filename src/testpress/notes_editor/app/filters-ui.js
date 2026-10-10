@@ -1,4 +1,5 @@
 import { refreshIcons } from './icons.js'
+import { MAX_PINNED_FOLDERS } from './store.js'
 
 // Library browsing: pick a folder, narrow by tags (several tags = AND), manage them in place.
 // State lives here; the notes list reads it through `state` and re-renders on `onChange`.
@@ -7,7 +8,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const cleanFolder = (s) => s.trim().replace(/\s+/g, ' ').slice(0, 40)
 const cleanTag = (s) => s.trim().replace(/^#+/, '').trim().toLowerCase().replace(/\s+/g, '-').replace(/[^\p{L}\p{N}_-]/gu, '').slice(0, 30)
 
-export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange }) {
+export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange, onHint = () => {} }) {
   const state = { folder: null, tags: new Set() }
   const pop = document.createElement('div')
   pop.className = 'meta-pop lib-pop'
@@ -59,7 +60,9 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     if (kind === 'folder') {
       const counts = store.folderCounts()
       if (!q) out.push({ key: '__all', label: 'All notes', count: store.notes.size, on: !state.folder, fixed: true })
-      store.folders().filter((f) => !q || f.toLowerCase().includes(q)).forEach((f) => out.push({ key: f, label: f, count: counts.get(f) || 0, on: state.folder === f }))
+      const pins = store.pinnedFolders()
+      const ordered = [...pins, ...store.folders().filter((x) => !pins.includes(x))]
+      ordered.filter((x) => !q || x.toLowerCase().includes(q)).forEach((x) => out.push({ key: x, label: x, count: counts.get(x) || 0, on: state.folder === x, pinned: pins.includes(x) }))
       const typed = cleanFolder(query)
       if (typed && !store.folders().some((f) => f.toLowerCase() === typed.toLowerCase())) out.push({ key: '__new', label: `Create folder “${typed}”`, create: typed, fixed: true })
     } else {
@@ -83,7 +86,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
       <div class="meta-pop__head">${title}${kind === 'tags' ? '<span class="lib-hint"> · notes must have all selected</span>' : ''}</div>
       <input type="text" autocomplete="off" spellcheck="false" class="meta-pop__input" role="combobox" aria-expanded="true" aria-controls="lib-list" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" value="${esc(query)}">
       <div id="lib-list" class="meta-pop__list" role="listbox" ${kind === 'tags' ? 'aria-multiselectable="true"' : ''}>${body}</div>
-      <div class="meta-pop__foot">${kind === 'folder' ? 'Enter open · F2 rename · Del delete' : 'Enter toggle · F2 rename · Del remove'}</div>`
+      <div class="meta-pop__foot">${kind === 'folder' ? 'Enter open · F2 rename · ⌥P pin · Del delete' : 'Enter toggle · F2 rename · Del remove'}</div>`
     refreshIcons(pop)
     const el = pop.querySelector('input')
     if (focusInput && mode.type === 'browse') {
@@ -118,9 +121,11 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
         <div class="lib-confirm__btns"><button type="button" data-confirm="no" class="lib-no">Cancel</button><button type="button" data-confirm="yes" class="lib-yes">${isFolder ? 'Delete' : 'Remove'}</button></div>
       </div>`
     }
-    const manage = r.fixed ? '' : `<span class="lib-actions"><button type="button" tabindex="-1" data-act="rename" data-k="${esc(r.key)}" aria-label="Rename ${esc(r.label)}"><i data-lucide="pencil" class="size-3.5"></i></button><button type="button" tabindex="-1" data-act="delete" data-k="${esc(r.key)}" aria-label="Delete ${esc(r.label)}"><i data-lucide="trash-2" class="size-3.5"></i></button></span>`
+    const pinFull = store.pinnedFolders().length >= MAX_PINNED_FOLDERS
+    const pinBtn = kind === 'folder' ? `<button type="button" tabindex="-1" data-act="pin" data-k="${esc(r.key)}" aria-label="${r.pinned ? 'Unpin' : 'Pin'} ${esc(r.label)}" title="${r.pinned ? 'Unpin' : pinFull ? `You can pin up to ${MAX_PINNED_FOLDERS} folders` : 'Pin to the top of the pane'}"><i data-lucide="${r.pinned ? 'pin-off' : 'pin'}" class="size-3.5"></i></button>` : ''
+    const manage = r.fixed ? '' : `<span class="lib-actions">${pinBtn}<button type="button" tabindex="-1" data-act="rename" data-k="${esc(r.key)}" aria-label="Rename ${esc(r.label)}"><i data-lucide="pencil" class="size-3.5"></i></button><button type="button" tabindex="-1" data-act="delete" data-k="${esc(r.key)}" aria-label="Delete ${esc(r.label)}"><i data-lucide="trash-2" class="size-3.5"></i></button></span>`
     const check = kind === 'tags' ? `<span class="lib-check ${r.on ? 'is-on' : ''}" aria-hidden="true">${r.on ? '✓' : ''}</span>` : ''
-    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</div>`
+    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}${r.pinned ? '<i data-lucide="pin" class="size-3.5 lib-pin"></i>' : ''}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</div>`
   }
 
   // ---- actions ---------------------------------------------------------------------------------
@@ -131,6 +136,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
         store.createFolder(r.create)
         state.folder = r.create
       } else state.folder = r.key === '__all' ? null : r.key
+      if (state.folder) store.touchFolder(state.folder)
       close(true)
       changed()
     } else {
@@ -138,6 +144,12 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
       changed()
       paint()
     }
+  }
+
+  function togglePin(name) {
+    if (store.isPinned(name)) store.unpinFolder(name)
+    else if (!store.pinFolder(name).ok) onHint(`You can pin up to ${MAX_PINNED_FOLDERS} folders. Unpin one to pin another.`)
+    paint(false)
   }
 
   function commitRename(row, value) {
@@ -186,7 +198,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     folderBtn.setAttribute('aria-expanded', 'false')
     tagsBtn.setAttribute('aria-expanded', 'false')
     mode = { type: 'browse' }
-    if (refocus && anchor) anchor.focus()
+    if (refocus && anchor?.isConnected) anchor.focus()
     kind = null
   }
 
@@ -203,6 +215,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
   })
   pop.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')
+    if (act && act.dataset.act === 'pin') return togglePin(act.dataset.k)
     if (act) {
       const row = rows.find((r) => r.key === act.dataset.k)
       mode = { type: act.dataset.act === 'rename' ? 'rename' : 'confirm', key: row.key }
@@ -284,6 +297,9 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (index >= 0) activate(rows[index])
+    } else if (e.altKey && e.code === 'KeyP' && kind === 'folder' && rows[index] && !rows[index].fixed) {
+      e.preventDefault()
+      togglePin(rows[index].key)
     } else if (e.key === 'F2' && rows[index] && !rows[index].fixed) {
       e.preventDefault()
       mode = { type: 'rename', key: rows[index].key }
@@ -318,8 +334,10 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange 
     // used by the nav pane so both views drive the same state
     setFolder: (name) => {
       state.folder = name || null
+      if (name) store.touchFolder(name)
       changed()
     },
+    openFolders: (el) => open('folder', el),
     toggleTag: (t) => {
       state.tags.has(t) ? state.tags.delete(t) : state.tags.add(t)
       changed()

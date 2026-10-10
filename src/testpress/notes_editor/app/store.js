@@ -2,6 +2,8 @@ import { storage } from './storage.js'
 import { deriveTitle, deriveSnippet, textOf, isEmptyDoc, emptyDoc } from './doc-utils.js'
 import { seedNotes } from './seed.js'
 
+export const MAX_PINNED_FOLDERS = 5
+
 // Local source of truth. Every edit is mirrored to localStorage (the "unsaved edits kept on this
 // device" copy). `savedRev` tracks what the fake server last confirmed, so any note with
 // rev > savedRev is dirty and gets re-queued on the next load.
@@ -110,7 +112,46 @@ export class NotesStore {
   createFolder(name) {
     const list = storage.get('folders', [])
     if (!list.includes(name)) storage.set('folders', [...list, name])
+    this.touchFolder(name)
     this.#emit(null, 'folders')
+  }
+
+  // ---- pinned folders (at most MAX_PINNED_FOLDERS, in the order they were pinned) -------------
+  pinnedFolders() {
+    const all = new Set(this.folders())
+    return storage.get('pinnedFolders', []).filter((f) => all.has(f))
+  }
+
+  isPinned(name) {
+    return this.pinnedFolders().includes(name)
+  }
+
+  // returns { ok: true } or { ok: false, reason: 'limit' }
+  pinFolder(name) {
+    const pins = this.pinnedFolders()
+    if (pins.includes(name)) return { ok: true }
+    if (pins.length >= MAX_PINNED_FOLDERS) return { ok: false, reason: 'limit' }
+    storage.set('pinnedFolders', [...pins, name])
+    this.#emit(null, 'folders')
+    return { ok: true }
+  }
+
+  unpinFolder(name) {
+    storage.set('pinnedFolders', this.pinnedFolders().filter((f) => f !== name))
+    this.#emit(null, 'folders')
+  }
+
+  // "recently used" = last time a note in the folder changed, or the folder was opened/created
+  touchFolder(name) {
+    if (!name) return
+    storage.set('folderStamps', { ...storage.get('folderStamps', {}), [name]: Date.now() })
+  }
+
+  folderRecency() {
+    const stamps = storage.get('folderStamps', {})
+    const m = new Map(Object.entries(stamps))
+    this.notes.forEach((n) => n.folder && m.set(n.folder, Math.max(m.get(n.folder) || 0, n.updatedAt)))
+    return m
   }
 
   folderCounts() {
@@ -128,12 +169,16 @@ export class NotesStore {
   // Renaming/deleting a folder keeps its notes; deleting a tag only removes the label.
   renameFolder(from, to) {
     storage.set('folders', storage.get('folders', []).map((f) => (f === from ? to : f)))
+    storage.set('pinnedFolders', storage.get('pinnedFolders', []).map((f) => (f === from ? to : f)))
+    const st = storage.get('folderStamps', {})
+    if (st[from]) storage.set('folderStamps', { ...st, [to]: st[from] })
     this.notes.forEach((n) => n.folder === from && this.setMeta(n.id, { folder: to }))
     this.#emit(null, 'folders')
   }
 
   deleteFolder(name) {
     storage.set('folders', storage.get('folders', []).filter((f) => f !== name))
+    storage.set('pinnedFolders', storage.get('pinnedFolders', []).filter((f) => f !== name))
     this.notes.forEach((n) => n.folder === name && this.setMeta(n.id, { folder: null }))
     this.#emit(null, 'folders')
   }

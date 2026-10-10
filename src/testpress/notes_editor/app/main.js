@@ -52,6 +52,7 @@ const filters = createFiltersUI({
   folderBtn: $('#filter-folder'),
   tagsBtn: $('#filter-tags'),
   clearBtn: $('#filter-clear'),
+  onHint: showHint,
   onChange: () => {
     renderList()
     navUI?.render()
@@ -285,6 +286,16 @@ searchEl.addEventListener('keydown', (e) => {
     listEl.querySelector('.note-row')?.click() // open the top result and move into the editor
   }
 })
+
+// A short message at the bottom of the app (e.g. when the pin limit is reached).
+let hintTimer = 0
+function showHint(text) {
+  const el = $('#hint-toast')
+  el.textContent = text
+  el.hidden = false
+  clearTimeout(hintTimer)
+  hintTimer = setTimeout(() => (el.hidden = true), 3800)
+}
 
 // ---- Select, delete, undo --------------------------------------------------------------------
 const selectBar = $('#select-bar')
@@ -678,7 +689,7 @@ $('#space-shared').addEventListener('click', () => switchSpace('shared'))
 $('#space-menu').addEventListener('keydown', () => {})
 
 // folders + tags in the nav pane
-navUI = createNavUI({ store, filters, foldersEl: $('#nav-folders'), tagsEl: $('#nav-tags'), newFolderBtn: $('#nav-new-folder'), tagsMenuBtn: $('#nav-tags-menu'), findBtn: $('#nav-find'), findRow: $('#nav-find-row'), findInput: $('#nav-find-input'), findClear: $('#nav-find-clear') })
+navUI = createNavUI({ store, filters, foldersEl: $('#nav-folders'), tagsEl: $('#nav-tags'), newFolderBtn: $('#nav-new-folder'), tagsMenuBtn: $('#nav-tags-menu'), onHint: showHint })
 
 // layout switch for reviewers (mirrors the handoff's "1 / 2 / 3" control)
 document.querySelectorAll('#stage-switch [data-stage]').forEach((b) => b.addEventListener('click', () => setStage(Number(b.dataset.stage))))
@@ -1353,6 +1364,7 @@ const SHORTCUTS = [
     ['Back to the list from the editor', 'Esc'],
     ['Back to the editor from the list', '→  or  Esc'],
     ['Set the note\'s folder', `${MOD}${A}F`],
+    ['Pin / unpin the focused folder', `${A}P`],
     ['Add or remove tags', `${MOD}${A}T`],
   ]],
   ['Writing', [
