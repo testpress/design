@@ -124,8 +124,11 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     const pinFull = store.pinnedFolders().length >= MAX_PINNED_FOLDERS
     const pinBtn = kind === 'folder' ? `<button type="button" tabindex="-1" data-act="pin" data-k="${esc(r.key)}" aria-label="${r.pinned ? 'Unpin' : 'Pin'} ${esc(r.label)}" title="${r.pinned ? 'Unpin' : pinFull ? `You can pin up to ${MAX_PINNED_FOLDERS} folders` : 'Pin to the top of the pane'}"><i data-lucide="${r.pinned ? 'pin-off' : 'pin'}" class="size-3.5"></i></button>` : ''
     const manage = r.fixed ? '' : `<span class="lib-actions">${pinBtn}<button type="button" tabindex="-1" data-act="rename" data-k="${esc(r.key)}" aria-label="Rename ${esc(r.label)}"><i data-lucide="pencil" class="size-3.5"></i></button><button type="button" tabindex="-1" data-act="delete" data-k="${esc(r.key)}" aria-label="Delete ${esc(r.label)}"><i data-lucide="trash-2" class="size-3.5"></i></button></span>`
+    // folders: every row gets a leading icon (same as the nav pane) so the labels line up
+    const leadIcon = r.key === '__all' ? 'layers' : r.create ? 'folder-plus' : r.pinned ? 'pin' : 'folder'
+    const lead = kind === 'folder' ? `<i data-lucide="${leadIcon}" class="size-4 lib-lead ${r.pinned ? 'lib-pin' : ''}" aria-hidden="true"></i>` : ''
     const check = kind === 'tags' ? `<span class="lib-check ${r.on ? 'is-on' : ''}" aria-hidden="true">${r.on ? '✓' : ''}</span>` : ''
-    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}${r.pinned ? '<i data-lucide="pin" class="size-3.5 lib-pin"></i>' : ''}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</div>`
+    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}${lead}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</div>`
   }
 
   // ---- actions ---------------------------------------------------------------------------------
