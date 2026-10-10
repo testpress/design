@@ -5,6 +5,7 @@ import { createMetaUI } from './meta-ui.js'
 import { createFiltersUI } from './filters-ui.js'
 import { createNavUI } from './nav-ui.js'
 import { sharedNotes } from './shared.js'
+import { ui } from './ui.js'
 import { CellSelection } from '@tiptap/pm/tables'
 import { SaveQueue, serverSim } from './save-queue.js'
 import { createNotesEditor, stateForDoc } from './editor.js'
@@ -117,12 +118,12 @@ function rowHTML(n) {
   const active = n.id === currentId
   const picked = selected.has(n.id)
   const st = queue.stateOf(n.id)
-  const warn = st === 'error' ? `<span class="row-warn" title="Not saved yet">${icon('alert-triangle', 'size-3')}</span>` : ''
+  const warn = st === 'error' ? `<span class="${ui.rowWarn}" title="Not saved yet">${icon('alert-triangle', 'size-3')}</span>` : ''
   const sub = [filters.state.folder ? null : n.folder, n.snippet].filter(Boolean).join(' · ')
-  const check = selectMode ? `<span class="note-row__check ${picked ? 'is-on' : ''}" aria-hidden="true">${picked ? '✓' : ''}</span>` : ''
-  return `<button type="button" role="option" aria-selected="${selectMode ? picked : active}" data-id="${n.id}" class="note-row ${active && !selectMode ? 'is-active' : ''} ${picked ? 'is-selected' : ''} ${selectMode ? 'has-check' : ''}">
-    <span class="note-row__top">${check}<span class="note-row__title ${n.derived ? 'is-derived' : ''}">${highlight(n.title, query)}</span>${warn}<span class="note-row__time">${relTime(n.updatedAt)}</span></span>
-    <span class="note-row__sub">${highlight(sub, query)}</span></button>`
+  const check = selectMode ? `<span class="${ui.noteRowCheck} ${picked ? 'is-on' : ''}" aria-hidden="true">${picked ? '✓' : ''}</span>` : ''
+  return `<button type="button" role="option" aria-selected="${selectMode ? picked : active}" data-id="${n.id}" class="${ui.noteRow} ${active && !selectMode ? 'is-active' : ''} ${picked ? 'is-selected' : ''} ${selectMode ? 'has-check' : ''}">
+    <span class="${ui.noteRowTop}">${check}<span class="${ui.noteRowTitle} ${n.derived ? 'is-derived' : ''}">${highlight(n.title, query)}</span>${warn}<span class="${ui.noteRowTime}">${relTime(n.updatedAt)}</span></span>
+    <span class="${selectMode ? ui.noteRowSubChecked : ui.noteRowSub}">${highlight(sub, query)}</span></button>`
 }
 
 // Notes that pass the folder/tag filters and the search box, in list order.
@@ -144,16 +145,16 @@ function renderSharedList() {
   $('#notes-count').textContent = SHARED.length
   if (!ids.length) {
     listEl.innerHTML = query
-      ? `<div class="list-empty"><p class="font-medium text-gray-800">No shared notes match “${esc(query)}”</p><p class="text-gray-500">Search covers titles and who shared them.</p></div>`
-      : '<div class="list-empty"><p class="font-medium text-gray-800">Nothing shared with you yet</p><p class="text-gray-500">When a mentor shares a note, it shows up here.</p></div>'
+      ? `<div class="${ui.listEmpty}"><p class="font-medium text-gray-800">No shared notes match “${esc(query)}”</p><p class="text-gray-500">Search covers titles and who shared them.</p></div>`
+      : `<div class="${ui.listEmpty}"><p class="font-medium text-gray-800">Nothing shared with you yet</p><p class="text-gray-500">When a mentor shares a note, it shows up here.</p></div>`
     return
   }
   const focusedId = document.activeElement?.closest?.('.note-row')?.dataset.id
   listEl.innerHTML = ids
     .map(
-      (s) => `<button type="button" role="option" aria-selected="${s.id === currentShared}" data-id="${s.id}" class="note-row ${s.id === currentShared ? 'is-active' : ''}">
-        <span class="note-row__top"><span class="note-row__title">${highlight(s.title, query)}</span><span class="note-row__time">${sharedDate(s.sharedAt)}</span></span>
-        <span class="note-row__sub">${highlight(s.from, query)} · ${esc(s.role)}</span></button>`
+      (s) => `<button type="button" role="option" aria-selected="${s.id === currentShared}" data-id="${s.id}" class="${ui.noteRow} ${s.id === currentShared ? 'is-active' : ''}">
+        <span class="${ui.noteRowTop}"><span class="${ui.noteRowTitle}">${highlight(s.title, query)}</span><span class="${ui.noteRowTime}">${sharedDate(s.sharedAt)}</span></span>
+        <span class="${ui.noteRowSub}">${highlight(s.from, query)} · ${esc(s.role)}</span></button>`
     )
     .join('')
   if (focusedId) listEl.querySelector(`[data-id="${focusedId}"]`)?.focus({ preventScroll: true })
@@ -171,10 +172,10 @@ function renderList() {
     const scoped = filters.scoped()
     const where = filters.state.folder ? `“${esc(filters.state.folder)}”` : 'these tags'
     listEl.innerHTML = query
-      ? `<div class="list-empty"><p class="font-medium text-gray-800">No notes match “${esc(query)}”</p><p class="text-gray-500">Search covers titles and note text${scoped ? ' in the current folder/tags' : ''}.</p>${scoped ? '<button type="button" data-clear-filters class="list-empty__btn">Search all notes</button>' : ''}</div>`
+      ? `<div class="${ui.listEmpty}"><p class="font-medium text-gray-800">No notes match “${esc(query)}”</p><p class="text-gray-500">Search covers titles and note text${scoped ? ' in the current folder/tags' : ''}.</p>${scoped ? '<button type="button" data-clear-filters class="${ui.listEmptyBtn}">Search all notes</button>' : ''}</div>`
       : scoped
-        ? `<div class="list-empty"><p class="font-medium text-gray-800">No notes in ${where} yet</p><p class="text-gray-500">New notes you create here are filed automatically.</p><button type="button" data-clear-filters class="list-empty__btn">Show all notes</button></div>`
-        : `<div class="list-empty"><p class="font-medium text-gray-800">No notes yet</p><p class="text-gray-500">Start one with “New note”.</p></div>`
+        ? `<div class="${ui.listEmpty}"><p class="font-medium text-gray-800">No notes in ${where} yet</p><p class="text-gray-500">New notes you create here are filed automatically.</p><button type="button" data-clear-filters class="${ui.listEmptyBtn}">Show all notes</button></div>`
+        : `<div class="${ui.listEmpty}"><p class="font-medium text-gray-800">No notes yet</p><p class="text-gray-500">Start one with “New note”.</p></div>`
     return
   }
   let html = ''
@@ -185,8 +186,8 @@ function renderList() {
     if (g !== last) {
       // the first group header carries the sort control, as in the handoff ("Today ........ Modified v")
       html += last === ''
-        ? `<div class="list-group list-group--sort" role="presentation"><span>${g}</span><button type="button" class="list-sort" data-sort-btn aria-haspopup="menu" aria-expanded="false" aria-label="Sort by ${SORT_LABEL[sortBy]}">${SORT_LABEL[sortBy]}${icon('chevron-down', 'size-3')}</button></div>`
-        : `<div class="list-group" role="presentation">${g}</div>`
+        ? `<div class="${ui.listGroupSort}" role="presentation"><span>${g}</span><button type="button" class="${ui.listSort}" data-sort-btn aria-haspopup="menu" aria-expanded="false" aria-label="Sort by ${SORT_LABEL[sortBy]}">${SORT_LABEL[sortBy]}${icon('chevron-down', 'size-3')}</button></div>`
+        : `<div class="${ui.listGroup}" role="presentation">${g}</div>`
       last = g
     }
     html += rowHTML(n)
@@ -447,7 +448,7 @@ document.addEventListener('keydown', (e) => {
 // Trash icon that appears over the hovered row (an overlay, so the row never changes size).
 const rowDel = document.createElement('button')
 rowDel.type = 'button'
-rowDel.className = 'row-del'
+rowDel.className = ui.rowDel
 rowDel.setAttribute('aria-label', 'Delete note')
 rowDel.tabIndex = -1
 rowDel.innerHTML = icon('trash-2', 'size-3.5')
@@ -704,7 +705,7 @@ function renderStatus() {
   const st = currentId ? queue.stateOf(currentId) : 'idle'
   const text = { saving: 'Saving…', still: 'Still saving…', error: 'Not saved', idle: savedFlash === currentId ? 'Saved' : '' }[st]
   statusEl.dataset.state = st
-  statusEl.innerHTML = text ? `<span class="status-dot"></span>${text}` : ''
+  statusEl.innerHTML = text ? `<span class="${ui.statusDot}"></span>${text}` : ''
   strip.hidden = st !== 'error'
 }
 
