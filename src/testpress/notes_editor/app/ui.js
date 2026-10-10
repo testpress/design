@@ -114,7 +114,7 @@ export const ui = {
   slashEmpty: 'slash-empty p-2.5 text-[13px] text-gray-500',
   slashFoot: 'slash-foot sticky -bottom-1 -mx-1 -mb-1 mt-1 flex items-center justify-between rounded-b-[10px] border-t border-[#f0f1f3] bg-white px-3 py-2 text-[13px] text-gray-500 dark:border-[#3a3a3a] dark:bg-[#262626] [&_kbd]:text-[11px] [&_kbd]:font-medium [&_kbd]:leading-none [&_kbd]:text-gray-400 [&_kbd]:[font-family:ui-monospace,Menlo,monospace]',
   slashPreview: 'slash-preview pointer-events-none fixed z-[91] w-56 rounded-[10px] bg-gray-800 p-2 text-white shadow-[0_10px_30px_rgba(17,24,39,.22)] max-lg:!hidden',
-  slashPreviewPage: 'slash-preview__page note-mini h-[6.5rem] overflow-hidden rounded-md bg-white px-3 py-2.5 text-[11px] leading-normal text-gray-700 [&>*+*]:mt-[.4em] [&_h1]:text-[17px] [&_h1]:font-bold [&_h1]:leading-[1.2] [&_h2]:text-[14px] [&_h2]:font-bold [&_h3]:text-[12px] [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:ps-[1.2em] [&_ol]:list-decimal [&_ol]:ps-[1.3em] [&_blockquote]:border-s-[3px] [&_blockquote]:border-primary-600 [&_blockquote]:ps-2 [&_blockquote]:text-gray-600 [&_pre]:rounded-md [&_pre]:bg-[#0f1729] [&_pre]:px-2.5 [&_pre]:py-2 [&_pre]:text-[11px] [&_pre]:text-gray-200 [&_hr]:my-[.8em] [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-gray-300',
+  slashPreviewPage: 'slash-preview__page note-mini h-[6.5rem] overflow-hidden rounded-md bg-white px-3 py-2.5 text-[11px] leading-normal text-gray-700 dark:bg-[#1f1f1f] dark:text-gray-200 [&>*+*]:mt-[.4em] [&_h1]:text-[17px] [&_h1]:font-bold [&_h1]:leading-[1.2] [&_h2]:text-[14px] [&_h2]:font-bold [&_h3]:text-[12px] [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:ps-[1.2em] [&_ol]:list-decimal [&_ol]:ps-[1.3em] [&_blockquote]:border-s-[3px] [&_blockquote]:border-primary-600 [&_blockquote]:ps-2 [&_blockquote]:text-gray-600 dark:[&_blockquote]:text-gray-400 [&_pre]:rounded-md [&_pre]:bg-[#0f1729] [&_pre]:px-2.5 [&_pre]:py-2 [&_pre]:text-[11px] [&_pre]:text-gray-200 [&_hr]:my-[.8em] [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-gray-300 dark:[&_hr]:border-[#444]',
   slashPreviewCap: 'slash-preview__cap px-1 pb-0.5 pt-2 text-[13px]',
 
   // ---- folder / tag popovers (meta line + filter bar) ------------------------------------------------------
@@ -177,10 +177,10 @@ export const ui = {
 
   // ---- slash-menu preview samples (blocks.js) --------------------------------------------------------------
   pvTask: 'flex items-center gap-1.5',
-  pvBox: 'size-[11px] flex-none rounded-[3px] border border-gray-400',
+  pvBox: 'size-[11px] flex-none rounded-[3px] border border-gray-400 dark:border-gray-500',
   pvBoxOn: 'size-[11px] flex-none rounded-[3px] border border-primary-600 bg-primary-600',
-  pvCallout: 'flex gap-2 rounded-md bg-primary-50 px-2.5 py-2 [&_p]:m-0',
+  pvCallout: 'flex gap-2 rounded-md bg-primary-50 px-2.5 py-2 dark:bg-primary-500/[.15] [&_p]:m-0',
   pvToggle: 'font-semibold',
-  pvIndent: 'ps-3.5 text-gray-500',
-  pvTable: 'w-full border-collapse [&_td]:border [&_td]:border-gray-300 [&_td]:px-1.5 [&_td]:py-[3px] [&_td]:text-start [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:px-1.5 [&_th]:py-[3px] [&_th]:text-start',
+  pvIndent: 'ps-3.5 text-gray-500 dark:text-gray-400',
+  pvTable: 'w-full border-collapse dark:[&_td]:border-[#444] dark:[&_th]:border-[#444] dark:[&_th]:bg-[#2a2a2a] [&_td]:border [&_td]:border-gray-300 [&_td]:px-1.5 [&_td]:py-[3px] [&_td]:text-start [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:px-1.5 [&_th]:py-[3px] [&_th]:text-start',
 }
