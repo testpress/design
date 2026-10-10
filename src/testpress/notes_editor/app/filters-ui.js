@@ -86,7 +86,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
       <div class="meta-pop__head">${title}${kind === 'tags' ? '<span class="lib-hint"> · notes must have all selected</span>' : ''}</div>
       <input type="text" autocomplete="off" spellcheck="false" class="meta-pop__input" role="combobox" aria-expanded="true" aria-controls="lib-list" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" value="${esc(query)}">
       <div id="lib-list" class="meta-pop__list" role="listbox" ${kind === 'tags' ? 'aria-multiselectable="true"' : ''}>${body}</div>
-      <div class="meta-pop__foot">${kind === 'folder' ? 'Enter open · F2 rename · ⌥P pin · Del delete' : 'Enter toggle · F2 rename · Del remove'}</div>`
+      <div class="meta-pop__foot">${kind === 'folder' ? 'F2 rename · ⌥P pin · Del delete' : 'Enter toggle · F2 rename · Del remove'}</div>`
     refreshIcons(pop)
     const el = pop.querySelector('input')
     if (focusInput && mode.type === 'browse') {
@@ -128,7 +128,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     const leadIcon = r.key === '__all' ? 'layers' : r.create ? 'folder-plus' : r.pinned ? 'pin' : 'folder'
     const lead = kind === 'folder' ? `<i data-lucide="${leadIcon}" class="size-4 lib-lead ${r.pinned ? 'lib-pin' : ''}" aria-hidden="true"></i>` : ''
     const check = kind === 'tags' ? `<span class="lib-check ${r.on ? 'is-on' : ''}" aria-hidden="true">${r.on ? '✓' : ''}</span>` : ''
-    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}${lead}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</div>`
+    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}${lead}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4 lib-tick"></i>' : ''}</div>`
   }
 
   // ---- actions ---------------------------------------------------------------------------------
