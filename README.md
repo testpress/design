@@ -94,3 +94,11 @@ For larger features, copy `docs/ui_plan/ui_plan_template.md` to `docs/ui_plan/<f
 - Don't commit one-off scripts that rewrite templates (the `fix_*.py` / `update_*.py` style) to the repo root. Do those locally.
 - Don't edit generated output (`public/`, built files in `css/`).
 - Don't duplicate an existing component or page pattern; extend it.
+
+## Notes editor prototype (TipTap)
+
+`src/testpress/notes_editor/` is a working TipTap editor (no backend). Its JS lives in `app/` and is bundled by esbuild into `js/notes-editor.js`, which is committed like `css/testpress-v2.css`.
+
+- `npm start` rebuilds the bundle on change; run `npm run build:notes-editor` once if you only use `npx eleventy`.
+- Commit the rebuilt `js/notes-editor.js` together with any change under `app/`.
+- Open `/testpress/notes_editor/`. The flask button (bottom right) simulates failed saves and slow servers.
