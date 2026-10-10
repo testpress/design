@@ -29,6 +29,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
   let index = 0
   let rows = []
   let mode = { type: 'browse' } // or { type: 'rename', key } | { type: 'confirm', key }
+  let frozen = null // order of the folder list while it is open (see build())
 
   const labelOf = () => (state.folder ? state.folder : 'All notes')
 
@@ -69,7 +70,12 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
       const counts = store.folderCounts()
       if (!q) out.push({ key: '__all', label: 'All notes', count: store.notes.size, on: !state.folder, fixed: true })
       const pins = store.pinnedFolders()
-      const ordered = [...pins, ...store.folders().filter((x) => !pins.includes(x))]
+      // The order is frozen while the list is open (pinned first, then A-Z when it opened), so a folder you just
+      // renamed or created stays where you are looking instead of jumping to its new alphabetical place.
+      const all = store.folders()
+      const base = frozen ? frozen.filter((x) => all.includes(x)) : [...pins, ...all.filter((x) => !pins.includes(x))]
+      const ordered = [...base, ...all.filter((x) => !base.includes(x))]
+      frozen = ordered
       ordered.filter((x) => !q || x.toLowerCase().includes(q)).forEach((x) => out.push({ key: x, label: x, count: counts.get(x) || 0, on: state.folder === x, pinned: pins.includes(x) }))
       const typed = cleanFolder(query)
       if (typed && !store.folders().some((f) => f.toLowerCase() === typed.toLowerCase())) out.push({ key: '__new', label: `Create folder “${typed}”`, create: typed, fixed: true })
@@ -167,6 +173,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
   }
 
   function togglePin(name) {
+    frozen = null // pinning changes the order on purpose: pinned folders go first
     if (store.isPinned(name)) store.unpinFolder(name)
     else if (!store.pinFolder(name).ok) onHint(`You can pin up to ${MAX_PINNED_FOLDERS} folders. Unpin one to pin another.`)
     paint(false)
@@ -177,6 +184,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     const to = kind === 'folder' ? cleanFolder(value) : cleanTag(value)
     if (to && to !== row.key) {
       if (kind === 'folder') {
+        if (frozen) frozen = frozen.map((x) => (x === row.key ? to : x)) // same place in the list
         store.renameFolder(row.key, to)
         if (state.folder === row.key) state.folder = to
       } else {
@@ -189,6 +197,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
   }
 
   function doDelete(row) {
+    frozen = null
     mode = { type: 'browse' }
     if (kind === 'folder') {
       store.deleteFolder(row.key)
@@ -205,6 +214,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     if (!pop.hidden && kind === which) return close(true)
     kind = which
     anchor = el
+    frozen = null
     index = -1 // nothing is highlighted until you hover, press an arrow key or type
     mode = { type: 'browse' }
     pop.hidden = false
