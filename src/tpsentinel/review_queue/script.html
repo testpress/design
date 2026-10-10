@@ -5,6 +5,7 @@
       total: data.total_assigned,
       selectedId: data.cases.length ? data.cases[0].id : null,
       search: '',
+      mobileDetail: false,
       choice: null,
       notes: '',
       viewer: { open: false, title: '', items: [], index: 0 },
@@ -88,6 +89,20 @@
         });
       },
 
+      open(id) {
+        this.select(id);
+        this.mobileDetail = true;
+        window.scrollTo({ top: 0 });
+      },
+
+      backToList() {
+        this.mobileDetail = false;
+        this.$nextTick(() => {
+          const el = document.getElementById('case-' + this.selectedId);
+          if (el) el.scrollIntoView({ block: 'center' });
+        });
+      },
+
       move(step) {
         const list = this.filtered;
         if (!list.length) return;
@@ -147,12 +162,21 @@
         const c = this.current;
         if (!c || !c.stale) return;
         c.latest_session = c.stale.refreshed_session;
+        c.recordings = c.stale.refreshed_recordings.concat(c.recordings);
         c.sessions_total += 1;
         c.stale = null;
       },
 
       openViewer(anomaly, index) {
         this.viewer = { open: true, title: anomaly.name, items: anomaly.media.items, index };
+      },
+
+      openRecording(r) {
+        const items = this.current.recordings
+          .filter((x) => x.state === 'available')
+          .map((x) => ({ ...x, label: x.session + ' · ' + x.label }));
+        const index = items.findIndex((x) => x.src === r.src && x.session + ' · ' + r.label === x.label);
+        this.viewer = { open: true, title: 'Full session recordings', items, index: Math.max(index, 0) };
       },
 
       closeViewer() {
