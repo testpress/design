@@ -1118,7 +1118,7 @@ bubbleEl.addEventListener('keydown', (e) => {
 const mobile = { mode: 'bar', tray: false }
 
 function mb(act, ic, label, on = false, text = '') {
-  return `<button type="button" tabindex="-1" data-m="${act}" class="mb-btn ${on ? 'is-on' : ''} ${text ? 'mb-btn--text' : ''}" aria-label="${label}" aria-pressed="${on}">${text ? esc(text) : icon(ic, 'size-5')}${text ? icon('chevron-down', 'size-3.5') : ''}</button>`
+  return `<button type="button" tabindex="-1" data-m="${act}" class="${text ? ui.mbBtnText : ui.mbBtn} ${on ? 'is-on' : ''}" aria-label="${label}" aria-pressed="${on}">${text ? esc(text) : icon(ic, 'size-5')}${text ? icon('chevron-down', 'size-3.5') : ''}</button>`
 }
 
 function mobileVisible() {
@@ -1137,7 +1137,7 @@ function renderMobileBar() {
   let main = ''
   if (mobile.mode === 'link') {
     const href = ed.getAttributes('link').href || ''
-    $('#mobile-row').innerHTML = `<form class="mb-link" data-m-link>${icon('link', 'size-4 text-gray-400')}<input type="text" inputmode="url" autocomplete="off" aria-label="Link address" placeholder="Paste or type a link" value="${esc(href)}" class="${ui.bmInput}"><button type="submit" class="${ui.bmApply}">Apply</button>${href ? `<button type="button" data-m="unlink" class="mb-btn" aria-label="Remove link">${icon('unlink', 'size-5')}</button>` : ''}<button type="button" data-m="cancel-link" class="mb-btn" aria-label="Cancel">${icon('x', 'size-5')}</button></form>`
+    $('#mobile-row').innerHTML = `<form class="${ui.mbLink}" data-m-link>${icon('link', 'size-4 text-gray-400')}<input type="text" inputmode="url" autocomplete="off" aria-label="Link address" placeholder="Paste or type a link" value="${esc(href)}" class="${ui.mbInput}"><button type="submit" class="${ui.bmApply}">Apply</button>${href ? `<button type="button" data-m="unlink" class="${ui.mbBtn}" aria-label="Remove link">${icon('unlink', 'size-5')}</button>` : ''}<button type="button" data-m="cancel-link" class="${ui.mbBtn}" aria-label="Cancel">${icon('x', 'size-5')}</button></form>`
     refreshIcons($('#mobile-row'))
     $('#mobile-row input')?.focus({ preventScroll: true })
     $('#mobile-tray').hidden = true
@@ -1177,8 +1177,8 @@ function renderMobileBar() {
   const tray = $('#mobile-tray')
   tray.hidden = !(mobile.tray && !sel)
   if (!tray.hidden) {
-    tray.innerHTML = `<div class="tray-label">Turn this line into</div><div class="tray-row">${BLOCKS.map((b) => `<button type="button" tabindex="-1" data-tray="${b.id}" class="tray-chip ${b.active(ed) ? 'is-on' : ''}" aria-pressed="${b.active(ed)}">${icon(b.icon)}<span>${b.label}</span></button>`).join('')}</div>
-      <div class="tray-label">Insert</div><div class="tray-row">${[DIVIDER, TABLE].map((x) => `<button type="button" tabindex="-1" data-tray="${x.id}" class="tray-chip">${icon(x.icon)}<span>${x.label}</span></button>`).join('')}</div>`
+    tray.innerHTML = `<div class="${ui.trayLabel}">Turn this line into</div><div class="${ui.trayRow}">${BLOCKS.map((b) => `<button type="button" tabindex="-1" data-tray="${b.id}" class="${ui.trayChip} ${b.active(ed) ? 'is-on' : ''}" aria-pressed="${b.active(ed)}">${icon(b.icon)}<span>${b.label}</span></button>`).join('')}</div>
+      <div class="${ui.trayLabel}">Insert</div><div class="${ui.trayRow}">${[DIVIDER, TABLE].map((x) => `<button type="button" tabindex="-1" data-tray="${x.id}" class="${ui.trayChip}">${icon(x.icon)}<span>${x.label}</span></button>`).join('')}</div>`
     refreshIcons(tray)
   }
 }

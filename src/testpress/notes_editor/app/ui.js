@@ -165,4 +165,22 @@ export const ui = {
   bmItem: 'bm-item flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-start text-[14px] text-gray-200 hover:bg-white/10 focus-visible:bg-white/[.16] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white [&.is-on]:font-semibold [&.is-on]:text-white',
   bmInput: 'bm-input h-[30px] w-60 rounded-md border-0 bg-white/10 px-2 text-[14px] text-white shadow-none outline-none focus:bg-white/[.16] focus:shadow-none focus:ring-0',
   bmApply: 'bm-apply h-[30px] rounded-md bg-primary-600 px-2.5 text-[13px] font-semibold text-white focus-visible:bg-white/[.16] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white',
+
+  // ---- mobile format bar, link row and block tray ---------------------------------------------------------
+  mbBtn: 'mb-btn inline-flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-lg text-gray-700 disabled:opacity-[.35] dark:text-gray-200 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700',
+  mbBtnText: 'mb-btn mb-btn--text inline-flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-lg px-2.5 text-[15px] font-semibold text-gray-700 disabled:opacity-[.35] dark:text-gray-200 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700',
+  mbLink: 'mb-link flex w-full items-center gap-1.5 px-2',
+  mbInput: 'bm-input h-[34px] w-auto flex-1 rounded-md border border-gray-300 bg-white px-2 text-[16px] text-gray-900 shadow-none outline-none focus:shadow-none focus:ring-0',
+  trayLabel: 'tray-label mb-1.5 mt-0.5 text-[11px] font-semibold uppercase tracking-[.05em] text-gray-400',
+  trayRow: 'tray-row flex gap-1.5 overflow-x-auto pb-1.5 [scrollbar-width:none]',
+  trayChip: `tray-chip inline-flex h-9 flex-none items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[14px] text-gray-700 [&.is-on]:border-primary-600 [&.is-on]:bg-primary-100 [&.is-on]:text-primary-700 ${ring}`,
+
+  // ---- slash-menu preview samples (blocks.js) --------------------------------------------------------------
+  pvTask: 'flex items-center gap-1.5',
+  pvBox: 'size-[11px] flex-none rounded-[3px] border border-gray-400',
+  pvBoxOn: 'size-[11px] flex-none rounded-[3px] border border-primary-600 bg-primary-600',
+  pvCallout: 'flex gap-2 rounded-md bg-primary-50 px-2.5 py-2 [&_p]:m-0',
+  pvToggle: 'font-semibold',
+  pvIndent: 'ps-3.5 text-gray-500',
+  pvTable: 'w-full border-collapse [&_td]:border [&_td]:border-gray-300 [&_td]:px-1.5 [&_td]:py-[3px] [&_td]:text-start [&_th]:border [&_th]:border-gray-300 [&_th]:bg-gray-100 [&_th]:px-1.5 [&_th]:py-[3px] [&_th]:text-start',
 }

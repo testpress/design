@@ -1,3 +1,4 @@
+import { ui } from './ui.js'
 // Block/mark commands shared by the slash menu, desktop bubble menu and mobile tray.
 // Everything runs through the editor instance; nothing here knows about the DOM chrome.
 
@@ -8,10 +9,10 @@ export const BLOCKS = [
   { id: 'h3', desc: 'Small section heading', sample: '<h3>Section title</h3><p>Text under a small heading.</p>', label: 'Heading 3', hint: '###', icon: 'heading-3', keywords: 'h3 heading small', active: (e) => e.isActive('heading', { level: 3 }) },
   { id: 'bullet', desc: 'Create a simple bulleted list', sample: '<ul><li>First point</li><li>Second point</li><li>Third point</li></ul>', label: 'Bulleted list', hint: '-', icon: 'list', keywords: 'bullet list ul unordered', active: (e) => e.isActive('bulletList') },
   { id: 'ordered', desc: 'Create a list with numbering', sample: '<ol><li>First step</li><li>Second step</li><li>Third step</li></ol>', label: 'Numbered list', hint: '1.', icon: 'list-ordered', keywords: 'number ordered list ol', active: (e) => e.isActive('orderedList') },
-  { id: 'task', desc: 'Track tasks with a checklist', sample: "<div class='pv-task'><span class='pv-box on'></span>Read chapter 4</div><div class='pv-task'><span class='pv-box'></span>Solve DPP 3</div><div class='pv-task'><span class='pv-box'></span>Revise notes</div>", label: 'Checklist', hint: '[ ]', icon: 'list-checks', keywords: 'todo task checkbox checklist', active: (e) => e.isActive('taskList') },
+  { id: 'task', desc: 'Track tasks with a checklist', sample: `<div class='${ui.pvTask}'><span class='${ui.pvBoxOn}'></span>Read chapter 4</div><div class='${ui.pvTask}'><span class='${ui.pvBox}'></span>Solve DPP 3</div><div class='${ui.pvTask}'><span class='${ui.pvBox}'></span>Revise notes</div>`, label: 'Checklist', hint: '[ ]', icon: 'list-checks', keywords: 'todo task checkbox checklist', active: (e) => e.isActive('taskList') },
   { id: 'quote', desc: 'Capture a quote', sample: '<blockquote>Slow down on the first read.</blockquote>', label: 'Quote', hint: '>', icon: 'text-quote', keywords: 'quote blockquote citation', active: (e) => e.isActive('blockquote') },
-  { id: 'callout', label: 'Callout', hint: '', icon: 'lightbulb', desc: 'Make something stand out', sample: "<div class='pv-callout'><span>💡</span><p>Remember: E = 0 inside a conductor.</p></div>", keywords: 'callout note tip highlight box important', active: (e) => e.isActive('callout') },
-  { id: 'toggle', label: 'Toggle list', hint: '', icon: 'list-collapse', desc: 'Hide details inside a collapsible toggle', sample: "<div class='pv-toggle'><b>▾</b> Why does this work?</div><p class='pv-indent'>The details live inside the toggle.</p>", keywords: 'toggle collapse details fold accordion', active: (e) => e.isActive('details') },
+  { id: 'callout', label: 'Callout', hint: '', icon: 'lightbulb', desc: 'Make something stand out', sample: `<div class='${ui.pvCallout}'><span>💡</span><p>Remember: E = 0 inside a conductor.</p></div>`, keywords: 'callout note tip highlight box important', active: (e) => e.isActive('callout') },
+  { id: 'toggle', label: 'Toggle list', hint: '', icon: 'list-collapse', desc: 'Hide details inside a collapsible toggle', sample: `<div class='${ui.pvToggle}'><b>▾</b> Why does this work?</div><p class='${ui.pvIndent}'>The details live inside the toggle.</p>`, keywords: 'toggle collapse details fold accordion', active: (e) => e.isActive('details') },
   { id: 'code', desc: 'Capture a code snippet', sample: '<pre>E = m * c ** 2</pre>', label: 'Code block', hint: '```', icon: 'code-xml', keywords: 'code snippet pre', active: (e) => e.isActive('codeBlock') },
 ]
 
@@ -23,7 +24,7 @@ export const TABLE = {
   hint: '',
   icon: 'table',
   desc: 'Add a simple table to organise data',
-  sample: "<table class='pv-table'><tr><th>Term</th><th>Meaning</th></tr><tr><td>E</td><td>Field</td></tr><tr><td>q</td><td>Charge</td></tr></table>",
+  sample: `<table class='${ui.pvTable}'><tr><th>Term</th><th>Meaning</th></tr><tr><td>E</td><td>Field</td></tr><tr><td>q</td><td>Charge</td></tr></table>`,
   keywords: 'table grid rows columns cells',
 }
 
