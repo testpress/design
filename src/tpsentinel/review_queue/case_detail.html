@@ -1,0 +1,186 @@
+<!-- Case Detail -->
+<template x-if="current">
+  <div class="p-4 sm:p-6 space-y-5 max-w-5xl">
+
+    <!-- Candidate Header -->
+    <div class="flex flex-wrap items-center gap-4">
+      <img class="shrink-0 size-14 rounded-full object-cover" :src="current.candidate.photo"
+        :alt="'Enrolment photo of ' + current.candidate.name">
+      <div class="grow min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="text-xl font-semibold text-gray-800 dark:text-neutral-200" x-text="current.candidate.name"></h2>
+          <span class="inline-flex items-center py-0.5 px-2 rounded-full text-xs font-medium"
+            :class="severityClass(current.risk)" x-text="current.risk"></span>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-neutral-400">
+          <span x-text="current.candidate.email"></span> ·
+          <span x-text="current.id"></span> ·
+          <span x-text="current.workspace"></span>
+        </p>
+      </div>
+      <p class="text-xs text-gray-500 dark:text-neutral-400">Assigned <span x-text="current.assigned"></span></p>
+    </div>
+    <!-- End Candidate Header -->
+
+    <!-- Why Flagged -->
+    <div class="p-4 sm:p-5 bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-neutral-800 dark:border-neutral-700">
+      <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Why this candidate was flagged</h3>
+
+      <div class="mt-4 divide-y divide-gray-200 dark:divide-neutral-700">
+        <template x-for="(a, ai) in current.anomalies" :key="current.id + '-' + ai">
+          <div class="py-4 first:pt-0 last:pb-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <h4 class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="a.name"></h4>
+              <span class="inline-flex items-center py-0.5 px-2 rounded-full text-xs font-medium"
+                :class="severityClass(a.severity)" x-text="a.severity"></span>
+            </div>
+            <p class="mt-1 text-sm text-gray-600 dark:text-neutral-400" x-text="a.explanation"></p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-neutral-500" x-text="timingText(a.timing)"></p>
+
+            <!-- Evidence Gallery -->
+            <div x-show="a.media.state === 'available'" class="mt-3 flex flex-wrap gap-3">
+              <template x-for="(m, mi) in (a.media.items || [])" :key="mi">
+                <button type="button" @click="openViewer(a, mi)"
+                  class="group w-40 text-start rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  :aria-label="'Open ' + m.label + ' at ' + m.time">
+                  <span class="relative block h-24 rounded-lg overflow-hidden bg-gray-100 dark:bg-neutral-700">
+                    <template x-if="m.src">
+                      <img class="size-full object-cover group-hover:opacity-90" :src="m.src" alt="">
+                    </template>
+                    <template x-if="!m.src">
+                      <span class="size-full flex flex-col items-center justify-center gap-1 text-gray-500 dark:text-neutral-400">
+                        <svg class="shrink-0 size-6" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></svg>
+                        <span class="text-xs">Audio</span>
+                      </span>
+                    </template>
+                    <template x-if="m.length">
+                      <span class="absolute bottom-1 end-1 inline-flex items-center gap-x-1 py-0.5 px-1.5 rounded-md bg-gray-900/70 text-[11px] font-medium text-white">
+                        <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        <span x-text="m.length"></span>
+                      </span>
+                    </template>
+                  </span>
+                  <span class="mt-1 block text-xs font-medium text-gray-800 dark:text-neutral-200" x-text="m.label"></span>
+                  <span class="block text-xs text-gray-500 dark:text-neutral-500" x-text="m.time"></span>
+                </button>
+              </template>
+            </div>
+
+            <!-- Media State (no fake placeholders) -->
+            <div x-show="a.media.state !== 'available'"
+              class="mt-3 p-3 rounded-lg border border-dashed border-gray-300 text-sm dark:border-neutral-600">
+              <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="mediaStateLabel(a.media.state)"></span>
+              <span class="text-gray-500 dark:text-neutral-400" x-text="a.media.note"></span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+    <!-- End Why Flagged -->
+
+    <!-- Identity + Coverage -->
+    <div class="grid md:grid-cols-2 gap-5">
+      <!-- Identity -->
+      <div class="p-4 sm:p-5 bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="flex items-center justify-between gap-2">
+          <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Identity check</h3>
+          <span class="inline-flex items-center py-0.5 px-2 rounded-full text-xs font-medium"
+            :class="identityClass(current.identity.outcome)" x-text="current.identity.outcome"></span>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-3">
+          <figure>
+            <img class="w-full aspect-square rounded-lg object-cover bg-gray-100 dark:bg-neutral-700"
+              :src="current.identity.reference" alt="Enrolment photo">
+            <figcaption class="mt-1 text-xs text-gray-500 dark:text-neutral-400">Enrolment photo</figcaption>
+          </figure>
+          <figure>
+            <template x-if="current.identity.attempt">
+              <img class="w-full aspect-square rounded-lg object-cover bg-gray-100 dark:bg-neutral-700"
+                :src="current.identity.attempt" alt="Check-in photo">
+            </template>
+            <template x-if="!current.identity.attempt">
+              <div class="w-full aspect-square rounded-lg border border-dashed border-gray-300 p-3 flex items-center justify-center text-center text-sm text-gray-500 dark:border-neutral-600 dark:text-neutral-400">
+                The candidate did not take an identity check, so there is no check-in photo.
+              </div>
+            </template>
+            <figcaption class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
+              Check-in photo<span x-show="current.identity.at" x-text="' · ' + current.identity.at"></span>
+            </figcaption>
+          </figure>
+        </div>
+      </div>
+      <!-- End Identity -->
+
+      <!-- Coverage -->
+      <div class="p-4 sm:p-5 bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-neutral-800 dark:border-neutral-700">
+        <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Evidence coverage</h3>
+        <p x-show="hasGaps(current)" class="mt-1 text-sm text-gray-600 dark:text-neutral-400">
+          Coverage is incomplete. Judge the case on the available evidence.
+        </p>
+        <ul class="mt-4 space-y-3">
+          <template x-for="cv in current.coverage" :key="cv.channel">
+            <li class="flex items-start justify-between gap-3 text-sm">
+              <span>
+                <span class="block text-gray-800 dark:text-neutral-200" x-text="cv.channel"></span>
+                <span x-show="cv.detail" class="block text-xs text-gray-500 dark:text-neutral-400" x-text="cv.detail"></span>
+              </span>
+              <span class="shrink-0 inline-flex items-center py-0.5 px-2 rounded-full text-xs font-medium"
+                :class="cv.status === 'Gap' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-500/20 dark:text-yellow-400' : 'bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200'"
+                x-text="cv.status"></span>
+            </li>
+          </template>
+        </ul>
+      </div>
+      <!-- End Coverage -->
+    </div>
+    <!-- End Identity + Coverage -->
+
+    <!-- Latest Session -->
+    <div class="p-4 sm:p-5 bg-white border border-gray-200 rounded-xl shadow-sm dark:bg-neutral-800 dark:border-neutral-700">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Latest session</h3>
+        <span class="text-xs text-gray-500 dark:text-neutral-400"
+          x-text="current.latest_session.label + ' of ' + current.sessions_total"></span>
+      </div>
+      <dl class="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 text-sm">
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">Status</dt>
+          <dd class="text-gray-800 dark:text-neutral-200" x-text="current.latest_session.status"></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">Date</dt>
+          <dd class="text-gray-800 dark:text-neutral-200" x-text="current.latest_session.date"></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">Time</dt>
+          <dd class="text-gray-800 dark:text-neutral-200"
+            x-text="current.latest_session.started + ' – ' + current.latest_session.ended"></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">IP address</dt>
+          <dd class="text-gray-800 dark:text-neutral-200 font-mono text-xs leading-5" x-text="current.latest_session.ip"></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">Device</dt>
+          <dd class="text-gray-800 dark:text-neutral-200" x-text="current.latest_session.device"></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">OS</dt>
+          <dd class="text-gray-800 dark:text-neutral-200" x-text="current.latest_session.os"></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">Browser</dt>
+          <dd class="text-gray-800 dark:text-neutral-200" x-text="current.latest_session.browser"></dd>
+        </div>
+        <div>
+          <dt class="text-xs text-gray-500 dark:text-neutral-400">SDK</dt>
+          <dd class="text-gray-800 dark:text-neutral-200" x-text="current.latest_session.sdk"></dd>
+        </div>
+      </dl>
+    </div>
+    <!-- End Latest Session -->
+
+    {% include "./decision_panel.html" %}
+  </div>
+</template>
+<!-- End Case Detail -->
