@@ -10,6 +10,7 @@ import { Plugin, PluginKey, TextSelection, EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { SLASH_ITEMS, turnInto, insertDivider, insertTable } from './blocks.js'
 import { Callout, TrailingParagraph } from './nodes.js'
+import { ui } from './ui.js'
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import { Details, DetailsSummary, DetailsContent } from '@tiptap/extension-details'
 import { refreshIcons } from './icons.js'
@@ -84,7 +85,7 @@ const activeCell = Extension.create({
             const n = $from.node(d)
             if (n.type.name === 'tableCell' || n.type.name === 'tableHeader') {
               const pos = $from.before(d)
-              return DecorationSet.create(state.doc, [Decoration.node(pos, pos + n.nodeSize, { class: 'is-active-cell' })])
+              return DecorationSet.create(state.doc, [Decoration.node(pos, pos + n.nodeSize, { class: ui.activeCell })])
             }
           }
           return null
@@ -137,26 +138,26 @@ function metaPlugin(getMeta) {
               if (meta.shared) {
                 // Shared with Me: who shared it, plus a quiet Read-only label. Nothing here is editable.
                 const el = document.createElement('div')
-                el.className = 'note-meta note-meta--shared'
+                el.className = ui.metaShared
                 el.setAttribute('contenteditable', 'false')
-                el.innerHTML = `<span class="note-meta__from">Shared by ${esc(meta.shared.from)} · ${esc(meta.shared.role)} · ${esc(meta.shared.date)}</span><span class="note-meta__ro"><i data-lucide="lock" class="size-3"></i>Read-only</span>`
+                el.innerHTML = `<span class="${ui.metaFrom}">Shared by ${esc(meta.shared.from)} · ${esc(meta.shared.role)} · ${esc(meta.shared.date)}</span><span class="${ui.metaRo}"><i data-lucide="lock" class="size-3"></i>Read-only</span>`
                 refreshIcons(el)
                 return el
               }
               const empty = !meta.folder && !meta.tags.length
-              el.className = 'note-meta' + (empty ? ' note-meta--empty' : '')
+              el.className = ui.meta + (empty ? ' note-meta--empty ' + ui.metaEmpty : '')
               el.setAttribute('contenteditable', 'false')
               const parts = []
               if (empty) {
-                parts.push('<button type="button" data-meta="folder" class="note-meta__hint" aria-haspopup="dialog">Add folder</button><span class="note-meta__dot" aria-hidden="true">or</span><button type="button" data-meta="tags" class="note-meta__hint" aria-haspopup="dialog">tags</button>')
+                parts.push(`<button type="button" data-meta="folder" class="note-meta__hint ${ui.metaChip}" aria-haspopup="dialog">Add folder</button><span class="${ui.metaDot}" aria-hidden="true">or</span><button type="button" data-meta="tags" class="note-meta__hint ${ui.metaChip}" aria-haspopup="dialog">tags</button>`)
               } else {
                 parts.push(
-                  `<button type="button" data-meta="folder" class="note-meta__folder${meta.folder ? '' : ' is-unset'}" aria-haspopup="dialog" aria-label="Folder: ${meta.folder ? esc(meta.folder) : 'none'}"><i data-lucide="folder" class="size-3.5"></i>${meta.folder ? esc(meta.folder) : 'Add folder'}</button>`
+                  `<button type="button" data-meta="folder" class="note-meta__folder ${meta.folder ? ui.metaChip : ui.metaChipDim}" aria-haspopup="dialog" aria-label="Folder: ${meta.folder ? esc(meta.folder) : 'none'}"><i data-lucide="folder" class="size-3.5"></i>${meta.folder ? esc(meta.folder) : 'Add folder'}</button>`
                 )
                 meta.tags.forEach((t) =>
-                  parts.push(`<span class="note-meta__tag"><span>#${esc(t)}</span><button type="button" data-meta="remove-tag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}">&times;</button></span>`)
+                  parts.push(`<span class="${ui.metaTag}"><span>#${esc(t)}</span><button type="button" class="${ui.metaTagX}" data-meta="remove-tag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}">&times;</button></span>`)
                 )
-                parts.push('<button type="button" data-meta="tags" class="note-meta__add" aria-haspopup="dialog" aria-label="Add tag">+ Tag</button>')
+                parts.push(`<button type="button" data-meta="tags" class="note-meta__add ${ui.metaChipDim}" aria-haspopup="dialog" aria-label="Add tag">+ Tag</button>`)
               }
               el.innerHTML = parts.join('')
               refreshIcons(el)
@@ -208,12 +209,12 @@ function slashRenderer() {
     el.innerHTML = items.length
       ? items
           .map(
-            (it, i) => `${i === 0 || it.group !== items[i - 1].group ? `<div class="slash-group" role="presentation">${it.group}</div>` : ''}<button type="button" id="slash-opt-${i}" role="option" tabindex="-1" aria-selected="false" data-i="${i}" class="slash-item">
-              <i data-lucide="${it.icon}" class="size-4"></i><span class="slash-item__label">${it.label}</span><kbd class="slash-item__hint">${it.hint}</kbd></button>`
+            (it, i) => `${i === 0 || it.group !== items[i - 1].group ? `<div class="${ui.slashGroup}" role="presentation">${it.group}</div>` : ''}<button type="button" id="slash-opt-${i}" role="option" tabindex="-1" aria-selected="false" data-i="${i}" class="${ui.slashItem}">
+              <i data-lucide="${it.icon}" class="size-4"></i><span class="${ui.slashLabel}">${it.label}</span><kbd class="${ui.slashHint}">${it.hint}</kbd></button>`
           )
           .join('')
-      : '<div class="slash-empty">No matching blocks</div>'
-    el.insertAdjacentHTML('beforeend', '<div class="slash-foot" aria-hidden="true">Close menu<kbd>esc</kbd></div>')
+      : `<div class="${ui.slashEmpty}">No matching blocks</div>`
+    el.insertAdjacentHTML('beforeend', `<div class="${ui.slashFoot}" aria-hidden="true">Close menu<kbd>esc</kbd></div>`)
     refreshIcons(el)
     highlightIndex(false)
   }
@@ -241,7 +242,7 @@ function slashRenderer() {
       preview.style.display = 'none'
       return
     }
-    preview.innerHTML = `<div class="slash-preview__page note-mini">${item.sample}</div><div class="slash-preview__cap">${item.desc || item.label}</div>`
+    preview.innerHTML = `<div class="${ui.slashPreviewPage}">${item.sample}</div><div class="${ui.slashPreviewCap}">${item.desc || item.label}</div>`
     preview.style.display = 'block'
     const m = el.getBoundingClientRect()
     const a = active.getBoundingClientRect()
@@ -288,7 +289,7 @@ function slashRenderer() {
     onStart(props) {
       editorDom = props.editor.view.dom
       el = document.createElement('div')
-      el.className = 'slash-menu'
+      el.className = ui.slashMenu
       el.id = 'slash-menu'
       el.setAttribute('role', 'listbox')
       el.setAttribute('aria-label', 'Insert block')
@@ -310,7 +311,7 @@ function slashRenderer() {
         }
       })
       preview = document.createElement('div')
-      preview.className = 'slash-preview'
+      preview.className = ui.slashPreview
       preview.setAttribute('aria-hidden', 'true')
       preview.style.display = 'none'
       document.body.append(el, preview)
@@ -400,7 +401,14 @@ export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta
         document: false,
         underline: false,
         heading: { levels: [1, 2, 3] },
-        link: { openOnClick: false, autolink: true, defaultProtocol: 'https' },
+        bulletList: { HTMLAttributes: { class: ui.bulletList } },
+        orderedList: { HTMLAttributes: { class: ui.orderedList } },
+        listItem: { HTMLAttributes: { class: ui.listItem } },
+        blockquote: { HTMLAttributes: { class: ui.blockquote } },
+        horizontalRule: { HTMLAttributes: { class: ui.hr } },
+        code: { HTMLAttributes: { class: ui.codeInline } },
+        codeBlock: { HTMLAttributes: { class: ui.codeBlock } },
+        link: { openOnClick: false, autolink: true, defaultProtocol: 'https', HTMLAttributes: { class: ui.link } },
       }),
       Placeholder.configure({
         showOnlyCurrent: false,
@@ -413,18 +421,18 @@ export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta
           return ''
         },
       }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
+      TaskList.configure({ HTMLAttributes: { class: ui.taskList } }),
+      TaskItem.configure({ nested: true, HTMLAttributes: { class: ui.taskItem } }),
       Callout,
       TrailingParagraph,
-      Details.configure({ persist: true, HTMLAttributes: { class: 'toggle' } }),
-      DetailsSummary,
-      DetailsContent,
-      Table.configure({ resizable: false }),
+      Details.configure({ persist: true, HTMLAttributes: { class: ui.toggle } }),
+      DetailsSummary.configure({ HTMLAttributes: { class: ui.toggleSummary } }),
+      DetailsContent.configure({ HTMLAttributes: { class: ui.toggleContent } }),
+      Table.configure({ resizable: false, HTMLAttributes: { class: ui.table } }),
       TableRow,
-      TableHeader,
-      TableCell,
-      Highlight,
+      TableHeader.configure({ HTMLAttributes: { class: ui.tableHeader } }),
+      TableCell.configure({ HTMLAttributes: { class: ui.tableCell } }),
+      Highlight.configure({ HTMLAttributes: { class: ui.mark } }),
       TitleKeys,
       activeCell,
       keyboardExtras({ onLinkShortcut }),
@@ -437,7 +445,7 @@ export function createNotesEditor({ element, bubbleEl, shouldShowBubble, getMeta
       }),
     ],
     editorProps: {
-      attributes: { class: 'note-prose', 'aria-label': 'Note editor', spellcheck: 'true' },
+      attributes: { class: ui.prose, 'aria-label': 'Note editor', spellcheck: 'true' },
       scrollMargin: { top: 24, bottom: 140, left: 0, right: 0 },
       scrollThreshold: { top: 24, bottom: 140, left: 0, right: 0 },
       handleKeyDown: (view, e) => {

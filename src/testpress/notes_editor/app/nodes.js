@@ -1,3 +1,4 @@
+import { ui } from './ui.js'
 import { Node, mergeAttributes } from '@tiptap/core'
 
 // A highlighted box for something worth remembering. Holds any blocks, so it can contain
@@ -8,7 +9,7 @@ export const Callout = Node.create({
   content: 'block+',
   defining: true,
   parseHTML: () => [{ tag: 'div[data-callout]' }],
-  renderHTML: ({ HTMLAttributes }) => ['div', mergeAttributes(HTMLAttributes, { 'data-callout': '', class: 'callout' }), 0],
+  renderHTML: ({ HTMLAttributes }) => ['div', mergeAttributes(HTMLAttributes, { 'data-callout': '', class: ui.callout }), 0],
   addCommands() {
     return { toggleCallout: () => ({ commands }) => commands.toggleWrap(this.name) }
   },
