@@ -47,9 +47,22 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     onChange()
   }
 
+  // The anchor can be re-created while the list is open (the nav pane re-renders after a rename/pin), so we keep a
+  // way to find it again and the last position we used; the list must never jump to the corner.
+  let anchorSel = null
+  let lastPos = null
+  const selectorFor = (el) => (el.id ? '#' + el.id : el.matches('[data-more-folders]') ? '[data-more-folders]' : el.matches('[data-more-tags]') ? '[data-more-tags]' : null)
+
   function position() {
-    if (!anchor) return
-    const r = anchor.getBoundingClientRect()
+    if (anchor && !anchor.isConnected && anchorSel) anchor = document.querySelector(anchorSel) || anchor
+    const r = anchor && anchor.isConnected ? anchor.getBoundingClientRect() : null
+    if (!r || (!r.width && !r.height)) {
+      if (lastPos) {
+        pop.style.left = lastPos.left + 'px'
+        pop.style.top = lastPos.top + 'px'
+      }
+      return
+    }
     const vv = window.visualViewport
     const vw = vv ? vv.width : innerWidth
     const vh = vv ? vv.height : innerHeight
@@ -58,6 +71,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     const left = Math.min(Math.max(8, r.left), vw - w - 8)
     let top = r.bottom + 6
     if (top + h > vh - 8) top = Math.max(8, vh - h - 8)
+    lastPos = { left, top }
     pop.style.left = left + 'px'
     pop.style.top = top + 'px'
   }
@@ -214,6 +228,8 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     if (!pop.hidden && kind === which) return close(true)
     kind = which
     anchor = el
+    anchorSel = selectorFor(el)
+    lastPos = null
     frozen = null
     index = -1 // nothing is highlighted until you hover, press an arrow key or type
     mode = { type: 'browse' }
@@ -228,6 +244,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     folderBtn.setAttribute('aria-expanded', 'false')
     tagsBtn.setAttribute('aria-expanded', 'false')
     mode = { type: 'browse' }
+    if (anchor && !anchor.isConnected && anchorSel) anchor = document.querySelector(anchorSel) || anchor
     if (refocus && anchor?.isConnected) anchor.focus()
     kind = null
   }
