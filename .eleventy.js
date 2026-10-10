@@ -49,7 +49,7 @@ module.exports = config => {
     // Render "- [ ] item" as a real checkbox (markdown-it has no task-list support) on checklist pages only.
     config.addTransform("task-list", (content, outputPath) => {
         if (!outputPath || !outputPath.endsWith("notes_editor/testing/index.html")) return content;
-        return content.replace(/<li>\[ \] /g, '<li class="task-item"><label><input type="checkbox" class="task-check"> ') .replace(/(<li class="task-item"><label>[\s\S]*?)<\/li>/g, (m, head) => head + "</label></li>");
+        return content.replace(/<li>\[ \] /g, '<li class="task-item"><label><input type="checkbox" class="task-check"><span> ').replace(/(<li class="task-item"><label>[\s\S]*?)<\/li>/g, (m, head) => head + "</span></label></li>");
     });
     config.addFilter("groupBy", groupBy);
     config.addFilter("filter", filter);
