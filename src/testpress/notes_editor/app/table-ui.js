@@ -1,3 +1,4 @@
+import { ui } from './ui.js'
 import { TableMap, addRow, addColumn, CellSelection } from '@tiptap/pm/tables'
 import { TextSelection } from '@tiptap/pm/state'
 import { Fragment } from '@tiptap/pm/model'
@@ -31,17 +32,17 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     host.appendChild(b)
     return b
   }
-  const colGrip = mk('tbl-grip tbl-grip--col', DOTS_H, 'Column options', { 'aria-haspopup': 'menu', 'aria-expanded': 'false' })
-  const rowGrip = mk('tbl-grip tbl-grip--row', DOTS_V, 'Row options', { 'aria-haspopup': 'menu', 'aria-expanded': 'false' })
-  const addRowBtn = mk('tbl-add tbl-add--row', PLUS, 'Add row')
-  const addColBtn = mk('tbl-add tbl-add--col', PLUS, 'Add column')
+  const colGrip = mk(ui.tblGrip + ' tbl-grip--col', DOTS_H, 'Column options', { 'aria-haspopup': 'menu', 'aria-expanded': 'false' })
+  const rowGrip = mk(ui.tblGrip + ' tbl-grip--row', DOTS_V, 'Row options', { 'aria-haspopup': 'menu', 'aria-expanded': 'false' })
+  const addRowBtn = mk(ui.tblAdd + ' tbl-add--row', PLUS, 'Add row')
+  const addColBtn = mk(ui.tblAdd + ' tbl-add--col', PLUS, 'Add column')
   const menu = document.createElement('div')
-  menu.className = 'tbl-menu'
+  menu.className = ui.tblMenu
   menu.setAttribute('role', 'menu')
   menu.hidden = true
   host.appendChild(menu)
   const dropLine = document.createElement('div')
-  dropLine.className = 'tbl-drop'
+  dropLine.className = ui.tblDrop
   dropLine.hidden = true
   host.appendChild(dropLine)
   const buttons = [colGrip, rowGrip, addRowBtn, addColBtn]
@@ -284,7 +285,7 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     gripSelected = !wasMulti
     const items = actionsFor(kind)
     menu.innerHTML = items
-      .map((a, i) => `<button type="button" role="menuitem" tabindex="-1" data-i="${i}" class="tbl-item ${a.danger ? 'is-danger' : ''}"><i data-lucide="${a.icon}" class="size-4"></i><span>${a.label}</span>${a.hint ? `<kbd class="tbl-item__hint">${a.hint}</kbd>` : ''}</button>`)
+      .map((a, i) => `<button type="button" role="menuitem" tabindex="-1" data-i="${i}" class="${a.danger ? ui.tblItemDanger : ui.tblItem}"><i data-lucide="${a.icon}" class="size-4"></i><span>${a.label}</span>${a.hint ? `<kbd class="${ui.tblHint}">${a.hint}</kbd>` : ''}</button>`)
       .join('')
     menu._items = items
     refreshIcons(menu)
@@ -366,15 +367,15 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     const [r0, r1] = kind === 'col' ? [0, map.height] : [range.top, range.bottom]
     const [c0, c1] = kind === 'col' ? [range.left, range.right] : [0, map.width]
     const el = document.createElement('div')
-    el.className = 'tbl-ghost'
+    el.className = ui.tblGhost
     for (let r = r0; r < r1; r++) {
       const row = document.createElement('div')
-      row.className = 'tbl-ghost__row'
+      row.className = ui.tblGhostRow
       for (let c = c0; c < c1; c++) {
         const dom = cellAt(r, c)
         const rect = dom.getBoundingClientRect()
         const cell = document.createElement('div')
-        cell.className = 'tbl-ghost__cell' + (dom.tagName === 'TH' ? ' is-head' : '')
+        cell.className = dom.tagName === 'TH' ? ui.tblGhostHead : ui.tblGhostCell
         cell.style.width = rect.width + 'px'
         cell.style.height = rect.height + 'px'
         cell.textContent = dom.textContent
@@ -399,7 +400,7 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
     drag.canceled = true
     removeGhost()
     dropLine.hidden = true
-    document.body.classList.remove('tbl-dragging')
+    document.body.classList.remove(...ui.dragBody)
   }
 
   function removeGhost() {
@@ -432,7 +433,7 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
         g.classList.add('is-dragging')
         buildGhost(kind)
         document.addEventListener('keydown', onDragKey, true)
-        document.body.classList.add('tbl-dragging')
+        document.body.classList.add(...ui.dragBody)
       }
       if (!drag.canceled) showDrop(e)
     })
@@ -441,7 +442,7 @@ export function createTableUI({ editor, host, scroller, isMobile }) {
       const was = drag
       drag = null
       g.classList.remove('is-dragging')
-      document.body.classList.remove('tbl-dragging')
+      document.body.classList.remove(...ui.dragBody)
       dropLine.hidden = true
       removeGhost()
       document.removeEventListener('keydown', onDragKey, true)

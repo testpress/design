@@ -953,7 +953,7 @@ leaveDlg.addEventListener('keydown', (e) => {
 const bubble = { mode: 'main', kbd: false, focusAct: null, rendering: false }
 
 function btn(act, ic, label, active = false, extra = '') {
-  return `<button type="button" data-act="${act}" class="bm-btn ${active ? 'is-on' : ''}" aria-label="${label}" aria-pressed="${active}" ${extra}>${icon(ic)}</button>`
+  return `<button type="button" data-act="${act}" class="${ui.bmBtn} ${active ? 'is-on' : ''}" aria-label="${label}" aria-pressed="${active}" ${extra}>${icon(ic)}</button>`
 }
 
 function renderBubble(force = false) {
@@ -966,9 +966,9 @@ function renderBubble(force = false) {
   // The toolbar row is always rendered; "Turn into", "More" and the link field open as a panel
   // *below* it, so Bold/Italic/Highlight/Link stay visible while a menu is open.
   const open = bubble.mode
-  const bar = `<div class="bm-bar">
-      <button type="button" data-act="turn" class="bm-btn bm-btn--text ${open === 'turn' ? 'is-open' : ''}" aria-haspopup="menu" aria-expanded="${open === 'turn'}">${esc(currentBlockLabel(ed))}${icon('chevron-down', 'size-3.5')}</button>
-      <span class="bm-sep"></span>
+  const bar = `<div class="${ui.bmBar}">
+      <button type="button" data-act="turn" class="${ui.bmBtnText} ${open === 'turn' ? 'is-open' : ''}" aria-haspopup="menu" aria-expanded="${open === 'turn'}">${esc(currentBlockLabel(ed))}${icon('chevron-down', 'size-3.5')}</button>
+      <span class="${ui.bmSep}"></span>
       ${btn('bold', 'bold', 'Bold', MARKS.bold.active(ed))}
       ${btn('italic', 'italic', 'Italic', MARKS.italic.active(ed))}
       ${btn('highlight', 'highlighter', 'Highlight', MARKS.highlight.active(ed))}
@@ -977,17 +977,17 @@ function renderBubble(force = false) {
     </div>`
   let pop = ''
   if (open === 'turn') {
-    pop = `<div class="bm-pop bm-menu" role="menu">${BLOCKS.map((b) => `<button type="button" role="menuitem" data-turn="${b.id}" class="bm-item ${b.active(ed) ? 'is-on' : ''}">${icon(b.icon)}<span>${b.label}</span>${b.active(ed) ? icon('check', 'size-3.5 ms-auto') : ''}</button>`).join('')}</div>`
+    pop = `<div class="${ui.bmMenu}" role="menu">${BLOCKS.map((b) => `<button type="button" role="menuitem" data-turn="${b.id}" class="${ui.bmItem} ${b.active(ed) ? 'is-on' : ''}">${icon(b.icon)}<span>${b.label}</span>${b.active(ed) ? icon('check', 'size-3.5 ms-auto') : ''}</button>`).join('')}</div>`
   } else if (open === 'more') {
-    pop = `<div class="bm-pop bm-menu" role="menu">
-      <button type="button" role="menuitem" data-act="strike" class="bm-item ${MARKS.strike.active(ed) ? 'is-on' : ''}">${icon('strikethrough')}<span>Strikethrough</span></button>
-      <button type="button" role="menuitem" data-act="code" class="bm-item ${MARKS.code.active(ed) ? 'is-on' : ''}">${icon('code')}<span>Inline code</span></button></div>`
+    pop = `<div class="${ui.bmMenu}" role="menu">
+      <button type="button" role="menuitem" data-act="strike" class="${ui.bmItem} ${MARKS.strike.active(ed) ? 'is-on' : ''}">${icon('strikethrough')}<span>Strikethrough</span></button>
+      <button type="button" role="menuitem" data-act="code" class="${ui.bmItem} ${MARKS.code.active(ed) ? 'is-on' : ''}">${icon('code')}<span>Inline code</span></button></div>`
   } else if (open === 'link') {
     const href = ed.getAttributes('link').href || ''
-    pop = `<form class="bm-pop bm-link" data-link-form>${icon('link', 'size-4 text-gray-400')}
-      <input type="text" inputmode="url" autocomplete="off" aria-label="Link address" placeholder="Paste or type a link" value="${esc(href)}" class="bm-input">
-      <button type="submit" class="bm-apply">Apply</button>
-      ${href ? `<button type="button" data-act="unlink" class="bm-btn" aria-label="Remove link">${icon('unlink')}</button>` : ''}</form>`
+    pop = `<form class="${ui.bmLink}" data-link-form>${icon('link', 'size-4 text-gray-400')}
+      <input type="text" inputmode="url" autocomplete="off" aria-label="Link address" placeholder="Paste or type a link" value="${esc(href)}" class="${ui.bmInput}">
+      <button type="submit" class="${ui.bmApply}">Apply</button>
+      ${href ? `<button type="button" data-act="unlink" class="${ui.bmBtn}" aria-label="Remove link">${icon('unlink')}</button>` : ''}</form>`
   }
   const html = bar + pop
   if (bubbleEl.dataset.html !== html) {
@@ -1018,12 +1018,13 @@ function placePanel() {
   const apply = () => {
     const pop = bubbleEl.querySelector('.bm-pop')
     if (!pop) return
-    pop.classList.remove('bm-pop--up')
+    pop.style.top = ''
+    pop.style.bottom = ''
     const vv = window.visualViewport
     const bottom = (vv ? vv.offsetTop + vv.height : innerHeight) - 8
     const bar = bubbleEl.querySelector('.bm-bar').getBoundingClientRect()
     const need = pop.offsetHeight + 6
-    if (bar.bottom + need > bottom && bar.top - need > 8) pop.classList.add('bm-pop--up')
+    if (bar.bottom + need > bottom && bar.top - need > 8) { pop.style.top = 'auto'; pop.style.bottom = 'calc(100% + 6px)' }
   }
   apply()
   requestAnimationFrame(() => requestAnimationFrame(apply)) // again once BubbleMenu has repositioned
@@ -1136,7 +1137,7 @@ function renderMobileBar() {
   let main = ''
   if (mobile.mode === 'link') {
     const href = ed.getAttributes('link').href || ''
-    $('#mobile-row').innerHTML = `<form class="mb-link" data-m-link>${icon('link', 'size-4 text-gray-400')}<input type="text" inputmode="url" autocomplete="off" aria-label="Link address" placeholder="Paste or type a link" value="${esc(href)}" class="bm-input"><button type="submit" class="bm-apply">Apply</button>${href ? `<button type="button" data-m="unlink" class="mb-btn" aria-label="Remove link">${icon('unlink', 'size-5')}</button>` : ''}<button type="button" data-m="cancel-link" class="mb-btn" aria-label="Cancel">${icon('x', 'size-5')}</button></form>`
+    $('#mobile-row').innerHTML = `<form class="mb-link" data-m-link>${icon('link', 'size-4 text-gray-400')}<input type="text" inputmode="url" autocomplete="off" aria-label="Link address" placeholder="Paste or type a link" value="${esc(href)}" class="${ui.bmInput}"><button type="submit" class="${ui.bmApply}">Apply</button>${href ? `<button type="button" data-m="unlink" class="mb-btn" aria-label="Remove link">${icon('unlink', 'size-5')}</button>` : ''}<button type="button" data-m="cancel-link" class="mb-btn" aria-label="Cancel">${icon('x', 'size-5')}</button></form>`
     refreshIcons($('#mobile-row'))
     $('#mobile-row input')?.focus({ preventScroll: true })
     $('#mobile-tray').hidden = true
@@ -1197,7 +1198,7 @@ function mobilePopup(kind) {
     return
   }
   pop.dataset.kind = kind
-  pop.innerHTML = items.map((i) => `<button type="button" tabindex="-1" role="menuitem" ${i.turn ? `data-turn="${i.turn}"` : `data-act="${i.act}"`} class="bm-item ${i.on ? 'is-on' : ''}">${icon(i.ic)}<span>${i.label}</span>${i.on ? icon('check', 'size-3.5 ms-auto') : ''}</button>`).join('')
+  pop.innerHTML = items.map((i) => `<button type="button" tabindex="-1" role="menuitem" ${i.turn ? `data-turn="${i.turn}"` : `data-act="${i.act}"`} class="${ui.bmItem} ${i.on ? 'is-on' : ''}">${icon(i.ic)}<span>${i.label}</span>${i.on ? icon('check', 'size-3.5 ms-auto') : ''}</button>`).join('')
   pop.hidden = false
   refreshIcons(pop)
 }

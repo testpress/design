@@ -1,3 +1,4 @@
+import { ui } from './ui.js'
 import { refreshIcons } from './icons.js'
 import { MAX_PINNED_FOLDERS } from './store.js'
 
@@ -19,7 +20,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
   // tagMode: 'all' = a note needs every selected tag (default), 'any' = at least one of them
   const state = { folder: null, tags: new Set(), tagMode: readMode() }
   const pop = document.createElement('div')
-  pop.className = 'meta-pop lib-pop'
+  pop.className = ui.libPop
   pop.hidden = true
   pop.setAttribute('role', 'dialog')
   document.body.appendChild(pop)
@@ -107,15 +108,16 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
     index = Math.min(index, rows.length - 1) // -1 = nothing highlighted yet
     const title = kind === 'folder' ? 'Folders' : 'Tags'
     pop.setAttribute('aria-label', title)
+    pop.className = kind === 'tags' ? ui.libPopWide : ui.libPop
     const body = rows.length
       ? rows.map((r, i) => rowHTML(r, i)).join('')
-      : `<div class="meta-pop__empty">${kind === 'folder' ? 'No folders yet. Type a name to create one.' : 'No tags yet. Add tags from a note.'}</div>`
+      : `<div class="${ui.popEmpty}">${kind === 'folder' ? 'No folders yet. Type a name to create one.' : 'No tags yet. Add tags from a note.'}</div>`
     pop.innerHTML = `
-      <div class="meta-pop__head">${title}</div>
-      ${kind === 'tags' ? `<div class="lib-match" role="group" aria-label="How selected tags combine"><span>Show notes with</span><span class="seg" role="presentation"><button type="button" tabindex="-1" data-match="all" aria-pressed="${state.tagMode === 'all'}">all</button><button type="button" tabindex="-1" data-match="any" aria-pressed="${state.tagMode === 'any'}">any</button></span><span>of the selected tags</span></div>` : ''}
-      <input type="text" autocomplete="off" spellcheck="false" class="meta-pop__input" role="combobox" aria-expanded="true" aria-controls="lib-list" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" value="${esc(query)}">
-      <div id="lib-list" class="meta-pop__list" role="listbox" ${kind === 'tags' ? 'aria-multiselectable="true"' : ''}>${body}</div>
-      <div class="meta-pop__foot">${kind === 'folder' ? 'F2 rename · ⌥P pin · Del delete' : 'Enter toggle · ⌥M all/any · F2 rename'}</div>`
+      <div class="${ui.popHead}">${title}</div>
+      ${kind === 'tags' ? `<div class="${ui.libMatch}" role="group" aria-label="How selected tags combine"><span>Show notes with</span><span class="${ui.seg}" role="presentation"><button type="button" class="${ui.segBtn}" tabindex="-1" data-match="all" aria-pressed="${state.tagMode === 'all'}">all</button><button type="button" class="${ui.segBtn}" tabindex="-1" data-match="any" aria-pressed="${state.tagMode === 'any'}">any</button></span><span>of the selected tags</span></div>` : ''}
+      <input type="text" autocomplete="off" spellcheck="false" class="${ui.popInput}" role="combobox" aria-expanded="true" aria-controls="lib-list" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Find a tag'}" value="${esc(query)}">
+      <div id="lib-list" class="${ui.popList}" role="listbox" ${kind === 'tags' ? 'aria-multiselectable="true"' : ''}>${body}</div>
+      <div class="${ui.popFoot}">${kind === 'folder' ? 'F2 rename · ⌥P pin · Del delete' : 'Enter toggle · ⌥M all/any · F2 rename'}</div>`
     refreshIcons(pop)
     const el = pop.querySelector('input')
     if (focusInput && mode.type === 'browse') {
@@ -137,7 +139,7 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
   function rowHTML(r, i) {
     const active = i === index
     if (mode.type === 'rename' && mode.key === r.key)
-      return `<div class="lib-row is-active"><input class="lib-rename" aria-label="Rename" value="${esc(kind === 'tags' ? r.key : r.label)}"></div>`
+      return `<div class="${ui.libRow} is-active"><input class="${ui.libRename}" aria-label="Rename" value="${esc(kind === 'tags' ? r.key : r.label)}"></div>`
     if (mode.type === 'confirm' && mode.key === r.key) {
       const isFolder = kind === 'folder'
       const n = r.count
@@ -145,19 +147,19 @@ export function createFiltersUI({ store, folderBtn, tagsBtn, clearBtn, onChange,
       const note = isFolder
         ? n ? `Its ${n} note${n === 1 ? '' : 's'} will stay, unfiled.` : 'This folder is empty.'
         : n ? `It will be taken off ${n} note${n === 1 ? '' : 's'}. The notes stay.` : 'No notes use this tag.'
-      return `<div class="lib-confirm" role="group" aria-label="Confirm delete">
-        <div class="lib-confirm__text"><strong>${title}</strong><span>${note}</span></div>
-        <div class="lib-confirm__btns"><button type="button" data-confirm="no" class="lib-no">Cancel</button><button type="button" data-confirm="yes" class="lib-yes">${isFolder ? 'Delete' : 'Remove'}</button></div>
+      return `<div class="${ui.confirm}" role="group" aria-label="Confirm delete">
+        <div class="${ui.confirmText}"><strong class="${ui.confirmTitle}">${title}</strong><span class="${ui.confirmNote}">${note}</span></div>
+        <div class="${ui.confirmBtns}"><button type="button" data-confirm="no" class="${ui.confirmNo}">Cancel</button><button type="button" data-confirm="yes" class="${ui.confirmYes}">${isFolder ? 'Delete' : 'Remove'}</button></div>
       </div>`
     }
     const pinFull = store.pinnedFolders().length >= MAX_PINNED_FOLDERS
-    const pinBtn = kind === 'folder' ? `<button type="button" tabindex="-1" data-act="pin" data-k="${esc(r.key)}" aria-label="${r.pinned ? 'Unpin' : 'Pin'} ${esc(r.label)}" title="${r.pinned ? 'Unpin' : pinFull ? `You can pin up to ${MAX_PINNED_FOLDERS} folders` : 'Pin to the top of the pane'}"><i data-lucide="${r.pinned ? 'pin-off' : 'pin'}" class="size-3.5"></i></button>` : ''
-    const manage = r.fixed ? '' : `<span class="lib-actions">${pinBtn}<button type="button" tabindex="-1" data-act="rename" data-k="${esc(r.key)}" aria-label="Rename ${esc(r.label)}"><i data-lucide="pencil" class="size-3.5"></i></button><button type="button" tabindex="-1" data-act="delete" data-k="${esc(r.key)}" aria-label="Delete ${esc(r.label)}"><i data-lucide="trash-2" class="size-3.5"></i></button></span>`
+    const pinBtn = kind === 'folder' ? `<button type="button" tabindex="-1" class="${ui.libActionBtn}" data-act="pin" data-k="${esc(r.key)}" aria-label="${r.pinned ? 'Unpin' : 'Pin'} ${esc(r.label)}" title="${r.pinned ? 'Unpin' : pinFull ? `You can pin up to ${MAX_PINNED_FOLDERS} folders` : 'Pin to the top of the pane'}"><i data-lucide="${r.pinned ? 'pin-off' : 'pin'}" class="size-3.5"></i></button>` : ''
+    const manage = r.fixed ? '' : `<span class="${ui.libActions}">${pinBtn}<button type="button" tabindex="-1" class="${ui.libActionBtn}" data-act="rename" data-k="${esc(r.key)}" aria-label="Rename ${esc(r.label)}"><i data-lucide="pencil" class="size-3.5"></i></button><button type="button" tabindex="-1" class="${ui.libActionBtn}" data-act="delete" data-k="${esc(r.key)}" aria-label="Delete ${esc(r.label)}"><i data-lucide="trash-2" class="size-3.5"></i></button></span>`
     // folders: every row gets a leading icon (same as the nav pane) so the labels line up
     const leadIcon = r.key === '__all' ? 'layers' : r.create ? 'folder-plus' : r.pinned ? 'pin' : 'folder'
-    const lead = kind === 'folder' ? `<i data-lucide="${leadIcon}" class="size-4 lib-lead ${r.pinned ? 'lib-pin' : ''}" aria-hidden="true"></i>` : ''
-    const check = kind === 'tags' ? `<span class="lib-check ${r.on ? 'is-on' : ''}" aria-hidden="true">${r.on ? '✓' : ''}</span>` : ''
-    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="meta-opt lib-row ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}${lead}<span class="lib-label">${esc(r.label)}</span>${r.count != null ? `<span class="lib-count">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="size-4 lib-tick"></i>' : ''}</div>`
+    const lead = kind === 'folder' ? `<i data-lucide="${leadIcon}" class="${r.pinned ? ui.libLeadPin : ui.libLead}" aria-hidden="true"></i>` : ''
+    const check = kind === 'tags' ? `<span class="${r.on ? ui.libCheckOn : ui.libCheck}" aria-hidden="true">${r.on ? '✓' : ''}</span>` : ''
+    return `<div role="option" id="lib-o${i}" aria-selected="${r.on ? 'true' : 'false'}" data-i="${i}" class="${ui.libRow} ${active ? 'is-active' : ''} ${r.create ? 'is-create' : ''}">${check}${lead}<span class="${ui.libLabel}">${esc(r.label)}</span>${r.count != null ? `<span class="${ui.libCount}">${r.count}</span>` : ''}${manage}${kind === 'folder' && r.on ? '<i data-lucide="check" class="${ui.libTick}"></i>' : ''}</div>`
   }
 
   // ---- actions ---------------------------------------------------------------------------------

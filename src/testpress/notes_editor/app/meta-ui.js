@@ -1,3 +1,4 @@
+import { ui } from './ui.js'
 import { refreshIcons } from './icons.js'
 
 // Folder + tag editing for the open note. One popover element is reused:
@@ -14,7 +15,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 
 export function createMetaUI({ editor, store, getCurrentId, onChange }) {
   const pop = document.createElement('div')
-  pop.className = 'meta-pop'
+  pop.className = ui.metaPop
   pop.hidden = true
   pop.setAttribute('role', 'dialog')
   document.body.appendChild(pop)
@@ -69,17 +70,17 @@ export function createMetaUI({ editor, store, getCurrentId, onChange }) {
     build()
     const title = kind === 'folder' ? 'Folder' : 'Tags'
     const chips = kind === 'tags' && n.tags?.length
-      ? `<div class="meta-pop__chips">${n.tags.map((t) => `<span class="note-meta__tag"><span>#${esc(t)}</span><button type="button" tabindex="-1" data-rm="${esc(t)}" aria-label="Remove tag ${esc(t)}">&times;</button></span>`).join('')}</div>`
+      ? `<div class="${ui.popChips}">${n.tags.map((t) => `<span class="${ui.metaTag}"><span>#${esc(t)}</span><button type="button" class="${ui.metaTagX} !opacity-100" tabindex="-1" data-rm="${esc(t)}" aria-label="Remove tag ${esc(t)}">&times;</button></span>`).join('')}</div>`
       : ''
     pop.setAttribute('aria-label', title)
     pop.innerHTML = `
-      <div class="meta-pop__head">${title}</div>
+      <div class="${ui.popHead}">${title}</div>
       ${chips}
-      <input type="text" autocomplete="off" spellcheck="false" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Add a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Type a tag, press Enter'}" value="${esc(inputVal)}" class="meta-pop__input" role="combobox" aria-expanded="true" aria-controls="meta-list">
-      <div id="meta-list" class="meta-pop__list" role="listbox">
-        ${opts.length ? opts.map((o, i) => `<button type="button" tabindex="-1" role="option" id="meta-o${i}" aria-selected="${i === index}" data-i="${i}" class="meta-opt ${i === index ? 'is-active' : ''} ${o.create ? 'is-create' : ''}"><span>${esc(o.label)}</span>${o.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</button>`).join('') : `<div class="meta-pop__empty">${kind === 'folder' ? 'No folders yet. Type a name to create one.' : 'No tags yet. Type to create one.'}</div>`}
+      <input type="text" autocomplete="off" spellcheck="false" aria-label="${kind === 'folder' ? 'Find or create a folder' : 'Add a tag'}" placeholder="${kind === 'folder' ? 'Find or create a folder' : 'Type a tag, press Enter'}" value="${esc(inputVal)}" class="${ui.popInput}" role="combobox" aria-expanded="true" aria-controls="meta-list">
+      <div id="meta-list" class="${ui.popList}" role="listbox">
+        ${opts.length ? opts.map((o, i) => `<button type="button" tabindex="-1" role="option" id="meta-o${i}" aria-selected="${i === index}" data-i="${i}" class="${ui.metaOpt} ${i === index ? 'is-active' : ''} ${o.create ? 'is-create' : ''}"><span>${esc(o.label)}</span>${o.on ? '<i data-lucide="check" class="size-4"></i>' : ''}</button>`).join('') : `<div class="${ui.popEmpty}">${kind === 'folder' ? 'No folders yet. Type a name to create one.' : 'No tags yet. Type to create one.'}</div>`}
       </div>
-      <div class="meta-pop__foot">${kind === 'folder' ? '↑ ↓ choose · Enter select · Esc close' : 'Enter add · Backspace remove last · Esc close'}</div>`
+      <div class="${ui.popFoot}">${kind === 'folder' ? '↑ ↓ choose · Enter select · Esc close' : 'Enter add · Backspace remove last · Esc close'}</div>`
     refreshIcons(pop)
     const input = pop.querySelector('input')
     if (keepFocus) {
