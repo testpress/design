@@ -1,6 +1,6 @@
 // Screenshot a prototype page in desktop, mobile and dark mode for design review.
-// Usage: node .claude/skills/design/scripts/screenshot.mjs /<product>/<feature>/<page>/ [--base http://localhost:8080]
-// Needs the dev server running (`npm start`). Writes PNGs to .design-screenshots/ and prints their paths
+// Usage: node .claude/skills/design/scripts/screenshot.mjs /<product>/<feature>/<page>/ [--base http://localhost:8080] [--slices 4]
+// Needs the dev server running (`npm start`). Writes one PNG per screen-height slice to .design-screenshots/ and prints their paths
 // plus any console errors on the page.
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
@@ -10,6 +10,8 @@ const args = process.argv.slice(2);
 const pagePath = args.find((a) => a.startsWith("/"));
 const baseIndex = args.indexOf("--base");
 const base = baseIndex >= 0 ? args[baseIndex + 1] : "http://localhost:8080";
+const slicesIndex = args.indexOf("--slices");
+const maxSlices = slicesIndex >= 0 ? Number(args[slicesIndex + 1]) : 4;
 
 if (!pagePath) {
   console.error("Usage: screenshot.mjs /<product>/<feature>/<page>/ [--base http://localhost:8080]");
@@ -64,9 +66,18 @@ for (const shot of shots) {
   await page.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), shot.dark);
   await page.waitForTimeout(400);
 
-  const file = resolve(outDir, `${slug}--${shot.name}.png`);
-  await page.screenshot({ path: file, fullPage: true });
-  console.log(`✓ ${shot.name}: ${file}`);
+  // One image per screen-height slice: a single full-page image of a long page shrinks until unreadable.
+  const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  const { width, height } = shot.viewport;
+  const total = Math.ceil(pageHeight / height);
+  const count = Math.min(total, maxSlices);
+  for (let i = 0; i < count; i++) {
+    const file = resolve(outDir, `${slug}--${shot.name}-${i + 1}.png`);
+    const clipHeight = Math.min(height, pageHeight - i * height);
+    await page.screenshot({ path: file, fullPage: true, clip: { x: 0, y: i * height, width, height: clipHeight } });
+    console.log(`✓ ${shot.name} ${i + 1}/${total}: ${file}`);
+  }
+  if (total > count) console.log(`  … ${total - count} more screens not captured (pass --slices ${total} for all)`);
   for (const error of errors) console.log(`  console error: ${error}`);
   await context.close();
 }

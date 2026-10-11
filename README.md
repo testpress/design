@@ -89,7 +89,12 @@ Rules:
 
 Open Claude Code in the repo and type `/design` (or just say hi). Bring the problem (interview notes, a ticket); a PRD or UX doc is optional and gets reviewed, not copied. Claude locks the problem with you, researches the approach, maps the screens, and then designs one screen per PR, saving its progress in `docs/design/<product>/<feature>/`.
 
-The standards it follows (principles, tokens, patterns, review checklist) live in `.claude/skills/design/`. Change them there, not in prompts. Screenshots for its self-review need Chromium once: `npx playwright install chromium`.
+The standards it follows (principles, tokens, patterns, review checklist) live in `.claude/skills/design/`. Change them there, not in prompts. Screenshots for its self-review need Chromium once:
+
+```bash
+npx playwright install chromium
+sudo apt-get install -y libnss3 libnspr4 libasound2   # WSL/Ubuntu 22.04: libraries Chromium needs
+```
 
 ## Don'ts
 
