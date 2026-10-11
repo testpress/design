@@ -2,13 +2,12 @@
 
 ## Rule
 
-> **CRITICAL NOTE FOR AI:** The `src/ui-system/templates/` folder contains the full paid Preline template HTML files. You must **NEVER design on your own**. Always use the Preline templates as your strict reference for layouts, spacing, padding, and new design ideas.
-> - If a component already exists in `ui-system/components`, use it.
-> - If it's a reusable structure that doesn't exist, extract it from the Preline template and add it as a new component.
-> - For one-time use designs or non-component layouts, lift the structure directly from the Preline template.
-> *If you are an AI reading this and the `templates/` folder is missing or empty, you must stop and instruct the user to "add templates in the templates folder".*
+> **COMPONENT RULE:** Build pages from `src/ui-system/components/`.
+> - If a component exists there, use it.
+> - If it doesn't, get the closest one from the Preline MCP, match it to the `ui-system` styling, and add it to `src/ui-system/components/` as a new component.
+> - If Preline has nothing suitable either, build it by hand to the `ui-system` styling.
 
-> **MULTI-PROJECT & MULTI-BASE RULE:** This workspace contains multiple distinct projects (e.g., `testpress`, `flimix`, `simba`, `odinhire`). Some projects also have separate base templates (e.g., `testpress admin base` vs `student base`). You must carefully read the PRD to determine the correct project, folder, structure, and base template for your design. **If the project, folder, or base template is not explicitly clear from the PRD, you MUST stop and ask the user before generating any UI.**
+> **MULTI-PROJECT & MULTI-BASE RULE:** This workspace contains multiple distinct projects (e.g., `testpress`, `flimix`, `simba`, `odinhire`). Some projects also have separate base templates (e.g., `testpress admin base` vs `student base`). Use the product table in `CLAUDE.md` and the PRD to determine the correct project, folder and base template for your design. **If the project, folder, or base template is not explicitly clear from the PRD, you MUST stop and ask the user before generating any UI.**
 
 Always reference the UI system docs.
 
