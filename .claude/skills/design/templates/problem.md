@@ -8,6 +8,9 @@ source: <interview / ticket / PRD link>
 
 # <Feature name>: problem
 
+## The problem
+<2–4 sentences: what is broken, for whom, and what it costs. Readable on its own, without the sections below.>
+
 ## Who has this problem
 - Primary users: <role, how often they hit this, how expert they are, main device>
 - Others affected: <e.g. the client who waits on us>
