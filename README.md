@@ -96,6 +96,12 @@ npx playwright install chromium
 sudo apt-get install -y libnss3 libnspr4 libasound2   # WSL/Ubuntu 22.04: libraries Chromium needs
 ```
 
+Missing components come from the Preline MCP (configured in `.mcp.json`). Set your Preline token once in your shell profile (`~/.bashrc` or `~/.zshrc`), then restart Claude Code and approve the `preline` server when asked:
+
+```bash
+export PRELINE_TOKEN=<your Preline MCP token>
+```
+
 ## Don'ts
 
 - Don't commit one-off scripts that rewrite templates (the `fix_*.py` / `update_*.py` style) to the repo root. Do those locally.

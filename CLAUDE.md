@@ -36,7 +36,7 @@ Gotchas no config file tells you:
 ## Building blocks
 
 - Components: `src/ui-system/components/*.html` (Nunjucks macros). Read a macro's signature before calling it. Gallery: `/ui-system/preview/components/`.
-- Missing component: get it from the Preline MCP (`preline-mcp` skill in `.agents/skills/`), restyle it to the tokens, and add it as a macro in `src/ui-system/components/` with a preview include.
+- Missing component: get it from the Preline MCP (`preline-mcp` skill in `.agents/skills/`), restyle it to the tokens, and add it as a macro in `src/ui-system/components/` with a preview include. If the `preline` MCP tools are unavailable, tell the user to set `PRELINE_TOKEN` (see README) instead of hand-writing the component.
 - Mock data: `src/_data/<name>.json`. Internal links: `href=('/path/' | url)`.
 - Icons: Lucide via `<i data-lucide="name" class="size-4">`.
 
