@@ -48,13 +48,7 @@ Create a new component when:
 
 ### Missing Component Rule
 
-If no approved component exists:
-
-Return:
-
-> New component required
-
-Do not invent new reusable UI structures.
+If no approved component exists, get the closest one from the Preline MCP, restyle it to `.claude/skills/design/tokens.md`, and add it to `src/ui-system/components/` with a preview include and an entry in this registry.
 
 
 ---

@@ -85,9 +85,11 @@ Rules:
 - CI builds the site and posts a **PR preview** at `/pr-preview/pr-<number>/`. Put the direct URL of your pages in the PR description and add screenshots.
 - On merge to `main`, the site is built and published to GitHub Pages.
 
-## 6. Optional: plan first
+## 6. Designing with Claude Code
 
-For larger features, copy `docs/ui_plan/ui_plan_template.md` to `docs/ui_plan/<feature>_plan.md` and fill in purpose, audience, states and components before building.
+Open Claude Code in the repo and type `/design` (or just say hi). Bring the problem (interview notes, a ticket); a PRD or UX doc is optional and gets reviewed, not copied. Claude locks the problem with you, researches the approach, maps the screens, and then designs one screen per PR, saving its progress in `docs/design/<product>/<feature>/`.
+
+The standards it follows (principles, tokens, patterns, review checklist) live in `.claude/skills/design/`. Change them there, not in prompts. Screenshots for its self-review need Chromium once: `npx playwright install chromium`.
 
 ## Don'ts
 

@@ -255,9 +255,5 @@ AI and developers must:
 * Avoid inventing new layouts unnecessarily.
 * Keep similar pages visually familiar.
 
-If a page does not fit an existing pattern:
-
-Return:
-
-> New page pattern required
+If a page does not fit an existing pattern, research how leading products solve that problem type (`.claude/skills/design/patterns.md`, Step 4 of the `design` skill), propose the pattern with its trade-offs, and add it to `patterns.md` once chosen.
 

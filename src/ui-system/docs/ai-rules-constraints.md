@@ -2,7 +2,7 @@
 
 This document defines the non-negotiable rules for AI-assisted UI generation. Its purpose is to ensure frontend interfaces remain consistent, reusable, responsive, and maintainable across pages and projects.
 
-AI must behave as a **frontend assembler**, not a creative designer.
+AI designs with judgment and builds with approved parts: design decisions follow `.claude/skills/design/principles.md`, and the build reuses the components in `src/ui-system/components/`.
 
 
 ---
@@ -13,11 +13,11 @@ AI must behave as a **frontend assembler**, not a creative designer.
 
 AI must always reuse approved components and page patterns before introducing new UI structures.
 
-Approved UI will be in ui system/components and ui system/patterns
+Approved UI lives in `src/ui-system/components/`. Exact classes for spacing, type and color are in `.claude/skills/design/tokens.md`.
 
-### Consistency Over Creativity
+### Consistency With Judgment
 
-AI must prioritize consistency across pages over visual experimentation or redesign.
+Similar pages follow similar structure. When an existing pattern serves the user's job poorly, AI proposes a better one (see `.claude/skills/design/patterns.md`) instead of copying it.
 
 ### Composition Over Reinvention
 
@@ -45,11 +45,11 @@ AI-generated UI must only use approved technologies.
 
 ### Icons
 
-* Lucide icons only
+* Lucide icons only, via `<i data-lucide="name">` (inline `<svg>` in older pages is legacy)
 
 ### Templates
 
-* Reusable Django template includes
+* Nunjucks macros from `src/ui-system/components/`
 
 
 ---
@@ -81,7 +81,7 @@ AI must follow the below priority order:
 1. Existing page pattern
 2. Existing reusable component
 3. Approved UI variation
-4. New component request
+4. New component, sourced from the Preline MCP, restyled to the tokens and added to `src/ui-system/components/`
 
 AI must not skip hierarchy.
 
@@ -104,13 +104,7 @@ AI must request a new component when:
 
 ### Missing Component Rule
 
-If no approved component exists:
-
-AI must return:
-
-> New component required
-
-AI must not invent new reusable UI patterns.
+If no approved component exists, get the closest one from the Preline MCP, restyle it to the tokens, and add it to `src/ui-system/components/` with a preview include. Mention the new component in the PR.
 
 
 ---
@@ -233,11 +227,10 @@ AI must not:
 * invent random UI layouts
 * introduce inconsistent spacing
 * mix multiple visual styles
-* use inline SVG icons
+* add inline `<svg>` icons (use Lucide `data-lucide`)
 * introduce unapproved libraries
 * generate duplicate reusable components
-* prioritize aesthetics over consistency
-* redesign existing approved UI patterns
+* restyle a shared component inside a single page (change the component itself, with approval)
 
 
 ---
