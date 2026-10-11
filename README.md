@@ -87,7 +87,7 @@ Rules:
 
 ## 6. Designing with Claude Code
 
-Open Claude Code in the repo and type `/design` (or just say hi). Bring the problem (interview notes, a ticket); a PRD or UX doc is optional and gets reviewed, not copied. Claude locks the problem with you, researches the approach, maps the screens, and then designs one screen per PR, saving its progress in `docs/design/<product>/<feature>/`.
+Open Claude Code in the repo and type `/design` (or just say hi), then give it a PRD, UX doc, mock, screenshot or description. Claude replies with a short design take (the screens, any better UI idea, the states it will cover), builds after your go-ahead, checks its own screenshots on desktop, mobile and dark, and opens one PR per screen when you ask.
 
 The standards it follows (principles, tokens, patterns, review checklist) live in `.claude/skills/design/`. Change them there, not in prompts. Screenshots for its self-review need Chromium once:
 
@@ -96,7 +96,7 @@ npx playwright install chromium
 sudo apt-get install -y libnss3 libnspr4 libasound2   # WSL/Ubuntu 22.04: libraries Chromium needs
 ```
 
-Missing components come from the Preline MCP (configured in `.mcp.json`). Set your Preline token once in your shell profile (`~/.bashrc` or `~/.zshrc`), then restart Claude Code and approve the `preline` server when asked:
+Components missing from `ui-system` come from the Preline MCP (configured in `.mcp.json`). Set your Preline token once in your shell profile (`~/.bashrc` or `~/.zshrc`), then restart Claude Code and approve the `preline` server when asked:
 
 ```bash
 export PRELINE_TOKEN=<your Preline MCP token>

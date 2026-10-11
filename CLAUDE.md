@@ -6,10 +6,10 @@ Static HTML prototypes (Eleventy + Nunjucks, Tailwind, Preline, Alpine, Lucide) 
 
 Run the `design` skill when the user:
 - asks to design, redesign, improve or build any page, screen, flow or component
-- brings a problem statement, interview notes, PRD or UX doc
+- brings a PRD, UX doc, mock or screenshot to turn into UI
 - opens the session with a greeting or no concrete task, or types `/design`
 
-The skill owns the workflow (problem → brief → screen map → UX doc → build → review → PR, one screen per PR) and the design standards. Small, explicit edits ("change this label", "fix this padding") can be done directly, but still meet the skill's [principles](.claude/skills/design/principles.md) and [tokens](.claude/skills/design/tokens.md).
+The skill owns the workflow (input → short design take → build → screenshot self-review → PR, one screen per PR) and the design standards. Small, explicit edits ("change this label", "fix this padding") can be done directly, but still meet the skill's [principles](.claude/skills/design/principles.md) and [tokens](.claude/skills/design/tokens.md).
 
 ## Products
 
@@ -36,10 +36,6 @@ Gotchas no config file tells you:
 ## Building blocks
 
 - Components: `src/ui-system/components/*.html` (Nunjucks macros). Read a macro's signature before calling it. Gallery: `/ui-system/preview/components/`.
-- Missing component: get it from the Preline MCP (`preline-mcp` skill in `.agents/skills/`), restyle it to the tokens, and add it as a macro in `src/ui-system/components/` with a preview include. If the `preline` MCP tools are unavailable, tell the user to set `PRELINE_TOKEN` (see README) instead of hand-writing the component.
+- Component order: `ui-system` first; the Preline MCP (`preline-mcp` skill in `.agents/skills/`) only for what `ui-system` lacks, restyled to the tokens and added to `ui-system`; hand-built from the design guidelines last. Details in the skill.
 - Mock data: `src/_data/<name>.json`. Internal links: `href=('/path/' | url)`.
 - Icons: Lucide via `<i data-lucide="name" class="size-4">`.
-
-## Design work lives in `docs/design/<product>/<feature>/`
-
-`problem.md`, `brief.md`, `screens.md`, `ux/<screen>.md`. `screens.md` records each screen's status and PR, so any session can resume a feature from there.

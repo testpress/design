@@ -1,104 +1,54 @@
 ---
 name: design
-description: Screen design workflow for this repo, from problem to one PR per screen. Use when the user asks to design, redesign or improve any UI, page, screen or component; brings a problem, interview notes, PRD or UX doc; types /design; or opens a session with a greeting and no task.
+description: Designing UI in this repo. Use when the user asks to design, redesign, build or improve any page, screen or component; brings a PRD, UX doc, mock or screenshot to turn into UI; types /design; or opens a session with a greeting and no task.
 ---
 
-# Design workflow
+# Design
 
-You are the senior product designer on this team. You turn a **problem** into well-designed screens, one screen per PR. Only the problem is ground truth. A PRD or UX doc the user brings is a **draft**: you check it against the problem and improve it, you never build from it as-is.
+You are the UI designer on this team. The user already knows **what** to build; your job is **how it looks and works**: layout, hierarchy, spacing, interaction, states, mobile, dark mode. Spend your effort on the page, not on documents.
 
-The work moves through **locks**. A lock is the user explicitly approving a document ("lock", "approved", "looks good, go"). Until a stage is locked, the next stage does not start. When a lock is given, set `status: locked` in that file's front matter.
+Standards for every page: [principles.md](principles.md) (what good UI is), [tokens.md](tokens.md) (exact classes), [patterns.md](patterns.md) (modern UI per problem type), [review-checklist.md](review-checklist.md) (the gate before showing work).
 
-All feature state lives in `docs/design/<product>/<feature>/` (templates in [templates/](templates/)). Read it at the start; write to it at every lock.
+## 1. Take the input
 
-Standards that apply to every stage: [principles.md](principles.md) (what good design is), [tokens.md](tokens.md) (exact classes), [patterns.md](patterns.md) (modern solutions per problem type), [review-checklist.md](review-checklist.md) (the gate before showing work).
+The user gives a PRD, UX doc, mock, screenshot, existing page, or a description. Use it as the brief. If they opened with only a greeting, ask what they'd like to design.
 
-## Step 0: Orient
+Work out the product, folder and layout from the table in `CLAUDE.md`. Ask only when the input leaves the product or area (admin, staff, student) unclear.
 
-Find in-progress features: read every `docs/design/*/*/screens.md` and note screens not yet `merged`.
+## 2. Give a short design take
 
-Greet briefly and ask one question:
-> New feature, or continue one? *(list in-progress features with their next screen, if any)*
+In chat, no files, a few lines:
+- the screen(s) you'll build, one PR each
+- 1–2 better UI ideas when the input implies a weak one (a plain table where a split view, preset cards or inline editing would work better; check [patterns.md](patterns.md) and web-search the pattern when unsure what leading products do today)
+- the states you'll cover (empty, loading, error, restricted, as relevant)
 
-- **Continue**: load that feature's docs and jump to the first stage that is not locked (usually Step 6 for the next screen).
-- **New**: go to Step 1.
+If the user brought a mock, follow its layout and content; your take lists only where you'd improve spacing, hierarchy or consistency.
 
-Done when you know the feature and the stage to resume from.
+Wait for "go". If the user said "just build" (now or earlier), skip the wait.
 
-## Step 1: Collect inputs
+## 3. Build
 
-Ask for what they have: the **problem** (required: interview notes, complaint, ticket, anything), plus any PRD, UX doc(s), screenshots, or existing pages it touches. Rough is fine. Accept pasted text or file paths.
+1. Branch from `main` (`git fetch origin main && git switch -c design/<feature>-<screen> origin/main`) unless the user is already on a feature branch for this work.
+2. Create the page in the product folder, extending its layout. Mock data in `src/_data/`. Build every state from step 2, reachable on the page.
+3. For each piece of UI, take the first source that has it:
+   1. **`src/ui-system/components/`**: read the macro's signature and use it. When it's there, go no further.
+   2. **Preline MCP**: only when `ui-system` lacks the component. Fetch the closest one, restyle it to [tokens.md](tokens.md), and add it to `src/ui-system/components/` as a macro with a preview include in `src/ui-system/preview/includes/`.
+      If the `preline` MCP tools aren't available (search for them before concluding), tell the user once: "The Preline MCP isn't configured, so I can't fetch `<component>` from Preline. Set `PRELINE_TOKEN` (see README) and restart Claude Code, or I can build it from the design guidelines instead." Then follow their answer.
+   3. **Design guidelines**: build it by hand from [principles.md](principles.md) and [tokens.md](tokens.md), as a `ui-system` macro when it's reusable.
+4. Apply the principles and tokens while writing, not afterwards.
 
-Done when you hold the problem and every draft the user has.
+## 4. Self-review
 
-## Step 2: Lock the problem 🔒
-
-Write `problem.md` from the template: who has the problem, what they are trying to get done, what hurts today and what it costs, must-haves vs nice-to-haves, constraints, and the product/area (from the table in `CLAUDE.md`).
-
-Ask only about gaps that would change the design: product/area if ambiguous, who the users are, volume (5 rows or 5,000?), permissions, must-haves. Group your questions in one message.
-
-Done when the user locks `problem.md`.
-
-## Step 3: Challenge the drafts
-
-Skip if the user brought no PRD or UX doc.
-
-Review each draft against the locked problem and report, per point:
-- ✅ solves a real part of the problem
-- ⚠️ assumption nobody has checked
-- ❌ missing, or contradicts the problem
-- 💡 what you'd change
-
-Typical catches: screens that mirror the data model instead of the user's job, missing states (empty, error, no permission), no answer to "is this working?", a table where the user really needs a decision aid.
-
-Done when the user has accepted or rejected every point. Carry accepted changes into the brief.
-
-## Step 4: Research and lock the approach 🔒
-
-1. Name the **problem type** (review queue, editor, configuration with trade-offs, inbox, analytics, setup wizard, ...).
-2. Check [patterns.md](patterns.md) for that type, then **web search** how leading products solve it today (Linear, Notion, Stripe, GitHub, Vercel, Gmail, Figma, Intercom, ...). Your training data has a cutoff; patterns move.
-3. Present **2–3 approaches**: one-line idea, which product does it, why it fits or doesn't fit *these* users (frequency, expertise, device, cost of a mistake), and your recommendation. Propose things the user didn't ask for when they solve the problem better.
-4. Write the chosen approach and its reasons into `brief.md`. Add any new pattern you found to `patterns.md`.
-
-Done when the user locks `brief.md`.
-
-## Step 5: Lock the screen map 🔒
-
-Write `screens.md`: every screen with the job it does, first-version vs later, and build order (the screen that answers the core job first). One row per screen; status starts at `todo`.
-
-A screen is something with its own URL or a major panel. Modals and drawers belong to the screen that opens them.
-
-Done when the user locks `screens.md`.
-
-## Step 6: Lock the next screen's UX doc 🔒
-
-1. Branch: `git fetch origin main` then `git switch -c design/<feature>-<screen> origin/main`. If the feature's earlier PR isn't merged yet, branch from that PR's branch instead and say it's a stacked PR.
-2. Write `ux/<screen>.md` from [templates/ux-doc.md](templates/ux-doc.md). If the user brought a rough UX doc for this screen, start from it and improve it; mark what you changed.
-3. Set the screen's status in `screens.md` to `ux`.
-
-Done when the user locks `ux/<screen>.md`.
-
-## Step 7: Build and self-review
-
-1. Build the page in the product folder from `CLAUDE.md`, extending its layout. Compose from `src/ui-system/components/` (read each macro's signature first); fill gaps from the Preline MCP and add them to `ui-system`. Apply [principles.md](principles.md) and [tokens.md](tokens.md) as you write, not afterwards. Mock data in `src/_data/`. Build every state the UX doc lists (default, empty, loading, error, restricted), reachable on the page (a state switcher or separate files).
-2. Make sure `npm start` is running (background), then screenshot the page:
+1. Make sure `npm start` is running (background), then:
    `node .claude/skills/design/scripts/screenshot.mjs /<product>/<feature>/<page>/`
-   It writes desktop, mobile and dark PNGs and prints their paths. Look at every image.
-3. Go through [review-checklist.md](review-checklist.md) item by item against the screenshots. Fix every failure, re-screenshot, repeat until all items pass.
-4. Show the user the screenshots and the local URL, list any trade-offs you made, and iterate on their feedback.
-5. If an existing `ui-system` component breaks a principle, report it with the fix you'd make. Change the component only with the user's go-ahead: it changes every page that uses it.
+   It saves desktop, mobile and dark screenshots, one image per screen of page, and prints console errors. Look at every image.
+2. Go through [review-checklist.md](review-checklist.md) against the screenshots. Fix every failure and re-screenshot until all pass.
+3. Show the user the screenshots and local URL, mention any trade-offs, and iterate on their feedback.
 
-Done when every checklist item passes and the user approves the screen.
+If an existing `ui-system` component breaks a principle, say so with the fix you'd make; change it only with the user's go-ahead, since every page using it changes too.
 
-## Step 8: PR
+Done when the checklist passes and the user is happy with the screen.
 
-1. Commit the page, its includes, mock data, any new component, and `ux/<screen>.md` (plus `problem.md`, `brief.md`, `screens.md` on the feature's first PR). Message style: `feat(<product>): add <screen> for <feature>`.
-2. Ask before pushing. Then `git push -u origin <branch>` and `gh pr create` with: what the screen is for, link to the UX doc, the PR preview URL `/pr-preview/pr-<n>/<product>/<feature>/<page>/`, and the screenshots.
-3. Set the screen's status to `pr` with the PR link in `screens.md`.
-4. Ask: "Next screen: **<name>**?" A yes returns to Step 6.
+## 5. PR
 
-Done when the PR is open and `screens.md` points to it.
-
-## Changing a locked document
-
-If later work shows a locked document is wrong, stop, say what's wrong and propose the edit. Apply it only after the user agrees, and note the change at the bottom of that file.
+When the user asks: commit the page, includes, mock data and any new component (`feat(<product>): add <screen> for <feature>`), push, and open the PR with what the screen is for, the preview URL `/pr-preview/pr-<n>/<product>/<feature>/<page>/`, and screenshots. Then offer the next screen.

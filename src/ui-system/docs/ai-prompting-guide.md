@@ -1,12 +1,11 @@
 # How to Ask AI to Design Pages
 
-Open Claude Code in this repo and type `/design` (or just say hi). The `design` skill in `.claude/skills/design/` runs the whole flow and asks you for what it needs:
+Open Claude Code in this repo and type `/design` (or just say hi), then give it whatever you have: a PRD, UX doc, mock, screenshot or a description.
 
-1. **Problem** (required): interview notes, a ticket, a complaint. Rough is fine.
-2. **Drafts** (optional): a PRD or UX doc. Claude reviews them against the problem instead of accepting them as-is.
-3. Claude locks the problem, researches how leading products solve this kind of problem, proposes approaches, maps the screens, then designs **one screen per PR**, each with its own UX doc.
-
-You approve ("lock") each stage before the next one starts. Progress is saved in `docs/design/<product>/<feature>/`, so any session can continue a feature where it left off.
+1. Claude replies with a short design take: the screens it will build, any better UI idea, and the states it will cover. Say "go" (or "just build" to skip this).
+2. It builds with `ui-system` components first, the Preline MCP for anything missing (added to `ui-system`), and the design guidelines as a last resort.
+3. It checks its own screenshots on desktop, mobile and dark, fixes issues, and shows you the result.
+4. It opens one PR per screen when you ask.
 
 ## What you don't need to say
 

@@ -1,6 +1,6 @@
 # Patterns
 
-How leading products solve each **problem type** today. This is the starting point for Step 4's research, not the end of it: web-search the problem type before deciding, and add what you learn here (with the products that do it and the date you checked).
+How leading products solve each **problem type** today. Use it for the design take's UI suggestions; web-search when unsure what leading products do today, and add what you learn here (with the products that do it and the date you checked).
 
 Each entry: the current pattern, where it's seen, when it fits, when it doesn't.
 

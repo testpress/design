@@ -3,10 +3,10 @@
 Run this against the screenshots (desktop, mobile, dark) before showing a screen to the user. Every item is pass or fail; fix every fail and re-screenshot. Report anything you deliberately left failing, with the reason.
 
 ## Job
-- [ ] The answer to the screen's main question (from the UX doc) is the first thing the eye lands on in the desktop screenshot.
+- [ ] The answer to the screen's main question is the first thing the eye lands on in the desktop screenshot.
 - [ ] The primary action is obvious, and there is only one per section.
 - [ ] The screen shows what the data *means* for the user's decision, not only raw fields.
-- [ ] Every state in the UX doc exists and is reachable (default, empty, no results, loading, error, restricted, as listed).
+- [ ] Every state from the design take exists and is reachable (default, empty, no results, loading, error, restricted, as relevant).
 
 ## Hierarchy and type
 - [ ] Squint test: blur your attention on the screenshot; the main content, not borders or chrome, still stands out.
