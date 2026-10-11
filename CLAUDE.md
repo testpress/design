@@ -9,6 +9,7 @@ A PRD, UX doc, mock, screenshot or a description of a screen. Build the UI it de
 - Ask only when the product or area (admin, staff, student) isn't clear from the input.
 - If the input implies a weak UI (for example a plain table where a split view or inline editing would serve the user better), suggest the better option in a few lines before building, and let the user choose.
 - If a mock is given, follow its layout and content.
+- Design every page to [docs/ui-principles.md](docs/ui-principles.md): hierarchy, spacing, type, color, depth and empty states.
 
 ## Where the page goes
 
