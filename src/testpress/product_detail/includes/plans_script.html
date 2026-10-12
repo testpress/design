@@ -1,0 +1,130 @@
+<script>
+  function productDetail() {
+    // Product-level benefits, in the order the admin set. Each plan lists the
+    // ids it includes; a missing id means the benefit is not included.
+    const BENEFITS = [
+      { id: 1, name: "Recorded video lectures" },
+      { id: 2, name: "Question bank with explanations" },
+      { id: 3, name: "Weekly grand tests with all-India rank" },
+      { id: 4, name: "Live doubt-clearing sessions" },
+      { id: 5, name: "Printed study materials" },
+      { id: 6, name: "Personal mentor" },
+      { id: 7, name: "1:1 weekly mentor call" },
+      { id: 8, name: "Priority support on WhatsApp" },
+    ];
+
+    const PLANS = [
+      {
+        id: 0,
+        name: "Basic Access",
+        description: "Ideal for self-learners covering all essential topics.",
+        courses: ["Prelims GS", "CSAT"],
+        benefits: [1, 2],
+        details: [
+          { duration: "90 days", ends_on: "10-01-2027", price: 2999, strike_through_price: 3999 },
+          { duration: "180 days", ends_on: "10-04-2027", price: 4999, strike_through_price: 5999 },
+        ],
+      },
+      {
+        id: 1,
+        name: "Standard Access",
+        description: "Foundation to advanced video lectures and practice tests.",
+        courses: ["Prelims GS", "CSAT", "Test series"],
+        benefits: [1, 2, 3],
+        details: [
+          { duration: "90 days", ends_on: "10-01-2027", price: 4499, strike_through_price: 5499 },
+          { duration: "180 days", ends_on: "10-04-2027", price: 7499, strike_through_price: 8999 },
+        ],
+      },
+      {
+        id: 2,
+        name: "Mentorship Pro",
+        description: "Everything in Standard, plus a personal mentor and doubt sessions.",
+        courses: ["Prelims GS", "CSAT", "Test series", "Mains GS"],
+        benefits: [1, 2, 3, 4, 5, 6],
+        details: [
+          { duration: "90 days", ends_on: "10-01-2027", price: 6999, strike_through_price: 8499 },
+          { duration: "180 days", ends_on: "10-04-2027", price: 11999, strike_through_price: 13999 },
+        ],
+      },
+      {
+        id: 3,
+        name: "Premium Elite",
+        description: "Everything in Mentorship Pro, plus a weekly 1:1 mentor call and priority support.",
+        courses: ["Prelims GS", "CSAT", "Test series", "Mains GS", "Current affairs"],
+        benefits: [1, 2, 3, 4, 5, 6, 7, 8],
+        details: [
+          { duration: "90 days", ends_on: "10-01-2027", price: 9499, strike_through_price: 11499 },
+          { duration: "180 days", ends_on: "10-04-2027", price: 15499, strike_through_price: 17999 },
+        ],
+      },
+    ];
+
+    return {
+      showInstallments: false,
+      isCustomInstallmentPlan: false,
+
+      // Prototype switches (bottom-right menu).
+      hasPlans: true,
+      hasBenefits: true,
+
+      allBenefits: BENEFITS,
+      plans: PLANS,
+
+      // Chosen duration per plan (index into plan.details). First one is preselected.
+      choice: Object.fromEntries(PLANS.map((p) => [p.id, 0])),
+      // Plan shown on small screens, where plans are switched one at a time.
+      activePlan: 0,
+
+      // The plan and duration the student picked in the comparison.
+      selectedPlan: null,
+      selectedDetail: null,
+
+      init() {
+        const value = new URLSearchParams(window.location.search).get("is_custom_plan");
+        this.isCustomInstallmentPlan = !!(value && value.toLowerCase() === "true");
+        this.$watch("hasPlans", () => this.clearPlan());
+      },
+
+      get benefits() {
+        return this.hasBenefits ? this.allBenefits : [];
+      },
+
+      // Benefits to list on the page: all of them for a product without plans,
+      // only the included ones once a plan is chosen.
+      get pageBenefits() {
+        if (!this.hasPlans) return this.benefits;
+        if (!this.selectedPlan) return [];
+        return this.benefits.filter((b) => this.includes(this.selectedPlan, b));
+      },
+
+      includes(plan, benefit) {
+        return plan.benefits.includes(benefit.id);
+      },
+
+      money(amount) {
+        return "₹" + Number(amount).toLocaleString("en-IN");
+      },
+
+      get lowestPrice() {
+        return Math.min(...this.plans.flatMap((p) => p.details.map((d) => d.price)));
+      },
+
+      openPlans() {
+        if (this.selectedPlan) this.activePlan = this.selectedPlan.id;
+        this.$dispatch("open-modal-compare-plans");
+      },
+
+      selectPlan(plan) {
+        this.selectedPlan = plan;
+        this.selectedDetail = plan.details[this.choice[plan.id]];
+        this.$dispatch("close-modal-compare-plans");
+      },
+
+      clearPlan() {
+        this.selectedPlan = null;
+        this.selectedDetail = null;
+      },
+    };
+  }
+</script>
