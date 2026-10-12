@@ -1,0 +1,212 @@
+{# Plan cards + comparison table, adapted from the Preline "Pricing Card Grid" block. #}
+
+{% set check_icon %}<svg class="mx-auto shrink-0 size-5 text-emerald-600 dark:text-emerald-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>{% endset %}
+{% set cross_icon %}<svg class="mx-auto shrink-0 size-4 text-gray-300 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>{% endset %}
+
+{% from "../../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% set duration_trigger %}<button type="button" class="py-1.5 ps-3 pe-2 inline-flex items-center gap-x-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200" aria-haspopup="menu" :aria-label="'Duration: ' + duration"><span x-text="duration"></span><svg class="shrink-0 size-4 text-gray-500 transition-transform" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>{% endset %}
+{% set description_text %}<p class="mt-1 text-sm text-gray-500 line-clamp-2 dark:text-neutral-400" x-text="plan.description" x-init="$nextTick(() => measureDescription($el, plan))" @resize.window.debounce.150ms="measureDescription($el, plan)"></p>{% endset %}
+
+<section id="plans" x-show="hasPlans" class="scroll-mt-20">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 class="text-xl font-semibold text-gray-800 dark:text-neutral-200">Choose a plan</h2>
+      <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Pick the plan that fits you and how long you need it.</p>
+    </div>
+
+    {# Duration for all plans, at the right of the header. No "Duration" label: the options say it.
+       Rule: 2-3 durations show as a compact segmented toggle (Preline "Segment" tabs look, sized down),
+       so students see every option at once. 4 or more switch to the ui-system dropdown so the header
+       stays tidy. A product whose plans offer only one duration shows neither. #}
+    <template x-if="durations.length > 1 && durations.length <= 3">
+      <div class="flex bg-gray-100 rounded-lg p-1 dark:bg-neutral-700" role="radiogroup" aria-label="Access duration">
+        <template x-for="item in durations" :key="item">
+          <button type="button" role="radio" :aria-checked="duration === item" @click="setDuration(item)"
+            class="py-1.5 px-3 text-sm font-medium rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            :class="duration === item
+              ? 'bg-white text-gray-800 shadow-sm dark:bg-neutral-800 dark:text-white'
+              : 'text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
+            x-text="item"></button>
+        </template>
+      </div>
+    </template>
+    <template x-if="durations.length > 3">
+      <div>
+        {% call dropdown(trigger=duration_trigger, placement="bottom-end", width="small") %}
+          <template x-for="item in durations" :key="item">
+            <button type="button" role="menuitemradio" :aria-checked="duration === item"
+              @click="setDuration(item); open = false"
+              class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+              <span x-text="item"></span>
+              <svg x-show="duration === item" class="shrink-0 size-3.5 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+            </button>
+          </template>
+        {% endcall %}
+      </div>
+    </template>
+  </div>
+
+
+
+  {# Plan cards as radio cards (built by hand, card shell from the Preline "Pricing Card Grid"): the card is the radio, and it
+     shows its price for the duration chosen in the header dropdown. Each card is a subgrid with 3 rows
+     (name, price, summary) so prices line up across cards. #}
+  {# Dev note, grid columns follow the plan count: 1 plan = 1 column, 2 plans = 2 wider columns,
+     3 or more = 3 columns (a 4th plan wraps to a new row). Keep the full class names in the
+     :class below so Tailwind generates them. #}
+  <div class="mt-6 grid gap-4" role="radiogroup" aria-label="Plans"
+       :class="plans.length === 1 ? 'sm:grid-cols-1' : plans.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'">
+    <template x-for="plan in plans" :key="plan.id">
+      <div role="radio" :tabindex="detailFor(plan) ? 0 : -1"
+           :aria-checked="isSelected(plan)" :aria-disabled="!detailFor(plan)"
+           @click="selectPlan(plan)"
+           @keydown.enter.prevent="selectPlan(plan)" @keydown.space.prevent="selectPlan(plan)"
+           class="row-span-3 grid grid-rows-subgrid gap-y-0 bg-white rounded-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-neutral-800"
+           :class="!detailFor(plan) ? 'border border-gray-200 opacity-60 cursor-not-allowed dark:border-neutral-700'
+                   : isSelected(plan) ? 'ring-2 ring-primary-600 shadow-md cursor-pointer' : 'border border-gray-200 hover:border-gray-300 cursor-pointer dark:border-neutral-700'">
+
+        {# 1. Name, radio mark and description #}
+        <div class="px-4 pt-4 pb-3">
+          <div class="flex items-start justify-between gap-x-3">
+            <h3 class="font-semibold text-base text-gray-800 dark:text-neutral-200" x-text="plan.name"></h3>
+            <span class="mt-0.5 shrink-0 size-5 inline-flex items-center justify-center rounded-full border-2 transition-colors"
+                  :class="isSelected(plan) ? 'border-primary-600 bg-primary-600' : 'border-gray-300 bg-white dark:border-neutral-600 dark:bg-neutral-800'" aria-hidden="true">
+              <span x-show="isSelected(plan)" class="size-2 rounded-full bg-white"></span>
+            </span>
+          </div>
+          {# Description: 2 lines at most. Only a cut-off description gets a tooltip with the full text. #}
+          <template x-if="!truncated[plan.id]">
+            {{ description_text | safe }}
+          </template>
+          <template x-if="truncated[plan.id]">
+            {{ tooltip(trigger=description_text, content='<span x-text="plan.description"></span>', placement="bottom") }}
+          </template>
+        </div>
+
+        {# 2. Price for the duration chosen in the header dropdown #}
+        <div class="px-4 pb-3">
+          <template x-if="detailFor(plan)">
+            <p class="flex flex-wrap items-baseline gap-x-1.5">
+              <span class="font-bold text-xl text-gray-800 dark:text-neutral-200" x-text="money(detailFor(plan).price)"></span>
+              <span class="text-sm text-gray-500 dark:text-neutral-400" x-text="'/ ' + duration"></span>
+              <s class="text-sm text-gray-400" x-text="money(detailFor(plan).strike_through_price)"></s>
+            </p>
+          </template>
+          <template x-if="!detailFor(plan)">
+            <p class="text-sm text-gray-500 dark:text-neutral-400">
+              Not available for <span x-text="duration"></span>.
+              <span class="block">Available for <span x-text="plan.details.map(d => d.duration).join(', ')"></span>.</span>
+            </p>
+          </template>
+        </div>
+
+        {# 3. What the plan includes, in short #}
+        <ul class="px-4 pb-4 flex flex-wrap gap-x-3 gap-y-1 text-sm text-gray-600 dark:text-neutral-400">
+          <li class="inline-flex items-center gap-x-1.5">
+            <i data-lucide="book-open" class="shrink-0 size-4 text-gray-400"></i>
+            <span x-text="plan.courses.length + ' courses'"></span>
+          </li>
+          <li x-show="benefits.length" class="inline-flex items-center gap-x-1.5">
+            <i data-lucide="badge-check" class="shrink-0 size-4 text-gray-400"></i>
+            <span x-text="benefits.filter(b => includes(plan, b)).length + ' of ' + benefits.length + ' benefits'"></span>
+          </li>
+        </ul>
+      </div>
+    </template>
+  </div>
+
+  {# Comparison #}
+  <div class="mt-10">
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-neutral-200">Compare plans</h3>
+
+    {# xs to lg: one plan at a time #}
+    <div class="lg:hidden mt-4">
+      <div class="-mx-4 px-4 overflow-x-auto">
+        <div class="inline-flex gap-1 p-1 rounded-lg bg-gray-100 dark:bg-neutral-700" role="group" aria-label="Plans">
+          <template x-for="plan in plans" :key="plan.id">
+            <button type="button" @click="activePlan = plan.id; $el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })"
+              :aria-pressed="activePlan === plan.id"
+              :class="activePlan === plan.id ? 'bg-white text-gray-900 shadow-sm dark:bg-neutral-800 dark:text-white' : 'text-gray-500 hover:text-gray-800 dark:text-neutral-400'"
+              class="whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors" x-text="plan.name"></button>
+          </template>
+        </div>
+      </div>
+      <template x-for="plan in plans" :key="plan.id">
+        <div x-show="activePlan === plan.id" class="mt-4 border border-gray-200 rounded-xl divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+          <p class="py-2.5 px-4 bg-gray-50 text-sm font-semibold text-gray-800 rounded-t-xl dark:bg-neutral-800 dark:text-neutral-200">Courses</p>
+          <template x-for="course in allCourses" :key="course">
+            <div class="py-3 px-4 flex items-center justify-between gap-x-3 text-sm">
+              <span :class="plan.courses.includes(course) ? 'text-gray-800 dark:text-neutral-200' : 'text-gray-400'" x-text="course"></span>
+              <span x-show="plan.courses.includes(course)">{{ check_icon | safe }}</span>
+              <span x-show="!plan.courses.includes(course)">{{ cross_icon | safe }}</span>
+            </div>
+          </template>
+          <template x-if="benefits.length">
+            <p class="py-2.5 px-4 bg-gray-50 text-sm font-semibold text-gray-800 dark:bg-neutral-800 dark:text-neutral-200">What you get</p>
+          </template>
+          <template x-for="benefit in benefits" :key="benefit.id">
+            <div class="py-3 px-4 flex items-center justify-between gap-x-3 text-sm">
+              <span :class="includes(plan, benefit) ? 'text-gray-800 dark:text-neutral-200' : 'text-gray-400'" x-text="benefit.name"></span>
+              <span x-show="includes(plan, benefit)">{{ check_icon | safe }}</span>
+              <span x-show="!includes(plan, benefit)">{{ cross_icon | safe }}</span>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    {# lg and up: full table #}
+    <div class="hidden lg:block mt-4 border border-gray-200 rounded-xl overflow-hidden dark:border-neutral-700">
+      <table class="w-full">
+        <caption class="sr-only">Plan comparison</caption>
+        <thead class="bg-white dark:bg-neutral-800">
+          <tr>
+            <th class="py-4 px-5 text-sm font-medium text-gray-800 text-start dark:text-neutral-200" scope="col">
+              <span class="sr-only">Feature by</span>Plans
+            </th>
+            <template x-for="plan in plans" :key="plan.id">
+              <th class="py-4 px-3 text-sm font-medium text-center" scope="col"
+                  :class="isSelected(plan) ? 'bg-primary-50 text-primary-800 dark:bg-primary-500/15 dark:text-primary-300' : 'text-gray-800 dark:text-neutral-200'" x-text="plan.name"></th>
+            </template>
+          </tr>
+        </thead>
+        <tbody class="border-t border-gray-200 divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+          <tr>
+            <th class="py-2.5 px-5 bg-gray-50 text-sm font-semibold text-gray-800 text-start dark:bg-neutral-800 dark:text-neutral-200" :colspan="plans.length + 1" scope="colgroup">Courses</th>
+          </tr>
+          <template x-for="course in allCourses" :key="course">
+            <tr>
+              <th class="py-3 px-5 text-sm font-normal text-gray-600 text-start dark:text-neutral-300" scope="row" x-text="course"></th>
+              <template x-for="plan in plans" :key="plan.id">
+                <td class="py-3 px-3" :class="isSelected(plan) ? 'bg-primary-50/50 dark:bg-primary-500/10' : ''">
+                  <span x-show="plan.courses.includes(course)">{{ check_icon | safe }}</span>
+                  <span x-show="!plan.courses.includes(course)">{{ cross_icon | safe }}</span>
+                  <span class="sr-only" x-text="(plan.courses.includes(course) ? 'Included in ' : 'Not included in ') + plan.name"></span>
+                </td>
+              </template>
+            </tr>
+          </template>
+
+          <template x-if="benefits.length">
+            <tr>
+              <th class="py-2.5 px-5 bg-gray-50 text-sm font-semibold text-gray-800 text-start dark:bg-neutral-800 dark:text-neutral-200" :colspan="plans.length + 1" scope="colgroup">What you get</th>
+            </tr>
+          </template>
+          <template x-for="benefit in benefits" :key="benefit.id">
+            <tr>
+              <th class="py-3 px-5 text-sm font-normal text-gray-600 text-start dark:text-neutral-300" scope="row" x-text="benefit.name"></th>
+              <template x-for="plan in plans" :key="plan.id">
+                <td class="py-3 px-3" :class="isSelected(plan) ? 'bg-primary-50/50 dark:bg-primary-500/10' : ''">
+                  <span x-show="includes(plan, benefit)">{{ check_icon | safe }}</span>
+                  <span x-show="!includes(plan, benefit)">{{ cross_icon | safe }}</span>
+                  <span class="sr-only" x-text="(includes(plan, benefit) ? 'Included in ' : 'Not included in ') + plan.name"></span>
+                </td>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
