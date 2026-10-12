@@ -1,5 +1,5 @@
 <script>
-  function productDetailV2() {
+  function productDetail() {
     // Product-level benefits, in the order the admin set. Each plan lists the
     // ids it includes; a missing id means the benefit is not included.
     const BENEFITS = [
@@ -38,19 +38,8 @@
       },
       {
         id: 2,
-        name: "Mentorship Pro",
-        description: "Everything in Standard, plus a personal mentor.",
-        courses: ["Prelims GS", "CSAT", "Test series", "Mains GS"],
-        benefits: [1, 2, 3, 4, 5, 6],
-        details: [
-          { duration: "90 days", ends_on: "10 Jan 2027", price: 6999, strike_through_price: 8499 },
-          { duration: "180 days", ends_on: "10 Apr 2027", price: 11999, strike_through_price: 13999 },
-        ],
-      },
-      {
-        id: 3,
         name: "Premium Elite",
-        description: "Everything in Pro, plus weekly 1:1 calls and priority support.",
+        description: "Everything in Standard, plus a personal mentor, a weekly 1:1 call, priority support on WhatsApp and a study plan reviewed every month.",
         courses: ["Prelims GS", "CSAT", "Test series", "Mains GS", "Current affairs"],
         benefits: [1, 2, 3, 4, 5, 6, 7, 8],
         details: [
@@ -73,14 +62,19 @@
       allBenefits: BENEFITS,
       plans: PLANS,
 
-      // Chosen duration per plan (index into plan.details). First one is preselected.
-      choice: Object.fromEntries(PLANS.map((p) => [p.id, 0])),
+      // One duration for the whole page, picked in the dropdown at the right of the plans header.
+      // Durations are set per plan, so a plan may not offer the chosen one.
+      duration: PLANS[0].details[0].duration,
       // Plan shown in the comparison on small screens.
       activePlan: 0,
-      selectedPlan: null,
+      // One selection across all plans. The first plan is preselected so the
+      // purchase card always has a price and a Buy button.
+      selectedPlan: PLANS[0],
+      // Plan ids whose description is cut off at 2 lines.
+      truncated: {},
 
       init() {
-        this.$watch("hasPlans", () => (this.selectedPlan = null));
+        this.$watch("hasPlans", () => (this.selectedPlan = this.plans[0]));
         // Icons inside x-for / x-if templates render after lucide's first pass.
         const refreshIcons = () => this.$nextTick(() => window.lucide && window.lucide.createIcons());
         refreshIcons();
@@ -97,8 +91,26 @@
         return [...new Set(this.plans.flatMap((p) => p.courses))];
       },
 
+      // Every duration offered by any plan, in first-seen order.
+      get durations() {
+        return [...new Set(this.plans.flatMap((p) => p.details.map((d) => d.duration)))];
+      },
+
+      // The plan's price for the chosen duration, or undefined when it doesn't offer it.
+      detailFor(plan) {
+        return plan.details.find((d) => d.duration === this.duration);
+      },
+
+      setDuration(duration) {
+        this.duration = duration;
+        // Keep the selection valid: move to the first plan that offers this duration.
+        if (this.selectedPlan && !this.detailFor(this.selectedPlan)) {
+          this.selectedPlan = this.plans.find((p) => this.detailFor(p)) || null;
+        }
+      },
+
       get selectedDetail() {
-        return this.selectedPlan ? this.selectedPlan.details[this.choice[this.selectedPlan.id]] : null;
+        return this.selectedPlan ? this.detailFor(this.selectedPlan) : null;
       },
 
       get lowestPrice() {
@@ -117,17 +129,18 @@
         return "₹" + Number(amount).toLocaleString("en-IN");
       },
 
+      measureDescription(el, plan) {
+        this.truncated[plan.id] = el.scrollHeight > el.clientHeight + 1;
+      },
+
       percentOff(price, strike) {
         return Math.round((1 - price / strike) * 100);
       },
 
       selectPlan(plan) {
+        if (!this.detailFor(plan)) return;
         this.selectedPlan = plan;
         this.activePlan = plan.id;
-      },
-
-      goToPlans() {
-        document.getElementById("plans").scrollIntoView({ behavior: "smooth", block: "start" });
       },
     };
   }
