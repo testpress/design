@@ -80,11 +80,11 @@
 
     // Sort and filters are a per-viewer convenience: remembered in this browser only.
     const VIEW_KEY = 'tpsentinel-review-queue-view';
-    const DEFAULT_VIEW = { sort: 'oldest', workspace: '', types: [] };
+    const DEFAULT_VIEW = { sort: 'oldest', workspace: '', types: [], focus: false };
     const loadView = () => {
       try {
         const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
-        return { sort: saved.sort || 'oldest', workspace: typeof saved.workspace === 'string' ? saved.workspace : '', types: saved.types || [] };
+        return { sort: saved.sort || 'oldest', workspace: typeof saved.workspace === 'string' ? saved.workspace : '', types: saved.types || [], focus: Boolean(saved.focus) };
       } catch (e) { return { ...DEFAULT_VIEW, types: [] }; }
     };
 
@@ -99,7 +99,8 @@
       choice: null,
       notes: '',
       filter: 'all',
-      viewer: { items: [], index: 0 },
+      viewer: { items: [], index: 0, startAt: null },
+      showFullSessions: false,
       candidateTab: 'details',
       copied: null,
 
@@ -185,18 +186,26 @@
         return [
           { key: 'all', label: 'All' },
           ...this.current.anomalies.map((a) => ({ key: a.type, label: a.label })),
-          { key: 'recordings', label: 'Full recordings' },
         ];
       },
 
       get evidenceItems() {
         const c = this.current;
         if (!c) return [];
-        if (this.filter === 'recordings') return c.recordings.filter((r) => r.state === 'available');
         const anomalies = this.filter === 'all' ? c.anomalies : c.anomalies.filter((a) => a.type === this.filter);
         return anomalies.flatMap((a) =>
           (a.media.items || []).map((m) => ({ ...m, anomaly: a.label }))
         );
+      },
+
+      // Full session recordings, one group per session (newest first).
+      get sessionRecordings() {
+        const c = this.current;
+        if (!c) return [];
+        return c.sessions.map((s) => ({
+          session: s,
+          recordings: c.recordings.filter((r) => r.session === s.label && r.state === 'available'),
+        })).filter((g) => g.recordings.length);
       },
 
       get viewerItem() {
@@ -257,12 +266,25 @@
         this.choice = null;
         this.notes = '';
         this.filter = 'all';
+        this.showFullSessions = false;
         if (this.$refs.detail) this.$refs.detail.scrollTop = 0;
         window.scrollTo({ top: 0 });
         this.$nextTick(() => {
           const el = document.getElementById('case-' + id);
           if (el) el.scrollIntoView({ block: 'nearest' });
         });
+      },
+
+      // Where the open case sits in the current list, for focus mode.
+      get position() {
+        return { index: this.filtered.findIndex((c) => c.id === this.selectedId) + 1, total: this.filtered.length };
+      },
+
+      step(delta) {
+        const list = this.filtered;
+        const i = list.findIndex((c) => c.id === this.selectedId);
+        const next = list[i + delta];
+        if (next) this.select(next.id);
       },
 
       openCase(id) {
@@ -321,8 +343,30 @@
       },
 
       openViewer(index) {
-        this.viewer = { items: this.evidenceItems, index };
+        this.viewer = { items: this.evidenceItems, index, startAt: null };
         window.dispatchEvent(new CustomEvent('open-modal-viewer'));
+      },
+
+      openRecording(r) {
+        const items = this.sessionRecordings.flatMap((g) => g.recordings);
+        this.viewer = { items, index: Math.max(items.indexOf(r), 0), startAt: null };
+        window.dispatchEvent(new CustomEvent('open-modal-viewer'));
+      },
+
+      // The full recording that covers a flagged moment: same session, screen for screen clips, webcam otherwise.
+      fullRecordingFor(m) {
+        if (!m || !m.anomaly || m.reference || m.kind === 'recording') return null;
+        const source = m.label.startsWith('Screen') ? 'Screen' : 'Webcam';
+        return this.sessionRecordings
+          .flatMap((g) => g.recordings)
+          .find((r) => r.session === m.session && r.label.startsWith(source)) || null;
+      },
+
+      watchInFull(m) {
+        const r = this.fullRecordingFor(m);
+        if (!r) return;
+        const items = this.sessionRecordings.flatMap((g) => g.recordings);
+        this.viewer = { items, index: items.indexOf(r), startAt: { index: items.indexOf(r), time: m.time } };
       },
 
       stepViewer(step) {
@@ -333,6 +377,16 @@
       openCandidate(tab) {
         this.candidateTab = tab;
         window.dispatchEvent(new CustomEvent('open-modal-candidate'));
+      },
+
+      isMac: /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent),
+
+      // Ctrl+K / ⌘K focuses the queue search (the usual web-app search shortcut).
+      focusSearch(e) {
+        if (e.key.toLowerCase() !== 'k' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+        e.preventDefault();
+        this.mobileDetail = false;
+        this.$nextTick(() => this.$refs.search && this.$refs.search.focus());
       },
 
       copy(row) {
