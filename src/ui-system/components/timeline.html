@@ -1,0 +1,49 @@
+{#
+  Timeline (stepped style from the Testpress Messages "Signals" tab, based on Preline's timeline).
+
+  Renders an Alpine list of groups. `groups` is an Alpine expression returning
+  [{ <group_label>: "Session 2", <events_key>: [{ time, title, description }] }].
+  A group with an empty label renders without its marker.
+
+  Call with a body to fill each event's icon circle; the body can read `event`:
+    {% call timeline(groups="activityGroups") %}<template x-if="event.kind === 'x'">…</template>{% endcall %}
+  Without a body, each event gets a small dot.
+#}
+{% macro timeline(groups="", group_label="label", events_key="events", time_key="time", title_key="title", description_key="description", extra_classes="") %}
+<div class="{{ extra_classes }}">
+  <template x-for="(group, gIdx) in {{ groups }}" :key="gIdx">
+    <div>
+      <!-- Group marker -->
+      <div x-show="group.{{ group_label }}" class="relative pb-1 after:absolute after:top-4 after:bottom-0 after:start-4 after:w-px after:bg-gray-300 dark:after:bg-neutral-600 after:-translate-x-1/2">
+        <div class="w-full flex gap-x-4">
+          <span class="relative z-1 flex shrink-0 justify-center items-center w-8">
+            <span class="flex shrink-0 justify-center items-center size-2 bg-white dark:bg-neutral-800 border border-gray-300 dark:border-neutral-600 rounded-full"></span>
+          </span>
+          <span class="grow text-xs text-gray-500 dark:text-neutral-400" x-text="group.{{ group_label }}"></span>
+        </div>
+      </div>
+
+      <template x-for="(event, eIdx) in group.{{ events_key }}" :key="eIdx">
+        <!-- Event -->
+        <div class="relative after:absolute after:top-8 after:bottom-0 after:start-4 after:w-px after:border-s after:border-dashed after:-translate-x-1/2"
+          :class="gIdx === {{ groups }}.length - 1 && eIdx === group.{{ events_key }}.length - 1 ? 'pb-0 after:border-transparent' : 'pb-6 after:border-gray-300 dark:after:border-neutral-600'">
+          <div class="w-full flex gap-x-4">
+            <span class="flex shrink-0 justify-center items-center size-8 bg-gray-100 dark:bg-neutral-700 text-gray-500 dark:text-neutral-400 rounded-full">
+              {% if caller %}{{ caller() }}{% else %}<span class="size-1.5 rounded-full bg-current"></span>{% endif %}
+            </span>
+            <div class="grow mt-1 flex flex-col gap-y-1">
+              <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="event.{{ title_key }}"></span>
+              <span class="flex flex-wrap items-center gap-x-1.5 text-xs text-gray-500 dark:text-neutral-400">
+                <span x-text="event.{{ time_key }}"></span>
+                <template x-if="event.{{ description_key }}">
+                  <span class="inline-flex items-center gap-x-1.5"><span aria-hidden="true">&middot;</span><span x-text="event.{{ description_key }}"></span></span>
+                </template>
+              </span>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+</div>
+{% endmacro %}
