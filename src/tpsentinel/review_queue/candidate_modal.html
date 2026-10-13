@@ -1,0 +1,144 @@
+{% from "./icons.html" import icon %}
+{% from "src/ui-system/components/modal.html" import modal %}
+{% from "src/ui-system/components/timeline.html" import timeline %}
+{% set rq = tpsentinel_review_queue %}
+
+{% set candidate_tabs = [
+  {"key": "details", "label": "Details", "icon": "user"},
+  {"key": "sessions", "label": "Sessions", "icon": "sessions"},
+  {"key": "activity", "label": "Activity", "icon": "activity"},
+  {"key": "history", "label": "Review history", "icon": "history"}
+] %}
+
+{#- Icon for an activity or history event, by its kind. -#}
+{% set event_icon %}
+  {% for t in rq.anomaly_types %}<template x-if="event.kind === '{{ t.key }}'">{{ icon(t.key, "size-3.5") }}</template>{% endfor %}
+  <template x-if="event.kind === 'identity'">{{ icon("identity", "size-3.5") }}</template>
+  <template x-if="event.kind === 'session' || event.kind === 'session_end'">{{ icon("sessions", "size-3.5") }}</template>
+  <template x-if="event.kind === 'assigned'">{{ icon("user", "size-3.5") }}</template>
+  <template x-if="event.kind === 'created' || event.kind === 'earlier'">{{ icon("history", "size-3.5") }}</template>
+{% endset %}
+
+<!-- Candidate Details Modal: same layout as the Testpress Messages "Student details" modal -->
+{% call modal(id="candidate", title="Candidate details", size="3xl", confirm_text="", show_cancel=false, body_padding="p-0") %}
+<template x-if="current">
+  <div class="flex flex-col lg:flex-row h-full overflow-hidden">
+    <!-- Sidebar -->
+    <div class="shrink-0 border-b lg:border-b-0 lg:border-e border-layer-line">
+      <div class="size-full lg:w-60 flex flex-col">
+        <!-- Select Nav (Mobile) -->
+        <div class="py-4 px-2 lg:hidden">
+          <select x-model="candidateTab" aria-label="Section"
+            class="py-2 px-3 pe-9 block w-full bg-layer border-layer-line rounded-lg text-sm text-foreground focus:border-primary focus:ring-primary">
+            {% for t in candidate_tabs %}<option value="{{ t.key }}">{{ t.label }}</option>{% endfor %}
+          </select>
+        </div>
+
+        <!-- Nav (Desktop) -->
+        <nav class="p-4 hidden lg:flex flex-col gap-1" aria-label="Tabs" role="tablist" aria-orientation="vertical">
+          {% for t in candidate_tabs %}
+          <button type="button" role="tab" @click="candidateTab = '{{ t.key }}'" :aria-selected="candidateTab === '{{ t.key }}'"
+            class="w-full flex items-center gap-x-2 p-2 text-start text-sm rounded-lg text-foreground focus:outline-hidden transition-colors"
+            :class="candidateTab === '{{ t.key }}' ? 'bg-muted-active' : 'hover:bg-muted-hover focus:bg-muted-focus'">
+            {{ icon(t.icon) }} {{ t.label }}
+          </button>
+          {% endfor %}
+        </nav>
+      </div>
+    </div>
+    <!-- End Sidebar -->
+
+    <!-- Tab Content -->
+    <div class="grow h-full overflow-hidden">
+      <div class="my-1 me-1 pt-1 sm:pt-2.5 p-4 h-[55dvh] lg:h-[65dvh] overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb">
+
+        <!-- Details -->
+        <div x-show="candidateTab === 'details'">
+          <div class="flex flex-col justify-center items-center text-center mb-8">
+            <img class="shrink-0 size-28 rounded-full object-cover" :src="current.candidate.photo" alt="">
+            <div class="mt-4 w-full">
+              <h2 class="text-lg font-semibold text-foreground" x-text="current.candidate.name"></h2>
+              <p class="text-[13px] text-muted-foreground-1" x-text="current.workspace"></p>
+            </div>
+          </div>
+
+          <div class="space-y-3">
+            <template x-for="row in candidateRows" :key="row.label">
+              <dl class="flex flex-col sm:flex-row sm:items-center gap-1">
+                <dt class="min-w-40 text-sm text-muted-foreground-1" x-text="row.label"></dt>
+                <dd class="grow min-w-0 flex items-center gap-x-2">
+                  <span class="text-sm text-foreground break-all" x-text="row.value"></span>
+                  <button type="button" @click="copy(row)" :aria-label="'Copy ' + row.label"
+                    class="shrink-0 size-7 inline-flex justify-center items-center rounded-md text-muted-foreground-1 hover:bg-muted-hover focus:outline-hidden focus:bg-muted-hover">
+                    <span x-show="copied !== row.label">{{ icon("copy", "size-3.5") }}</span>
+                    <span x-show="copied === row.label" class="text-primary">{{ icon("check", "size-3.5") }}</span>
+                  </button>
+                </dd>
+              </dl>
+            </template>
+          </div>
+        </div>
+
+        <!-- Sessions -->
+        <div x-show="candidateTab === 'sessions'">
+          <h3 class="mb-1 text-lg font-medium text-foreground">Sessions</h3>
+          <p class="mb-6 text-sm text-muted-foreground-1">Each time the candidate opened this workspace, newest first. Select one for its details.</p>
+          <!-- Compact session list: one row per session, expand for details (Preline session details list) -->
+          <div class="divide-y divide-layer-line border-y border-layer-line">
+            <template x-for="s in current.sessions" :key="s.label">
+              <div>
+                <button type="button" @click="openSession = openSession === s.label ? null : s.label" :aria-expanded="openSession === s.label"
+                  class="w-full flex items-center gap-x-3 py-3 text-start hover:bg-muted-hover focus:outline-hidden focus-visible:bg-muted-hover rounded-lg px-2 -mx-2">
+                  <span class="grow min-w-0">
+                    <span class="flex flex-wrap items-center gap-x-2">
+                      <span class="text-sm font-medium text-foreground" x-text="s.label"></span>
+                      <span x-show="s.status === 'Failed'" class="inline-flex items-center py-px px-2 rounded-full text-xs font-medium bg-surface text-muted-foreground-1">Failed</span>
+                    </span>
+                    <span class="block text-xs text-muted-foreground-1" x-text="s.date + ' · ' + s.started + ' – ' + s.ended + ' · ' + s.length"></span>
+                  </span>
+                  <span class="shrink-0 text-xs text-muted-foreground-1" x-text="s.verdict"></span>
+                  <svg class="shrink-0 size-4 text-muted-foreground transition-transform" :class="openSession === s.label ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </button>
+                <ul x-show="openSession === s.label" class="pb-3 space-y-2">
+                  <template x-for="row in [
+                    ['Verdict', s.verdict],
+                    ['Identity check', s.identity],
+                    ['Browser', s.browser + ' · ' + s.os],
+                    ['Screen', s.resolution],
+                    ['IP address', s.ip],
+                    ['Timezone', s.timezone]
+                  ]" :key="row[0]">
+                    <li class="flex justify-between items-center gap-x-4">
+                      <span class="text-xs uppercase text-muted-foreground-1" x-text="row[0]"></span>
+                      <span class="text-sm text-foreground text-end" x-text="row[1]"></span>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Activity -->
+        <div x-show="candidateTab === 'activity'">
+          <h3 class="mb-1 text-lg font-medium text-foreground">Activity</h3>
+          <p class="mb-6 text-sm text-muted-foreground-1">Everything recorded during each session, newest session first.</p>
+          {% call timeline(groups="activityGroups", description_key="detail") %}{{ event_icon | safe }}{% endcall %}
+          <button type="button" x-show="current.sessions.length > 3" @click="showAllActivity = !showAllActivity"
+            class="mt-4 text-sm font-medium text-primary hover:underline focus:outline-hidden focus:underline"
+            x-text="showAllActivity ? 'Show only the latest 3 sessions' : 'Show all ' + current.sessions.length + ' sessions'"></button>
+        </div>
+
+        <!-- Review history -->
+        <div x-show="candidateTab === 'history'">
+          <h3 class="mb-1 text-lg font-medium text-foreground">Review history</h3>
+          <p class="mb-6 text-sm text-muted-foreground-1">How this case reached you, and earlier reviews of this candidate.</p>
+          {% call timeline(groups="historyGroups", description_key="detail") %}{{ event_icon | safe }}{% endcall %}
+        </div>
+
+      </div>
+    </div>
+    <!-- End Tab Content -->
+  </div>
+</template>
+{% endcall %}

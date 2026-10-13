@@ -1,0 +1,529 @@
+<script>
+  document.addEventListener('alpine:init', () => {
+    // Assignment dates, grouped like the Notes editor: Today, Yesterday, Previous 7 days, then by month.
+    const DAY = 864e5;
+    const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const now = new Date();
+    const today = startOfDay(now);
+
+    // Mock data says "minutes ago" for today, otherwise "days ago at a time"; turn that into a real date.
+    const assignedAt = ({ minutes, days, time }) => {
+      if (minutes) return new Date(now.getTime() - minutes * 60e3);
+      const [hm, ampm] = time.split(' ');
+      const [h, m] = hm.split(':').map(Number);
+      const d = new Date(today.getTime() - days * DAY);
+      d.setHours((h % 12) + (ampm === 'PM' ? 12 : 0), m);
+      return d;
+    };
+
+    const bucket = (t) => {
+      if (t >= today) return { label: 'Today', start: today };
+      const yesterday = new Date(today.getTime() - DAY);
+      if (t >= yesterday) return { label: 'Yesterday', start: yesterday };
+      const week = new Date(today.getTime() - 7 * DAY);
+      if (t >= week) return { label: 'Previous 7 days', start: week };
+      const sameYear = t.getFullYear() === now.getFullYear();
+      return {
+        label: t.toLocaleDateString([], { month: 'long', year: sameYear ? undefined : 'numeric' }),
+        start: new Date(t.getFullYear(), t.getMonth(), 1),
+      };
+    };
+
+    // Time on each row. The group heading already says the day for Today and Yesterday,
+    // so those rows show just the time; older rows add the weekday or the date.
+    const clock = (t) => t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+    const shortTime = (t, group) => {
+      if (group === 'Today' || group === 'Yesterday') return clock(t);
+      if (group === 'Previous 7 days') return `${t.toLocaleDateString([], { weekday: 'short' })}, ${clock(t)}`;
+      return `${t.toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${clock(t)}`;
+    };
+
+    const PRIORITY = { Critical: 0, High: 1, Medium: 2, Low: 3, Routine: 4 };
+
+    // Oldest group first (Today at the bottom); within a group, priority first, then oldest.
+    const prepare = (cases) => cases
+      .map((c) => {
+        const at = assignedAt(c.assigned);
+        const g = bucket(at);
+        c.assignedAt = at;
+        c.group = g.label;
+        c.groupStart = g.start;
+        c.assignedShort = shortTime(at, g.label);
+        const time = at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+        c.history[0].time = g.label === 'Today' || g.label === 'Yesterday'
+          ? `${g.label}, ${time}`
+          : `${at.toLocaleDateString([], { day: 'numeric', month: 'short' })}, ${time}`;
+        c.hasIdentityIssue = Boolean(c.identity);
+        if (c.identity && !c.anomalies.some((a) => a.type === 'identity')) {
+          const id = c.identity;
+          c.anomalies.push({
+            type: 'identity',
+            label: 'Identity needs confirming',
+            explanation: 'The check-in photo only partly matched the enrolment photo.',
+            meta: `${id.score}% match`,
+            timing: { type: 'instant', at: id.at, date: id.date, sessions: id.session },
+            media: { state: 'available', items: [{
+              kind: 'identity', label: 'Identity check', time: id.at, date: id.date, session: id.session,
+              src: id.captured, reference: id.reference, score: id.score,
+            }] },
+          });
+        }
+        return c;
+      });
+
+    // Sorts. Day sorts group by day; Priority groups by priority level.
+    const SORTS = {
+      oldest: { label: 'Oldest first', cmp: (a, b) => a.groupStart - b.groupStart || PRIORITY[a.priority] - PRIORITY[b.priority] || a.assignedAt - b.assignedAt },
+      newest: { label: 'Newest first', cmp: (a, b) => b.groupStart - a.groupStart || PRIORITY[a.priority] - PRIORITY[b.priority] || b.assignedAt - a.assignedAt },
+      priority: { label: 'Priority', cmp: (a, b) => PRIORITY[a.priority] - PRIORITY[b.priority] || a.assignedAt - b.assignedAt },
+    };
+
+    // Sort and filters are a per-viewer convenience: remembered in this browser only.
+    const VIEW_KEY = 'tpsentinel-review-queue-view';
+    const DEFAULT_VIEW = { sort: 'oldest', workspace: '', types: [], focus: false };
+    const loadView = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
+        return { sort: saved.sort || 'oldest', workspace: typeof saved.workspace === 'string' ? saved.workspace : '', types: saved.types || [], focus: Boolean(saved.focus) };
+      } catch (e) { return { ...DEFAULT_VIEW, types: [] }; }
+    };
+
+    Alpine.data('reviewQueue', (data) => ({
+      cases: prepare(data.cases),
+      typeLabels: Object.fromEntries([...data.anomaly_types.map((t) => [t.key, t.label]), ['identity', 'Identity needs confirming']]),
+      sorts: SORTS,
+      view: loadView(),
+      selectedId: null,
+      search: '',
+      mobileDetail: false,
+      choice: null,
+      notes: '',
+      filter: 'all',
+      viewer: { items: [], index: 0, startAt: null },
+      allEvidence: { tab: 'moments', page: 0 },
+      openSession: null,
+      showAllActivity: false,
+      candidateTab: 'details',
+      copied: null,
+
+      // The visible list: search + filters, in the chosen sort. J/K and auto-advance follow this order.
+      get filtered() {
+        const q = this.search.trim().toLowerCase();
+        const v = this.view;
+        return this.cases
+          .filter((c) => !q || [c.candidate.name, c.candidate.external_id, c.candidate.email, c.workspace, c.id]
+            .some((x) => x.toLowerCase().includes(q)))
+          .filter((c) => !v.workspace || c.workspace === v.workspace)
+          .filter((c) => !v.types.length || v.types.some((t) => (t === 'identity' ? c.hasIdentityIssue : this.hasType(c, t))))
+          .sort((SORTS[v.sort] || SORTS.oldest).cmp);
+      },
+
+      get activeFilters() {
+        const v = this.view;
+        return [
+          ...(v.workspace ? [{ key: 'w', label: v.workspace, remove: () => { v.workspace = ''; } }] : []),
+          ...v.types.map((t) => ({ key: 't:' + t, label: this.typeLabels[t], remove: () => { v.types = v.types.filter((x) => x !== t); } })),
+        ];
+      },
+
+      get countLabel() {
+        return this.filtered.length === this.cases.length ? String(this.cases.length) : `${this.filtered.length} of ${this.cases.length}`;
+      },
+
+      // Shown beside each section in the filter menu: "All" or "N selected".
+      filterSummary(key) {
+        const n = key === 'workspace' ? (this.view.workspace ? 1 : 0) : this.view.types.length;
+        return n ? `${n} selected` : 'All';
+      },
+
+      setSort(key) {
+        this.view.sort = key;
+      },
+
+      clearFilters() {
+        this.view.workspace = '';
+        this.view.types = [];
+      },
+
+      init() {
+        this.selectedId = this.filtered.length ? this.filtered[0].id : (this.cases[0] || {}).id || null;
+        this.$watch('view', (v) => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } }, { deep: true });
+      },
+
+      get groups() {
+        const groups = [];
+        for (const c of this.filtered) {
+          const label = this.view.sort === 'priority' ? c.priority : c.group;
+          const last = groups[groups.length - 1];
+          if (last && last.label === label) last.cases.push(c);
+          else groups.push({ label, cases: [c] });
+        }
+        return groups;
+      },
+
+      get current() {
+        return this.cases.find((c) => c.id === this.selectedId) || null;
+      },
+
+      get canSubmit() {
+        if (!this.current || this.current.stale || !this.choice) return false;
+        return this.choice === 'clear' || this.notes.trim().length > 0;
+      },
+
+      get submitLabel() {
+        if (this.choice === 'clear') return 'Submit as Clear';
+        if (this.choice === 'flagged') return 'Submit as Flagged';
+        return 'Submit decision';
+      },
+
+      get submitHint() {
+        if (!this.choice) return 'Choose Clear or Flagged first.';
+        if (this.choice === 'flagged' && !this.notes.trim()) return 'Add a note to submit as Flagged.';
+        return '';
+      },
+
+      // Evidence: filter by anomaly type, or show the full session recordings.
+      get evidenceFilters() {
+        if (!this.current) return [];
+        return [
+          { key: 'all', label: 'All' },
+          ...this.current.anomalies.map((a) => ({ key: a.type, label: a.label })),
+        ];
+      },
+
+      get evidenceItems() {
+        const c = this.current;
+        if (!c) return [];
+        return c.anomalies.flatMap((a) =>
+          (a.media.items || []).map((m) => ({ ...m, anomaly: a.label }))
+        );
+      },
+
+      get evidenceGroups() {
+        return this.groupBySession(this.evidenceItems);
+      },
+
+      get pageEvidenceItems() {
+        return this.evidenceItems.slice(0, 4);
+      },
+
+      get hiddenEvidenceCount() {
+        return Math.max(this.evidenceItems.length - 4, 0);
+      },
+
+      // Format timestamp like "02 Mar 2026, 6:39 PM"
+      formatEvidenceTime(m) {
+        if (!m) return '';
+        const time = m.time || m.at || '';
+        let dateStr = m.date || '';
+        if (!dateStr) return time;
+
+        // Ensure 4-digit year (default to 2026)
+        if (!/\b\d{4}\b/.test(dateStr)) {
+          dateStr = `${dateStr} 2026`;
+        }
+
+        const match = dateStr.match(/^(\d{1,2})\s+([A-Za-z]+)(?:\s+(\d{4}))?/);
+        if (match) {
+          const day = match[1].padStart(2, '0');
+          const month = match[2].slice(0, 3);
+          const capMonth = month.charAt(0).toUpperCase() + month.slice(1).toLowerCase();
+          const year = match[3] || '2026';
+          const formattedDate = `${day} ${capMonth} ${year}`;
+          return time ? `${formattedDate}, ${time}` : formattedDate;
+        }
+
+        return time ? `${dateStr}, ${time}` : dateStr;
+      },
+
+      // The page shows the most recent sessions; everything is in "View all evidence".
+      get pageEvidenceGroups() {
+        return this.evidenceGroups.slice(0, 3);
+      },
+
+      get hiddenEvidenceSessions() {
+        return Math.max(this.evidenceGroups.length - 3, 0);
+      },
+
+      groupBySession(items) {
+        const groups = [];
+        for (const m of items) {
+          let g = groups.find((x) => x.session === m.session);
+          if (!g) groups.push(g = { session: m.session, date: m.date, items: [] });
+          g.items.push(m);
+        }
+        const n = (label) => Number(label.split(' ').pop());
+        return groups.sort((a, b) => n(b.session) - n(a.session));
+      },
+
+      // "View all evidence": flagged moments, full recordings and periodic snapshots, a few sessions per page.
+      get allEvidenceGroups() {
+        const c = this.current;
+        if (!c) return [];
+        const t = this.allEvidence.tab;
+        if (t === 'recordings') return this.groupBySession(this.sessionRecordings.flatMap((g) => g.recordings));
+        if (t === 'snapshots') return this.groupBySession(c.snapshots || []);
+        return this.groupBySession(c.anomalies.flatMap((a) => (a.media.items || []).map((m) => ({ ...m, anomaly: a.label }))));
+      },
+
+      get allEvidencePages() {
+        return Math.max(Math.ceil(this.allEvidenceGroups.length / 4), 1);
+      },
+
+      get allEvidencePageGroups() {
+        const p = Math.min(this.allEvidence.page, this.allEvidencePages - 1);
+        return this.allEvidenceGroups.slice(p * 4, p * 4 + 4);
+      },
+
+      openAllEvidence(tab = 'moments') {
+        this.allEvidence = { tab, page: 0 };
+        window.dispatchEvent(new CustomEvent('open-modal-all-evidence'));
+      },
+
+      setAllEvidenceTab(tab) {
+        this.allEvidence = { tab, page: 0 };
+      },
+
+      openFromAll(item) {
+        const items = this.allEvidenceGroups.flatMap((g) => g.items);
+        this.viewer = { items, index: Math.max(items.indexOf(item), 0), startAt: null };
+        window.dispatchEvent(new CustomEvent('open-modal-viewer'));
+      },
+
+      // Full session recordings, one group per session (newest first).
+      get sessionRecordings() {
+        const c = this.current;
+        if (!c) return [];
+        return c.sessions.map((s) => ({
+          session: s,
+          recordings: c.recordings.filter((r) => r.session === s.label && r.state === 'available'),
+        })).filter((g) => g.recordings.length);
+      },
+
+      get viewerItem() {
+        return this.viewer.items[this.viewer.index] || null;
+      },
+
+      get candidateRows() {
+        const c = this.current;
+        if (!c) return [];
+        return [
+          { label: 'Name', value: c.candidate.name },
+          { label: 'Email', value: c.candidate.email },
+          { label: 'Phone', value: c.candidate.phone },
+          { label: 'Candidate ID', value: c.candidate.external_id },
+          { label: 'Workspace', value: c.workspace },
+          { label: 'Review case', value: c.id },
+        ];
+      },
+
+      get activityGroups() {
+        const c = this.current;
+        if (!c) return [];
+        const groups = c.sessions.map((s) => ({ label: `${s.label} · ${s.date}`, events: this.activityFor(s.label) }));
+        return this.showAllActivity ? groups : groups.slice(0, 3);
+      },
+
+      get historyGroups() {
+        return this.current ? [{ label: '', events: this.current.history }] : [];
+      },
+
+      hasType(c, type) {
+        return c.anomalies.some((a) => a.type === type);
+      },
+
+      // Course-aware: one occurrence shows its date and time; several show how many and when.
+      timingText(t) {
+        if (t.type === 'across') return t.range ? `Across ${t.range}` : `${t.count} occurrences`;
+        const dateStr = t.date ? (/\b\d{4}\b/.test(t.date) ? t.date : `${t.date} 2026`) : '';
+        return [dateStr, t.at].filter(Boolean).join(', ');
+      },
+
+      // Totals for the "Evidence collected" card.
+      get evidenceCounts() {
+        const c = this.current;
+        if (!c) return { moments: 0, recordings: 0, snapshots: 0, total: 0 };
+        const moments = c.anomalies.reduce((n, a) => n + (a.media.items || []).length, 0);
+        const recordings = this.sessionRecordings.reduce((n, g) => n + g.recordings.length, 0);
+        const snapshots = (c.snapshots || []).length;
+        return { moments, recordings, snapshots, total: moments + recordings + snapshots };
+      },
+
+      // "Course completed" / "Course in progress" beside the workspace (nothing for a single exam).
+      get courseStatus() {
+        const k = this.current && this.current.course;
+        if (!k || k.kind !== 'course') return '';
+        return k.completed ? 'Course completed' : 'Course in progress';
+      },
+
+      // "14 sessions · 8–27 Sep · Course completed" under the candidate's name.
+      get courseSummary() {
+        const k = this.current && this.current.course;
+        if (!k) return '';
+        const sessions = this.current.sessions.length;
+        const parts = [`${sessions} ${sessions === 1 ? 'session' : 'sessions'}`, k.range];
+        if (k.kind === 'course') parts.push(k.completed ? 'Course completed' : 'Course in progress');
+        return parts.join(' · ');
+      },
+
+      evidenceLabel(a) {
+        const n = (a.media.items || []).length;
+        if (!n) return '';
+        return n === 1 ? '1 item' : `${n} items`;
+      },
+
+      activityFor(session) {
+        return this.current ? this.current.activity.filter((e) => e.session === session) : [];
+      },
+
+      showEvidence(type) {
+        const c = this.current;
+        if (!c) return;
+        const anomaly = c.anomalies.find((a) => a.type === type);
+        const item = anomaly && anomaly.media.items && anomaly.media.items[0];
+        if (item) {
+          this.openViewer(item);
+        } else {
+          this.$nextTick(() => this.$refs.evidence && this.$refs.evidence.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        }
+      },
+
+      select(id) {
+        if (id === this.selectedId) return;
+        this.selectedId = id;
+        this.choice = null;
+        this.notes = '';
+        this.filter = 'all';
+        this.openSession = null;
+        this.showAllActivity = false;
+        if (this.$refs.detail) this.$refs.detail.scrollTop = 0;
+        window.scrollTo({ top: 0 });
+        this.$nextTick(() => {
+          const el = document.getElementById('case-' + id);
+          if (el) el.scrollIntoView({ block: 'nearest' });
+        });
+      },
+
+      // Where the open case sits in the current list, for focus mode.
+      get position() {
+        return { index: this.filtered.findIndex((c) => c.id === this.selectedId) + 1, total: this.filtered.length };
+      },
+
+      step(delta) {
+        const list = this.filtered;
+        const i = list.findIndex((c) => c.id === this.selectedId);
+        const next = list[i + delta];
+        if (next) this.select(next.id);
+      },
+
+      openCase(id) {
+        this.select(id);
+        this.mobileDetail = true;
+        window.scrollTo({ top: 0 });
+      },
+
+      backToList() {
+        this.mobileDetail = false;
+        this.$nextTick(() => {
+          const el = document.getElementById('case-' + this.selectedId);
+          if (el) el.scrollIntoView({ block: 'center' });
+        });
+      },
+
+      submit() {
+        if (!this.canSubmit) return;
+        const entry = this.current;
+        const filteredIndex = this.filtered.indexOf(entry);
+        const snapshot = { entry, index: this.cases.indexOf(entry), choice: this.choice, notes: this.notes };
+
+        this.cases.splice(snapshot.index, 1);
+        window.dispatchEvent(new CustomEvent('toast', {
+          detail: {
+            title: `${entry.candidate.name} submitted as ${snapshot.choice === 'flagged' ? 'Flagged' : 'Clear'}`,
+            actionLabel: 'Undo',
+            actionHandler: () => this.undo(snapshot),
+            duration: 8000,
+          },
+        }));
+
+        // Advance to the case that now sits where the submitted one was.
+        const list = this.filtered.length ? this.filtered : this.cases;
+        const next = list[Math.min(filteredIndex, list.length - 1)] || list[0];
+        this.selectedId = null;
+        if (next) this.select(next.id);
+        if (document.activeElement) document.activeElement.blur();
+      },
+
+      undo({ entry, index, choice, notes }) {
+        if (this.cases.includes(entry)) return;
+        this.cases.splice(Math.min(index, this.cases.length), 0, entry);
+        this.selectedId = null;
+        this.select(entry.id);
+        this.choice = choice;
+        this.notes = notes;
+      },
+
+      refresh() {
+        const c = this.current;
+        if (!c || !c.stale) return;
+        c.sessions.unshift(c.stale.new_session);
+        c.recordings = c.stale.new_recordings.concat(c.recordings);
+        c.stale = null;
+      },
+
+      openViewer(item) {
+        const items = this.evidenceItems;
+        this.viewer = { items, index: Math.max(items.indexOf(item), 0), startAt: null };
+        window.dispatchEvent(new CustomEvent('open-modal-viewer'));
+      },
+
+      openRecording(r) {
+        const items = this.sessionRecordings.flatMap((g) => g.recordings);
+        this.viewer = { items, index: Math.max(items.indexOf(r), 0), startAt: null };
+        window.dispatchEvent(new CustomEvent('open-modal-viewer'));
+      },
+
+      // The full recording that covers a flagged moment: same session, screen for screen clips, webcam otherwise.
+      fullRecordingFor(m) {
+        if (!m || !m.anomaly || m.reference || m.kind === 'recording') return null;
+        const source = m.label.startsWith('Screen') ? 'Screen' : 'Webcam';
+        return this.sessionRecordings
+          .flatMap((g) => g.recordings)
+          .find((r) => r.session === m.session && r.label.startsWith(source)) || null;
+      },
+
+      watchInFull(m) {
+        const r = this.fullRecordingFor(m);
+        if (!r) return;
+        const items = this.sessionRecordings.flatMap((g) => g.recordings);
+        this.viewer = { items, index: items.indexOf(r), startAt: { index: items.indexOf(r), time: m.time } };
+      },
+
+      stepViewer(step) {
+        const i = this.viewer.index + step;
+        if (i >= 0 && i < this.viewer.items.length) this.viewer.index = i;
+      },
+
+      openCandidate(tab) {
+        this.candidateTab = tab;
+        window.dispatchEvent(new CustomEvent('open-modal-candidate'));
+      },
+
+      isMac: /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent),
+
+      // Ctrl+K / ⌘K focuses the queue search (the usual web-app search shortcut).
+      focusSearch(e) {
+        if (e.key.toLowerCase() !== 'k' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return;
+        e.preventDefault();
+        this.mobileDetail = false;
+        this.$nextTick(() => this.$refs.search && this.$refs.search.focus());
+      },
+
+      copy(row) {
+        navigator.clipboard && navigator.clipboard.writeText(row.value);
+        this.copied = row.label;
+        setTimeout(() => { if (this.copied === row.label) this.copied = null; }, 1500);
+      },
+    }));
+  });
+</script>

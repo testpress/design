@@ -1,0 +1,183 @@
+{% from "./icons.html" import icon %}
+{% from "src/ui-system/components/tooltip.html" import tooltip %}
+{% from "src/ui-system/components/dropdown.html" import dropdown %}
+{% from "src/ui-system/components/checkbox.html" import checkbox %}
+{% set rq = tpsentinel_review_queue %}
+{% set icon_btn = "relative size-8 inline-flex justify-center items-center rounded-full text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" %}
+{% set sort_trigger %}<button type="button" class="{{ icon_btn }}" aria-haspopup="menu" :aria-label="'Sort: ' + sorts[view.sort].label" :title="'Sort: ' + sorts[view.sort].label"><svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg></button>{% endset %}
+{% set filter_trigger %}<button type="button" class="{{ icon_btn }}" aria-haspopup="menu" aria-label="Filter cases" title="Filter"><svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg><span x-show="activeFilters.length" x-text="activeFilters.length" class="absolute -top-0.5 -end-0.5 min-w-4 h-4 px-1 inline-flex justify-center items-center rounded-full bg-foreground text-[10px] font-medium text-background"></span></button>{% endset %}
+
+<!-- Queue List -->
+<aside :class="mobileDetail ? (view.focus ? 'hidden' : 'hidden lg:flex') : (view.focus ? 'flex lg:hidden' : 'flex')"
+  class="lg:w-80 xl:w-96 shrink-0 flex-col lg:h-full bg-layer border-b lg:border-b-0 lg:border-e border-layer-line">
+  <div class="p-4 flex flex-col gap-4">
+    <!-- Heading with sort and filter (icons at the end, like a chat list header) -->
+    <div class="flex items-center justify-between gap-x-2">
+      <h1 class="flex items-baseline gap-x-1.5 text-lg font-semibold text-foreground">
+        My Assignments
+        <span class="text-sm font-normal text-muted-foreground" x-text="countLabel" :aria-label="countLabel + ' cases'"></span>
+      </h1>
+      <div class="flex items-center gap-x-0.5">
+        {% call dropdown(trigger=sort_trigger, width="medium", placement="bottom-end") %}
+          <p class="px-2 pt-1 pb-1.5 text-xs font-medium text-muted-foreground-1">Sort by</p>
+          {% for key, label in [["oldest", "Oldest first"], ["newest", "Newest first"], ["priority", "Priority"]] %}
+          <button type="button" role="menuitemradio" :aria-checked="view.sort === '{{ key }}'" @click="open = false; setSort('{{ key }}')"
+            class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus:bg-dropdown-item-focus">
+            {{ label }}
+            <span x-show="view.sort === '{{ key }}'"><svg class="shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+          </button>
+          {% endfor %}
+        {% endcall %}
+
+        {% call dropdown(trigger=filter_trigger, width="w-64", placement="bottom-start") %}
+          <!-- Filter menu: hover (or click) a section to open its options to the right. -->
+          <div x-data="{ sub: null, q: '' }" x-effect="if (!open) { sub = null; q = '' }">
+            <p class="px-2 pt-1 pb-1.5 text-xs font-medium text-muted-foreground-1">Filter by</p>
+
+            <!-- Workspace: one at a time, with search -->
+            <div class="relative" @mouseenter="sub = 'workspace'" @mouseleave="sub = null">
+              <button type="button" @click="sub = sub === 'workspace' ? null : 'workspace'" :aria-expanded="sub === 'workspace'"
+                class="w-full flex items-center justify-between gap-x-3 py-2 px-2 rounded-lg text-[13px] text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus:bg-dropdown-item-focus" :class="sub === 'workspace' ? 'bg-dropdown-item-hover' : ''">
+                <span class="text-foreground">Workspace</span>
+                <span class="flex items-center gap-x-1 min-w-0">
+                  <span class="text-xs text-muted-foreground-1" x-text="filterSummary('workspace')"></span>
+                  <svg class="shrink-0 size-3.5 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </span>
+              </button>
+              <div x-show="sub === 'workspace'" x-cloak class="mt-1 sm:mt-0 sm:absolute sm:start-full sm:-top-1 sm:ps-2 w-full sm:w-74 z-10">
+                <div class="p-2 bg-dropdown border border-dropdown-line rounded-xl shadow-xl">
+                <div class="flex items-center justify-between gap-x-2 px-1 pb-2">
+                  <p class="text-xs font-medium text-muted-foreground-1">Workspace</p>
+                  <button type="button" x-show="view.workspace" @click="view.workspace = ''" class="text-xs font-medium text-primary hover:underline focus:outline-hidden focus:underline">Clear</button>
+                </div>
+                <div class="px-1 pb-2">
+                  <input type="search" x-model="q" aria-label="Search workspaces" placeholder="Search workspaces"
+                    class="py-1.5 px-2.5 block w-full bg-layer border-layer-line rounded-lg text-[13px] text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary">
+                </div>
+                <div class="max-h-64 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb" role="radiogroup" aria-label="Workspace">
+                  {% for w in rq.workspaces %}
+                  <button type="button" role="radio" :aria-checked="view.workspace === {{ w | dump | replace('"', "'") }}"
+                    x-show="!q || '{{ w | lower | replace("'", "") }}'.includes(q.toLowerCase())"
+                    @click="view.workspace = {{ w | dump | replace('"', "'") }}"
+                    class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus:bg-dropdown-item-focus">
+                    <span>{{ w }}</span>
+                    <span x-show="view.workspace === {{ w | dump | replace('"', "'") }}"><svg class="shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                  </button>
+                  {% endfor %}
+                  <p x-show="q && ![{% for w in rq.workspaces %}'{{ w | lower | replace("'", "") }}'{% if not loop.last %}, {% endif %}{% endfor %}].some((w) => w.includes(q.toLowerCase()))"
+                    class="px-2 py-1.5 text-[13px] text-muted-foreground-1">No workspaces match.</p>
+                </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Why it needs review: several at once -->
+            <div class="relative" @mouseenter="sub = 'types'" @mouseleave="sub = null">
+              <button type="button" @click="sub = sub === 'types' ? null : 'types'" :aria-expanded="sub === 'types'"
+                class="w-full flex items-center justify-between gap-x-3 py-2 px-2 rounded-lg text-[13px] text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus:bg-dropdown-item-focus" :class="sub === 'types' ? 'bg-dropdown-item-hover' : ''">
+                <span class="text-foreground">Why it needs review</span>
+                <span class="flex items-center gap-x-1 min-w-0">
+                  <span class="text-xs text-muted-foreground-1" x-text="filterSummary('types')"></span>
+                  <svg class="shrink-0 size-3.5 text-muted-foreground" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </span>
+              </button>
+              <div x-show="sub === 'types'" x-cloak class="mt-1 sm:mt-0 sm:absolute sm:start-full sm:-top-1 sm:ps-2 w-full sm:w-74 z-10">
+                <div class="p-2 bg-dropdown border border-dropdown-line rounded-xl shadow-xl">
+                <div class="flex items-center justify-between gap-x-2 px-1 pb-2">
+                  <p class="text-xs font-medium text-muted-foreground-1">Why it needs review</p>
+                  <button type="button" x-show="view.types.length" @click="view.types = []" class="text-xs font-medium text-primary hover:underline focus:outline-hidden focus:underline">Clear</button>
+                </div>
+                <div class="px-1 pb-1 space-y-2.5">
+                  {% for t in rq.anomaly_types %}
+                  {{ checkbox(name="filter-type", id="filter-type-" ~ t.key, label=t.label, value=t.key, x_model="view.types") }}
+                  {% endfor %}
+                  {{ checkbox(name="filter-type", id="filter-type-identity", label="Identity needs confirming", value="identity", x_model="view.types") }}
+                </div>
+                </div>
+              </div>
+            </div>
+
+            <div x-show="activeFilters.length" class="mt-1 pt-1 border-t border-dropdown-divider">
+              <button type="button" @click="clearFilters()" class="w-full py-2 px-2 rounded-lg text-[13px] text-start font-medium text-primary hover:bg-dropdown-item-hover focus:outline-hidden focus:bg-dropdown-item-focus">Clear all filters</button>
+            </div>
+          </div>
+        {% endcall %}
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div class="relative">
+      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3.5 text-muted-foreground">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+      </div>
+      <input type="search" x-model="search" x-ref="search" aria-label="Search cases" :aria-keyshortcuts="isMac ? 'Meta+K' : 'Control+K'"
+        class="py-2 ps-10 pe-14 block w-full bg-layer border-layer-line rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary"
+        placeholder="Search candidate or workspace">
+      <div x-show="!search" class="absolute inset-y-0 end-0 flex items-center pointer-events-none pe-2.5">
+        <kbd class="min-h-5 inline-flex items-center py-0.5 px-1.5 bg-layer border border-layer-line font-mono text-[11px] text-muted-foreground-1 rounded-md" x-text="isMac ? '⌘K' : 'Ctrl K'"></kbd>
+      </div>
+    </div>
+    <!-- End Search -->
+
+  </div>
+
+  <!-- Case List -->
+  <div class="flex-1 lg:overflow-y-auto px-2 pb-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb" aria-label="Assigned cases">
+    <!-- Grouped by when the case was assigned: oldest first -->
+    <template x-for="(g, gIdx) in groups" :key="g.label">
+      <section>
+        <div class="sticky top-0 z-10 px-3 pt-3.5 pb-1 bg-layer flex items-center justify-between gap-x-2">
+          <h2 class="text-xs font-medium text-muted-foreground" x-text="g.label"></h2>
+        </div>
+        <ul class="space-y-1">
+    <template x-for="c in g.cases" :key="c.id">
+      <li>
+        <div role="button" tabindex="0" :id="'case-' + c.id" @mousedown.prevent @click="openCase(c.id)" @keydown.enter.self.prevent="openCase(c.id)"
+          :aria-current="c.id === selectedId"
+          class="w-full flex gap-x-3 p-3 text-start rounded-lg cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+          :class="c.id === selectedId ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-muted-hover'">
+          <img class="shrink-0 size-10 rounded-full object-cover" :src="c.candidate.photo"
+            :alt="'Enrolment photo of ' + c.candidate.name">
+          <div class="grow min-w-0">
+            <div class="flex items-center justify-between gap-x-2">
+              <span class="truncate text-sm font-medium text-foreground" x-text="c.candidate.name"></span>
+            </div>
+            <p class="truncate text-xs text-muted-foreground-1" x-text="c.workspace"></p>
+
+            <!-- Indicators: one per anomaly type, plus identity and missing evidence -->
+            <div class="mt-1.5 flex items-center gap-x-1">
+              {% for t in rq.anomaly_types %}
+              <template x-if="hasType(c, '{{ t.key }}')">
+                <span @click.stop>
+                  {{ tooltip(content=t.label, width="min-w-max", trigger='<span class="inline-flex justify-center items-center size-5 text-muted-foreground hover:text-muted-foreground-1" aria-label="' ~ t.label ~ '">' ~ icon(t.key, "size-3.5") ~ '</span>') }}
+                </span>
+              </template>
+              {% endfor %}
+              <template x-if="c.identity">
+                <span @click.stop>
+                  {{ tooltip(content="Identity needs confirming", width="min-w-max", trigger='<span class="inline-flex justify-center items-center size-5 text-muted-foreground hover:text-muted-foreground-1" aria-label="Identity needs confirming">' ~ icon("identity", "size-3.5") ~ '</span>') }}
+                </span>
+              </template>
+              <span class="ms-auto text-xs text-muted-foreground" x-text="c.assignedShort"
+                :title="'Assigned ' + c.assignedAt.toLocaleString()"></span>
+            </div>
+          </div>
+        </div>
+      </li>
+    </template>
+        </ul>
+      </section>
+    </template>
+
+    <div x-show="cases.length && !filtered.length" class="p-4 text-sm text-muted-foreground-1">
+      <p>No cases match your search or filters.</p>
+      <div class="mt-2 flex gap-x-3">
+        <button type="button" x-show="search" @click="search = ''" class="font-medium text-primary hover:underline focus:outline-hidden focus:underline">Clear search</button>
+        <button type="button" x-show="activeFilters.length" @click="clearFilters()" class="font-medium text-primary hover:underline focus:outline-hidden focus:underline">Clear filters</button>
+      </div>
+    </div>
+  </div>
+  <!-- End Case List -->
+
+</aside>
+<!-- End Queue List -->

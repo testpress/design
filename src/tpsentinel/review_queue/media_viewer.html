@@ -1,0 +1,66 @@
+{% from "./icons.html" import icon, play %}
+{% from "src/ui-system/components/modal.html" import modal %}
+{% from "src/ui-system/components/button.html" import button %}
+
+<!-- Media Viewer -->
+{% call modal(id="viewer", title="Evidence", size="xl", confirm_text="", show_cancel=false) %}
+<div @keydown.arrow-left.window="open && stepViewer(-1)" @keydown.arrow-right.window="open && stepViewer(1)">
+  <template x-if="viewerItem">
+    <div>
+      <p class="text-sm font-medium text-foreground" x-text="viewerItem.anomaly || viewerItem.label"></p>
+      <p class="text-xs text-muted-foreground-1"
+        x-text="(viewerItem.anomaly ? viewerItem.label + ' · ' : '') + formatEvidenceTime(viewerItem) + (viewerItem.length ? ' · ' + viewerItem.length : '')"></p>
+      <p x-show="viewer.startAt && viewer.startAt.index === viewer.index" class="mt-1 text-xs font-medium text-primary"
+        x-text="viewer.startAt ? 'Starts at ' + viewer.startAt.time + ', the flagged moment' : ''"></p>
+
+      <div class="mt-3">
+        <template x-if="viewerItem.reference">
+          <div class="max-w-xl mx-auto">
+            <div class="grid grid-cols-2 gap-3">
+              <figure>
+                <img class="w-full aspect-square object-cover rounded-lg bg-surface" :src="viewerItem.reference" alt="Enrolment photo">
+                <figcaption class="mt-1.5 text-xs text-muted-foreground-1">Enrolment photo</figcaption>
+              </figure>
+              <figure>
+                <img class="w-full aspect-square object-cover rounded-lg bg-surface" :src="viewerItem.src" alt="Check-in photo">
+                <figcaption class="mt-1.5 text-xs text-muted-foreground-1">Check-in photo</figcaption>
+              </figure>
+            </div>
+            <p class="mt-3 text-sm text-foreground" x-text="'Partial match · ' + viewerItem.score + '% similar'"></p>
+          </div>
+        </template>
+        <template x-if="viewerItem.src && !viewerItem.reference">
+          <div class="relative">
+            <img class="w-full max-h-[60vh] object-contain rounded-lg bg-surface" :src="viewerItem.src"
+              :alt="viewerItem.label + ' at ' + viewerItem.time">
+            <span x-show="viewerItem.length" class="absolute inset-0 flex items-center justify-center">
+              <span class="inline-flex justify-center items-center size-14 rounded-full bg-gray-900/70 text-white">{{ play("size-6") }}</span>
+            </span>
+          </div>
+        </template>
+        <template x-if="!viewerItem.src">
+          <div class="flex flex-col items-center justify-center gap-2 py-16 rounded-lg bg-surface text-surface-foreground">
+            {{ icon("mic", "size-8") }}
+            <span class="text-sm" x-text="'Audio clip · ' + viewerItem.length"></span>
+          </div>
+        </template>
+      </div>
+
+      <template x-if="fullRecordingFor(viewerItem)">
+        <button type="button" @click="watchInFull(viewerItem)"
+          class="mt-3 inline-flex items-center gap-x-1.5 text-sm font-medium text-primary hover:underline focus:outline-hidden focus:underline">
+          <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          Watch in full session
+        </button>
+      </template>
+      <div class="mt-4 flex items-center justify-between gap-x-2">
+        <span class="text-xs text-muted-foreground-1" x-text="(viewer.index + 1) + ' of ' + viewer.items.length + ' · use ← → to browse'"></span>
+        <div class="flex gap-x-2">
+          {{ button(text="Previous", variant="secondary", size="sm", extra_attrs='@click="stepViewer(-1)" :disabled="viewer.index === 0"') }}
+          {{ button(text="Next", variant="secondary", size="sm", extra_attrs='@click="stepViewer(1)" :disabled="viewer.index >= viewer.items.length - 1"') }}
+        </div>
+      </div>
+    </div>
+  </template>
+</div>
+{% endcall %}
