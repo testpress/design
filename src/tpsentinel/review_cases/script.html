@@ -86,7 +86,7 @@
           { value: 'evidence', label: 'Evidence concern', match: c => c.state === 'completed' ? c.concern === 'evidence' : c.indicators.includes('missing_evidence') },
         ] },
       candidate: { label: 'Candidate', title: 'Filter by candidate', icon: 'reviewer', searchable: true, perView: true,
-        values: () => CANDIDATES.map(p => ({ value: p.identifier.toLowerCase(), label: p.name, hint: p.identifier, search: `${p.name} ${p.identifier} ${p.email}`.toLowerCase(), match: c => c.identifier === p.identifier }))
+        values: () => CANDIDATES.map(p => ({ value: p.identifier.toLowerCase(), label: p.name, avatar: p.avatar, search: `${p.name} ${p.identifier} ${p.email}`.toLowerCase(), match: c => c.identifier === p.identifier }))
           .sort((a, b) => a.label.localeCompare(b.label)) },
       workspace: { label: 'Workspace', title: 'Filter by workspace', icon: 'workspace', searchable: true,
         values: () => WORKSPACES.map(w => ({ value: w.id, label: w.name, match: c => c.workspace === w.id })) },
@@ -132,13 +132,14 @@
       const cases = [];
       let n = 2400;
       CANDIDATES = [];
-      const ids = new Set();
+      const ids = new Set(), names = new Set();
       while (CANDIDATES.length < 220) {
         const name = `${pick(FIRST)} ${pick(LAST)}`;
         const identifier = `C-${10000 + Math.floor(rand() * 89999)}`;
-        if (ids.has(identifier)) continue;
-        ids.add(identifier);
-        CANDIDATES.push({ name, identifier, email: `${name.toLowerCase().replace(' ', '.')}${Math.floor(rand() * 90 + 10)}@example.com` });
+        // unique names so the candidate menu can show the name alone
+        if (ids.has(identifier) || names.has(name)) continue;
+        ids.add(identifier); names.add(name);
+        CANDIDATES.push({ name, identifier, email: `${name.toLowerCase().replace(' ', '.')}${Math.floor(rand() * 90 + 10)}@example.com`, avatar: `https://i.pravatar.cc/80?u=${identifier}` });
       }
       const make = (state) => {
         const person = pick(CANDIDATES);
@@ -459,6 +460,7 @@
         reviewerName(id) { return id === ME ? 'you' : REVIEWER_BY_ID[id]?.name; },
         reviewerFullName(id) { return REVIEWER_BY_ID[id]?.name; },
         avatar(id) { return REVIEWER_BY_ID[id]?.avatar; },
+        optionAvatar(key, o) { return key === 'reviewer' ? this.avatar(o.value) : o.avatar; },
         indicatorsFor(c) { return c.indicators.map(k => INDICATOR_BY_KEY[k]); },
         priorityLabel(c) { return PRIORITIES[c.priority]; },
         relative, exact,
