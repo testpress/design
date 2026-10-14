@@ -150,7 +150,8 @@
 
       // Evidence gaps: required evidence that's missing or incomplete
       const gaps = [];
-      if (c.indicators.includes('missing_evidence')) {
+      // An AI flag always has a reason: with no behaviour events, the reason is an evidence gap
+      if (c.indicators.includes('missing_evidence') || (origin === 'ai_flagged' && !events.length)) {
         const s = pick(sessions.slice(-Math.min(3, sessions.length)));
         const source = recordingEnabled ? pick(['screen', 'webcam']) : 'snapshots';
         if (source === 'snapshots') {
@@ -273,7 +274,10 @@
         reviewerFull(id) { return REVIEWER_BY_ID[id]?.name; },
         avatar(id) { return REVIEWER_BY_ID[id]?.avatar; },
         get workspace() { return WORKSPACE_BY_ID[c.workspace].name; },
-        get candidateAvatar() { return `https://i.pravatar.cc/160?u=${c.identifier}`; },
+        initialsOf(name) { return name.split(' ').map(s => s[0]).join('').slice(0, 2); },
+        get identityImage() { return MEDIA.webcam; },
+        // The one ownership action shown at the top, if any
+        get headerAction() { return c.state === 'queued' || (c.state === 'assigned' && this.isAdmin); },
 
         // ---------- result, review requirement, case state: kept separate ----------
         get result() {
@@ -356,7 +360,7 @@
               const e = evs[0];
               timing = `Session ${e.session} · ${dayTime(e.at)}${e.length ? ` · lasted ${dur(e.length)}` : ''}`;
             } else {
-              timing = `Sessions ${sessions.join(', ')} · ${day(evs[0].at)}${day(evs[0].at) !== day(evs[evs.length - 1].at) ? ` – ${day(evs[evs.length - 1].at)}` : ''}${longest ? ` · longest ${dur(longest)}` : ''}`;
+              timing = `${sessions.length === 1 ? 'Session' : 'Sessions'} ${sessions.join(', ')} · ${day(evs[0].at)}${day(evs[0].at) !== day(evs[evs.length - 1].at) ? ` – ${day(evs[evs.length - 1].at)}` : ''}${longest ? ` · longest ${dur(longest)}` : ''}`;
             }
             return { key, label: INDICATOR_BY_KEY[key].label, icon: ic(key, 'size-5'), severity, explanation: EXPLAIN[key], timing, events: evs, artifacts, latest: evs[evs.length - 1].at };
           }).sort((a, b) => rank(a.severity) - rank(b.severity) || b.latest - a.latest);
