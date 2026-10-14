@@ -676,7 +676,8 @@
   
 
 
-<div x-ref="list" class="bg-card border border-card-line rounded-xl scroll-mt-20">
+
+<div x-ref="list" class="bg-card border border-card-line rounded-xl overflow-hidden scroll-mt-20">
 
   <!-- Toolbar: views (or selection actions) on the left, filters and sort on the right -->
   <div class="flex flex-wrap items-center gap-x-4 gap-y-2 min-h-14 py-2 ps-4 pe-2 bg-muted border-b border-card-line rounded-t-xl">
@@ -697,7 +698,45 @@
                   :class="view === v.key ? 'text-foreground font-semibold' : 'text-muted-foreground-1 hover:text-foreground'"
                   class="shrink-0 inline-flex items-center gap-x-1.5 py-1.5 px-2 rounded-lg text-sm whitespace-nowrap focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
             <span x-text="v.label"></span>
-            <span class="font-normal text-muted-foreground-1" x-text="counts[v.key].toLocaleString()"></span>
+            
+
+
+
+
+  
+
+
+
+  
+  
+  
+  
+
+
+
+  
+  
+
+
+
+
+
+
+<span class="inline-flex items-center font-medium text-[11px] py-0.5 px-1.5 gap-x-1 bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-200 rounded-full ">
+
+
+  
+  
+  
+    <span x-text="tabCounts[v.key].toLocaleString()"></span>
+  
+
+  
+
+  
+
+</span>
+
           </button>
         </template>
       </nav>
@@ -870,7 +909,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-9911">
+         aria-describedby="tooltip-3318">
       <span tabindex="0" role="img" :aria-label="stateLabel(c)" :class="stateClass(c)" class="flex rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-html="stateIcon(c)"></span>
     </div>
 
@@ -878,7 +917,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-9911"
+         id="tooltip-3318"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -972,7 +1011,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-6263">
+         aria-describedby="tooltip-2521">
       <button type="button" :aria-label="ind.label" :class="ind.neutral ? 'text-muted-foreground-2' : 'text-muted-foreground-1'" class="inline-flex rounded-sm hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"><span x-html="ind.svg"></span></button>
     </div>
 
@@ -980,7 +1019,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-6263"
+         id="tooltip-2521"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1492,7 +1531,7 @@
   
 
 <!-- Card footer -->
-<div x-show="simulate !== 'error' && filtered.length" class="py-3 px-4 border-t border-card-line">
+<div x-show="simulate !== 'error' && pageCount > 1" class="py-3 px-4 border-t border-card-line">
   
 
 
@@ -2988,7 +3027,8 @@
         icons: Object.fromEntries(Object.keys(ICONS).map(k => [k, icon(k)])),
 
         view: 'mine',
-        queries: Object.assign({ mine: '', unassigned: '', open: '', closed: '' }, stored.queries),
+        // One search shared by all views, so tab counts and switching tabs reflect the same filters
+        query: typeof stored.query === 'string' ? stored.query : '',
         sorts: Object.assign(JSON.parse(JSON.stringify(DEFAULT_SORT)), stored.sorts),
         pages: Object.assign({ mine: 1, unassigned: 1, open: 1, closed: 1 }, stored.pages),
         selected: [],
@@ -3008,12 +3048,9 @@
           const params = new URLSearchParams(location.search);
           const fromUrl = params.get('view');
           this.view = VIEWS.some(v => v.key === fromUrl) ? fromUrl : (stored.view || this.defaultView());
-          // Each view keeps its own query; react only when the active view's query changes
-          this._prevQueries = { ...this.queries };
-          this.$watch('queries', () => {
-            const v = this.view;
-            if (this.queries[v] !== this._prevQueries[v]) { this.pages[v] = 1; this.pruneSelection(); }
-            this._prevQueries = { ...this.queries };
+          this.$watch('query', () => {
+            VIEWS.forEach(v => this.pages[v.key] = 1);
+            this.pruneSelection();
             this.save();
             // Filters can shift the toolbar; keep an open menu under its button
             this.$nextTick(() => this.placeMenu());
@@ -3029,7 +3066,7 @@
         },
         save() {
           try {
-            sessionStorage.setItem(STORE_KEY, JSON.stringify({ role: this.role, view: this.view, queries: this.queries, sorts: this.sorts, pages: this.pages, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } }));
+            sessionStorage.setItem(STORE_KEY, JSON.stringify({ role: this.role, view: this.view, query: this.query, sorts: this.sorts, pages: this.pages, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } }));
           } catch (e) { /* storage unavailable: state just isn't remembered */ }
         },
 
@@ -3042,7 +3079,7 @@
           this.menu = null;
           this.setView(this.defaultView());
           // Reviewers can't filter by reviewer
-          if (!this.isAdmin) Object.keys(this.queries).forEach(v => this.queries[v] = removeQualifier(this.queries[v], 'reviewer'));
+          if (!this.isAdmin) this.query = removeQualifier(this.query, 'reviewer');
         },
         setView(view) {
           this.view = view;
@@ -3055,8 +3092,6 @@
         },
 
         // ---------- query ----------
-        get query() { return this.queries[this.view]; },
-        set query(v) { this.queries[this.view] = v; },
         get parsed() { return parseQuery(this.query); },
         get availableFilters() {
           return VIEW_FILTERS[this.view].filter(k => !QUALIFIERS[k].admin || this.isAdmin);
@@ -3110,20 +3145,28 @@
           return out;
         },
         get viewCases() { return this.pool.filter(c => this.inView(c, this.view)); },
-        get filtered() {
+        // Build a test for one view: filters that don't vary in that view are ignored there
+        matcherFor(view) {
           const { filters, text } = this.parsed;
-          const matchers = Object.entries(filters).map(([key, value]) => {
+          const applies = k => VIEW_FILTERS[view].includes(k) || QUALIFIERS[k].searchOnly;
+          const matchers = Object.entries(filters).filter(([key]) => applies(key)).map(([key, value]) => {
             const wanted = value.split(',');
             const opts = QUALIFIERS[key].values().filter(o => wanted.includes(o.value));
             return c => opts.some(o => o.match(c));
           });
-          const list = this.viewCases.filter(c => {
+          return c => {
             if (!matchers.every(m => m(c))) return false;
             if (!text.length) return true;
             const hay = `${c.name} ${c.identifier} ${c.email} ${WORKSPACE_BY_ID[c.workspace].name} ${c.id}`.toLowerCase();
             return text.every(t => hay.includes(t));
-          });
-          return this.sortCases(list);
+          };
+        },
+        get filtered() { return this.sortCases(this.viewCases.filter(this.matcherFor(this.view))); },
+        // Tab counts follow the current search and filters
+        get tabCounts() {
+          const out = {};
+          VIEWS.forEach(v => { const m = this.matcherFor(v.key); out[v.key] = this.pool.filter(c => this.inView(c, v.key) && m(c)).length; });
+          return out;
         },
         ageTime(c) { return this.view === 'mine' ? c.assignedAt : c.createdAt; },
         sortCases(list) {
