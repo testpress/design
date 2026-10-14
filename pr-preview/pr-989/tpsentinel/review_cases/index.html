@@ -745,6 +745,7 @@
       <div x-show="selected.length" x-cloak class="flex flex-wrap items-center gap-2">
         <span class="text-sm font-medium text-foreground me-1" x-text="`${selected.length} selected`"></span>
 
+        <!-- Review in sequence: claim the unowned ones first if needed. Count = cases that will open -->
         
 
   
@@ -761,13 +762,75 @@
   
 
   
-    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   x-show="selectionKind === 'queued'" @click="assignToMe(selectedCases.map(c => c.id))">
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   x-show="selQueued.length" @click="assignAndReview()" x-text="`Assign & start review (${reviewableCount})`">
   
 
     
     
 
-    Assign to me
+    
+
+    
+
+  
+    </button>
+  
+
+
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   x-show="!selQueued.length && selMine.length" @click="reviewSelected()" x-text="`Review selected (${selMine.length})`">
+  
+
+    
+    
+
+    
+
+    
+
+  
+    </button>
+  
+
+
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:bg-layer-focus"   x-show="selQueued.length" @click="assignToMe(selQueued.map(c => c.id))" x-text="`Assign to me (${selQueued.length})`">
+  
+
+    
+    
+
+    
 
     
 
@@ -796,9 +859,11 @@
           </div>
         </template>
 
-        <!-- Explain why reviewer actions aren't offered -->
-        <span x-show="!isAdmin && selectionKind !== 'queued'" class="text-[13px] text-muted-foreground-1">
-          Only unassigned cases can be assigned to you. Deselect the others to continue.
+        <!-- Cases owned by someone else are left out of review actions; say so -->
+        <span x-show="!isAdmin && selOthers.length && reviewableCount" class="text-[13px] text-muted-foreground-1"
+              x-text="`${selOthers.length} ${selOthers.length === 1 ? 'case is' : 'cases are'} assigned to someone else and left out.`"></span>
+        <span x-show="!isAdmin && selOthers.length && !reviewableCount" class="text-[13px] text-muted-foreground-1">
+          These cases are assigned to other reviewers. You can review your own or unassigned cases.
         </span>
 
         <button type="button" @click="selected = []"
@@ -909,7 +974,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-1106">
+         aria-describedby="tooltip-9187">
       <span tabindex="0" role="img" :aria-label="stateLabel(c)" :class="stateClass(c)" class="flex rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-html="stateIcon(c)"></span>
     </div>
 
@@ -917,7 +982,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-1106"
+         id="tooltip-9187"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1011,7 +1076,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-7073">
+         aria-describedby="tooltip-5547">
       <button type="button" :aria-label="ind.label" :class="ind.neutral ? 'text-muted-foreground-2' : 'text-muted-foreground-1'" class="inline-flex rounded-sm hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"><span x-html="ind.svg"></span></button>
     </div>
 
@@ -1019,7 +1084,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-7073"
+         id="tooltip-5547"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -3254,10 +3319,13 @@
           if (c.state === 'assigned') return 'text-green-600 dark:text-green-500';
           return c.result === 'clear' ? 'text-violet-600 dark:text-violet-400' : 'text-amber-600 dark:text-amber-500';
         },
-        detailHref(c, sequence = this.view, ids = null) {
-          const list = ids || this.filtered.map(x => x.id);
-          const params = new URLSearchParams({ case: c.id, sequence, position: list.indexOf(c.id) + 1, of: list.length });
-          return `/tpsentinel/audit/detail/?${params}`;
+        // A single case: no Previous/Next on the detail page, just that case
+        detailHref(c) {
+          return `/tpsentinel/audit/detail/?${new URLSearchParams({ case: c.id, from: this.view })}`;
+        },
+        // Selected cases, in list order: the detail page steps through only these
+        sequenceHref(ids) {
+          return `/tpsentinel/audit/detail/?${new URLSearchParams({ case: ids[0], sequence: 'selected', cases: ids.join(','), position: 1, of: ids.length, from: this.view })}`;
         },
         openCase(c) {
           // Let people select text in a row without opening it
@@ -3266,8 +3334,7 @@
         },
 
         // ---------- selection ----------
-        // Reviewers only bulk-claim, so they get checkboxes where unowned cases can appear
-        get selectable() { return this.view !== 'closed' && (this.isAdmin || this.view !== 'mine'); },
+        get selectable() { return this.view !== 'closed'; },
         isSelected(id) { return this.selected.includes(id); },
         toggle(id) { this.selected = this.isSelected(id) ? this.selected.filter(x => x !== id) : [...this.selected, id]; },
         get allOnPageSelected() { return this.pageCases.length > 0 && this.pageCases.every(c => this.isSelected(c.id)); },
@@ -3289,17 +3356,17 @@
           // keep current list order: it becomes the review sequence
           return this.filtered.filter(c => this.isSelected(c.id));
         },
-        get selectionKind() {
-          const s = this.selectedCases;
-          if (!s.length) return null;
-          if (s.every(c => c.state === 'queued')) return 'queued';
-          if (s.every(c => c.state === 'assigned' && c.reviewer === ME)) return 'mine';
-          return 'mixed';
-        },
+        // Selected cases split by who owns them (each in list order)
+        get selMine() { return this.selectedCases.filter(c => c.state === 'assigned' && c.reviewer === ME); },
+        get selQueued() { return this.selectedCases.filter(c => c.state === 'queued'); },
+        get selOthers() { return this.selectedCases.filter(c => c.state === 'assigned' && c.reviewer !== ME); },
+        // How many cases a review would open: yours plus the unowned ones you'd claim
+        get reviewableCount() { return this.selMine.length + this.selQueued.length; },
         get selectedAssignedCount() { return this.selectedCases.filter(c => c.state === 'assigned').length; },
 
         // ---------- actions ----------
-        assignToMe(ids) {
+        // Claim cases; anything someone else took first is reported, not overwritten
+        claim(ids) {
           const done = [], lost = [];
           ids.forEach(id => {
             const c = this.cases.find(x => x.id === id);
@@ -3313,6 +3380,13 @@
               done.push(c);
             }
           });
+          return { done, lost };
+        },
+        lostNote(lost) {
+          return `${lost.map(c => c.name).join(', ')} ${lost.length === 1 ? 'was' : 'were'} already taken by ${this.reviewerFullName(lost[0].reviewer)}, so nothing changed there.`;
+        },
+        assignToMe(ids) {
+          const { done, lost } = this.claim(ids);
           this.selected = this.selected.filter(id => !ids.includes(id));
           const lostNote = lost.length ? `${lost.map(c => c.name).join(', ')} ${lost.length === 1 ? 'was' : 'were'} already taken by ${this.reviewerFullName(lost[0].reviewer)}, so nothing changed there.` : '';
           if (lost.length) {
@@ -3321,8 +3395,29 @@
           }
           const title = done.length === 1 ? 'Assigned to you' : `${done.length} cases assigned to you`;
           const desc = done.length === 1 ? `${done[0].name} \u00b7 ${this.workspaceName(done[0])}` : 'They\u2019re now in My assignments.';
-          const action = done.length === 1 ? { label: 'Review now', href: this.detailHref(done[0], 'mine', this.pool.filter(c => this.inView(c, 'mine')).map(c => c.id)) } : null;
+          const action = done.length === 1 ? { label: 'Review now', href: this.detailHref(done[0]) } : null;
           this.notify(title, desc, 'success', action);
+        },
+        // Review your selected cases one after another, in list order
+        reviewSelected() {
+          const ids = this.selMine.map(c => c.id);
+          if (ids.length) location.href = this.sequenceHref(ids);
+        },
+        // Claim the unowned selected cases, then review them together with your own
+        assignAndReview() {
+          const order = [...this.selMine, ...this.selQueued].map(c => c.id);
+          const ordered = this.selectedCases.map(c => c.id).filter(id => order.includes(id));
+          const { lost } = this.claim(this.selQueued.map(c => c.id));
+          const lostIds = lost.map(c => c.id);
+          const seq = ordered.filter(id => !lostIds.includes(id));
+          if (!lost.length) { location.href = this.sequenceHref(seq); return; }
+          // Someone took a case first: say so, and let the reviewer start with what they got
+          this.selected = this.selected.filter(id => seq.includes(id));
+          this.notify(
+            seq.length ? `${seq.length} of ${ordered.length} cases ready to review` : 'No cases to review',
+            this.lostNote(lost), 'warning',
+            seq.length ? { label: `Start review (${seq.length})`, href: this.sequenceHref(seq) } : null
+          );
         },
         assignTo(ids, reviewerId) {
           this.menu = null;

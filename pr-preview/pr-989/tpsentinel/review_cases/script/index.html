@@ -483,10 +483,13 @@
           if (c.state === 'assigned') return 'text-green-600 dark:text-green-500';
           return c.result === 'clear' ? 'text-violet-600 dark:text-violet-400' : 'text-amber-600 dark:text-amber-500';
         },
-        detailHref(c, sequence = this.view, ids = null) {
-          const list = ids || this.filtered.map(x => x.id);
-          const params = new URLSearchParams({ case: c.id, sequence, position: list.indexOf(c.id) + 1, of: list.length });
-          return `/tpsentinel/audit/detail/?${params}`;
+        // A single case: no Previous/Next on the detail page, just that case
+        detailHref(c) {
+          return `/tpsentinel/audit/detail/?${new URLSearchParams({ case: c.id, from: this.view })}`;
+        },
+        // Selected cases, in list order: the detail page steps through only these
+        sequenceHref(ids) {
+          return `/tpsentinel/audit/detail/?${new URLSearchParams({ case: ids[0], sequence: 'selected', cases: ids.join(','), position: 1, of: ids.length, from: this.view })}`;
         },
         openCase(c) {
           // Let people select text in a row without opening it
@@ -495,8 +498,7 @@
         },
 
         // ---------- selection ----------
-        // Reviewers only bulk-claim, so they get checkboxes where unowned cases can appear
-        get selectable() { return this.view !== 'closed' && (this.isAdmin || this.view !== 'mine'); },
+        get selectable() { return this.view !== 'closed'; },
         isSelected(id) { return this.selected.includes(id); },
         toggle(id) { this.selected = this.isSelected(id) ? this.selected.filter(x => x !== id) : [...this.selected, id]; },
         get allOnPageSelected() { return this.pageCases.length > 0 && this.pageCases.every(c => this.isSelected(c.id)); },
@@ -518,17 +520,17 @@
           // keep current list order: it becomes the review sequence
           return this.filtered.filter(c => this.isSelected(c.id));
         },
-        get selectionKind() {
-          const s = this.selectedCases;
-          if (!s.length) return null;
-          if (s.every(c => c.state === 'queued')) return 'queued';
-          if (s.every(c => c.state === 'assigned' && c.reviewer === ME)) return 'mine';
-          return 'mixed';
-        },
+        // Selected cases split by who owns them (each in list order)
+        get selMine() { return this.selectedCases.filter(c => c.state === 'assigned' && c.reviewer === ME); },
+        get selQueued() { return this.selectedCases.filter(c => c.state === 'queued'); },
+        get selOthers() { return this.selectedCases.filter(c => c.state === 'assigned' && c.reviewer !== ME); },
+        // How many cases a review would open: yours plus the unowned ones you'd claim
+        get reviewableCount() { return this.selMine.length + this.selQueued.length; },
         get selectedAssignedCount() { return this.selectedCases.filter(c => c.state === 'assigned').length; },
 
         // ---------- actions ----------
-        assignToMe(ids) {
+        // Claim cases; anything someone else took first is reported, not overwritten
+        claim(ids) {
           const done = [], lost = [];
           ids.forEach(id => {
             const c = this.cases.find(x => x.id === id);
@@ -542,6 +544,13 @@
               done.push(c);
             }
           });
+          return { done, lost };
+        },
+        lostNote(lost) {
+          return `${lost.map(c => c.name).join(', ')} ${lost.length === 1 ? 'was' : 'were'} already taken by ${this.reviewerFullName(lost[0].reviewer)}, so nothing changed there.`;
+        },
+        assignToMe(ids) {
+          const { done, lost } = this.claim(ids);
           this.selected = this.selected.filter(id => !ids.includes(id));
           const lostNote = lost.length ? `${lost.map(c => c.name).join(', ')} ${lost.length === 1 ? 'was' : 'were'} already taken by ${this.reviewerFullName(lost[0].reviewer)}, so nothing changed there.` : '';
           if (lost.length) {
@@ -550,8 +559,29 @@
           }
           const title = done.length === 1 ? 'Assigned to you' : `${done.length} cases assigned to you`;
           const desc = done.length === 1 ? `${done[0].name} \u00b7 ${this.workspaceName(done[0])}` : 'They\u2019re now in My assignments.';
-          const action = done.length === 1 ? { label: 'Review now', href: this.detailHref(done[0], 'mine', this.pool.filter(c => this.inView(c, 'mine')).map(c => c.id)) } : null;
+          const action = done.length === 1 ? { label: 'Review now', href: this.detailHref(done[0]) } : null;
           this.notify(title, desc, 'success', action);
+        },
+        // Review your selected cases one after another, in list order
+        reviewSelected() {
+          const ids = this.selMine.map(c => c.id);
+          if (ids.length) location.href = this.sequenceHref(ids);
+        },
+        // Claim the unowned selected cases, then review them together with your own
+        assignAndReview() {
+          const order = [...this.selMine, ...this.selQueued].map(c => c.id);
+          const ordered = this.selectedCases.map(c => c.id).filter(id => order.includes(id));
+          const { lost } = this.claim(this.selQueued.map(c => c.id));
+          const lostIds = lost.map(c => c.id);
+          const seq = ordered.filter(id => !lostIds.includes(id));
+          if (!lost.length) { location.href = this.sequenceHref(seq); return; }
+          // Someone took a case first: say so, and let the reviewer start with what they got
+          this.selected = this.selected.filter(id => seq.includes(id));
+          this.notify(
+            seq.length ? `${seq.length} of ${ordered.length} cases ready to review` : 'No cases to review',
+            this.lostNote(lost), 'warning',
+            seq.length ? { label: `Start review (${seq.length})`, href: this.sequenceHref(seq) } : null
+          );
         },
         assignTo(ids, reviewerId) {
           this.menu = null;

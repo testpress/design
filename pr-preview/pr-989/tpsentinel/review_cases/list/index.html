@@ -70,6 +70,7 @@
       <div x-show="selected.length" x-cloak class="flex flex-wrap items-center gap-2">
         <span class="text-sm font-medium text-foreground me-1" x-text="`${selected.length} selected`"></span>
 
+        <!-- Review in sequence: claim the unowned ones first if needed. Count = cases that will open -->
         
 
   
@@ -86,13 +87,75 @@
   
 
   
-    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   x-show="selectionKind === 'queued'" @click="assignToMe(selectedCases.map(c => c.id))">
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   x-show="selQueued.length" @click="assignAndReview()" x-text="`Assign & start review (${reviewableCount})`">
   
 
     
     
 
-    Assign to me
+    
+
+    
+
+  
+    </button>
+  
+
+
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   x-show="!selQueued.length && selMine.length" @click="reviewSelected()" x-text="`Review selected (${selMine.length})`">
+  
+
+    
+    
+
+    
+
+    
+
+  
+    </button>
+  
+
+
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:bg-layer-focus"   x-show="selQueued.length" @click="assignToMe(selQueued.map(c => c.id))" x-text="`Assign to me (${selQueued.length})`">
+  
+
+    
+    
+
+    
 
     
 
@@ -121,9 +184,11 @@
           </div>
         </template>
 
-        <!-- Explain why reviewer actions aren't offered -->
-        <span x-show="!isAdmin && selectionKind !== 'queued'" class="text-[13px] text-muted-foreground-1">
-          Only unassigned cases can be assigned to you. Deselect the others to continue.
+        <!-- Cases owned by someone else are left out of review actions; say so -->
+        <span x-show="!isAdmin && selOthers.length && reviewableCount" class="text-[13px] text-muted-foreground-1"
+              x-text="`${selOthers.length} ${selOthers.length === 1 ? 'case is' : 'cases are'} assigned to someone else and left out.`"></span>
+        <span x-show="!isAdmin && selOthers.length && !reviewableCount" class="text-[13px] text-muted-foreground-1">
+          These cases are assigned to other reviewers. You can review your own or unassigned cases.
         </span>
 
         <button type="button" @click="selected = []"
@@ -234,7 +299,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-2108">
+         aria-describedby="tooltip-7491">
       <span tabindex="0" role="img" :aria-label="stateLabel(c)" :class="stateClass(c)" class="flex rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-html="stateIcon(c)"></span>
     </div>
 
@@ -242,7 +307,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-2108"
+         id="tooltip-7491"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -336,7 +401,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-7083">
+         aria-describedby="tooltip-1315">
       <button type="button" :aria-label="ind.label" :class="ind.neutral ? 'text-muted-foreground-2' : 'text-muted-foreground-1'" class="inline-flex rounded-sm hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"><span x-html="ind.svg"></span></button>
     </div>
 
@@ -344,7 +409,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-7083"
+         id="tooltip-1315"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
