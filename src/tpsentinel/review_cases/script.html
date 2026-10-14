@@ -114,7 +114,9 @@
       { key: 'open', label: 'All open' },
       { key: 'closed', label: 'Closed' },
     ];
-    const DEFAULT_SORT = { mine: { by: 'priority', reverse: false }, unassigned: { by: 'priority', reverse: false }, open: { by: 'priority', reverse: false }, closed: { by: 'completed', reverse: false } };
+    // Until someone picks a sort, open views go by priority and Closed by most recent decision
+    const defaultSort = view => view === 'closed' ? { by: 'time', order: 'newest' } : { by: 'priority', order: 'highest' };
+    const ORDERS = { priority: [['highest', 'Highest first'], ['lowest', 'Lowest first']], time: [['oldest', 'Oldest first'], ['newest', 'Newest first']] };
     const PER_PAGE = 10;
     const STORE_KEY = 'tpsentinel.reviewCases';
 
@@ -266,7 +268,8 @@
         view: 'mine',
         // One search shared by all views, so tab counts and switching tabs reflect the same filters
         query: typeof stored.query === 'string' ? stored.query : '',
-        sorts: Object.assign(JSON.parse(JSON.stringify(DEFAULT_SORT)), stored.sorts),
+        // One sort shared by all views once chosen; null means each view's default
+        sortChoice: stored.sortChoice && ORDERS[stored.sortChoice.by] ? stored.sortChoice : null,
         pages: Object.assign({ mine: 1, unassigned: 1, open: 1, closed: 1 }, stored.pages),
         selected: [],
 
@@ -292,7 +295,7 @@
             // Filters can shift the toolbar; keep an open menu under its button
             this.$nextTick(() => this.placeMenu());
           });
-          this.$watch('sorts', () => this.save(), { deep: true });
+          this.$watch('sortChoice', () => { VIEWS.forEach(v => this.pages[v.key] = 1); this.save(); });
           // Keep the sidebar's Review entry in step with the role switch and counts
           if (window.Alpine) Alpine.effect(() => {
             const detail = { role: this.role, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } };
@@ -303,7 +306,7 @@
         },
         save() {
           try {
-            sessionStorage.setItem(STORE_KEY, JSON.stringify({ role: this.role, view: this.view, query: this.query, sorts: this.sorts, pages: this.pages, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } }));
+            sessionStorage.setItem(STORE_KEY, JSON.stringify({ role: this.role, view: this.view, query: this.query, sortChoice: this.sortChoice, pages: this.pages, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } }));
           } catch (e) { /* storage unavailable: state just isn't remembered */ }
         },
 
@@ -366,7 +369,6 @@
           const { filters } = this.parsed;
           this.query = Object.entries(filters).map(([k, v]) => `${k}:${v}`).join(' ');
         },
-        clearAll() { this.query = ''; this.sorts[this.view] = { ...DEFAULT_SORT[this.view] }; },
 
         // ---------- data ----------
         get pool() { return this.simulate === 'empty' ? [] : this.cases; },
@@ -405,36 +407,36 @@
           VIEWS.forEach(v => { const m = this.matcherFor(v.key); out[v.key] = this.pool.filter(c => this.inView(c, v.key) && m(c)).length; });
           return out;
         },
-        ageTime(c) { return this.view === 'mine' ? c.assignedAt : c.createdAt; },
+        // Each view's own clock: how long it's been mine, how old the case is, or when it was decided
+        timeOf(c) { return this.view === 'mine' ? c.assignedAt : this.view === 'closed' ? c.completedAt : c.createdAt; },
         sortCases(list) {
-          const { by, reverse } = this.sorts[this.view];
-          const dir = reverse ? -1 : 1;
+          const { by, order } = this.sort;
+          const byTime = (a, b) => this.timeOf(a) - this.timeOf(b);
           return [...list].sort((a, b) => {
-            if (by === 'priority') return dir * (a.priority - b.priority) || this.ageTime(a) - this.ageTime(b);
-            if (by === 'age') return dir * (this.ageTime(a) - this.ageTime(b));
-            return dir * (b.completedAt - a.completedAt);
+            if (by === 'priority') {
+              const p = order === 'highest' ? a.priority - b.priority : b.priority - a.priority;
+              // ties: longest waiting first in open views, latest decision first in Closed
+              return p || (this.view === 'closed' ? -byTime(a, b) : byTime(a, b));
+            }
+            return order === 'oldest' ? byTime(a, b) : -byTime(a, b);
           });
         },
 
         // ---------- sorting ----------
+        get sort() { return this.sortChoice || defaultSort(this.view); },
         get sortOptions() {
-          if (this.view === 'closed') return [{ by: 'completed', label: 'Completed' }, { by: 'priority', label: 'Priority' }];
-          return [{ by: 'priority', label: 'Priority' }, { by: 'age', label: this.view === 'mine' ? 'Assigned for' : 'Case age' }];
+          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed' : 'Case age' };
+          const priority = { by: 'priority', label: 'Priority' };
+          return this.view === 'closed' ? [time, priority] : [priority, time];
         },
-        orderLabels(by) {
-          if (by === 'priority') return ['Highest first', 'Lowest first'];
-          if (by === 'age') return ['Oldest first', 'Newest first'];
-          return ['Newest first', 'Oldest first'];
+        orderOptions(by) { return ORDERS[by]; },
+        get sortLabel() { return this.sortOptions.find(o => o.by === this.sort.by).label; },
+        get sortIcon() { return ['highest', 'newest'].includes(this.sort.order) ? this.icons.sort_down : this.icons.sort_up; },
+        setSort(by) {
+          if (by === this.sort.by) return;
+          this.sortChoice = { by, order: ORDERS[by][0][0] };
         },
-        get sort() { return this.sorts[this.view]; },
-        get sortLabel() { return this.sortOptions.find(o => o.by === this.sort.by)?.label || 'Sort'; },
-        get sortSummary() {
-          const order = this.orderLabels(this.sort.by)[this.sort.reverse ? 1 : 0].toLowerCase();
-          const tie = this.sort.by === 'priority' ? `, then oldest ${this.view === 'mine' ? 'assignment' : 'case'}` : '';
-          return `${this.sortLabel}, ${order}${tie}`;
-        },
-        setSort(by) { this.sorts[this.view] = { by, reverse: this.sort.by === by ? this.sort.reverse : false }; this.pages[this.view] = 1; },
-        setOrder(reverse) { this.sorts[this.view] = { ...this.sort, reverse }; this.pages[this.view] = 1; },
+        setOrder(order) { this.sortChoice = { by: this.sort.by, order }; },
 
         // ---------- pagination ----------
         get page() { return Math.min(this.pages[this.view], this.pageCount); },
