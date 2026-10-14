@@ -85,7 +85,8 @@
           { value: 'behaviour', label: 'Behaviour concern', match: c => c.state === 'completed' ? c.concern === 'behaviour' : c.indicators.some(k => BEHAVIOUR_KEYS.includes(k)) },
           { value: 'evidence', label: 'Evidence concern', match: c => c.state === 'completed' ? c.concern === 'evidence' : c.indicators.includes('missing_evidence') },
         ] },
-      candidate: { label: 'Candidate', title: 'Filter by candidate', icon: 'reviewer', searchable: true, perView: true,
+      // Candidate is search-only: finding a person is what the search box does
+      candidate: { label: 'Candidate', title: 'Filter by candidate', icon: 'reviewer', searchable: true, perView: true, searchOnly: true,
         values: () => CANDIDATES.map(p => ({ value: p.identifier.toLowerCase(), label: p.name, avatar: p.avatar, search: `${p.name} ${p.identifier} ${p.email}`.toLowerCase(), match: c => c.identifier === p.identifier }))
           .sort((a, b) => a.label.localeCompare(b.label)) },
       workspace: { label: 'Workspace', title: 'Filter by workspace', icon: 'workspace', searchable: true,
@@ -102,10 +103,10 @@
     };
     // Which filters can vary in each view
     const VIEW_FILTERS = {
-      mine: ['candidate', 'priority', 'concern', 'workspace'],
-      unassigned: ['candidate', 'priority', 'concern', 'workspace'],
-      open: ['candidate', 'priority', 'concern', 'workspace', 'reviewer'],
-      closed: ['candidate', 'result', 'concern', 'workspace', 'reviewer'],
+      mine: ['priority', 'concern', 'workspace'],
+      unassigned: ['priority', 'concern', 'workspace'],
+      open: ['priority', 'concern', 'workspace', 'reviewer'],
+      closed: ['result', 'concern', 'workspace', 'reviewer'],
     };
 
     const VIEWS = [
@@ -342,6 +343,20 @@
         get hasSearchText() { return this.parsed.text.length > 0; },
         get isFiltered() { return this.query.trim() !== ''; },
         filterValue(key) { return this.parsed.filters[key] || ''; },
+        // Grey summary in the compact Filters menu: All / the value / N selected
+        filterSummary(key) {
+          const on = this.filterValues(key);
+          if (!on.length) return 'All';
+          if (on.length > 1) return `${on.length} selected`;
+          return QUALIFIERS[key].values().find(o => o.value === on[0])?.label || on[0];
+        },
+        get toolbarFilterCount() { return this.availableFilters.filter(k => this.filterValue(k)).length; },
+        // From the compact Filters menu, open one filter's menu under the same button
+        openFilterFromMenu(key) {
+          const btn = this.$refs.filtersBtn;
+          this.menu = null;
+          this.$nextTick(() => this.openMenu('filter', { currentTarget: btn }, { key, searchable: !!QUALIFIERS[key].searchable, width: QUALIFIERS[key].searchable ? 300 : 240 }));
+        },
         // Multi-select filters are written as key:a,b (GitHub style)
         filterValues(key) { return this.filterValue(key).split(',').filter(Boolean); },
         isFilterOn(key, value) { return this.filterValues(key).includes(value); },
@@ -698,7 +713,7 @@
         // ---------- search suggestions (GitHub-style qualifier dropdown) ----------
         get searchKeys() {
           // Same order as the toolbar, then search-only qualifiers
-          return [...VIEW_FILTERS[this.view], ...Object.keys(QUALIFIERS).filter(k => QUALIFIERS[k].searchOnly)]
+          return ['candidate', ...VIEW_FILTERS[this.view], ...Object.keys(QUALIFIERS).filter(k => QUALIFIERS[k].searchOnly && k !== 'candidate')]
             .filter(k => !QUALIFIERS[k].admin || this.isAdmin);
         },
         currentToken() {
