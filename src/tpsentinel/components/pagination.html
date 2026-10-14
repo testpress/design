@@ -1,0 +1,73 @@
+{# TPSentinel copy of src/ui-system/components/pagination.html: same markup, Preline theme tokens for neutral and primary colours; accent colours stay Tailwind palette, as in Preline. #}
+{#
+  Static:  pagination(items=[1, 2, 3, '...', 10], current=1)
+  Alpine:  pagination(x_items="pageItems", x_current="page", x_last="pageCount", x_go="goPage")
+           Pass the names of Alpine properties/methods in scope. x_items is an array of page
+           numbers and '...' (or '…') gaps; x_go(n) is called with the page to show.
+#}
+{% macro pagination(items=[1, 2, 3, '...', 10], current=1, show_go_to=true, results_count="", results_x_show="", x_items="", x_current="", x_last="", x_go="") %}
+{% set btn = "min-h-9 min-w-9 flex justify-center items-center border border-layer-line py-2 px-3 text-sm first:rounded-s-lg last:rounded-e-lg focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none" %}
+{% set btn_idle = "text-foreground hover:bg-layer-hover focus:bg-layer-focus" %}
+{% set btn_current = "bg-layer-hover text-foreground" %}
+{% set arrow = "min-h-9 min-w-9 py-2 px-2.5 inline-flex justify-center items-center gap-x-1.5 text-sm first:rounded-s-lg last:rounded-e-lg border border-layer-line text-foreground hover:bg-layer-hover focus:outline-hidden focus:bg-layer-focus disabled:opacity-50 disabled:pointer-events-none" %}
+<div class="flex justify-between items-center gap-3">
+
+  <!-- Left Side: Results Count & Go To Page Input -->
+  <div class="flex items-center gap-x-4">
+    {% if results_count %}
+      <p class="text-sm text-muted-foreground-2" {% if results_x_show %}x-show="{{ results_x_show }}"{% endif %}>
+        <span class="font-medium text-foreground">{{ results_count }}</span>
+        results
+      </p>
+    {% endif %}
+
+    {% if show_go_to %}
+      <input type="number" placeholder="Go to" class="min-h-9 py-1.5 px-2 block w-14 bg-layer border border-layer-line rounded-lg text-sm text-center text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:pointer-events-none" style="-moz-appearance: textfield;"
+             {% if x_go %}min="1" :max="{{ x_last }}" aria-label="Go to page" @keydown.enter.prevent="if ($el.value) {{ x_go }}(Math.min(Math.max(1, Math.round(Number($el.value))), {{ x_last }})); $el.value = ''"{% endif %}>
+    {% endif %}
+  </div>
+
+  <!-- Right Side: Pagination Pages -->
+  <nav class="flex items-center -space-x-px" aria-label="Pagination">
+    <button type="button" class="{{ arrow }}" aria-label="Previous"
+            {% if x_go %}@click="{{ x_go }}({{ x_current }} - 1)" :disabled="{{ x_current }} <= 1"{% endif %}>
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      <span class="sr-only">Previous</span>
+    </button>
+
+    {% if x_items %}
+      {# One element per item so first:/last: rounding stays on the arrows #}
+      <template x-for="(item, i) in {{ x_items }}" :key="i + '-' + item">
+        <button type="button"
+                :disabled="item === '...' || item === '…'"
+                @click="{{ x_go }}(item)"
+                :class="(item === '...' || item === '…') ? 'border-x-0 text-muted-foreground !opacity-100' : (item === {{ x_current }} ? '{{ btn_current }}' : '{{ btn_idle }}')"
+                :aria-current="item === {{ x_current }} ? 'page' : null"
+                class="{{ btn }}"
+                x-text="(item === '...' || item === '…') ? '•••' : item"></button>
+      </template>
+    {% else %}
+    {% for item in items %}
+      {% if item == '...' %}
+        <div class="inline-block border-y border-layer-line">
+          <span class="min-h-9 min-w-9 flex justify-center items-center text-muted-foreground px-2 text-sm">•••</span>
+        </div>
+      {% else %}
+        {% if item == current %}
+          <button type="button" class="{{ btn }} {{ btn_current }}" aria-current="page">{{ item }}</button>
+        {% else %}
+          <button type="button" class="{{ btn }} {{ btn_idle }}">{{ item }}</button>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+    {% endif %}
+
+    <button type="button" class="{{ arrow }}" aria-label="Next"
+            {% if x_go %}@click="{{ x_go }}({{ x_current }} + 1)" :disabled="{{ x_current }} >= {{ x_last }}"{% endif %}>
+      <span class="sr-only">Next</span>
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </nav>
+
+</div>
+{% endmacro %}
