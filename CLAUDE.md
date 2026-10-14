@@ -19,7 +19,7 @@ A PRD, UX doc, mock, screenshot or a description of a screen. Build the UI it de
 | Testpress staff | `src/testpress/<feature>/` | `layouts/staff_base.html` | root `css/tailwind.css` (v3.4) |
 | Testpress student | `src/testpress/<feature>/` | `layouts/student_base.html` or `src/testpress/layout/student_layout.html` | root `css/tailwind.css` (v3.4) |
 | TPStreams | `src/tpstreams/<feature>/` | `layouts/tpstreams/sidebar_layout.html` or `top_searchbar_layout.html` | root `css/tailwind.css` (v3.4) |
-| TPSentinel | `src/tpsentinel/<feature>/` | `src/tpsentinel/layout/index.html` | root `css/tailwind.css` (v3.4) |
+| TPSentinel | `src/tpsentinel/<feature>/` | `src/tpsentinel/layout/index.html` | `css/sentinel-backend.css` (v4 + Preline default theme tokens), built from `src/tpsentinel/backend.css` |
 | Limeread | `src/limeread/<feature>/` | `src/limeread/layouts/admin_base.html` or `member_base.html` | `css/limeread.css` (v4) |
 | Simba | `src/simba/<feature>/` | `src/simba/base.html` | `css/simba.css` (v4) + root `css/tailwind.css` |
 | Odinhire | `src/odinhire/<feature>/` | `src/odinhire/base.html` | `css/odinhire.css` (v4) |
@@ -27,11 +27,16 @@ A PRD, UX doc, mock, screenshot or a description of a screen. Build the UI it de
 
 Pages on the root `css/tailwind.css` only get Tailwind v3.4 classes; v4-only classes such as `shadow-2xs` and `outline-hidden` do nothing there.
 
+Products with their own CSS build (v4) only get classes from the files listed with `@source` in their entry CSS (for TPSentinel, `src/tpsentinel/backend.css`). Add every new page folder there, rebuild (`npm run build:css --prefix src/<product>`) and commit the rebuilt `css/<product>*.css`: the site build copies `css/` before it rebuilds, so PR previews use the committed file.
+
+On products that use the Preline theme (TPSentinel), use theme tokens (`bg-layer`, `border-layer-line`, `text-foreground`, `text-muted-foreground-1`, `bg-card`, `text-primary` …) for neutral and primary colours. Accent colours with no token (status icons, soft badges) use Tailwind palette classes with a `dark:` variant, as Preline's own components do. Don't invent custom tokens.
+
 ## Components
 
 Take each piece of UI from the first source that has it:
 
-1. **`src/ui-system/components/`** — read the macro's parameters and use it. If it's here, don't look further.
-2. **Preline MCP** — only when `ui-system` doesn't have the component. Take the closest Preline component, match it to the `ui-system` styling, add it to `src/ui-system/components/` as a macro (with a preview include in `src/ui-system/preview/includes/`), then use it.
+1. **The product's own `components/` folder** (for example `src/tpsentinel/components/`), if the product has one. These are the product's versions of ui-system macros, styled for its CSS (TPSentinel's use Preline theme tokens). Read the macro's parameters and use it. When the product has this folder and the component isn't in it, port the `ui-system` macro (or the Preline component from step 3) into the product's `components/` folder in the product's styling, add the folder's file to the product's `@source` list if needed, and use it from there. Never import a `ui-system` macro directly into such a product's pages.
+2. **`src/ui-system/components/`** — for products without their own `components/` folder: read the macro's parameters and use it. If it's here, don't look further.
+3. **Preline MCP** — only when `ui-system` doesn't have the component. Take the closest Preline component, match it to the `ui-system` styling, add it to `src/ui-system/components/` as a macro (with a preview include in `src/ui-system/preview/includes/`), then use it.
    If the `preline` MCP tools aren't available, tell the user once: "The Preline MCP isn't configured. Add `export PRELINE_TOKEN=<your token>` to your shell profile and restart Claude Code." Then continue as they decide.
-3. **Neither has it** — build it by hand, matching the `ui-system` styling.
+4. **Neither has it** — build it by hand, matching the `ui-system` styling.
