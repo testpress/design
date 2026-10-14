@@ -1,0 +1,635 @@
+
+<script>
+  (function () {
+    const {
+      MIN, HOUR, DAY, NOW, svg, ICONS, icon, INDICATORS, INDICATOR_BY_KEY, BEHAVIOUR_KEYS,
+      PRIORITIES, ME, REVIEWERS, REVIEWER_BY_ID, WORKSPACES, WORKSPACE_BY_ID, clock, relative, exact,
+    } = window.SentinelReview;
+
+    // Filters (search qualifiers). Values are slugs so they read well in the search box.
+    const QUALIFIERS = {
+      priority: { label: 'Priority', title: 'Filter by priority', icon: 'priority', multi: true,
+        values: () => PRIORITIES.map((p, i) => ({ value: p.toLowerCase(), label: p, match: c => c.priority === i })) },
+      concern: { label: 'Concern', title: 'Filter by concern', icon: 'concern',
+        values: () => [
+          { value: 'behaviour', label: 'Behaviour concern', match: c => c.state === 'completed' ? c.concern === 'behaviour' : c.indicators.some(k => BEHAVIOUR_KEYS.includes(k)) },
+          { value: 'evidence', label: 'Evidence concern', match: c => c.state === 'completed' ? c.concern === 'evidence' : c.indicators.includes('missing_evidence') },
+        ] },
+      // Candidate is search-only: finding a person is what the search box does
+      candidate: { label: 'Candidate', title: 'Filter by candidate', icon: 'reviewer', searchable: true, perView: true, searchOnly: true,
+        values: () => window.SentinelReview.candidates().map(p => ({ value: p.identifier.toLowerCase(), label: p.name, avatar: p.avatar, search: `${p.name} ${p.identifier} ${p.email}`.toLowerCase(), match: c => c.identifier === p.identifier }))
+          .sort((a, b) => a.label.localeCompare(b.label)) },
+      workspace: { label: 'Workspace', title: 'Filter by workspace', icon: 'workspace', searchable: true,
+        values: () => WORKSPACES.map(w => ({ value: w.id, label: w.name, match: c => c.workspace === w.id })) },
+      result: { label: 'Result', title: 'Filter by integrity result', icon: 'result',
+        values: () => [
+          { value: 'clear', label: 'Clear', match: c => c.result === 'clear' },
+          { value: 'flagged', label: 'Flagged', match: c => c.result === 'flagged' },
+        ] },
+      reviewer: { label: 'Reviewer', title: 'Filter by reviewer', icon: 'reviewer', searchable: true, admin: true,
+        values: () => REVIEWERS.map(r => ({ value: r.id, label: r.name, match: c => c.reviewer === r.id })) },
+      indicator: { label: 'Indicator', title: 'Filter by indicator', icon: 'indicator', searchOnly: true,
+        values: () => INDICATORS.map(i => ({ value: i.slug, label: i.label, match: c => c.indicators.includes(i.key) })) },
+    };
+    // Which filters can vary in each view
+    const VIEW_FILTERS = {
+      mine: ['priority', 'concern', 'workspace'],
+      unassigned: ['priority', 'concern', 'workspace'],
+      open: ['priority', 'concern', 'workspace', 'reviewer'],
+      closed: ['result', 'concern', 'workspace', 'reviewer'],
+    };
+
+    const VIEWS = [
+      { key: 'mine', label: 'My assignments' },
+      { key: 'unassigned', label: 'Unassigned' },
+      { key: 'open', label: 'All open' },
+      { key: 'closed', label: 'Closed' },
+    ];
+    // Until someone picks a sort, open views go by priority and Closed by most recent decision
+    const defaultSort = view => view === 'closed' ? { by: 'time', order: 'newest' } : { by: 'priority', order: 'highest' };
+    const ORDERS = { priority: [['highest', 'Highest first'], ['lowest', 'Lowest first']], time: [['oldest', 'Oldest first'], ['newest', 'Newest first']] };
+    const PER_PAGE = 10;
+    const STORE_KEY = 'tpsentinel.reviewCases';
+
+
+    // ---------- Search query parsing ----------
+    // Tokens: key:value, key:"quoted value", or free text.
+    function parseQuery(q) {
+      const filters = {}, text = [];
+      const re = /(\w+):"([^"]*)"?|(\w+):(\S*)|"([^"]*)"?|(\S+)/g;
+      let m;
+      while ((m = re.exec(q))) {
+        const key = (m[1] || m[3] || '').toLowerCase();
+        const value = (m[2] ?? m[4] ?? '').toLowerCase();
+        if (key && QUALIFIERS[key]) { if (value) filters[key] = value; continue; }
+        const t = m[5] ?? m[6] ?? m[0];
+        if (t) text.push(t.toLowerCase());
+      }
+      return { filters, text };
+    }
+    function removeQualifier(q, key) {
+      return q.replace(new RegExp(`(^|\\s)${key}:("[^"]*"?|\\S*)`, 'gi'), ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    let menuAnchorEl = null; // kept outside Alpine state: DOM nodes don't belong in reactive data
+
+    function loadStore() {
+      try { return JSON.parse(sessionStorage.getItem(STORE_KEY)) || {}; } catch (e) { return {}; }
+    }
+
+    window.reviewCasesPage = function () {
+      const stored = loadStore();
+      return {
+        // prototype controls
+        role: stored.role || 'reviewer',
+        simulate: 'normal', // normal | empty | error
+
+        me: ME,
+        cases: window.SentinelReview.loadCases(),
+        views: VIEWS,
+        indicators: INDICATORS,
+        priorities: PRIORITIES,
+        reviewers: REVIEWERS,
+        qualifiers: QUALIFIERS,
+        icons: Object.fromEntries(Object.keys(ICONS).map(k => [k, icon(k)])),
+
+        view: 'mine',
+        // One search shared by all views, so tab counts and switching tabs reflect the same filters
+        query: typeof stored.query === 'string' ? stored.query : '',
+        // One sort shared by all views once chosen; null means each view's default
+        sortChoice: stored.sortChoice && ORDERS[stored.sortChoice.by] ? stored.sortChoice : null,
+        pages: Object.assign({ mine: 1, unassigned: 1, open: 1, closed: 1 }, stored.pages),
+        selected: [],
+
+        // search box
+        searchFocused: false,
+        suggestIndex: 0,
+        caret: 0,
+
+        // floating menus: { type: 'filter'|'sort'|'assign'|'priority'|'guide', key, ids, top, left, width, search }
+        menu: null,
+        pending: null,  // action waiting for confirmation
+        toast: null,
+        toastTimer: null,
+
+        init() {
+          const params = new URLSearchParams(location.search);
+          const fromUrl = params.get('view');
+          this.view = VIEWS.some(v => v.key === fromUrl) ? fromUrl : (stored.view || this.defaultView());
+          this.$watch('query', () => {
+            VIEWS.forEach(v => this.pages[v.key] = 1);
+            this.pruneSelection();
+            this.save();
+            // Filters can shift the toolbar; keep an open menu under its button
+            this.$nextTick(() => this.placeMenu());
+          });
+          this.$watch('sortChoice', () => { VIEWS.forEach(v => this.pages[v.key] = 1); this.save(); });
+          // Keep the sidebar's Review entry in step with the role switch and counts
+          if (window.Alpine) Alpine.effect(() => {
+            const detail = { role: this.role, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } };
+            window.dispatchEvent(new CustomEvent('review-cases-updated', { detail }));
+            this.save();
+          });
+          this.$watch('pages', () => this.save(), { deep: true });
+        },
+        save() {
+          try {
+            sessionStorage.setItem(STORE_KEY, JSON.stringify({ role: this.role, view: this.view, query: this.query, sortChoice: this.sortChoice, pages: this.pages, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } }));
+          } catch (e) { /* storage unavailable: state just isn't remembered */ }
+        },
+
+        // ---------- role / view ----------
+        get isAdmin() { return this.role === 'admin'; },
+        defaultView() { return this.role === 'admin' ? 'open' : 'mine'; },
+        setRole(role) {
+          if (this.role === role) return;
+          this.role = role;
+          this.menu = null;
+          this.setView(this.defaultView());
+          // Reviewers can't filter by reviewer
+          if (!this.isAdmin) this.query = removeQualifier(this.query, 'reviewer');
+        },
+        setView(view) {
+          this.view = view;
+          this.selected = [];
+          this.menu = null;
+          const url = new URL(location.href);
+          url.searchParams.set('view', view);
+          history.replaceState(null, '', url);
+          this.save();
+        },
+
+        // ---------- query ----------
+        get parsed() { return parseQuery(this.query); },
+        get availableFilters() {
+          return VIEW_FILTERS[this.view].filter(k => !QUALIFIERS[k].admin || this.isAdmin);
+        },
+        get activeFilterCount() {
+          return Object.keys(this.parsed.filters).length;
+        },
+        get hasSearchText() { return this.parsed.text.length > 0; },
+        get isFiltered() { return this.query.trim() !== ''; },
+        filterValue(key) { return this.parsed.filters[key] || ''; },
+        // Grey summary in the compact Filters menu: All / the value / N selected
+        filterSummary(key) {
+          const on = this.filterValues(key);
+          if (!on.length) return 'All';
+          if (on.length > 1) return `${on.length} selected`;
+          return QUALIFIERS[key].values().find(o => o.value === on[0])?.label || on[0];
+        },
+        get toolbarFilterCount() { return this.availableFilters.filter(k => this.filterValue(k)).length; },
+        // From the compact Filters menu, open one filter's menu under the same button
+        openFilterFromMenu(key) {
+          const btn = this.$refs.filtersBtn;
+          this.menu = null;
+          this.$nextTick(() => this.openMenu('filter', { currentTarget: btn }, { key, searchable: !!QUALIFIERS[key].searchable, width: QUALIFIERS[key].searchable ? 300 : 240 }));
+        },
+        // Multi-select filters are written as key:a,b (GitHub style)
+        filterValues(key) { return this.filterValue(key).split(',').filter(Boolean); },
+        isFilterOn(key, value) { return this.filterValues(key).includes(value); },
+        setFilter(key, value) {
+          let q = removeQualifier(this.query, key);
+          if (value && value !== this.filterValue(key)) q = `${key}:${value} ${q}`;
+          this.query = q.trim();
+          this.menu = null;
+        },
+        toggleFilterValue(key, value) {
+          const on = this.filterValues(key);
+          const next = on.includes(value) ? on.filter(v => v !== value) : [...on, value];
+          // keep the menu's own order so the query reads predictably
+          const order = QUALIFIERS[key].values().map(o => o.value);
+          next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+          const q = removeQualifier(this.query, key);
+          this.query = (next.length ? `${key}:${next.join(',')} ${q}` : q).trim();
+        },
+        clearFilters() {
+          let q = this.query;
+          Object.keys(QUALIFIERS).forEach(k => q = removeQualifier(q, k));
+          this.query = q;
+        },
+        clearSearchText() {
+          const { filters } = this.parsed;
+          this.query = Object.entries(filters).map(([k, v]) => `${k}:${v}`).join(' ');
+        },
+
+        // ---------- data ----------
+        get pool() { return this.simulate === 'empty' ? [] : this.cases; },
+        inView(c, view) {
+          if (view === 'mine') return c.state === 'assigned' && c.reviewer === ME;
+          if (view === 'unassigned') return c.state === 'queued';
+          if (view === 'open') return c.state !== 'completed';
+          return c.state === 'completed';
+        },
+        get counts() {
+          const out = { mine: 0, unassigned: 0, open: 0, closed: 0 };
+          this.pool.forEach(c => VIEWS.forEach(v => { if (this.inView(c, v.key)) out[v.key]++; }));
+          return out;
+        },
+        get viewCases() { return this.pool.filter(c => this.inView(c, this.view)); },
+        // Build a test for one view: filters that don't vary in that view are ignored there
+        matcherFor(view) {
+          const { filters, text } = this.parsed;
+          const applies = k => VIEW_FILTERS[view].includes(k) || QUALIFIERS[k].searchOnly;
+          const matchers = Object.entries(filters).filter(([key]) => applies(key)).map(([key, value]) => {
+            const wanted = value.split(',');
+            const opts = QUALIFIERS[key].values().filter(o => wanted.includes(o.value));
+            return c => opts.some(o => o.match(c));
+          });
+          return c => {
+            if (!matchers.every(m => m(c))) return false;
+            if (!text.length) return true;
+            const hay = `${c.name} ${c.identifier} ${c.email} ${WORKSPACE_BY_ID[c.workspace].name} ${c.id}`.toLowerCase();
+            return text.every(t => hay.includes(t));
+          };
+        },
+        get filtered() { return this.sortCases(this.viewCases.filter(this.matcherFor(this.view))); },
+        // Tab counts follow the current search and filters
+        get tabCounts() {
+          const out = {};
+          VIEWS.forEach(v => { const m = this.matcherFor(v.key); out[v.key] = this.pool.filter(c => this.inView(c, v.key) && m(c)).length; });
+          return out;
+        },
+        // Each view's own clock: how long it's been mine, how old the case is, or when it was decided
+        timeOf(c) { return this.view === 'mine' ? c.assignedAt : this.view === 'closed' ? c.completedAt : c.createdAt; },
+        sortCases(list) {
+          const { by, order } = this.sort;
+          const byTime = (a, b) => this.timeOf(a) - this.timeOf(b);
+          return [...list].sort((a, b) => {
+            if (by === 'priority') {
+              const p = order === 'highest' ? a.priority - b.priority : b.priority - a.priority;
+              // ties: longest waiting first in open views, latest decision first in Closed
+              return p || (this.view === 'closed' ? -byTime(a, b) : byTime(a, b));
+            }
+            return order === 'oldest' ? byTime(a, b) : -byTime(a, b);
+          });
+        },
+
+        // ---------- sorting ----------
+        get sort() { return this.sortChoice || defaultSort(this.view); },
+        get sortOptions() {
+          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed' : 'Case age' };
+          const priority = { by: 'priority', label: 'Priority' };
+          return this.view === 'closed' ? [time, priority] : [priority, time];
+        },
+        orderOptions(by) { return ORDERS[by]; },
+        get sortLabel() { return this.sortOptions.find(o => o.by === this.sort.by).label; },
+        get sortIcon() { return ['highest', 'newest'].includes(this.sort.order) ? this.icons.sort_down : this.icons.sort_up; },
+        setSort(by) {
+          if (by === this.sort.by) return;
+          this.sortChoice = { by, order: ORDERS[by][0][0] };
+        },
+        setOrder(order) { this.sortChoice = { by: this.sort.by, order }; },
+
+        // ---------- pagination ----------
+        get page() { return Math.min(this.pages[this.view], this.pageCount); },
+        get pageCount() { return Math.max(1, Math.ceil(this.filtered.length / PER_PAGE)); },
+        get pageCases() { const s = (this.page - 1) * PER_PAGE; return this.filtered.slice(s, s + PER_PAGE); },
+        get rangeFrom() { return this.filtered.length ? (this.page - 1) * PER_PAGE + 1 : 0; },
+        get rangeTo() { return Math.min(this.page * PER_PAGE, this.filtered.length); },
+        get rangeLabel() {
+          const total = this.filtered.length;
+          if (!total) return '';
+          const s = (this.page - 1) * PER_PAGE + 1;
+          return `${s}–${Math.min(s + PER_PAGE - 1, total)} of ${total}`;
+        },
+        get pageItems() {
+          const n = this.pageCount, p = this.page;
+          if (n <= 7) return Array.from({ length: n }, (_, i) => i + 1);
+          const items = [1];
+          const from = Math.max(2, p - 1), to = Math.min(n - 1, p + 1);
+          if (from > 2) items.push('…');
+          for (let i = from; i <= to; i++) items.push(i);
+          if (to < n - 1) items.push('…');
+          items.push(n);
+          return items;
+        },
+        goPage(p) { if (p >= 1 && p <= this.pageCount) { this.pages[this.view] = p; this.$nextTick(() => this.$refs.list?.scrollIntoView({ block: 'nearest' })); } },
+
+        // ---------- row helpers ----------
+        workspaceName(c) { return WORKSPACE_BY_ID[c.workspace].name; },
+        reviewerName(id) { return id === ME ? 'you' : REVIEWER_BY_ID[id]?.name; },
+        reviewerFullName(id) { return REVIEWER_BY_ID[id]?.name; },
+        avatar(id) { return REVIEWER_BY_ID[id]?.avatar; },
+        optionAvatar(key, o) { return key === 'reviewer' ? this.avatar(o.value) : o.avatar; },
+        indicatorsFor(c) { return c.indicators.map(k => INDICATOR_BY_KEY[k]); },
+        priorityLabel(c) { return PRIORITIES[c.priority]; },
+        relative, exact,
+        stateIcon(c) { return this.icons[`state_${c.state === 'completed' ? c.result : c.state}`]; },
+        stateLabel(c) {
+          if (c.state === 'queued') return 'Queued: waiting for a reviewer';
+          if (c.state === 'assigned') return `Assigned to ${this.reviewerName(c.reviewer)}`;
+          return `Completed: ${c.result === 'clear' ? 'Clear' : 'Flagged'}`;
+        },
+        stateClass(c) {
+          if (c.state === 'queued') return 'text-muted-foreground-1';
+          if (c.state === 'assigned') return 'text-green-600 dark:text-green-500';
+          return c.result === 'clear' ? 'text-violet-600 dark:text-violet-400' : 'text-amber-600 dark:text-amber-500';
+        },
+        // A single case: no Previous/Next on the detail page, just that case
+        detailHref(c) {
+          return window.SentinelReview.url(`/tpsentinel/review_cases/detail/?${new URLSearchParams({ case: c.id })}`);
+        },
+        // Selected cases, in list order: the detail page steps through only these
+        sequenceHref(ids) {
+          return window.SentinelReview.url(`/tpsentinel/review_cases/detail/?${new URLSearchParams({ case: ids[0], sequence: 'selected', cases: ids.join(',') })}`);
+        },
+        openCase(c) {
+          // Let people select text in a row without opening it
+          if (String(window.getSelection?.() || '')) return;
+          this.rememberList();
+          location.href = this.detailHref(c);
+        },
+        // Opening a row: the detail page's Previous/Next follows this list's filters and order
+        rememberList() {
+          const label = VIEWS.find(v => v.key === this.view).label;
+          window.SentinelReview.saveSequence({ source: 'list', view: this.view, label, ids: this.filtered.map(c => c.id) });
+        },
+
+        // ---------- selection ----------
+        get selectable() { return this.view !== 'closed'; },
+        isSelected(id) { return this.selected.includes(id); },
+        toggle(id) { this.selected = this.isSelected(id) ? this.selected.filter(x => x !== id) : [...this.selected, id]; },
+        get allOnPageSelected() { return this.pageCases.length > 0 && this.pageCases.every(c => this.isSelected(c.id)); },
+        get someOnPageSelected() { return this.pageCases.some(c => this.isSelected(c.id)); },
+        toggleAll() {
+          const ids = this.pageCases.map(c => c.id);
+          this.selected = this.allOnPageSelected ? this.selected.filter(id => !ids.includes(id)) : [...new Set([...this.selected, ...ids])];
+        },
+        pruneSelection() {
+          const visible = new Set(this.filtered.map(c => c.id));
+          const kept = this.selected.filter(id => visible.has(id));
+          const dropped = this.selected.length - kept.length;
+          if (dropped) {
+            this.selected = kept;
+            this.notify('Selection updated', `${dropped} selected ${dropped === 1 ? 'case is' : 'cases are'} outside the new search, so ${dropped === 1 ? 'it was' : 'they were'} deselected.`, 'info');
+          }
+        },
+        get selectedCases() {
+          // keep current list order: it becomes the review sequence
+          return this.filtered.filter(c => this.isSelected(c.id));
+        },
+        // Selected cases split by who owns them (each in list order)
+        get selMine() { return this.selectedCases.filter(c => c.state === 'assigned' && c.reviewer === ME); },
+        get selQueued() { return this.selectedCases.filter(c => c.state === 'queued'); },
+        get selOthers() { return this.selectedCases.filter(c => c.state === 'assigned' && c.reviewer !== ME); },
+        // How many cases a review would open: yours plus the unowned ones you'd claim
+        get reviewableCount() { return this.selMine.length + this.selQueued.length; },
+        get selectedAssignedCount() { return this.selectedCases.filter(c => c.state === 'assigned').length; },
+
+        // ---------- actions ----------
+        // Claim cases; anything someone else took first is reported, not overwritten
+        claim(ids) {
+          const done = [], lost = [];
+          ids.forEach(id => {
+            const c = this.cases.find(x => x.id === id);
+            if (c.takenBy) {
+              // Someone else claimed it first: reflect that instead of overwriting
+              Object.assign(c, { state: 'assigned', reviewer: c.takenBy, assignedAt: NOW - 30e3 });
+              window.SentinelReview.saveChange(c.id, { state: c.state, reviewer: c.reviewer, assignedAt: c.assignedAt });
+              delete c.takenBy;
+              lost.push(c);
+            } else {
+              Object.assign(c, { state: 'assigned', reviewer: ME, assignedAt: Date.now() });
+              window.SentinelReview.saveChange(c.id, { state: c.state, reviewer: c.reviewer, assignedAt: c.assignedAt });
+              done.push(c);
+            }
+          });
+          return { done, lost };
+        },
+        lostNote(lost) {
+          return `${lost.map(c => c.name).join(', ')} ${lost.length === 1 ? 'was' : 'were'} already taken by ${this.reviewerFullName(lost[0].reviewer)}, so nothing changed there.`;
+        },
+        assignToMe(ids) {
+          const { done, lost } = this.claim(ids);
+          this.selected = this.selected.filter(id => !ids.includes(id));
+          const lostNote = lost.length ? `${lost.map(c => c.name).join(', ')} ${lost.length === 1 ? 'was' : 'were'} already taken by ${this.reviewerFullName(lost[0].reviewer)}, so nothing changed there.` : '';
+          if (lost.length) {
+            const title = done.length ? `${done.length} of ${ids.length} cases assigned to you` : 'Case not assigned';
+            return this.notify(title, lostNote, 'warning');
+          }
+          const title = done.length === 1 ? 'Assigned to you' : `${done.length} cases assigned to you`;
+          const desc = done.length === 1 ? `${done[0].name} \u00b7 ${this.workspaceName(done[0])}` : 'They\u2019re now in My assignments.';
+          const action = done.length === 1 ? { label: 'Review now', href: this.detailHref(done[0]) } : null;
+          this.notify(title, desc, 'success', action);
+        },
+        // Review your selected cases one after another, in list order
+        reviewSelected() {
+          const ids = this.selMine.map(c => c.id);
+          if (ids.length) location.href = this.sequenceHref(ids);
+        },
+        // Claim the unowned selected cases, then review them together with your own
+        assignAndReview() {
+          const order = [...this.selMine, ...this.selQueued].map(c => c.id);
+          const ordered = this.selectedCases.map(c => c.id).filter(id => order.includes(id));
+          const { lost } = this.claim(this.selQueued.map(c => c.id));
+          const lostIds = lost.map(c => c.id);
+          const seq = ordered.filter(id => !lostIds.includes(id));
+          if (!lost.length) { location.href = this.sequenceHref(seq); return; }
+          // Someone took a case first: say so, and let the reviewer start with what they got
+          this.selected = this.selected.filter(id => seq.includes(id));
+          this.notify(
+            seq.length ? `${seq.length} of ${ordered.length} cases ready to review` : 'No cases to review',
+            this.lostNote(lost), 'warning',
+            seq.length ? { label: `Start review (${seq.length})`, href: this.sequenceHref(seq) } : null
+          );
+        },
+        assignTo(ids, reviewerId) {
+          this.menu = null;
+          const targets = ids.map(id => this.cases.find(c => c.id === id)).filter(c => c.reviewer !== reviewerId);
+          if (!targets.length) return this.notify('Nothing changed', `Already assigned to ${this.reviewerName(reviewerId)}.`, 'info');
+          const moving = targets.filter(c => c.reviewer);
+          const apply = () => {
+            targets.forEach(c => {
+              Object.assign(c, { state: 'assigned', reviewer: reviewerId, assignedAt: Date.now() });
+              window.SentinelReview.saveChange(c.id, { state: c.state, reviewer: c.reviewer, assignedAt: c.assignedAt });
+            });
+            this.selected = this.selected.filter(id => !ids.includes(id));
+            const who = reviewerId === ME ? 'you' : this.reviewerFullName(reviewerId);
+            this.notify(`Assigned to ${who}`, targets.length === 1 ? `${targets[0].name} \u00b7 ${this.workspaceName(targets[0])}` : `${targets.length} cases`);
+          };
+          if (!moving.length) return apply();
+          // Reassigning takes work away from someone: confirm with the affected count
+          this.pending = {
+            run: apply,
+            count: targets.length,
+            moving: moving.length,
+            to: reviewerId === ME ? 'you' : this.reviewerFullName(reviewerId),
+            single: targets.length === 1 ? targets[0] : null,
+          };
+          this.$dispatch('open-modal-rc-reassign');
+        },
+        unassign(ids) {
+          this.menu = null;
+          const targets = ids.map(id => this.cases.find(c => c.id === id)).filter(c => c.state === 'assigned');
+          if (!targets.length) return;
+          this.pending = {
+            count: targets.length,
+            single: targets.length === 1 ? targets[0] : null,
+            run: () => {
+              targets.forEach(c => {
+                Object.assign(c, { state: 'queued', reviewer: null, assignedAt: null });
+                window.SentinelReview.saveChange(c.id, { state: 'queued', reviewer: null, assignedAt: null });
+              });
+              this.selected = this.selected.filter(id => !ids.includes(id));
+              this.notify('Moved to Unassigned', targets.length === 1 ? `${targets[0].name} \u00b7 ${this.workspaceName(targets[0])}` : `${targets.length} cases`);
+            },
+          };
+          this.$dispatch('open-modal-rc-unassign');
+        },
+        runPending() { if (this.pending) { this.pending.run(); this.pending = null; } },
+        setPriority(ids, p) {
+          this.menu = null;
+          const targets = ids.map(id => this.cases.find(c => c.id === id)).filter(c => c.priority !== p);
+          targets.forEach(c => { c.priority = p; window.SentinelReview.saveChange(c.id, { priority: p }); });
+          if (targets.length) this.notify(`Priority set to ${PRIORITIES[p]}`, targets.length === 1 ? `${targets[0].name} \u00b7 ${this.workspaceName(targets[0])}` : `${targets.length} cases`);
+        },
+
+        // ---------- floating menus ----------
+        openMenu(type, ev, opts = {}) {
+          const anchor = `${type}:${opts.key || ''}:${(opts.ids || []).join(',')}`;
+          if (this.menu && this.menu.anchor === anchor) { this.menu = null; return; }
+          menuAnchorEl = ev.currentTarget;
+          this.menu = { type, anchor, top: 0, bottom: null, left: 0, width: opts.width || 288, maxHeight: null, search: '', ...opts };
+          this.placeMenu();
+          // Measure the rendered menu (like ui-system dropdown.html), then flip if needed
+          this.$nextTick(() => this.placeMenu());
+          this.$nextTick(() => this.$refs.menuSearch && this.menu?.searchable && this.$refs.menuSearch.focus());
+        },
+        closeMenu() { this.menu = null; menuAnchorEl = null; },
+        placeMenu() {
+          if (!this.menu || !menuAnchorEl || !menuAnchorEl.isConnected) return;
+          const r = menuAnchorEl.getBoundingClientRect();
+          const w = this.menu.width;
+          const left = this.menu.align === 'right' ? r.right - w : r.left;
+          // Keep the menu inside the list card (and the window), so it never hangs past the table
+          const box = this.$refs.list?.getBoundingClientRect();
+          const minL = Math.max(8, box ? box.left : 8);
+          const maxR = Math.min(window.innerWidth - 8, box ? box.right : window.innerWidth - 8);
+          this.menu.left = Math.max(minL, Math.min(left, maxR - w));
+          // Open below unless the menu doesn't fit there and there's more room above
+          const gap = 6, edge = 8;
+          const h = this.$refs.menuPanel?.offsetHeight || 0;
+          const below = window.innerHeight - r.bottom - gap - edge;
+          const above = r.top - gap - edge;
+          if (h > below && above > below) {
+            // anchor the menu's bottom to the button so filtering the list keeps it attached
+            this.menu.top = null;
+            this.menu.bottom = window.innerHeight - r.top + gap;
+            this.menu.maxHeight = above;
+          } else {
+            this.menu.bottom = null;
+            this.menu.top = r.bottom + gap;
+            this.menu.maxHeight = below;
+          }
+        },
+        optionsFor(key) {
+          const opts = QUALIFIERS[key].values();
+          if (!QUALIFIERS[key].perView) return opts;
+          // Only offer candidates who have a case in this view
+          const here = new Set(this.viewCases.map(c => c.identifier.toLowerCase()));
+          return opts.filter(o => here.has(o.value));
+        },
+        menuOptions(key) {
+          const s = (this.menu?.search || '').toLowerCase();
+          const opts = this.optionsFor(key);
+          return s ? opts.filter(o => (o.search || o.label.toLowerCase()).includes(s)) : opts;
+        },
+        get assignOptions() {
+          const s = (this.menu?.search || '').toLowerCase();
+          const open = this.pool.filter(c => c.state === 'assigned');
+          return REVIEWERS
+            .map(r => ({ ...r, load: open.filter(c => c.reviewer === r.id).length, label: r.id === ME ? `${r.name} (you)` : r.name }))
+            .filter(r => !s || r.name.toLowerCase().includes(s));
+        },
+        get menuCases() { return (this.menu?.ids || []).map(id => this.cases.find(c => c.id === id)); },
+        get menuCurrentReviewer() {
+          const rs = [...new Set(this.menuCases.map(c => c.reviewer))];
+          return rs.length === 1 ? rs[0] : undefined;
+        },
+        get menuCurrentPriority() {
+          const ps = [...new Set(this.menuCases.map(c => c.priority))];
+          return ps.length === 1 ? ps[0] : undefined;
+        },
+
+        // ---------- search suggestions (GitHub-style qualifier dropdown) ----------
+        get searchKeys() {
+          // Same order as the toolbar, then search-only qualifiers
+          return ['candidate', ...VIEW_FILTERS[this.view], ...Object.keys(QUALIFIERS).filter(k => QUALIFIERS[k].searchOnly && k !== 'candidate')]
+            .filter(k => !QUALIFIERS[k].admin || this.isAdmin);
+        },
+        currentToken() {
+          const before = this.query.slice(0, this.caret);
+          const m = before.match(/(\w+:"[^"]*|\S*)$/);
+          return m ? m[0] : '';
+        },
+        get suggestions() {
+          if (!this.searchFocused) return [];
+          const token = this.currentToken();
+          const colon = token.indexOf(':');
+          if (colon > -1) {
+            const key = token.slice(0, colon).toLowerCase();
+            if (!this.searchKeys.includes(key)) return [];
+            const partial = token.slice(colon + 1).replace(/"/g, '').toLowerCase();
+            return this.optionsFor(key)
+              .filter(o => !partial || (o.search || o.label.toLowerCase()).includes(partial) || o.value.includes(partial))
+              .slice(0, 8)
+              .map(o => ({ id: `${key}:${o.value}`, label: o.label, hint: `${key}:${o.value}`, insert: `${key}:${o.value} `, icon: this.icons[QUALIFIERS[key].icon] }));
+          }
+          const t = token.toLowerCase();
+          return this.searchKeys
+            .filter(k => !t || k.startsWith(t) || QUALIFIERS[k].label.toLowerCase().startsWith(t))
+            .map(k => ({ id: k, label: QUALIFIERS[k].label, hint: `${k}:`, insert: `${k}:`, icon: this.icons[QUALIFIERS[k].icon] }));
+        },
+        get suggestHeading() {
+          const token = this.currentToken();
+          const colon = token.indexOf(':');
+          return colon > -1 ? QUALIFIERS[token.slice(0, colon).toLowerCase()]?.title : 'Narrow your search';
+        },
+        trackCaret(el) { this.caret = el.selectionStart ?? this.query.length; },
+        onSearchInput(el) { this.trackCaret(el); this.suggestIndex = 0; },
+        applySuggestion(s) {
+          const el = this.$refs.search;
+          const before = this.query.slice(0, this.caret), after = this.query.slice(this.caret);
+          const token = this.currentToken();
+          const head = before.slice(0, before.length - token.length);
+          // drop a qualifier of the same key elsewhere, filters are single-select
+          const key = s.insert.split(':')[0];
+          let rest = after.replace(/^\S*/, '');
+          if (s.insert.endsWith(' ')) { rest = removeQualifier(rest, key); }
+          const cleanHead = s.insert.endsWith(' ') ? removeQualifier(head, key) + (removeQualifier(head, key) ? ' ' : '') : head;
+          this.query = (cleanHead + s.insert + rest.trimStart()).replace(/\s{2,}/g, ' ');
+          const pos = (cleanHead + s.insert).length;
+          this.suggestIndex = 0;
+          this.$nextTick(() => { el.focus(); el.setSelectionRange(pos, pos); this.caret = pos; });
+        },
+        onSearchKeydown(ev) {
+          const list = this.suggestions;
+          if (ev.key === 'ArrowDown' && list.length) { ev.preventDefault(); this.suggestIndex = (this.suggestIndex + 1) % list.length; }
+          else if (ev.key === 'ArrowUp' && list.length) { ev.preventDefault(); this.suggestIndex = (this.suggestIndex - 1 + list.length) % list.length; }
+          else if (ev.key === 'Enter') {
+            ev.preventDefault();
+            const token = this.currentToken();
+            if (list.length && token) this.applySuggestion(list[this.suggestIndex]);
+            else this.$refs.search.blur();
+          }
+          else if (ev.key === 'Escape') { this.$refs.search.blur(); }
+        },
+        focusSearch() { const el = this.$refs.search; el.focus(); el.select(); },
+
+        // ---------- toast ----------
+        notify(title, description = '', variant = 'success', action = null) {
+          clearTimeout(this.toastTimer);
+          this.toast = { title, description, variant, action };
+          this.toastTimer = setTimeout(() => this.toast = null, 5000);
+        },
+        get toastIcon() {
+          const key = { success: 'clear', warning: 'toast_warning', info: 'toast_info' }[this.toast?.variant] || 'toast_info';
+          return icon(key, 'size-5 mt-0.5');
+        },
+        pauseToast() { clearTimeout(this.toastTimer); },
+        resumeToast() { if (this.toast) this.toastTimer = setTimeout(() => this.toast = null, 2500); },
+      };
+    };
+  })();
+</script>
+

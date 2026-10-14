@@ -1,0 +1,199 @@
+<!-- One floating menu, positioned under whichever control opened it (fixed, so the list never clips it) -->
+<div x-show="menu" x-cloak
+     @click.outside="closeMenu()"
+     x-ref="menuPanel"
+     :style="menu && { top: menu.top === null ? 'auto' : menu.top + 'px', bottom: menu.bottom === null ? 'auto' : menu.bottom + 'px', left: menu.left + 'px', width: menu.width + 'px', maxHeight: menu.maxHeight ? menu.maxHeight + 'px' : null }"
+     x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+     class="fixed z-[80] flex flex-col bg-dropdown border border-dropdown-line rounded-xl shadow-xl overflow-hidden"
+     role="menu">
+  <template x-if="menu">
+    <div class="flex flex-col min-h-0">
+
+      <!-- Filters (narrow toolbar): pick a filter, its own menu opens in place -->
+      <template x-if="menu.type === 'filters'">
+        <div class="p-1">
+          <template x-for="key in availableFilters" :key="key">
+            <button type="button" @click.stop="openFilterFromMenu(key)"
+                    class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+              <span x-text="qualifiers[key].label"></span>
+              <span class="ms-auto truncate max-w-32 text-muted-foreground-1" x-text="filterSummary(key)"></span>
+              <svg class="shrink-0 size-3.5 text-muted-foreground-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </template>
+        </div>
+      </template>
+
+      <!-- Filter -->
+      <template x-if="menu.type === 'filter'">
+        <div class="flex flex-col min-h-0">
+          <p class="px-3 py-2.5 text-[13px] font-semibold text-foreground border-b border-dropdown-divider" x-text="qualifiers[menu.key].title"></p>
+          <div x-show="menu.searchable" class="p-2 border-b border-dropdown-divider">
+            <div class="relative">
+              <svg class="absolute start-2.5 top-1/2 -translate-y-1/2 shrink-0 size-3.5 text-muted-foreground-1 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input x-ref="menuSearch" x-model="menu.search" type="text" :placeholder="`Filter ${qualifiers[menu.key].label.toLowerCase()}s`"
+                     class="py-1.5 ps-8 pe-3 block w-full bg-layer border border-layer-line rounded-lg text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:ring-1 focus:ring-primary">
+            </div>
+          </div>
+          <ul class="p-1 min-h-0 max-h-72 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb">
+            <template x-for="o in menuOptions(menu.key)" :key="o.value">
+              <li>
+                <!-- Multi-select (priority): checkboxes, menu stays open -->
+                <template x-if="qualifiers[menu.key].multi">
+                  <label class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-dropdown-item-foreground hover:bg-dropdown-item-hover cursor-pointer">
+                    <input type="checkbox" :checked="isFilterOn(menu.key, o.value)" @change="toggleFilterValue(menu.key, o.value)"
+                           class="shrink-0 size-4 bg-transparent border-line-3 rounded-sm text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+                    <span class="truncate" x-text="o.label"></span>
+                  </label>
+                </template>
+                <!-- Single-select: pick one, check mark at the end -->
+                <template x-if="!qualifiers[menu.key].multi">
+                  <button type="button" @click="setFilter(menu.key, o.value)" role="menuitemradio" :aria-checked="isFilterOn(menu.key, o.value)"
+                          class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+                    <template x-if="menu.key === 'reviewer' || menu.key === 'candidate'">
+                      <img class="shrink-0 size-6 rounded-full object-cover bg-surface" :src="optionAvatar(menu.key, o)" alt="" loading="lazy">
+                    </template>
+                    <span class="truncate" :class="isFilterOn(menu.key, o.value) && 'font-medium text-foreground'" x-text="o.label"></span>
+                    <span x-show="o.hint" class="shrink-0 text-xs text-muted-foreground-1" x-text="o.hint"></span>
+                    <svg x-show="isFilterOn(menu.key, o.value)" class="ms-auto shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  </button>
+                </template>
+              </li>
+            </template>
+            <li x-show="!menuOptions(menu.key).length" class="py-3 px-2 text-sm text-muted-foreground-1">No matches</li>
+          </ul>
+          <div x-show="filterValue(menu.key)" class="p-1 border-t border-dropdown-divider">
+            <button type="button" @click="setFilter(menu.key, '')"
+                    class="w-full py-2 px-2 rounded-lg text-sm text-start text-muted-foreground-1 hover:text-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+              Clear filter
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Sort -->
+      <template x-if="menu.type === 'sort'">
+        <div class="p-1 min-h-0 overflow-y-auto">
+          <p class="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground-1">Sort by</p>
+          <template x-for="o in sortOptions" :key="o.by">
+            <button type="button" @click="setSort(o.by); closeMenu()" role="menuitemradio" :aria-checked="sort.by === o.by"
+                    class="w-full flex items-center gap-x-2 py-2 px-2 rounded-lg text-sm text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+              <span x-text="o.label"></span>
+              <svg x-show="sort.by === o.by" class="ms-auto shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+          </template>
+          <div class="my-1 border-t border-dropdown-divider"></div>
+          <p class="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground-1">Order</p>
+          <template x-for="[value, label] in orderOptions(sort.by)" :key="value">
+            <button type="button" @click="setOrder(value); closeMenu()" role="menuitemradio" :aria-checked="sort.order === value"
+                    class="w-full flex items-center gap-x-2 py-2 px-2 rounded-lg text-sm text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+              <span x-text="label"></span>
+              <svg x-show="sort.order === value" class="ms-auto shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+          </template>
+        </div>
+      </template>
+
+      <!-- Assign reviewer (admin) -->
+      <template x-if="menu.type === 'assign'">
+        <div class="flex flex-col min-h-0">
+          <p class="px-3 py-2.5 text-[13px] font-semibold text-foreground border-b border-dropdown-divider"
+             x-text="menu.ids.length === 1 ? 'Assign reviewer' : `Assign ${menu.ids.length} cases`"></p>
+          <div class="p-2 border-b border-dropdown-divider">
+            <div class="relative">
+              <svg class="absolute start-2.5 top-1/2 -translate-y-1/2 shrink-0 size-3.5 text-muted-foreground-1 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input x-ref="menuSearch" x-model="menu.search" x-init="$nextTick(() => $el.focus())" type="text" placeholder="Filter reviewers"
+                     class="py-1.5 ps-8 pe-3 block w-full bg-layer border border-layer-line rounded-lg text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:ring-1 focus:ring-primary">
+            </div>
+          </div>
+          <ul class="p-1 min-h-0 max-h-72 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb">
+            <template x-for="r in assignOptions" :key="r.id">
+              <li>
+                <button type="button" @click="assignTo(menu.ids, r.id)"
+                        class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+                  <img class="shrink-0 size-6 rounded-full object-cover" :src="r.avatar" alt="">
+                  <span class="truncate" :class="menuCurrentReviewer === r.id && 'font-medium text-foreground'" x-text="r.label"></span>
+                  <span class="ms-auto shrink-0 text-xs text-muted-foreground-1" x-text="`${r.load} open`"></span>
+                  <svg x-show="menuCurrentReviewer === r.id" class="shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                </button>
+              </li>
+            </template>
+            <li x-show="!assignOptions.length" class="py-3 px-2 text-sm text-muted-foreground-1">No matches</li>
+          </ul>
+          <div x-show="menuCases.some(c => c.reviewer)" class="p-1 border-t border-dropdown-divider">
+            <button type="button" @click="unassign(menu.ids)"
+                    class="w-full py-2 px-2 rounded-lg text-sm text-start text-muted-foreground-1 hover:text-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+              Unassign
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- Change priority (admin) -->
+      <template x-if="menu.type === 'priority'">
+        <div class="p-1 min-h-0 overflow-y-auto">
+          <p class="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground-1">Priority</p>
+          <template x-for="(p, i) in priorities" :key="p">
+            <button type="button" @click="setPriority(menu.ids, i)" role="menuitemradio" :aria-checked="menuCurrentPriority === i"
+                    class="w-full flex items-center gap-x-2 py-2 px-2 rounded-lg text-sm text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+              <span x-text="p"></span>
+              <svg x-show="menuCurrentPriority === i" class="ms-auto shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+          </template>
+        </div>
+      </template>
+
+      <!-- Indicator guide -->
+      <template x-if="menu.type === 'guide'">
+        <div class="flex flex-col min-h-0">
+          <div class="px-4 pt-3 pb-2">
+            <p class="text-sm font-semibold text-foreground">Indicator guide</p>
+            <p class="mt-0.5 text-xs text-muted-foreground-1">Indicators show what to inspect, not proof of misconduct. Each type appears once per case.</p>
+          </div>
+          <ul class="p-1 pt-0 min-h-0 overflow-y-auto">
+            <template x-for="ind in indicators" :key="ind.key">
+              <li>
+                <button type="button" @click="setFilter('indicator', ind.slug); closeMenu()"
+                        class="group w-full flex items-start gap-x-3 py-2 px-3 rounded-lg text-start hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+                  <span class="mt-0.5" :class="ind.neutral ? 'text-muted-foreground-2' : 'text-muted-foreground-1'" x-html="ind.svg"></span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-sm text-foreground" x-text="ind.label"></span>
+                    <span class="block text-xs text-muted-foreground-1" x-text="ind.description"></span>
+                  </span>
+                  <span class="mt-0.5 shrink-0 text-xs text-primary opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">Show cases</span>
+                </button>
+              </li>
+            </template>
+          </ul>
+        </div>
+      </template>
+
+    </div>
+  </template>
+</div>
+
+<!-- Toast: ui-system toast layout, on TPSentinel theme tokens -->
+<div class="pointer-events-none fixed bottom-20 end-0 z-[90] w-full sm:w-96 px-4 sm:pe-6" aria-live="polite">
+  <div x-show="toast" x-cloak
+       x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+       @mouseenter="pauseToast()" @mouseleave="resumeToast()"
+       role="status"
+       class="pointer-events-auto w-full rounded-lg bg-card border border-card-line shadow-lg overflow-hidden">
+    <div class="p-4 flex items-start">
+      <div class="shrink-0"
+           :class="{ 'text-green-500 dark:text-green-400': toast?.variant === 'success', 'text-orange-500 dark:text-orange-400': toast?.variant === 'warning', 'text-primary': toast?.variant === 'info' }" x-html="toastIcon"></div>
+      <div class="ms-3 w-0 flex-1">
+        <p class="text-sm font-medium text-foreground" x-text="toast?.title"></p>
+        <p x-show="toast?.description" class="mt-1 text-sm text-muted-foreground-1" x-text="toast?.description"></p>
+        <div x-show="toast?.action" class="mt-3 flex gap-x-3">
+          <a :href="toast?.action?.href" class="rounded-md text-sm font-medium text-primary hover:text-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-text="toast?.action?.label"></a>
+        </div>
+      </div>
+      <div class="ms-4 flex shrink-0">
+        <button type="button" @click="toast = null" class="inline-flex rounded-md text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" aria-label="Close">
+          <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

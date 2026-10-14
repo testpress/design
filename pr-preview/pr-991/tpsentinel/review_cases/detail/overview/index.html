@@ -1,0 +1,842 @@
+<!-- Overview: result basis and evidence on the left, Session context on the right, decision last -->
+<div class="grid lg:grid-cols-3 gap-5 items-start">
+  <div class="lg:col-span-2 flex flex-col gap-5 min-w-0">
+    <!-- Why this candidate needs review: reasons first, then the evidence for each. No counts. -->
+<section class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5" aria-labelledby="why-heading">
+  <h2 id="why-heading" class="text-base font-semibold text-foreground"
+      x-text="c.state === 'completed' ? 'Why this candidate was reviewed' : 'Why this candidate needs review'"></h2>
+
+  <!-- Primary reason -->
+  <div class="mt-3 p-4 rounded-lg bg-muted">
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="inline-flex items-center py-0.5 px-2 rounded-md text-xs font-medium bg-surface text-surface-foreground" x-text="originLabel"></span>
+      <template x-if="d.concernType">
+        <span class="inline-flex items-center py-0.5 px-2 rounded-md text-xs font-medium bg-surface text-surface-foreground"
+              x-text="d.concernType === 'behaviour' ? 'Behaviour concern' : 'Evidence concern'"></span>
+      </template>
+    </div>
+    <p class="mt-2 text-sm text-foreground" x-text="summary"></p>
+    <template x-if="d.manualNote">
+      <p class="mt-2 ps-3 border-s-2 border-line-3 text-sm text-muted-foreground-2">
+        <span x-text="`“${d.manualNote}”`"></span> <span class="text-muted-foreground-1">— Anita Kumar</span>
+      </p>
+    </template>
+  </div>
+
+  <!-- Observed behaviour -->
+  <template x-if="behaviourConcerns.length">
+    <div class="mt-6">
+      <h3 class="text-sm font-medium text-muted-foreground-1">Observed behaviour</h3>
+      <ul class="mt-2 divide-y divide-card-line">
+        <template x-for="k in behaviourConcerns" :key="k.key">
+          <li class="py-4 first:pt-2">
+            <div class="flex gap-3">
+              <span class="mt-0.5 text-muted-foreground-1" x-html="k.icon"></span>
+              <div class="min-w-0 grow">
+                <div class="flex flex-wrap items-baseline gap-x-2">
+                  <p class="font-medium text-foreground" x-text="k.label"></p>
+                  <span class="text-sm" :class="k.severity === 'High' ? 'font-medium text-foreground' : 'text-muted-foreground-1'" x-text="`${k.severity} severity`"></span>
+                </div>
+                <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="k.explanation"></p>
+                <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="k.timing"></p>
+
+                <template x-if="k.artifacts.length">
+                  <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <template x-for="a in k.artifacts.slice(0, 4)" :key="a.id">
+                      <div><!-- One Artifact thumbnail. Expects `a` in scope. States other than Available are plain text, not fake media. -->
+<button type="button" @click="openViewer(a)" :disabled="a.state !== 'available'"
+        :aria-label="`${artifactLabel(a)}, Session ${a.session}${a.state !== 'available' ? ', ' + stateLabel(a) : ''}`"
+        class="group relative block w-full aspect-video rounded-lg overflow-hidden bg-surface border border-card-line text-start disabled:cursor-default focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+  <template x-if="a.state === 'available' && a.media !== 'audio'">
+    <img :src="a.poster || a.src" alt="" loading="lazy" class="size-full object-cover transition-transform group-hover:scale-[1.02]">
+  </template>
+  <template x-if="a.state === 'available' && a.media === 'audio'">
+    <span class="flex size-full items-center justify-center text-muted-foreground-1" x-html="icons.mic"></span>
+  </template>
+  <template x-if="a.state !== 'available'">
+    <span class="flex size-full flex-col items-center justify-center gap-1 p-2 text-center">
+      <span class="text-xs font-medium text-foreground" x-text="stateLabel(a)"></span>
+      <span class="text-[11px] leading-4 text-muted-foreground-1 line-clamp-2" x-text="stateNote(a)"></span>
+    </span>
+  </template>
+  <template x-if="a.state === 'available' && a.media === 'video'">
+    <span class="absolute inset-0 flex items-center justify-center">
+      <span class="flex items-center justify-center size-9 rounded-full bg-black/55 text-white" x-html="ic('play', 'size-4 ms-0.5 fill-current')"></span>
+    </span>
+  </template>
+  <span x-show="a.state === 'available'" class="absolute bottom-1.5 start-1.5 py-0.5 px-1.5 rounded-md bg-black/60 text-[11px] font-medium text-white" x-text="artifactLabel(a)"></span>
+</button>
+</div>
+                    </template>
+                  </div>
+                </template>
+                <template x-if="!k.artifacts.length">
+                  <p class="mt-2 text-sm text-muted-foreground-1">No media was captured for this event. It’s recorded in Activity.</p>
+                </template>
+
+                <button type="button" @click="openEvidenceFor(k.key)"
+                        class="mt-2 inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+                  View all evidence for this anomaly
+                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+            </div>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </template>
+
+  <!-- Evidence gaps: same weight as behaviour, kept separate -->
+  <template x-if="evidenceConcerns.length">
+    <div class="mt-6">
+      <h3 class="text-sm font-medium text-muted-foreground-1">Evidence gaps</h3>
+      <ul class="mt-2 divide-y divide-card-line">
+        <template x-for="g in evidenceConcerns" :key="g.id">
+          <li class="py-4 first:pt-2 flex gap-3">
+            <span class="mt-0.5 text-muted-foreground-1" x-html="g.icon"></span>
+            <div class="min-w-0 grow">
+              <p class="font-medium text-foreground" x-text="g.label"></p>
+              <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="`${g.detail} Cause: ${g.cause}.`"></p>
+              <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="g.timing"></p>
+              <button type="button" @click="openGapSession(g)"
+                      class="mt-2 inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+                <span x-text="`Open Session ${g.session}`"></span>
+                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              </button>
+            </div>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </template>
+
+  <!-- Nothing qualified -->
+  <template x-if="!behaviourConcerns.length && !evidenceConcerns.length">
+    <p class="mt-5 text-sm text-muted-foreground-2">
+      No qualifying anomalies were found in the available evidence.
+      <span x-show="coverage.some(r => r.gap)">Some evidence is incomplete; see Evidence coverage below.</span>
+    </p>
+  </template>
+
+  <!-- AI isn't proof -->
+  <p class="mt-5 pt-4 border-t border-card-line text-xs text-muted-foreground-1">
+    Anomalies show what to inspect. They aren’t proof of misconduct on their own.
+  </p>
+</section>
+
+    <!-- Evidence coverage: did TPSentinel collect what the policy expected? Then a few recent items. -->
+<section class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5" aria-labelledby="coverage-heading">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 id="coverage-heading" class="text-base font-semibold text-foreground">Evidence coverage</h2>
+    <span class="text-sm text-muted-foreground-1">All <span x-text="d.sessions.length"></span> sessions</span>
+  </div>
+
+  <!-- Section-level error (prototype): the rest of the page keeps working -->
+  <template x-if="condition === 'error'">
+    <div class="mt-3 p-4 rounded-lg bg-muted">
+      <p class="text-sm font-medium text-foreground">Couldn’t load evidence coverage</p>
+      <p class="mt-1 text-sm text-muted-foreground-2">The anomalies, sessions and history on this page are up to date. Submitting a decision is blocked until coverage loads, because a gap can change the decision.</p>
+      <button type="button" @click="setCondition('normal')" class="mt-2 text-sm font-medium text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">Try again</button>
+    </div>
+  </template>
+
+  <template x-if="condition !== 'error'">
+    <div>
+      <dl class="mt-3 divide-y divide-card-line">
+        <template x-for="row in coverage" :key="row.key">
+          <div class="py-2.5 grid grid-cols-[auto_1fr] sm:grid-cols-[auto_12rem_6rem_1fr] items-center gap-x-3 gap-y-0.5">
+            <span class="text-muted-foreground-1" x-html="row.icon"></span>
+            <dt class="text-sm text-foreground" x-text="row.label"></dt>
+            <dd class="col-start-2 sm:col-start-auto text-sm font-medium" :class="coverageClass(row)" x-text="row.status"></dd>
+            <dd class="col-start-2 sm:col-start-auto text-sm text-muted-foreground-1" x-text="row.measure"></dd>
+          </div>
+        </template>
+      </dl>
+      <div x-show="evidenceConcerns.length" class="mt-1">
+        <button type="button" @click="openGapSession(evidenceConcerns[0])"
+                class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+          View evidence gaps
+          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Recent evidence -->
+  <div class="mt-6">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-sm font-medium text-muted-foreground-1">Recent evidence</h3>
+      <button type="button" @click="resetEvidence(); tab = 'evidence'"
+              class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+        View all evidence
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+    <div class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <template x-for="a in recentMedia" :key="a.id">
+        <div>
+          <!-- One Artifact thumbnail. Expects `a` in scope. States other than Available are plain text, not fake media. -->
+<button type="button" @click="openViewer(a)" :disabled="a.state !== 'available'"
+        :aria-label="`${artifactLabel(a)}, Session ${a.session}${a.state !== 'available' ? ', ' + stateLabel(a) : ''}`"
+        class="group relative block w-full aspect-video rounded-lg overflow-hidden bg-surface border border-card-line text-start disabled:cursor-default focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+  <template x-if="a.state === 'available' && a.media !== 'audio'">
+    <img :src="a.poster || a.src" alt="" loading="lazy" class="size-full object-cover transition-transform group-hover:scale-[1.02]">
+  </template>
+  <template x-if="a.state === 'available' && a.media === 'audio'">
+    <span class="flex size-full items-center justify-center text-muted-foreground-1" x-html="icons.mic"></span>
+  </template>
+  <template x-if="a.state !== 'available'">
+    <span class="flex size-full flex-col items-center justify-center gap-1 p-2 text-center">
+      <span class="text-xs font-medium text-foreground" x-text="stateLabel(a)"></span>
+      <span class="text-[11px] leading-4 text-muted-foreground-1 line-clamp-2" x-text="stateNote(a)"></span>
+    </span>
+  </template>
+  <template x-if="a.state === 'available' && a.media === 'video'">
+    <span class="absolute inset-0 flex items-center justify-center">
+      <span class="flex items-center justify-center size-9 rounded-full bg-black/55 text-white" x-html="ic('play', 'size-4 ms-0.5 fill-current')"></span>
+    </span>
+  </template>
+  <span x-show="a.state === 'available'" class="absolute bottom-1.5 start-1.5 py-0.5 px-1.5 rounded-md bg-black/60 text-[11px] font-medium text-white" x-text="artifactLabel(a)"></span>
+</button>
+
+          <p class="mt-1 text-xs text-muted-foreground-1" x-text="`Session ${a.session} · ${dayTime(a.at)}`"></p>
+        </div>
+      </template>
+    </div>
+  </div>
+</section>
+
+    
+
+
+
+<!-- Decision: only the assigned Reviewer can submit; everyone else sees why -->
+<section id="decision" class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5 scroll-mt-20" aria-labelledby="decision-heading">
+  <h2 id="decision-heading" class="text-base font-semibold text-foreground">Decision</h2>
+
+  <!-- Completed: read-only result, never an empty form -->
+  <template x-if="c.state === 'completed'">
+    <div class="mt-3">
+      <div class="flex items-start gap-3 p-4 rounded-lg bg-muted">
+        <span class="mt-0.5" :class="resultClass" x-html="resultIcon"></span>
+        <div class="min-w-0">
+          <p class="font-medium text-foreground">
+            <span x-text="c.result === 'clear' ? 'Clear' : 'Flagged'"></span><span x-show="c.concern" x-text="` · ${c.concern === 'behaviour' ? 'Behaviour concern' : 'Evidence concern'}`"></span>
+          </p>
+          <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="c.reason"></p>
+          <p class="mt-1 text-sm text-muted-foreground-1">
+            <span x-text="`by ${reviewerFull(c.reviewer)}`"></span> ·
+            <span x-text="exact(c.completedAt)"></span> ·
+            <span x-text="`covers Sessions 1–${c.assessedThrough || d.assessedThrough}`"></span>
+          </p>
+        </div>
+      </div>
+      <p x-show="justSubmitted" class="mt-3 text-sm text-muted-foreground-2">Saved. This is now the candidate’s result and has been returned to the client.</p>
+
+      <template x-if="newReview">
+        <p class="mt-3 text-sm text-muted-foreground-2">
+          <span class="font-medium text-foreground" x-text="newReview.id"></span> was opened and queued. This decision stays the current result until that review is completed.
+        </p>
+      </template>
+
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <template x-if="justSubmitted && nextAssignedHref">
+          
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <a href="#" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   :href="nextAssignedHref">
+  
+
+    
+    
+
+    Next assigned case
+
+    
+
+  
+    </a>
+  
+
+
+        </template>
+        <template x-if="justSubmitted && !nextAssignedHref">
+          
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <a href="#" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   :href="listHref">
+  
+
+    
+    
+
+    Back to Review cases
+
+    
+
+  
+    </a>
+  
+
+
+        </template>
+        <template x-if="!newReview">
+          
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:bg-layer-focus"   @click="requestNewReview()">
+  
+
+    
+    
+
+    Request new review
+
+    
+
+  
+    </button>
+  
+
+
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <!-- Queued: nobody owns it yet -->
+  <template x-if="c.state === 'queued'">
+    <p class="mt-2 text-sm text-muted-foreground-2">Nobody has claimed this case yet. Assign it to yourself at the top of the page to record a decision.</p>
+  </template>
+
+  <!-- Someone else's case -->
+  <template x-if="c.state === 'assigned' && !isMine">
+    <p class="mt-2 text-sm text-muted-foreground-2">
+      Assigned to <span class="font-medium text-foreground" x-text="reviewerFull(c.reviewer)"></span>. Only they can submit a decision<span x-show="isAdmin">; use Reassign at the top to move it</span>.
+    </p>
+  </template>
+
+  <!-- The assigned Reviewer's form -->
+  <template x-if="isMine">
+    <div class="mt-1">
+      <p class="text-sm text-muted-foreground-1">
+        Covers Sessions 1–<span x-text="d.assessedThrough"></span>, the latest the AI assessed. Your decision becomes the candidate’s result.
+      </p>
+
+      <fieldset class="mt-4" :disabled="!canDecide">
+        <legend class="sr-only">Result</legend>
+        <div class="grid sm:grid-cols-2 gap-3">
+          
+
+
+
+
+<label for="cd-choice-clear" class="py-3 px-4 flex text-sm bg-layer text-foreground rounded-xl cursor-pointer ring-1 ring-layer-line has-[:checked]:ring-2 has-[:checked]:ring-primary transition-all ">
+  <input 
+    id="cd-choice-clear" 
+    name="cd-choice" 
+    type="radio" 
+    class="shrink-0 size-4 mt-0.5 bg-transparent border-line-3 rounded-full shadow-2xs text-primary focus:ring-0 focus:ring-offset-0 checked:bg-primary-checked checked:border-primary-checked disabled:opacity-50 disabled:pointer-events-none "
+    value="clear"
+    
+    
+    
+    
+    
+    :checked="decision.choice === 'clear'" @change="choose('clear')">
+  <span class="grow px-4 space-y-1">
+    
+      <span class="block font-medium ">
+        Clear
+      </span>
+    
+    
+      <span class="block text-sm/6 text-muted-foreground-1">
+        The available evidence doesn’t support an integrity concern.
+      </span>
+    
+  </span>
+</label>
+
+
+          
+
+
+
+
+<label for="cd-choice-flagged" class="py-3 px-4 flex text-sm bg-layer text-foreground rounded-xl cursor-pointer ring-1 ring-layer-line has-[:checked]:ring-2 has-[:checked]:ring-primary transition-all ">
+  <input 
+    id="cd-choice-flagged" 
+    name="cd-choice" 
+    type="radio" 
+    class="shrink-0 size-4 mt-0.5 bg-transparent border-line-3 rounded-full shadow-2xs text-primary focus:ring-0 focus:ring-offset-0 checked:bg-primary-checked checked:border-primary-checked disabled:opacity-50 disabled:pointer-events-none "
+    value="flagged"
+    
+    
+    
+    
+    
+    :checked="decision.choice === 'flagged'" @change="choose('flagged')">
+  <span class="grow px-4 space-y-1">
+    
+      <span class="block font-medium ">
+        Flagged
+      </span>
+    
+    
+      <span class="block text-sm/6 text-muted-foreground-1">
+        The evidence supports a concern, including required evidence that’s missing or unusable.
+      </span>
+    
+  </span>
+</label>
+
+
+        </div>
+      </fieldset>
+
+      <!-- Concern type (Flagged only) -->
+      <template x-if="decision.choice === 'flagged'">
+        <fieldset class="mt-5" :disabled="!canDecide">
+          <legend class="text-sm font-medium text-foreground">Concern type</legend>
+          <div class="mt-2 flex flex-wrap gap-x-6 gap-y-2">
+            
+
+
+
+
+<div class="relative">
+  <div class="flex gap-3">
+    <div class="flex h-6 shrink-0 items-center">
+      <input 
+        id="cd-concern-behaviour" 
+        name="cd-concern" 
+        type="radio" 
+        class="shrink-0 size-4 mt-0.5 bg-transparent border-line-3 rounded-full shadow-2xs text-primary focus:ring-0 focus:ring-offset-0 checked:bg-primary-checked checked:border-primary-checked disabled:opacity-50 disabled:pointer-events-none  "
+        value="behaviour"
+        
+        
+        
+        
+        
+        x-model="decision.concern">
+    </div>
+    
+    
+      <div class="text-sm/6">
+        
+          <label for="cd-concern-behaviour" class="font-medium text-foreground">
+            Behaviour concern
+          </label>
+        
+        
+      </div>
+    
+  </div>
+
+  
+</div>
+
+
+            
+
+
+
+
+<div class="relative">
+  <div class="flex gap-3">
+    <div class="flex h-6 shrink-0 items-center">
+      <input 
+        id="cd-concern-evidence" 
+        name="cd-concern" 
+        type="radio" 
+        class="shrink-0 size-4 mt-0.5 bg-transparent border-line-3 rounded-full shadow-2xs text-primary focus:ring-0 focus:ring-offset-0 checked:bg-primary-checked checked:border-primary-checked disabled:opacity-50 disabled:pointer-events-none  "
+        value="evidence"
+        
+        
+        
+        
+        
+        x-model="decision.concern">
+    </div>
+    
+    
+      <div class="text-sm/6">
+        
+          <label for="cd-concern-evidence" class="font-medium text-foreground">
+            Evidence concern
+          </label>
+        
+        
+      </div>
+    
+  </div>
+
+  
+</div>
+
+
+          </div>
+        </fieldset>
+      </template>
+
+      <!-- Structured reason -->
+      <template x-if="decision.choice">
+        <fieldset class="mt-5" :disabled="!canDecide">
+          <legend class="text-sm font-medium text-foreground">Reason</legend>
+          <div class="mt-2 flex flex-col gap-2">
+            <template x-for="[value, label] in reasons" :key="value">
+              <label class="flex items-center gap-x-3 text-sm text-foreground cursor-pointer">
+                <input type="radio" name="cd-reason" :value="value" x-model="decision.reason"
+                       class="shrink-0 size-4 bg-transparent border-line-3 rounded-full text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+                <span x-text="label"></span>
+              </label>
+            </template>
+          </div>
+        </fieldset>
+      </template>
+
+      <template x-if="decision.choice">
+        <div class="mt-5">
+          
+<div class="w-full">
+  
+    <label for="cd-notes" class="block mb-2 text-sm font-medium text-foreground">
+      Notes
+    </label>
+  
+
+  <div class="relative w-full">
+    <textarea id="cd-notes" 
+              name="cd-notes"
+              rows="3"
+              class="py-2 px-3 sm:py-3 sm:px-4 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:z-10 focus:ring-primary disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb  "
+              placeholder="What did you see, and why does it support this result?"
+              
+              
+              x-model="decision.notes"
+              
+              :disabled="!canDecide"></textarea>
+  </div>
+  
+  
+    <p class="mt-1.5 text-xs text-muted-foreground-1">Required when the reason is Other. Notes stay in the case history.</p>
+  
+</div>
+
+        </div>
+      </template>
+
+      <!-- Errors stay next to the decision -->
+      <p x-show="decision.error" class="mt-3 text-sm text-red-600 dark:text-red-500" role="alert" x-text="decision.error"></p>
+      <p x-show="condition === 'stale'" class="mt-3 text-sm text-amber-700 dark:text-amber-500">Refresh evidence before submitting. Your choice and notes are kept.</p>
+      <p x-show="condition === 'error'" class="mt-3 text-sm text-amber-700 dark:text-amber-500">Submitting is blocked until evidence coverage loads. Your choice and notes are kept.</p>
+
+      <!-- Submit, then a deliberate confirmation -->
+      <div class="mt-5 pt-4 border-t border-card-line">
+        <template x-if="!decision.confirming">
+          <div class="flex flex-wrap items-center gap-3">
+            
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   @click="reviewDecision()" :disabled="!canDecide">
+  
+
+    
+    
+
+    Submit decision
+
+    
+
+  
+    </button>
+  
+
+
+            <span class="text-sm text-muted-foreground-1">You’ll confirm before it’s saved.</span>
+          </div>
+        </template>
+        <template x-if="decision.confirming">
+          <div class="p-4 rounded-lg bg-muted">
+            <p class="text-sm font-medium text-foreground">
+              Submit as <span x-text="decision.choice === 'clear' ? 'Clear' : 'Flagged'"></span><span x-show="decision.choice === 'flagged'" x-text="` · ${decision.concern === 'behaviour' ? 'Behaviour concern' : 'Evidence concern'}`"></span>?
+            </p>
+            <p class="mt-1 text-sm text-muted-foreground-2">
+              Reason: <span x-text="reasonLabel"></span>. This becomes the candidate’s result, is returned to the client and closes the case.
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   @click="submit()">
+  
+
+    
+    
+
+    Confirm and submit
+
+    
+
+  
+    </button>
+  
+
+
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:bg-layer-focus"   @click="decision.confirming = false">
+  
+
+    
+    
+
+    Go back
+
+    
+
+  
+    </button>
+  
+
+
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
+</section>
+
+  </div>
+  <div class="flex flex-col gap-5 min-w-0">
+    <!-- Session context: changes with Session navigation; the result and decision don't -->
+<section id="session-panel" class="bg-card border border-card-line shadow-2xs rounded-xl scroll-mt-20" aria-labelledby="session-heading">
+  <div class="flex items-center justify-between gap-2 p-4 sm:px-5 border-b border-card-line">
+    <h2 id="session-heading" class="text-base font-semibold text-foreground">Session</h2>
+    <div class="flex items-center gap-x-1">
+      <button type="button" @click="prevSession()" :disabled="sessionIdx === 0" aria-label="Previous session"
+              class="inline-flex items-center justify-center size-8 rounded-lg text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-40 disabled:pointer-events-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <span class="text-sm text-muted-foreground-1 whitespace-nowrap">Session <span class="font-medium text-foreground" x-text="session.n"></span> of <span x-text="d.sessions.length"></span></span>
+      <button type="button" @click="nextSession()" :disabled="sessionIdx === d.sessions.length - 1" aria-label="Next session"
+              class="inline-flex items-center justify-center size-8 rounded-lg text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-40 disabled:pointer-events-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="p-4 sm:p-5 flex flex-col gap-5">
+    <p class="text-sm text-muted-foreground-1">
+      <span class="text-foreground" x-text="session.status"></span> ·
+      <span x-text="`${day(session.start)}, ${span(session.start, session.end)}`"></span> ·
+      <span x-text="dur(session.length)"></span>
+      <span x-show="sessionIdx === d.sessions.length - 1"> · latest</span>
+    </p>
+
+    <!-- Identity check: reference stays fixed, captured image follows the Session -->
+    <div>
+      <h3 class="text-sm font-medium text-muted-foreground-1">Identity check</h3>
+      <div class="mt-2 grid grid-cols-2 gap-2">
+        <figure>
+          <img :src="identityImage" alt="Reference photo" class="w-full aspect-[4/3] rounded-lg object-cover bg-surface">
+          <figcaption class="mt-1 text-xs text-muted-foreground-1">Reference</figcaption>
+        </figure>
+        <figure>
+          <img :src="identityImage" :alt="`Captured in Session ${session.n}`" class="w-full aspect-[4/3] rounded-lg object-cover bg-surface">
+          <figcaption class="mt-1 text-xs text-muted-foreground-1" x-text="`Captured · Session ${session.n}`"></figcaption>
+        </figure>
+      </div>
+      <p class="mt-2 text-sm">
+        <span class="font-medium" :class="session.identity.status === 'Verified' ? 'text-foreground' : 'text-amber-700 dark:text-amber-500'" x-text="session.identity.status"></span>
+        <span class="text-muted-foreground-1" x-text="`· ${session.identity.score}% face match`"></span>
+      </p>
+      <p x-show="session.identity.status === 'Conditional'" class="mt-0.5 text-sm text-muted-foreground-2">
+        Between 80% and 98%, so a person should confirm it’s the same candidate. This is Session context, not an integrity concern.
+      </p>
+      <button type="button" @click="activityFilter = { session: '', type: 'session', q: 'Identity' }; tab = 'activity'"
+              class="mt-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">View all identity checks</button>
+    </div>
+
+    <!-- This Session's coverage -->
+    <div>
+      <h3 class="text-sm font-medium text-muted-foreground-1">Evidence in this session</h3>
+      <dl class="mt-1 divide-y divide-card-line">
+        <template x-for="row in sessionCoverage(session)" :key="row.label">
+          <div class="py-2 flex items-center justify-between gap-3 text-sm">
+            <dt class="text-foreground" x-text="row.label"></dt>
+            <dd class="text-end">
+              <span class="font-medium" :class="coverageClass(row)" x-text="row.status"></span>
+              <span x-show="row.measure && row.gap" class="text-muted-foreground-1" x-text="`· ${row.measure}`"></span>
+            </dd>
+          </div>
+        </template>
+      </dl>
+    </div>
+
+    <!-- Device and connection -->
+    <div>
+      <h3 class="text-sm font-medium text-muted-foreground-1">Device</h3>
+      <dl class="mt-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        <dt class="text-muted-foreground-1">Device</dt><dd class="text-foreground" x-text="session.device.type"></dd>
+        <dt class="text-muted-foreground-1">OS</dt><dd class="text-foreground" x-text="session.device.os"></dd>
+        <dt class="text-muted-foreground-1">Browser</dt><dd class="text-foreground" x-text="session.device.browser"></dd>
+        <dt class="text-muted-foreground-1">SDK</dt><dd class="text-foreground" x-text="session.device.sdk"></dd>
+        <dt class="text-muted-foreground-1">IP</dt><dd class="text-foreground font-mono text-[13px]" x-text="session.device.ip"></dd>
+        <dt class="text-muted-foreground-1">Time zone</dt><dd class="text-foreground" x-text="session.device.timezone"></dd>
+      </dl>
+    </div>
+
+    <button type="button" @click="activityFilter = { session: String(session.n), type: '', q: '' }; tab = 'activity'"
+            class="self-start inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+      <span x-text="`View Session ${session.n} activity`"></span>
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </div>
+</section>
+
+    
+
+<!-- Latest assessment and recent case changes -->
+<section class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5" aria-labelledby="recent-history-heading">
+  <h2 id="recent-history-heading" class="text-base font-semibold text-foreground">Recent history</h2>
+  <div class="mt-3">
+    
+<div class="w-full ">
+  <template x-for="(item, i) in recentHistory" :key="item.id">
+    <div>
+      <!-- Heading -->
+      <template x-if="item.heading">
+        <div class="ps-2 my-2" :class="i === 0 ? 'mt-0' : ''">
+          <h3 class="text-xs font-medium uppercase text-muted-foreground-1" x-text="item.heading"></h3>
+        </div>
+      </template>
+
+      <!-- Item -->
+      <div class="flex gap-x-3">
+        <!-- Icon -->
+        <div class="relative after:absolute after:top-7 after:bottom-0 after:inset-s-3.5 after:-translate-x-[0.5px] after:border-s after:border-line-2"
+             :class="i === recentHistory.length - 1 ? 'after:hidden' : ''">
+          <div class="relative z-10 size-7 flex justify-center items-center">
+            <template x-if="item.icon">
+              <span class="flex text-muted-foreground-1" x-html="item.icon"></span>
+            </template>
+            <template x-if="!item.icon">
+              <div class="size-2 rounded-full" :class="item.tone === 'accent' ? 'bg-primary' : 'bg-surface-3'"></div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Right Content -->
+        <div class="grow min-w-0 pt-0.5 pb-6">
+          <h3 class="text-sm font-medium text-foreground" x-text="item.title"></h3>
+          <p x-show="item.description" class="mt-1 text-sm text-muted-foreground-2" x-text="item.description"></p>
+          <div x-show="item.actor || item.meta" class="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground-1">
+            <span x-show="item.actor" class="inline-flex items-center gap-x-1.5">
+              <template x-if="item.actor_avatar">
+                <img class="shrink-0 size-4 rounded-full object-cover" :src="item.actor_avatar" alt="">
+              </template>
+              <span x-text="item.actor"></span>
+            </span>
+            <span x-show="item.actor && item.meta" aria-hidden="true">·</span>
+            <span x-show="item.meta" x-text="item.meta"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </template>
+  <p x-show="!(recentHistory).length" class="py-6 text-sm text-muted-foreground-1">No prior assessment or review-case changes exist.</p>
+</div>
+
+  </div>
+  <button type="button" @click="resetHistory(); tab = 'history'"
+          class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+    View full history
+    <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+  </button>
+</section>
+
+  </div>
+</div>
