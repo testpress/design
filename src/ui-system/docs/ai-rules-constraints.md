@@ -13,7 +13,7 @@ AI must behave as a **frontend assembler**, not a creative designer.
 
 AI must always reuse approved components and page patterns before introducing new UI structures.
 
-Approved UI will be in ui system/components and ui system/patterns
+Approved UI components are in `src/ui-system/components/`. Approved page structures are in `page-pattern-standards.md`.
 
 ### Consistency Over Creativity
 
@@ -49,7 +49,7 @@ AI-generated UI must only use approved technologies.
 
 ### Templates
 
-* Reusable Django template includes
+* Nunjucks macros from `src/ui-system/components/`
 
 
 ---
@@ -81,7 +81,7 @@ AI must follow the below priority order:
 1. Existing page pattern
 2. Existing reusable component
 3. Approved UI variation
-4. New component request
+4. New component from the Preline MCP, added to `src/ui-system/components/`
 
 AI must not skip hierarchy.
 
@@ -95,7 +95,7 @@ AI must use parameters when:
 * content changes
 * small visual variations exist
 
-AI must request a new component when:
+AI must add a new component when:
 
 * layout changes
 * structure changes
@@ -106,11 +106,11 @@ AI must request a new component when:
 
 If no approved component exists:
 
-AI must return:
+1. Get the closest component from the Preline MCP.
+2. Match it to the `ui-system` styling and add it to `src/ui-system/components/` as a macro, with a preview include in `src/ui-system/preview/includes/`.
+3. Use it from there.
 
-> New component required
-
-AI must not invent new reusable UI patterns.
+If Preline has nothing suitable either, build it by hand to the `ui-system` styling and add it to `src/ui-system/components/` the same way.
 
 
 ---
