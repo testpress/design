@@ -82,10 +82,14 @@
       const pick = a => a[Math.floor(rand() * a.length)];
       const between = (a, b) => a + rand() * (b - a);
 
-      // Why a case exists: AI flag (most), a QA sample of an AI clear, or a manual request
-      const reasonRoll = rand();
-      const origin = reasonRoll < 0.1 ? 'qa' : reasonRoll < 0.15 ? 'manual' : 'ai_flagged';
+      // Why a case exists: AI flagged it (most), or the client asked to check the evidence of an AI-cleared candidate
+      const origin = rand() < 0.15 ? 'client' : 'ai_flagged';
       const recordingEnabled = rand() < 0.6;
+      // Candidate profile details shown on the page
+      const profile = {
+        phone: `+91 ${Math.floor(between(70000, 99999))} ${Math.floor(between(10000, 99999))}`,
+        enrolledDaysBefore: Math.floor(between(20, 90)),
+      };
       const device = pick([
         { type: 'Laptop', os: 'Windows 11', browser: 'Chrome 129' },
         { type: 'Laptop', os: 'macOS 14.6', browser: 'Safari 17.6' },
@@ -192,21 +196,27 @@
 
       // History: AI assessments and case changes (newest added last; the page sorts)
       const history = [];
-      history.push({ id: 'h-ai', at: aiAt, kind: 'assessment', actor: 'AI', title: aiResult === 'flagged' ? `AI flagged the candidate (${concernType === 'behaviour' ? 'Behaviour concern' : 'Evidence concern'})` : 'AI cleared the candidate', description: `Assessed through Session ${latest.n}.` });
+      history.push({ id: 'h-ai', at: aiAt, kind: 'assessment', actor: 'AI', title: aiResult === 'flagged' ? 'AI flagged the candidate' : 'AI cleared the candidate', description: `Assessed through Session ${latest.n}.` });
       if (sessions.length > 1) {
         const prev = sessions[sessions.length - 2];
         history.push({ id: 'h-ai-prev', at: prev.end + 12 * MIN, kind: 'assessment', actor: 'AI', title: 'AI cleared the candidate', description: `Assessed through Session ${prev.n}.` });
       }
       const created = c.createdAt || aiAt + 2 * MIN;
-      const why = origin === 'qa' ? 'Picked for a quality check of an AI Clear' : origin === 'manual' ? 'Review requested by Anita Kumar' : 'Opened because AI flagged the candidate';
-      history.push({ id: 'h-open', at: created, kind: 'case', actor: origin === 'manual' ? 'Anita Kumar' : 'TPSentinel', title: 'Review case opened', description: why });
+      // A client request names what to check: periodic snapshots, or recordings when the policy records sessions
+      const request = origin !== 'client' ? null : {
+        what: recordingEnabled && rand() < 0.5 ? 'recordings' : 'snapshots',
+        session: pick(sessions).n,
+        by: 'Anita Kumar',
+        note: pick(['Client wants to see the candidate was alone for this session.', 'Client asked for a look at this session before issuing the certificate.', 'Candidate scored unusually high here; client wants the evidence checked.']),
+      };
+      const why = request ? `Client asked to check the ${request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings'} of Session ${request.session}` : 'Opened because AI flagged the candidate';
+      history.push({ id: 'h-open', at: created, kind: 'case', actor: request ? request.by : 'TPSentinel', title: 'Review case opened', description: why });
       if (c.assignedAt && c.reviewer) history.push({ id: 'h-assign', at: c.assignedAt, kind: 'case', actor: c.reviewer === ME ? 'Divya Menon' : 'Anita Kumar', title: `Assigned to ${REVIEWER_BY_ID[c.reviewer].name}`, description: '' });
       if (c.state === 'completed') {
-        history.push({ id: 'h-done', at: c.completedAt, kind: 'case', actor: REVIEWER_BY_ID[c.reviewer].name, title: `Marked ${c.result === 'clear' ? 'Clear' : 'Flagged'}${c.concern ? ` (${c.concern === 'behaviour' ? 'Behaviour concern' : 'Evidence concern'})` : ''}`, description: c.reason || '' });
+        history.push({ id: 'h-done', at: c.completedAt, kind: 'case', actor: REVIEWER_BY_ID[c.reviewer].name, title: `Marked ${c.result === 'clear' ? 'Clear' : 'Flagged'}`, description: c.reason || '' });
       }
 
-      return { origin, recordingEnabled, sessions, events, gaps, sessionMedia, technical, aiResult, aiAt, concernType, history, assessedThrough: latest.n,
-        manualNote: origin === 'manual' ? 'Client asked us to double-check the final exam session.' : '' };
+      return { origin, request, profile, recordingEnabled, sessions, events, gaps, sessionMedia, technical, aiResult, aiAt, concernType, history, assessedThrough: latest.n };
     }
 
     function loadRole() {
@@ -240,7 +250,7 @@
         menu: null,
         viewer: null,
         newReview: null,
-        decision: { choice: '', concern: '', reason: '', notes: '', confirming: false, error: '', submitting: false },
+        decision: { choice: '', reason: '', notes: '', confirming: false, error: '', submitting: false },
         justSubmitted: false,
         evidenceFilter: { session: '', anomaly: '', source: '', availability: '', q: '' },
         activityFilter: { session: '', type: '', q: '' },
@@ -294,9 +304,7 @@
           return 'Completed';
         },
         get originLabel() {
-          if (d.origin === 'qa') return 'Quality check';
-          if (d.origin === 'manual') return 'Review requested';
-          return 'AI flagged';
+          return d.origin === 'client' ? 'Requested by client' : 'AI flagged';
         },
         relative, exact, day, dayTime, dur, span,
 
@@ -337,13 +345,37 @@
 
         // ---------- why this candidate needs review ----------
         get summary() {
-          if (d.origin === 'qa') return 'AI cleared this candidate, and the case was picked at random for a quality check. Confirm the Clear result, or flag it with a reason if the evidence shows a concern.';
-          if (d.origin === 'manual') return 'AI cleared this candidate, but a review was requested. Check the evidence below and record a decision.';
+          if (d.origin === 'client') {
+            const what = d.request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings';
+            return `The client asked to check the ${what} from Session ${d.request.session}. AI cleared this candidate, so review the requested evidence directly and record a decision.`;
+          }
           if (d.concernType === 'behaviour') {
             const top = this.behaviourConcerns[0];
-            return `AI flagged this candidate for a behaviour concern${top ? `: ${INDICATOR_BY_KEY[top.key].label.toLowerCase()}` : ''}. A reviewer must confirm whether it was a real integrity issue or has an innocent explanation.`;
+            return `AI flagged this candidate${top ? ` because of \u201c${INDICATOR_BY_KEY[top.key].label}\u201d` : ''}. A reviewer must confirm whether it was a real integrity issue or has an innocent explanation.`;
           }
           return 'AI flagged this candidate because required evidence is missing, so the attempt can’t be fully assessed. A reviewer must decide whether the available evidence is still enough.';
+        },
+        // Client request: the evidence they asked about, from the requested Session
+        get requestedEvidence() {
+          if (!d.request) return [];
+          const kind = d.request.what === 'snapshots' ? 'periodic' : 'recording';
+          return d.sessionMedia.filter(m => m.session === d.request.session && m.kind === kind).sort((a, b) => a.at - b.at);
+        },
+        openRequestedEvidence() {
+          this.evidenceFilter = { session: String(d.request.session), anomaly: '', source: '', availability: '', q: d.request.what === 'snapshots' ? 'Periodic' : 'recording' };
+          this.tab = 'evidence';
+          this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+        },
+        get enrolledOn() {
+          const t = d.sessions[0].start - d.profile.enrolledDaysBefore * DAY;
+          const dt = new Date(t);
+          return `${MONTHS[dt.getMonth()]} ${dt.getDate()}, ${dt.getFullYear()}`;
+        },
+        copied: '',
+        copy(text, key) {
+          try { navigator.clipboard?.writeText(text); } catch (e) { /* clipboard unavailable */ }
+          this.copied = key;
+          setTimeout(() => { if (this.copied === key) this.copied = ''; }, 1500);
         },
         // One entry per anomaly type, most decision-relevant first (severity, then most recent)
         get behaviourConcerns() {
@@ -493,8 +525,16 @@
         openMenu(type, ev) {
           if (this.menu?.type === type) { this.menu = null; return; }
           const r = ev.currentTarget.getBoundingClientRect();
-          const width = type === 'assign' ? 280 : 200;
-          this.menu = { type, top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), width };
+          const width = type === 'assign' ? 320 : 200;
+          this.menu = { type, top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - width - 8)), width, search: '' };
+          if (type === 'assign') this.$nextTick(() => this.$refs.assignSearch?.focus());
+        },
+        // Reviewers for the assign menu: filtered by the search box, with how many open cases each owns
+        get assignOptions() {
+          const q = (this.menu?.search || '').trim().toLowerCase();
+          return REVIEWERS
+            .filter(r => !q || r.name.toLowerCase().includes(q))
+            .map(r => ({ ...r, load: this.all.filter(x => x.state === 'assigned' && x.reviewer === r.id).length }));
         },
         assignTo(id) {
           this.menu = null;
@@ -521,13 +561,12 @@
         get reasons() { return this.decision.choice === 'flagged' ? FLAG_REASONS : CLEAR_REASONS; },
         choose(choice) {
           if (this.decision.choice === choice) return;
-          this.decision = { ...this.decision, choice, reason: '', concern: choice === 'flagged' ? (d.concernType || '') : '', confirming: false, error: '' };
+          this.decision = { ...this.decision, choice, reason: '', confirming: false, error: '' };
         },
         get reasonLabel() { return (this.reasons.find(r => r[0] === this.decision.reason) || [])[1] || ''; },
         get decisionError() {
           const x = this.decision;
           if (!x.choice) return 'Choose Clear or Flagged.';
-          if (x.choice === 'flagged' && !x.concern) return 'Choose the concern type.';
           if (!x.reason) return 'Choose a reason.';
           if (x.reason === 'other' && !x.notes.trim()) return 'Add a note explaining the reason.';
           return '';
@@ -540,10 +579,10 @@
         submit() {
           if (this.condition === 'stale') { this.decision.confirming = false; return; }
           const x = this.decision;
-          const fields = { state: 'completed', result: x.choice, concern: x.choice === 'flagged' ? x.concern : null, reason: this.reasonLabel + (x.notes.trim() ? ` — ${x.notes.trim()}` : ''), completedAt: Date.now(), reviewer: ME, assessedThrough: d.assessedThrough };
+          const fields = { state: 'completed', result: x.choice, reason: this.reasonLabel + (x.notes.trim() ? ` — ${x.notes.trim()}` : ''), completedAt: Date.now(), reviewer: ME, assessedThrough: d.assessedThrough };
           Object.assign(c, fields);
           SR.saveChange(c.id, fields);
-          this.log({ kind: 'case', actor: 'Divya Menon', title: `Marked ${x.choice === 'clear' ? 'Clear' : 'Flagged'}${fields.concern ? ` (${fields.concern === 'behaviour' ? 'Behaviour concern' : 'Evidence concern'})` : ''}`, description: fields.reason });
+          this.log({ kind: 'case', actor: 'Divya Menon', title: `Marked ${x.choice === 'clear' ? 'Clear' : 'Flagged'}`, description: fields.reason });
           this.justSubmitted = true;
           x.confirming = false;
         },
