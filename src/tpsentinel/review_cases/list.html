@@ -32,7 +32,10 @@
       <div x-show="selected.length" x-cloak class="flex flex-wrap items-center gap-2">
         <span class="text-sm font-medium text-foreground me-1" x-text="`${selected.length} selected`"></span>
 
-        {{ button(text="Assign to me", size="sm", extra_attrs='x-show="selectionKind === \'queued\'" @click="assignToMe(selectedCases.map(c => c.id))"') }}
+        <!-- Review in sequence: claim the unowned ones first if needed. Count = cases that will open -->
+        {{ button(size="sm", extra_attrs='x-show="selQueued.length" @click="assignAndReview()" x-text="`Assign & start review (${reviewableCount})`"') }}
+        {{ button(size="sm", extra_attrs='x-show="!selQueued.length && selMine.length" @click="reviewSelected()" x-text="`Review selected (${selMine.length})`"') }}
+        {{ button(size="sm", variant="secondary", extra_attrs='x-show="selQueued.length" @click="assignToMe(selQueued.map(c => c.id))" x-text="`Assign to me (${selQueued.length})`"') }}
 
         <template x-if="isAdmin">
           <div class="contents">
@@ -53,9 +56,11 @@
           </div>
         </template>
 
-        <!-- Explain why reviewer actions aren't offered -->
-        <span x-show="!isAdmin && selectionKind !== 'queued'" class="text-[13px] text-muted-foreground-1">
-          Only unassigned cases can be assigned to you. Deselect the others to continue.
+        <!-- Cases owned by someone else are left out of review actions; say so -->
+        <span x-show="!isAdmin && selOthers.length && reviewableCount" class="text-[13px] text-muted-foreground-1"
+              x-text="`${selOthers.length} ${selOthers.length === 1 ? 'case is' : 'cases are'} assigned to someone else and left out.`"></span>
+        <span x-show="!isAdmin && selOthers.length && !reviewableCount" class="text-[13px] text-muted-foreground-1">
+          These cases are assigned to other reviewers. You can review your own or unassigned cases.
         </span>
 
         <button type="button" @click="selected = []"
