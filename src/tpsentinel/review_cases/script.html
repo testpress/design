@@ -264,7 +264,8 @@
         icons: Object.fromEntries(Object.keys(ICONS).map(k => [k, icon(k)])),
 
         view: 'mine',
-        queries: Object.assign({ mine: '', unassigned: '', open: '', closed: '' }, stored.queries),
+        // One search shared by all views, so tab counts and switching tabs reflect the same filters
+        query: typeof stored.query === 'string' ? stored.query : '',
         sorts: Object.assign(JSON.parse(JSON.stringify(DEFAULT_SORT)), stored.sorts),
         pages: Object.assign({ mine: 1, unassigned: 1, open: 1, closed: 1 }, stored.pages),
         selected: [],
@@ -284,12 +285,9 @@
           const params = new URLSearchParams(location.search);
           const fromUrl = params.get('view');
           this.view = VIEWS.some(v => v.key === fromUrl) ? fromUrl : (stored.view || this.defaultView());
-          // Each view keeps its own query; react only when the active view's query changes
-          this._prevQueries = { ...this.queries };
-          this.$watch('queries', () => {
-            const v = this.view;
-            if (this.queries[v] !== this._prevQueries[v]) { this.pages[v] = 1; this.pruneSelection(); }
-            this._prevQueries = { ...this.queries };
+          this.$watch('query', () => {
+            VIEWS.forEach(v => this.pages[v.key] = 1);
+            this.pruneSelection();
             this.save();
             // Filters can shift the toolbar; keep an open menu under its button
             this.$nextTick(() => this.placeMenu());
@@ -305,7 +303,7 @@
         },
         save() {
           try {
-            sessionStorage.setItem(STORE_KEY, JSON.stringify({ role: this.role, view: this.view, queries: this.queries, sorts: this.sorts, pages: this.pages, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } }));
+            sessionStorage.setItem(STORE_KEY, JSON.stringify({ role: this.role, view: this.view, query: this.query, sorts: this.sorts, pages: this.pages, counts: { mine: this.counts.mine, unassigned: this.counts.unassigned } }));
           } catch (e) { /* storage unavailable: state just isn't remembered */ }
         },
 
@@ -318,7 +316,7 @@
           this.menu = null;
           this.setView(this.defaultView());
           // Reviewers can't filter by reviewer
-          if (!this.isAdmin) Object.keys(this.queries).forEach(v => this.queries[v] = removeQualifier(this.queries[v], 'reviewer'));
+          if (!this.isAdmin) this.query = removeQualifier(this.query, 'reviewer');
         },
         setView(view) {
           this.view = view;
@@ -331,8 +329,6 @@
         },
 
         // ---------- query ----------
-        get query() { return this.queries[this.view]; },
-        set query(v) { this.queries[this.view] = v; },
         get parsed() { return parseQuery(this.query); },
         get availableFilters() {
           return VIEW_FILTERS[this.view].filter(k => !QUALIFIERS[k].admin || this.isAdmin);
@@ -386,20 +382,28 @@
           return out;
         },
         get viewCases() { return this.pool.filter(c => this.inView(c, this.view)); },
-        get filtered() {
+        // Build a test for one view: filters that don't vary in that view are ignored there
+        matcherFor(view) {
           const { filters, text } = this.parsed;
-          const matchers = Object.entries(filters).map(([key, value]) => {
+          const applies = k => VIEW_FILTERS[view].includes(k) || QUALIFIERS[k].searchOnly;
+          const matchers = Object.entries(filters).filter(([key]) => applies(key)).map(([key, value]) => {
             const wanted = value.split(',');
             const opts = QUALIFIERS[key].values().filter(o => wanted.includes(o.value));
             return c => opts.some(o => o.match(c));
           });
-          const list = this.viewCases.filter(c => {
+          return c => {
             if (!matchers.every(m => m(c))) return false;
             if (!text.length) return true;
             const hay = `${c.name} ${c.identifier} ${c.email} ${WORKSPACE_BY_ID[c.workspace].name} ${c.id}`.toLowerCase();
             return text.every(t => hay.includes(t));
-          });
-          return this.sortCases(list);
+          };
+        },
+        get filtered() { return this.sortCases(this.viewCases.filter(this.matcherFor(this.view))); },
+        // Tab counts follow the current search and filters
+        get tabCounts() {
+          const out = {};
+          VIEWS.forEach(v => { const m = this.matcherFor(v.key); out[v.key] = this.pool.filter(c => this.inView(c, v.key) && m(c)).length; });
+          return out;
         },
         ageTime(c) { return this.view === 'mine' ? c.assignedAt : c.createdAt; },
         sortCases(list) {
