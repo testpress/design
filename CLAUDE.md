@@ -29,6 +29,8 @@ Pages on the root `css/tailwind.css` only get Tailwind v3.4 classes; v4-only cla
 
 Products with their own CSS build (v4) only get classes from the files listed with `@source` in their entry CSS (for TPSentinel, `src/tpsentinel/backend.css`). Add every new page folder there, rebuild (`npm run build:css --prefix src/<product>`) and commit the rebuilt `css/<product>*.css`: the site build copies `css/` before it rebuilds, so PR previews use the committed file.
 
+TPSentinel's layout caps page content at `max-w-7xl` and centres it, so pages don't set their own width. Lists, tables, dashboards and detail pages fill that width; forms and settings narrow further inside it (`max-w-3xl`).
+
 On products that use the Preline theme (TPSentinel), use theme tokens (`bg-layer`, `border-layer-line`, `text-foreground`, `text-muted-foreground-1`, `bg-card`, `text-primary` …) for neutral and primary colours. Accent colours with no token (status icons, soft badges) use Tailwind palette classes with a `dark:` variant, as Preline's own components do. Don't invent custom tokens.
 
 ## Components
