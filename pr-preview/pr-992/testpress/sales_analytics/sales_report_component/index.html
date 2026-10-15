@@ -1,0 +1,819 @@
+<script src="https://preline.co/pro/assets/vendor/lodash/lodash.min.js"></script>
+<script src="https://preline.co/pro/assets/vendor/apexcharts/dist/apexcharts.min.js"></script>
+<script src="https://preline.co/pro/assets/js/hs-apexcharts-helpers.js"></script>
+
+
+<script>
+  function salesAnalytics() {
+    return {
+      isCNO: false, // Set to true for CNO role
+      showFilterModal: false,
+      selectedDateRange: 'last-30-days',
+      customDateStart: null,
+      customDateEnd: null,
+      showCustomDatePicker: false,
+      selectedAirports: [],
+      selectedCourses: [],
+      selectedUserType: 'all',
+
+      clearAllFilters() {
+        this.selectedDateRange = 'last-30-days';
+        this.customDateStart = null;
+        this.customDateEnd = null;
+        this.selectedAirports = [];
+        this.selectedCourses = [];
+        this.selectedUserType = 'all';
+      },
+
+      // KPI Data
+      totalRevenue: 1545000,
+      totalRegistrations: 1234,
+      individualUsers: 856,
+      cohortUsers: 378,
+
+      // Growth percentages
+      revenueGrowth: 15,
+      registrationsGrowth: 14,
+      individualGrowth: 12,
+      cohortGrowth: 18,
+
+      // Format currency
+      formatCurrency(amount) {
+        return new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          maximumFractionDigits: 0
+        }).format(amount);
+      },
+
+      // Format number with commas
+      formatNumber(num) {
+        return new Intl.NumberFormat('en-IN').format(num);
+      }
+    }
+  }
+
+</script>
+<script>
+  window.addEventListener('load', () => {
+    // Registrations Over Time Chart
+    (function () {
+      const individualData = [120, 180, 160, 220, 200, 280, 250, 300];
+      const cohortData = [80, 140, 120, 180, 160, 200, 180, 220];
+      const maxValue = Math.max(...individualData, ...cohortData);
+
+      // Calculate step for y-axis
+      let step;
+      if (maxValue <= 40) {
+        step = 5;
+      } else if (maxValue <= 80) {
+        step = 10;
+      } else {
+        step = Math.ceil(maxValue / 8 / 5) * 5;
+      }
+      const maxY = Math.ceil(maxValue / step) * step;
+      const tickAmount = Math.min(8, Math.floor(maxY / step));
+
+      buildChart('#hs-registrations-line-chart', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'line',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Individual Users',
+            data: individualData
+          },
+          {
+            name: 'Cohort Users',
+            data: cohortData
+          }
+        ],
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'straight',
+          width: [2, 2],
+          dashArray: [0, 0] // both solid lines
+        },
+        title: {
+          show: false
+        },
+        legend: {
+          show: false
+        },
+        xaxis: {
+          type: 'category',
+          categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'],
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          tooltip: {
+            enabled: false
+          },
+          labels: {
+            show: true,
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: 2,
+            offsetY: 4,
+            formatter: function (value, index) {
+              return value;
+            }
+          }
+        },
+        yaxis: {
+          min: 0,
+          max: maxY,
+          tickAmount: tickAmount,
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: -2,
+            formatter: (value) => {
+              if (value % step === 0 && value <= maxY) return value;
+              return '';
+            }
+          }
+        },
+        tooltip: {
+          custom: function (props) {
+            const { categories } = props.ctx.opts.xaxis;
+            const { dataPointIndex } = props;
+            const title = categories[dataPointIndex];
+
+            return buildTooltip(props, {
+              title: title,
+              mode,
+              hasTextLabel: true,
+              wrapperExtClasses: 'min-w-36',
+              labelDivider: ':',
+              labelExtClasses: 'ms-2',
+              valuePrefix: '',
+            });
+          }
+        },
+      }), {
+        colors: ['#2563EB', '#14B8A6'], // blue for Individual, teal for Cohort
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#e5e7eb'
+        }
+      }, {
+        colors: ['#3b82f6', '#06B6D4'],
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#404040'
+        }
+      });
+    })();
+
+    // Revenue Over Time Chart
+    (function () {
+      const individualSalesData = [150000, 200000, 180000, 240000, 220000, 280000, 260000, 300000];
+      const cohortSalesData = [100000, 180000, 160000, 220000, 200000, 250000, 230000, 280000];
+      const maxValue = Math.max(...individualSalesData, ...cohortSalesData);
+
+      // Calculate step for y-axis
+      let step;
+      if (maxValue <= 40000) {
+        step = 5000;
+      } else if (maxValue <= 80000) {
+        step = 10000;
+      } else {
+        step = Math.ceil(maxValue / 8 / 50000) * 50000;
+      }
+      const maxY = Math.ceil(maxValue / step) * step;
+      const tickAmount = Math.min(8, Math.floor(maxY / step));
+
+      buildChart('#hs-revenue-line-chart', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'line',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Individual Sales',
+            data: individualSalesData
+          },
+          {
+            name: 'Cohort Sales',
+            data: cohortSalesData
+          }
+        ],
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          curve: 'straight',
+          width: [2, 2],
+          dashArray: [0, 0] // both solid lines
+        },
+        title: {
+          show: false
+        },
+        legend: {
+          show: false
+        },
+        xaxis: {
+          type: 'category',
+          categories: ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5', 'Week 6', 'Week 7', 'Week 8'],
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          tooltip: {
+            enabled: false
+          },
+          labels: {
+            show: true,
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: 2,
+            offsetY: 4,
+            formatter: function (value, index) {
+              return value;
+            }
+          }
+        },
+        yaxis: {
+          min: 0,
+          max: maxY,
+          tickAmount: tickAmount,
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: -2,
+            formatter: (value) => {
+              if (value % step === 0 && value <= maxY) {
+                if (value >= 100000) {
+                  return `₹${(value / 100000).toFixed(1)}L`;
+                } else if (value >= 1000) {
+                  return `₹${(value / 1000).toFixed(0)}k`;
+                }
+                return `₹${value}`;
+              }
+              return '';
+            }
+          }
+        },
+        tooltip: {
+          custom: function (props) {
+            const { categories } = props.ctx.opts.xaxis;
+            const { dataPointIndex } = props;
+            const title = categories[dataPointIndex];
+
+            return buildTooltip(props, {
+              title: title,
+              mode,
+              hasTextLabel: true,
+              wrapperExtClasses: 'min-w-36',
+              labelDivider: ':',
+              labelExtClasses: 'ms-2',
+              valuePrefix: '',
+            });
+          }
+        },
+      }), {
+        colors: ['#2563EB', '#14B8A6'], // blue for Individual, teal for Cohort
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#e5e7eb'
+        }
+      }, {
+        colors: ['#3b82f6', '#06B6D4'],
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#404040'
+        }
+      });
+    })();
+
+    // Revenue by User Type Donut Chart
+    (function () {
+      buildChart('#hs-revenue-donut-chart', (mode) => ({
+        chart: {
+          height: 230,
+          width: 230,
+          type: 'donut',
+          zoom: {
+            enabled: false
+          },
+          events: {
+            dataPointSelection: (event, chartContext, config) => {
+              chartContext.toggleDataPointSelection(config.seriesIndex);
+            }
+          }
+        },
+        plotOptions: {
+          pie: {
+            donut: {
+              size: '76%'
+            }
+          }
+        },
+        series: [850000, 695000],
+        labels: ['Individual Sales', 'Cohort Sales'],
+        legend: {
+          show: false
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          width: 5,
+          colors: ['#ffffff']
+        },
+        grid: {
+          padding: {
+            top: -12,
+            bottom: -11,
+            left: -12,
+            right: -12
+          }
+        },
+        states: {
+          hover: {
+            filter: {
+              type: 'none',
+              value: 0
+            }
+          },
+          active: {
+            allowMultipleDataPointsSelection: false
+          }
+        },
+        tooltip: {
+          enabled: true,
+          custom: ({ seriesIndex, w }) => {
+            if (seriesIndex < 0 || !w.globals.labels[seriesIndex]) return '';
+            const label = w.globals.labels[seriesIndex];
+            const value = w.globals.series[seriesIndex];
+            const total = w.globals.series.reduce((a, b) => a + b, 0);
+            const percentage = ((value / total) * 100).toFixed(1);
+            const color = w.globals.colors[seriesIndex];
+            return `
+              <div class="border border-gray-300 bg-white w-48 text-gray-900 shadow-xl dark:bg-neutral-800 dark:border-neutral-700">
+                <div class="px-2 py-1.5 font-semibold text-[13px] flex items-center dark:text-neutral-200">
+                  <span>${label}</span>
+                  <span class="ms-auto">${percentage}%</span>
+                </div>
+                <div class="border-t border-gray-200 dark:border-neutral-700"></div>
+                <div class="space-y-1.5 p-2">
+                  <div class="flex items-center gap-x-2 text-xs text-gray-600 dark:text-neutral-400">
+                    <span class="w-3 h-3 rounded-sm inline-block" style="background:${color}"></span>
+                    <span>Revenue</span>
+                    <span class="ms-auto">₹${new Intl.NumberFormat('en-IN').format(value)}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+          }
+        }
+      }), {
+        colors: ['#2563EB', '#14B8A6'], // blue for Individual, teal for Cohort
+        stroke: {
+          colors: ['#ffffff']
+        }
+      }, {
+        colors: ['#3b82f6', '#06B6D4'],
+        stroke: {
+          colors: ['#ffffff']
+        }
+      });
+    })();
+
+    // Month-over-Month Comparison Bar Chart
+    (function () {
+      // Jan to Dec data with fluctuations
+      const individualData = [250000, 280000, 270000, 300000, 290000, 320000, 310000, 340000, 330000, 360000, 350000, 380000];
+      const cohortData = [200000, 220000, 210000, 240000, 230000, 260000, 250000, 280000, 270000, 300000, 290000, 320000];
+      const maxValue = Math.max(...individualData, ...cohortData);
+
+      // Calculate step for y-axis
+      let step = Math.ceil(maxValue / 8 / 50000) * 50000;
+      const maxY = Math.ceil(maxValue / step) * step;
+      const tickAmount = Math.min(8, Math.floor(maxY / step));
+
+      buildChart('#hs-month-over-month-bar-chart', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'bar',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Individual',
+            data: individualData
+          },
+          {
+            name: 'Cohort',
+            data: cohortData
+          }
+        ],
+        plotOptions: {
+          bar: {
+            horizontal: false,
+            columnWidth: '40%',
+            borderRadius: 2,
+            dataLabels: {
+              position: 'top'
+            }
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          show: true,
+          width: 2,
+          colors: ['transparent']
+        },
+        legend: {
+          show: false
+        },
+        xaxis: {
+          categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          },
+          labels: {
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: -2
+          }
+        },
+        yaxis: {
+          min: 0,
+          max: maxY,
+          tickAmount: tickAmount,
+          labels: {
+            align: 'left',
+            minWidth: 0,
+            maxWidth: 140,
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            offsetX: -2,
+            formatter: (value) => {
+              if (value % step === 0 && value <= maxY) {
+                if (value >= 100000) {
+                  return `₹${(value / 100000).toFixed(1)}L`;
+                } else if (value >= 1000) {
+                  return `₹${(value / 1000).toFixed(0)}k`;
+                }
+                return `₹${value}`;
+              }
+              return '';
+            }
+          }
+        },
+        tooltip: {
+          custom: function (props) {
+            const { categories } = props.ctx.opts.xaxis;
+            const { dataPointIndex, seriesIndex } = props;
+            const month = categories[dataPointIndex];
+            const seriesName = props.ctx.opts.series[seriesIndex].name;
+            const value = props.ctx.opts.series[seriesIndex].data[dataPointIndex];
+
+            return buildTooltip(props, {
+              title: month,
+              mode,
+              hasTextLabel: true,
+              wrapperExtClasses: 'min-w-36',
+              labelDivider: ':',
+              labelExtClasses: 'ms-2',
+              valuePrefix: '₹',
+            });
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e5e7eb'
+        },
+        states: {
+          hover: {
+            filter: {
+              type: 'darken',
+              value: 0.9
+            }
+          }
+        }
+      }), {
+        colors: ['#2563EB', '#14B8A6'], // blue for Individual, teal for Cohort
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#e5e7eb'
+        }
+      }, {
+        colors: ['#3b82f6', '#06B6D4'],
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#404040'
+        }
+      });
+    })();
+
+    // Airport Performance Horizontal Bar Chart
+    (function () {
+      const airportData = [
+        { name: 'DEL', revenue: 1545000 },
+        { name: 'BOM', revenue: 1230000 },
+        { name: 'BLR', revenue: 980000 },
+        { name: 'CCU', revenue: 750000 },
+        { name: 'HYD', revenue: 620000 }
+      ];
+      const maxValue = Math.max(...airportData.map(a => a.revenue));
+
+      // Calculate step for x-axis
+      let step = Math.ceil(maxValue / 8 / 200000) * 200000;
+      const maxX = Math.ceil(maxValue / step) * step;
+      const tickAmount = Math.min(8, Math.floor(maxX / step));
+
+      buildChart('#hs-airport-performance-bar-chart', (mode) => ({
+        chart: {
+          height: 300,
+          type: 'bar',
+          toolbar: {
+            show: false
+          },
+          zoom: {
+            enabled: false
+          }
+        },
+        series: [
+          {
+            name: 'Revenue',
+            data: airportData.map(a => ({
+              x: a.name,
+              y: a.revenue
+            }))
+          }
+        ],
+        plotOptions: {
+          bar: {
+            horizontal: true,
+            barHeight: '60%',
+            borderRadius: 2,
+            dataLabels: {
+              position: 'top'
+            }
+          }
+        },
+        dataLabels: {
+          enabled: false
+        },
+        stroke: {
+          show: true,
+          width: 2,
+          colors: ['transparent']
+        },
+        legend: {
+          show: false
+        },
+        xaxis: {
+          type: 'numeric',
+          min: 0,
+          max: maxX,
+          tickAmount: tickAmount,
+          labels: {
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            },
+            formatter: (value) => {
+              if (value % step === 0 && value <= maxX) {
+                if (value >= 100000) {
+                  return `₹${(value / 100000).toFixed(1)}L`;
+                } else if (value >= 1000) {
+                  return `₹${(value / 1000).toFixed(0)}k`;
+                }
+                return `₹${value}`;
+              }
+              return '';
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af',
+              fontSize: '13px',
+              fontFamily: 'Inter, ui-sans-serif',
+              fontWeight: 400
+            }
+          },
+          axisBorder: {
+            show: false
+          },
+          axisTicks: {
+            show: false
+          }
+        },
+        tooltip: {
+          custom: function (props) {
+            const { dataPointIndex } = props;
+            const dataPoint = props.ctx.opts.series[0].data[dataPointIndex];
+            const airportName = typeof dataPoint === 'object' ? dataPoint.x : airportData[dataPointIndex].name;
+            const value = typeof dataPoint === 'object' ? dataPoint.y : dataPoint;
+
+            return buildTooltip(props, {
+              title: airportName,
+              mode,
+              hasTextLabel: true,
+              wrapperExtClasses: 'min-w-36',
+              labelDivider: ':',
+              labelExtClasses: 'ms-2',
+              valuePrefix: '₹',
+            });
+          }
+        },
+        grid: {
+          strokeDashArray: 2,
+          borderColor: '#e5e7eb'
+        },
+        states: {
+          hover: {
+            filter: {
+              type: 'darken',
+              value: 0.9
+            }
+          }
+        }
+      }), {
+        colors: ['#2563EB'], // blue
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#9ca3af'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#e5e7eb'
+        }
+      }, {
+        colors: ['#3b82f6'],
+        xaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3',
+            }
+          }
+        },
+        yaxis: {
+          labels: {
+            style: {
+              colors: '#a3a3a3'
+            }
+          }
+        },
+        grid: {
+          borderColor: '#404040'
+        }
+      });
+    })();
+  });
+</script>
