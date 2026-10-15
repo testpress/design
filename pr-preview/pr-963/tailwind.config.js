@@ -7,10 +7,10 @@ module.exports = {
   content: [
     "./src/**/*.{html,js}",
     "!./src/simba/**",
-    "!./src/sentinel/proctor_widget/**",
-    "!./src/sentinel/session_monitor/**",
-    "!./src/sentinel/warning_widget/**",
-    "!./src/sentinel/authentication/**",
+    "!./src/tpsentinel/proctor_widget/**",
+    "!./src/tpsentinel/session_monitor/**",
+    "!./src/tpsentinel/warning_widget/**",
+    "!./src/tpsentinel/authentication/**",
     "node_modules/preline/dist/*.js",
     "node_modules/@themesberg/tailwind-datepicker/dist/js/*.js"
   ],
