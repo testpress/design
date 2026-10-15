@@ -20,6 +20,7 @@ module.exports = config => {
     config.addPassthroughCopy("css/videojs-tps.css");
     config.addPassthroughCopy("css/chapter-plugin.min.css");
     config.addPassthroughCopy("js/settings.js");
+    config.addPassthroughCopy("js/notes-editor.js");
     config.addPassthroughCopy("js/video.js");
     config.addPassthroughCopy("js/videojs-hls-quality-selector.js");
     config.addPassthroughCopy("js/videojs-sprite-thumbnails.js");
@@ -45,6 +46,11 @@ module.exports = config => {
     config.addPassthroughCopy('./tailwind.config.js')
     config.addPassthroughCopy("css/tailwind.css");
     config.addPassthroughCopy("fonts");
+    // Render "- [ ] item" as a real checkbox (markdown-it has no task-list support) on checklist pages only.
+    config.addTransform("task-list", (content, outputPath) => {
+        if (!outputPath || !outputPath.endsWith("notes_editor/testing/index.html")) return content;
+        return content.replace(/<li>\[ \] /g, '<li class="task-item"><label><input type="checkbox" class="task-check"><span> ').replace(/(<li class="task-item"><label>[\s\S]*?)<\/li>/g, (m, head) => head + "</span></label></li>");
+    });
     config.addFilter("groupBy", groupBy);
     config.addFilter("filter", filter);
     config.addFilter("dueIn", (dateString) => {

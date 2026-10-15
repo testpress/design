@@ -50,11 +50,13 @@ Create a new component when:
 
 If no approved component exists:
 
-Return:
+1. Get the closest component from the Preline MCP.
+2. Match it to the `ui-system` styling and add it to `src/ui-system/components/` as a macro, with a preview include in `src/ui-system/preview/includes/`.
+3. Use it from there.
 
-> New component required
+If Preline has nothing suitable either, build it by hand to the `ui-system` styling and add it to `src/ui-system/components/` the same way.
 
-Do not invent new reusable UI structures.
+Add the new component to this registry.
 
 
 ---

@@ -1,0 +1,143 @@
+{% from "../../../ui-system/components/card.html" import card %}
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+
+{% call card(padding="p-0", extra_classes="overflow-hidden") %}
+
+  <div>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50">
+          <tr class="border-b border-gray-200">
+            <th scope="col" class="sticky left-0 z-10 bg-gray-50 px-4 py-3 align-top text-start text-xs leading-5 font-medium uppercase tracking-wide text-gray-500 min-w-[16rem]">
+              {# Centred against the plan name + count lines, not the whole header #}
+              <span class="flex items-center" :class="hasPlans && benefits.length > 0 ? 'h-[38px]' : 'h-5'">Benefits</span>
+            </th>
+            <template x-for="plan in plans" :key="plan.id">
+              <th scope="col" class="px-3 py-3 w-32 min-w-[7.5rem] text-center align-top">
+                <span class="block whitespace-nowrap text-sm font-medium text-gray-800" x-text="plan.name"></span>
+                <span x-show="benefits.length > 0" class="mt-0.5 block text-xs font-normal text-gray-500" x-text="countIn(plan.id) + ' of ' + benefits.length"></span>
+                <span x-show="benefits.length > 0" class="mt-2 inline-flex">
+                  {{ checkbox(
+                    name="include_all",
+                    extra_attrs=':id="\'include-all-\' + plan.id" :aria-label="\'Include every benefit in \' + plan.name" x-effect="$el.checked = benefits.length > 0 && countIn(plan.id) === benefits.length" @change="setAll(plan.id, $event.target.checked)" :disabled="benefits.length === 0"'
+                  ) }}
+                </span>
+              </th>
+            </template>
+            <th scope="col" class="w-12"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+
+        <tbody class="divide-y divide-gray-200">
+          <template x-for="(b, index) in benefits" :key="b.id">
+            <tr :draggable="dragReady === b.id"
+                @dragstart="dragId = b.id; $event.dataTransfer.effectAllowed = 'move'"
+                @dragover.prevent="overId = b.id"
+                @dragleave="if (overId === b.id) overId = null"
+                @drop.prevent="dropOn(b.id)"
+                @dragend="dragId = null; overId = null; dragReady = null"
+                :class="{ 'opacity-40': dragId === b.id }">
+
+              <td class="sticky left-0 z-10 px-4 py-3 bg-white"
+                  :class="{ '!bg-gray-50': overId === b.id && dragId !== b.id }">
+                <div class="flex items-center gap-x-2">
+                  <button type="button"
+                          class="shrink-0 -ms-1.5 p-1 rounded-md text-gray-400 cursor-grab hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          @mousedown="dragReady = b.id"
+                          @mouseup="dragReady = null"
+                          :aria-label="'Reorder ' + b.name + '. Use the up and down arrow keys.'"
+                          @keydown.arrow-up.prevent="move(index, -1); $nextTick(() => $el.focus())"
+                          @keydown.arrow-down.prevent="move(index, 1); $nextTick(() => $el.focus())">
+                    <i data-lucide="grip-vertical" class="size-4"></i>
+                  </button>
+
+                  {# The name is always an input: click and type to rename. #}
+                  <div class="flex-1 min-w-0">
+                    <input type="text"
+                           :id="'benefit-name-' + b.id"
+                           :value="b.name"
+                           maxlength="255"
+                           autocomplete="off"
+                           :aria-label="'Benefit name: ' + b.name"
+                           @focus="startEdit(b)"
+                           @input="editName = $el.value; editError = ''"
+                           @keydown.enter.prevent="saveEdit(b) && $el.blur()"
+                           @keydown.escape.prevent="$el.value = b.name; cancelEdit(); $el.blur()"
+                           @blur="if (!saveEdit(b)) { $el.value = b.name; cancelEdit(); }"
+                           class="block w-full p-0 border-0 bg-transparent text-sm font-medium text-gray-800 focus:ring-0 focus:outline-none">
+                    <p x-show="editingId === b.id && editError" x-text="editError" class="mt-1 text-xs text-red-600"></p>
+                  </div>
+                </div>
+              </td>
+
+              <template x-for="plan in plans" :key="plan.id">
+                <td class="px-3 py-3 text-center"
+                    :class="{ 'bg-gray-50': overId === b.id && dragId !== b.id }">
+                  <span class="inline-flex">
+                    {{ checkbox(
+                      name="benefit_plan",
+                      extra_attrs=':id="\'b\' + b.id + \'-p\' + plan.id" :aria-label="plan.name + \' includes \' + b.name" x-effect="$el.checked = b.plans.includes(plan.id)" @change="toggle(b, plan.id)"'
+                    ) }}
+                  </span>
+                </td>
+              </template>
+
+              <td class="px-2 py-3 text-end"
+                  :class="{ 'bg-gray-50': overId === b.id && dragId !== b.id }">
+                {{ dropdown(
+                  trigger="ellipsis-vertical",
+                  width="medium",
+                  items=[
+                    { label: "Rename", icon: "pencil", attrs: '@click="open = false; $nextTick(() => document.getElementById(\'benefit-name-\' + b.id).select())"' },
+                    { label: "Move up", icon: "arrow-up", attrs: '@click="open = false; move(index, -1)" :disabled="index === 0" :class="index === 0 ? \'opacity-50 pointer-events-none\' : \'\'"' },
+                    { label: "Move down", icon: "arrow-down", attrs: '@click="open = false; move(index, 1)" :disabled="index === benefits.length - 1" :class="index === benefits.length - 1 ? \'opacity-50 pointer-events-none\' : \'\'"' },
+                    { divider: true },
+                    { label: "Delete", icon: "trash-2", variant: "danger", attrs: '@click="open = false; askDelete(b)"' }
+                  ]
+                ) }}
+              </td>
+            </tr>
+          </template>
+
+          {# Add a benefit: reads as the next row of the list #}
+          <tr>
+            <td :colspan="plans.length + 2" class="p-0">
+              <label for="new_benefit"
+                     class="group/add flex items-center gap-x-3 px-4 py-3 cursor-text"
+                     :class="newError ? 'bg-red-50/60' : ''">
+                <span class="shrink-0 flex justify-center items-center size-6 rounded-md border border-dashed text-gray-400"
+                      :class="newError ? 'border-red-300 text-red-400' : 'border-gray-300'">
+                  <i data-lucide="plus" class="size-3.5"></i>
+                </span>
+                <span class="flex-1 min-w-0">
+                  <input id="new_benefit"
+                         type="text"
+                         x-ref="newBenefit"
+                         x-model="newName"
+                         maxlength="255"
+                         autocomplete="off"
+                         @input="newError = ''"
+                         @keydown.enter.prevent="addBenefit()"
+                         @keydown.escape="newName = ''; newError = ''; $el.blur()"
+                         :placeholder="benefits.length ? 'Add another benefit' : 'Add a benefit, like Live doubt-clearing sessions'"
+                         class="block w-full p-0 border-0 bg-transparent text-sm font-medium text-gray-800 placeholder:font-normal placeholder:text-gray-400 focus:ring-0 focus:outline-none">
+                  <span x-show="newError" x-text="newError" class="mt-1 block text-xs text-red-600"></span>
+                </span>
+                <span x-show="newName.trim()" x-cloak class="shrink-0 flex items-center gap-x-2">
+                  <span class="hidden sm:inline text-xs text-gray-400">Press
+                    <kbd class="ms-0.5 px-1.5 py-0.5 rounded border border-gray-200 bg-white font-sans text-[11px] text-gray-500">Enter</kbd>
+                  </span>
+                  {{ button(text="Add", size="sm", extra_attrs='@click.prevent="addBenefit()"') }}
+                </span>
+              </label>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+{% endcall %}
