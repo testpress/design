@@ -1,0 +1,427 @@
+
+<script>
+  (function () {
+    const SR = window.SentinelReview;
+    const { MIN, HOUR, DAY, NOW, PRIORITIES, ME, REVIEWERS, WORKSPACES, WORKSPACE_BY_ID, clock, exact } = SR;
+
+    const STORE_KEY = 'tpsentinel.reviewerWorkload';
+    const CASES_STORE_KEY = 'tpsentinel.reviewCases';
+    const HIGH = [0, 1]; // Critical, High
+    const WEEK = 7 * DAY;
+    const PER_PAGE = 8;
+    const PRIORITY_OPTIONS = [['critical-high', 'Critical and High'], ...PRIORITIES.map(p => [p.toLowerCase(), p])];
+    const AGE_BUCKETS = [
+      { key: 'under-1d', label: 'Under 1 day', short: '<1d', from: 0, to: DAY },
+      { key: '1-3d', label: '1–3 days', short: '1–3d', from: DAY, to: 3 * DAY },
+      { key: '3-7d', label: '3–7 days', short: '3–7d', from: 3 * DAY, to: WEEK },
+      { key: '1-2w', label: '1–2 weeks', short: '1–2w', from: WEEK, to: 14 * DAY },
+      { key: 'over-2w', label: 'Over 2 weeks', short: '2w+', from: 14 * DAY, to: Infinity },
+    ];
+    // Table columns per tab: [key, label, classes]; numbers right-aligned, secondary ones fold away on small screens
+    const COLUMNS = {
+      reviewers: [['open', 'Open', ''], ['high', 'High priority', ''], ['week', 'Over 7 days', 'hidden md:table-cell'], ['oldest', 'Oldest', 'hidden sm:table-cell'], ['done', 'Done today', 'hidden lg:table-cell']],
+      workspaces: [['open', 'Open', ''], ['unowned', 'Unassigned', ''], ['high', 'High priority', 'hidden md:table-cell'], ['week', 'Over 7 days', 'hidden md:table-cell'], ['oldest', 'Oldest', 'hidden sm:table-cell']],
+    };
+    const START_OF_TODAY = new Date(NOW).setHours(0, 0, 0, 0);
+
+    // Prototype "Large team": 28 reviewers sharing the same cases, to show search and pagination
+    const TEAM_FIRST = ['Aditi', 'Bharat', 'Chitra', 'Deepak', 'Esha', 'Farhan', 'Gita', 'Hemant', 'Indu', 'Jatin', 'Kiran', 'Leela', 'Mohan', 'Nisha', 'Omkar', 'Pallavi', 'Qasim', 'Revathi', 'Sanjay', 'Tara', 'Uday', 'Vani', 'Wasim', 'Yamini', 'Zubin', 'Arun', 'Bhavna', 'Charan'];
+    const TEAM_LAST = ['Rao', 'Shah', 'Iyer', 'Kapoor', 'Nair', 'Das', 'Menon', 'Joshi', 'Pillai', 'Reddy', 'Sethi', 'Bose', 'Gill', 'Kaur'];
+    const LARGE_TEAM = TEAM_FIRST.map((f, i) => {
+      const last = TEAM_LAST[i % TEAM_LAST.length];
+      return { id: `t${i}`, name: `${f} ${last}`, email: `${f.toLowerCase()}.${last.toLowerCase()}@acme-assess.com` };
+    });
+    const caseNo = c => parseInt(c.id.slice(3), 10);
+
+    function load(key) {
+      try { return JSON.parse(sessionStorage.getItem(key)) || {}; } catch (e) { return {}; }
+    }
+
+    window.reviewerWorkloadPage = function () {
+      const stored = load(STORE_KEY);
+      return {
+        // prototype: normal | large | balanced | unassigned_only | no_reviewers | none | loading | stale | error
+        simulate: 'normal',
+
+        cases: SR.loadCases(),
+        refreshedAt: NOW,
+        refreshing: false,
+
+        workspace: stored.workspace || '',
+        priority: stored.priority || '',
+        tab: stored.tab === 'workspaces' ? 'workspaces' : 'reviewers',
+        sort: stored.sort && stored.sort.by ? stored.sort : { by: 'open', dir: 'desc' },
+        search: '',
+        page: 1,
+
+        workspaceOptions: WORKSPACES.map(w => [w.id, w.name]),
+        priorityOptions: PRIORITY_OPTIONS,
+        columns: COLUMNS,
+
+        // Assign / move drawer: { from: 'unassigned' | reviewerId, ws: workspaceId | '', which, count, to: [ids] }
+        move: null,
+        largeOverrides: {}, // prototype "Large team": assignments kept in memory only (those reviewers don't exist elsewhere)
+        tip: null,
+        toast: null,
+        toastTimer: null,
+
+        init() {
+          // Admin-only view; opening it directly in the prototype acts as an admin
+          const casesStore = load(CASES_STORE_KEY);
+          if (casesStore.role !== 'admin') {
+            try { sessionStorage.setItem(CASES_STORE_KEY, JSON.stringify(Object.assign(casesStore, { role: 'admin' }))); } catch (e) { /* not remembered */ }
+            window.dispatchEvent(new CustomEvent('review-cases-updated', { detail: { role: 'admin', counts: Object.assign({ mine: 54, unassigned: 80 }, casesStore.counts) } }));
+          }
+          ['workspace', 'priority', 'tab', 'sort'].forEach(k => this.$watch(k, () => this.save()));
+          ['workspace', 'priority', 'search', 'sort', 'simulate'].forEach(k => this.$watch(k, () => { this.page = 1; }));
+          this.$watch('tab', () => { this.page = 1; this.search = ''; this.sort = { by: 'open', dir: 'desc' }; });
+          this.$watch('simulate', () => { this.move = null; });
+        },
+        save() {
+          try { sessionStorage.setItem(STORE_KEY, JSON.stringify({ workspace: this.workspace, priority: this.priority, tab: this.tab, sort: this.sort })); } catch (e) { /* not remembered */ }
+        },
+        reload() { this.cases = SR.loadCases(); this.refreshedAt = Date.now(); },
+        refresh() {
+          this.refreshing = true;
+          setTimeout(() => {
+            this.reload();
+            if (['stale', 'error', 'loading'].includes(this.simulate)) this.simulate = 'normal';
+            this.refreshing = false;
+          }, 600);
+        },
+        viewAsReviewer() {
+          const casesStore = load(CASES_STORE_KEY);
+          try { sessionStorage.setItem(CASES_STORE_KEY, JSON.stringify(Object.assign(casesStore, { role: 'reviewer' }))); } catch (e) { /* not remembered */ }
+          location.href = SR.url('/tpsentinel/review_cases/');
+        },
+
+        // ---------- data in scope ----------
+        get reviewers() {
+          if (this.simulate === 'large') return LARGE_TEAM;
+          // Removing review access moves a reviewer's open cases to Unassigned, so "no reviewers" means no one and nothing owned
+          if (this.simulate === 'no_reviewers') return [];
+          return REVIEWERS;
+        },
+        get source() {
+          if (this.simulate === 'none') return this.cases.filter(c => c.state === 'completed');
+          if (this.simulate === 'unassigned_only' || this.simulate === 'no_reviewers') return this.cases.map(c => c.state === 'assigned' ? { ...c, state: 'queued', reviewer: null } : c);
+          if (this.simulate === 'balanced') {
+            const ids = REVIEWERS.map(r => r.id);
+            let i = 0;
+            return this.cases.map(c => c.state === 'queued' ? { ...c, state: 'assigned', reviewer: ids[i++ % ids.length] } : c);
+          }
+          if (this.simulate === 'large') {
+            // Same cases, owned by a bigger team (uneven on purpose so sorting means something)
+            return this.cases.map(c => {
+              const moved = this.largeOverrides[c.id];
+              if (moved) return { ...c, state: 'assigned', reviewer: moved };
+              return c.reviewer ? { ...c, reviewer: LARGE_TEAM[(caseNo(c) * 7) % 23 + (caseNo(c) % 3 === 0 ? 5 : 0)].id } : c;
+            });
+          }
+          return this.cases;
+        },
+        priorityMatch(c) {
+          if (!this.priority) return true;
+          if (this.priority === 'critical-high') return HIGH.includes(c.priority);
+          return PRIORITIES[c.priority].toLowerCase() === this.priority;
+        },
+        inScope(c) { return (!this.workspace || c.workspace === this.workspace) && this.priorityMatch(c); },
+        get openCases() { return this.source.filter(c => c.state !== 'completed' && this.inScope(c)); },
+        get unassignedCases() { return this.openCases.filter(c => c.state === 'queued'); },
+        get eligible() { return this.reviewers; },
+        get highCases() { return this.openCases.filter(c => HIGH.includes(c.priority)); },
+        get longWaiting() { return this.openCases.filter(c => NOW - c.createdAt >= WEEK); },
+        get today() {
+          const inScope = this.source.filter(c => this.inScope(c));
+          const created = inScope.filter(c => c.createdAt >= START_OF_TODAY).length;
+          const decided = inScope.filter(c => c.state === 'completed' && c.completedAt >= START_OF_TODAY).length;
+          return { created, decided, change: created - decided };
+        },
+        highCount(cases) { return cases.filter(c => HIGH.includes(c.priority)).length; },
+
+        // ---------- states ----------
+        get loading() { return this.simulate === 'loading'; },
+        get loadFailed() { return this.simulate === 'error'; },
+        get stale() { return this.simulate === 'stale'; },
+        get ready() { return !this.loading && !this.loadFailed; },
+        get noOpenWork() { return this.ready && this.openCases.length === 0; },
+        get hasFilters() { return !!(this.workspace || this.priority); },
+        get workspaceLabel() { return this.workspace ? WORKSPACE_BY_ID[this.workspace].name : ''; },
+        get priorityLabel() { return (PRIORITY_OPTIONS.find(o => o[0] === this.priority) || [])[1] || ''; },
+        clearFilters() { this.workspace = ''; this.priority = ''; },
+        get updatedLabel() { return `Updated ${clock(new Date(this.refreshedAt))}`; },
+        get headline() {
+          const n = this.openCases.length;
+          return `${n.toLocaleString()} open case${n === 1 ? '' : 's'} · ${this.eligible.length} reviewer${this.eligible.length === 1 ? '' : 's'} can review`;
+        },
+
+        // ---------- measures for one group of open cases ----------
+        measures(cases) {
+          return {
+            open: cases.length,
+            high: this.highCount(cases),
+            week: cases.filter(c => NOW - c.createdAt >= WEEK).length,
+            oldest: cases.length ? Math.min(...cases.map(c => c.createdAt)) : null,
+          };
+        },
+        doneToday(id) { return this.source.filter(c => c.state === 'completed' && c.reviewer === id && c.completedAt >= START_OF_TODAY && this.inScope(c)).length; },
+
+        // ---------- reviewers table ----------
+        get reviewerRows() {
+          const pinned = [];
+          if (this.unassignedCases.length) pinned.push({ id: 'unassigned', kind: 'unassigned', name: 'Unassigned', ...this.measures(this.unassignedCases), done: null });
+          const q = this.search.trim().toLowerCase();
+          const people = this.eligible
+            .filter(r => !q || r.name.toLowerCase().includes(q) || (r.email || '').toLowerCase().includes(q))
+            .map(r => ({ ...r, kind: 'reviewer', you: r.id === ME, ...this.measures(this.openCases.filter(c => c.state === 'assigned' && c.reviewer === r.id)), done: this.doneToday(r.id) }));
+          // Unassigned work stays on top whatever the sort
+          return pinned.concat(this.sorted(people));
+        },
+        // ---------- workspaces table ----------
+        get workspaceRows() {
+          const groups = {};
+          this.openCases.forEach(c => (groups[c.workspace] = groups[c.workspace] || []).push(c));
+          const q = this.search.trim().toLowerCase();
+          return this.sorted(Object.entries(groups)
+            .map(([id, cases]) => ({ id, kind: 'workspace', name: WORKSPACE_BY_ID[id].name, unowned: cases.filter(c => c.state === 'queued').length, ...this.measures(cases) }))
+            .filter(w => !q || w.name.toLowerCase().includes(q)));
+        },
+        sorted(rows) {
+          const { by, dir } = this.sort;
+          const sign = dir === 'asc' ? 1 : -1;
+          return rows.sort((a, b) => {
+            if (by === 'oldest') {
+              if (a.oldest === null || b.oldest === null) return (a.oldest === null) - (b.oldest === null);
+              return sign * (a.oldest - b.oldest);
+            }
+            return sign * ((a[by] ?? -1) - (b[by] ?? -1)) || b.open - a.open || a.name.localeCompare(b.name);
+          });
+        },
+        sortBy(by) {
+          // Counts default to highest first; age defaults to longest waiting first
+          const first = by === 'oldest' ? 'asc' : 'desc';
+          this.sort = this.sort.by === by ? { by, dir: this.sort.dir === 'asc' ? 'desc' : 'asc' } : { by, dir: first };
+        },
+        ariaSort(by) { return this.sort.by === by ? (this.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'; },
+        get rows() { return this.tab === 'workspaces' ? this.workspaceRows : this.reviewerRows; },
+        get tabCounts() {
+          return { reviewers: this.reviewers.length, workspaces: new Set(this.openCases.map(c => c.workspace)).size };
+        },
+
+        // ---------- pagination ----------
+        get pageCount() { return Math.max(1, Math.ceil(this.rows.length / PER_PAGE)); },
+        get pageRows() { return this.rows.slice((this.page - 1) * PER_PAGE, this.page * PER_PAGE); },
+        get rangeFrom() { return this.rows.length ? (this.page - 1) * PER_PAGE + 1 : 0; },
+        get rangeTo() { return Math.min(this.page * PER_PAGE, this.rows.length); },
+        get pageItems() {
+          const n = this.pageCount, p = this.page;
+          if (n <= 7) return Array.from({ length: n }, (_, i) => i + 1);
+          const items = [1];
+          if (p > 3) items.push('...');
+          for (let i = Math.max(2, p - 1); i <= Math.min(n - 1, p + 1); i++) items.push(i);
+          if (p < n - 2) items.push('...');
+          items.push(n);
+          return items;
+        },
+        goPage(n) { this.page = Math.min(Math.max(1, n), this.pageCount); },
+        showWorkspaces() {
+          this.tab = 'workspaces';
+          this.$nextTick(() => document.getElementById('workload-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        },
+
+        // ---------- age chart ----------
+        get ages() {
+          return AGE_BUCKETS.map(b => {
+            const inBucket = this.openCases.filter(c => NOW - c.createdAt >= b.from && NOW - c.createdAt < b.to);
+            return { ...b, total: inBucket.length, unowned: inBucket.filter(c => c.state === 'queued').length };
+          });
+        },
+        get ageMax() { return Math.max(1, ...this.ages.map(a => a.total)); },
+        get topWorkspaces() {
+          const groups = {};
+          this.openCases.forEach(c => {
+            const g = groups[c.workspace] || (groups[c.workspace] = { id: c.workspace, name: WORKSPACE_BY_ID[c.workspace].name, open: 0, unowned: 0 });
+            g.open++; if (c.state === 'queued') g.unowned++;
+          });
+          return Object.values(groups).sort((a, b) => b.open - a.open || a.name.localeCompare(b.name));
+        },
+
+        // ---------- display ----------
+        waiting(ts) {
+          if (ts === null || ts === undefined) return '—';
+          const diff = NOW - ts;
+          if (diff < HOUR) return `${Math.max(1, Math.round(diff / MIN))} min`;
+          if (diff < DAY) return `${Math.round(diff / HOUR)} h`;
+          const d = Math.floor(diff / DAY);
+          return `${d} day${d === 1 ? '' : 's'}`;
+        },
+        exact(ts) { return ts === null ? '' : exact(ts); },
+        num(n) { return n.toLocaleString(); },
+        plural(n, word) { return `${n.toLocaleString()} ${word}${n === 1 ? '' : 's'}`; },
+        initials(name) { return name.split(' ').map(p => p[0]).slice(0, 2).join(''); },
+        cell(row, key) {
+          if (key === 'oldest') return this.waiting(row.oldest);
+          if (row[key] === null || row[key] === undefined) return '—';
+          return this.num(row[key]);
+        },
+
+        // ---------- tooltips ----------
+        showTip(e, title, rows, note = '') {
+          const r = e.currentTarget.getBoundingClientRect();
+          this.tip = { title, rows, note, x: r.left + r.width / 2, y: r.top };
+        },
+        hideTip() { this.tip = null; },
+        ageTip(e, a) {
+          this.showTip(e, a.label, [['With a reviewer', a.total - a.unowned, 'bg-primary-200 dark:bg-primary-800'], ['Unassigned', a.unowned, 'bg-primary-600 dark:bg-primary-400']], `${this.num(a.total)} open · click to see them`);
+        },
+
+        // ---------- links into Review Cases, carrying this view's scope ----------
+        casesHref({ view = 'open', reviewer = '', ws = '', high = false, sort = '', waiting = '' } = {}) {
+          const parts = [];
+          if (waiting) parts.push(`waiting:${waiting}`);
+          if (reviewer) parts.push(`reviewer:${reviewer}`);
+          const w = ws || this.workspace;
+          if (w) parts.push(`workspace:${w}`);
+          if (view !== 'closed') {
+            let p = this.priority === 'critical-high' ? 'critical,high' : this.priority;
+            if (high && !['critical', 'high'].includes(p)) p = 'critical,high';
+            if (p) parts.push(`priority:${p}`);
+          }
+          const params = new URLSearchParams({ view, q: parts.join(' ') });
+          if (sort) params.set('sort', sort);
+          return SR.url(`/tpsentinel/review_cases/?${params}`);
+        },
+        rowHref(row) {
+          if (row.kind === 'unassigned') return this.casesHref({ view: 'unassigned' });
+          if (row.kind === 'workspace') return this.casesHref({ ws: row.id });
+          return this.casesHref({ reviewer: row.id });
+        },
+        rowCellHref(row, key) {
+          const base = row.kind === 'unassigned' ? { view: 'unassigned' } : row.kind === 'workspace' ? { ws: row.id } : { reviewer: row.id };
+          if (key === 'high') return this.casesHref({ ...base, high: true });
+          if (key === 'week' || key === 'oldest') return this.casesHref({ ...base, sort: 'oldest' });
+          if (key === 'unowned') return this.casesHref({ view: 'unassigned', ws: row.id });
+          if (key === 'done') return this.casesHref({ view: 'closed', reviewer: row.id, sort: 'newest' });
+          return this.rowHref(row);
+        },
+
+        // ---------- assign / move cases from here ----------
+        openMove(from, which = 'all', ws = '') {
+          if (!this.movePool(from, 'all', ws).length) return;
+          const w = which !== 'all' && this.movePool(from, which, ws).length ? which : 'all';
+          this.move = { from, ws, which: w, count: this.movePool(from, w, ws).length, to: [] };
+        },
+        closeMove() { this.move = null; },
+        movePool(from, which, ws = this.move?.ws || '') {
+          const pool = (from === 'unassigned'
+            ? this.unassignedCases
+            : this.openCases.filter(c => c.state === 'assigned' && c.reviewer === from))
+            .filter(c => !ws || c.workspace === ws);
+          return pool.filter(c => which === 'all' || (which === 'high' ? HIGH.includes(c.priority) : NOW - c.createdAt >= 14 * DAY))
+            // Most urgent first, then longest waiting (longest waiting first when picking old cases)
+            .sort((a, b) => which === 'old' ? a.createdAt - b.createdAt : a.priority - b.priority || a.createdAt - b.createdAt);
+        },
+        get moveFromName() {
+          if (!this.move) return '';
+          return this.move.from === 'unassigned' ? 'Unassigned' : (this.reviewers.find(r => r.id === this.move.from) || {}).name;
+        },
+        get moveTitle() {
+          if (!this.move) return '';
+          if (this.move.from === 'unassigned') return 'Assign cases';
+          return `Move cases from ${this.moveFromName}`;
+        },
+        get moveSubtitle() {
+          if (!this.move) return '';
+          const where = this.move.ws ? ` in ${WORKSPACE_BY_ID[this.move.ws].name}` : this.hasFilters ? ' in the current filters' : '';
+          const n = this.movePool(this.move.from, 'all').length;
+          return this.move.from === 'unassigned' ? `${this.plural(n, 'case')} ${n === 1 ? 'has' : 'have'} no reviewer${where}.` : `${this.moveFromName} has ${this.plural(n, 'open case')}${where}.`;
+        },
+        get moveCases() {
+          if (!this.move) return [];
+          const pool = this.movePool(this.move.from, this.move.which);
+          const n = Math.max(0, Math.min(pool.length, Math.floor(Number(this.move.count) || 0)));
+          return pool.slice(0, n);
+        },
+        get whichOptions() {
+          if (!this.move) return [];
+          return [['all', 'All'], ['high', 'High priority'], ['old', 'Waiting over 2 weeks']]
+            .map(([key, label]) => ({ key, label, n: this.movePool(this.move.from, key).length }))
+            .filter(o => o.key === 'all' || o.n);
+        },
+        setWhich(which) { this.move.which = which; this.move.count = this.movePool(this.move.from, which).length; },
+        get moveTargets() {
+          if (!this.move) return [];
+          return this.eligible.filter(r => r.id !== this.move.from).map(r => {
+            const load = this.openCases.filter(c => c.state === 'assigned' && c.reviewer === r.id).length;
+            return { ...r, you: r.id === ME, load };
+          }).sort((a, b) => a.load - b.load || a.name.localeCompare(b.name));
+        },
+        toggleTarget(id) {
+          const i = this.move.to.indexOf(id);
+          i === -1 ? this.move.to.push(id) : this.move.to.splice(i, 1);
+        },
+        // Cases go to whoever has the fewest open cases at each step, so loads even out
+        get plan() {
+          if (!this.move || !this.move.to.length) return {};
+          const loads = Object.fromEntries(this.moveTargets.filter(t => this.move.to.includes(t.id)).map(t => [t.id, t.load]));
+          const out = Object.fromEntries(Object.keys(loads).map(id => [id, []]));
+          this.moveCases.forEach(c => {
+            const id = Object.keys(loads).sort((a, b) => loads[a] - loads[b] || a.localeCompare(b))[0];
+            out[id].push(c.id); loads[id]++;
+          });
+          return out;
+        },
+        get planMax() { return Math.max(1, ...this.moveTargets.map(t => t.load + (this.plan[t.id]?.length || 0))); },
+        get canApply() { return this.move && this.moveCases.length > 0 && this.move.to.length > 0; },
+        get applyLabel() {
+          if (!this.move) return '';
+          return `${this.move.from === 'unassigned' ? 'Assign' : 'Move'} ${this.plural(this.moveCases.length, 'case')}`;
+        },
+        applyMove() {
+          if (!this.canApply) return;
+          const undo = [];
+          const now = Date.now();
+          const plan = this.plan; // snapshot: the plan is computed from the cases about to change
+          const people = Object.values(plan).filter(ids => ids.length).length;
+          if (this.simulate === 'large') {
+            const before = { ...this.largeOverrides };
+            Object.entries(plan).forEach(([reviewer, ids]) => ids.forEach(id => { this.largeOverrides[id] = reviewer; }));
+            const n = Object.values(plan).flat().length;
+            this.move = null;
+            this.showToast(`Assigned ${this.plural(n, 'case')} to ${this.plural(people, 'reviewer')}.`, { large: before });
+            return;
+          }
+          Object.entries(plan).forEach(([reviewer, ids]) => ids.forEach(id => {
+            const c = this.cases.find(x => x.id === id);
+            if (!c) return;
+            undo.push({ id, state: c.state, reviewer: c.reviewer, assignedAt: c.assignedAt });
+            Object.assign(c, { state: 'assigned', reviewer, assignedAt: now });
+            SR.saveChange(id, { state: 'assigned', reviewer, assignedAt: now });
+          }));
+          const verb = this.move.from === 'unassigned' ? 'Assigned' : 'Moved';
+          this.move = null;
+          this.refreshedAt = now;
+          this.showToast(`${verb} ${this.plural(undo.length, 'case')} to ${this.plural(people, 'reviewer')}.`, undo);
+        },
+        showToast(text, undo) {
+          clearTimeout(this.toastTimer);
+          this.toast = { text, undo };
+          this.toastTimer = setTimeout(() => { this.toast = null; }, 8000);
+        },
+        undoMove() {
+          if (!this.toast?.undo) return;
+          if (this.toast.undo.large) { this.largeOverrides = this.toast.undo.large; }
+          else this.toast.undo.forEach(prev => {
+            const c = this.cases.find(x => x.id === prev.id);
+            if (c) Object.assign(c, { state: prev.state, reviewer: prev.reviewer, assignedAt: prev.assignedAt });
+            SR.saveChange(prev.id, { state: prev.state, reviewer: prev.reviewer, assignedAt: prev.assignedAt });
+          });
+          clearTimeout(this.toastTimer);
+          this.toast = { text: 'Undone. Cases are back where they were.' };
+          this.toastTimer = setTimeout(() => { this.toast = null; }, 4000);
+        },
+      };
+    };
+  })();
+</script>
+
