@@ -77,6 +77,11 @@
     const WORKSPACE_BY_ID = Object.fromEntries(WORKSPACES.map(w => [w.id, w]));
     let CANDIDATES = []; // filled by makeCases()
 
+    // People on the client's side who can ask for a review of an AI-cleared candidate
+    const REQUESTERS = ['Ramesh Iyer', 'Fatima Sheikh', 'Joseph Mathew'];
+    // Why a requested review got its priority (by priority index), so Critical never stands without a reason
+    const REQUEST_URGENCY = ['Certificate issuance is on hold until this is reviewed', 'Results are due to be published this week', 'Needed before the next batch’s results', 'Routine spot check', 'Routine spot check'];
+
     // ---------- Mock data (seeded so reloads look the same) ----------
     function makeCases() {
       let seed = 20261013;
@@ -158,8 +163,28 @@
         c.reason = flagged ? pick(REASONS_FLAG) : pick(REASONS_CLEAR);
         cases.push(c);
       }
+      // Why each case exists, worked out from its ID so the list and the detail page agree (no extra random draws).
+      // Most are AI-flagged: a behaviour concern when a behaviour anomaly was found, otherwise an evidence concern.
+      // The rest are reviews someone asked for even though AI cleared the candidate.
+      cases.forEach(c => {
+        const num = parseInt(c.id.slice(3), 10);
+        const h = (Math.imul(num, 2654435761) >>> 0) % 100;
+        if (h < 15) {
+          c.origin = 'requested';
+          c.requestedBy = REQUESTERS[num % REQUESTERS.length];
+          c.urgency = REQUEST_URGENCY[c.priority];
+          c.concern = null;
+        } else {
+          c.origin = 'ai_flagged';
+          c.concern = c.indicators.some(k => BEHAVIOUR_KEYS.includes(k)) ? 'behaviour' : 'evidence';
+        }
+      });
       return cases;
     }
+
+    // What the AI said and why the case is open, in words
+    const CONCERN_LABEL = { behaviour: 'Behaviour concern', evidence: 'Evidence concern' };
+    function triggerLabel(c) { return c.origin === 'requested' ? `Requested by ${c.requestedBy}` : CONCERN_LABEL[c.concern]; }
 
     // ---------- Time helpers ----------
     const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -177,6 +202,14 @@
       if (diff < 31 * DAY) return `${Math.floor(diff / (7 * DAY))} weeks ago`;
       const d = new Date(ts);
       return `on ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+    }
+    // How long something has waited, without "ago": "5 hours", "1 day", "12 days"
+    function waited(ts) {
+      const diff = NOW - ts;
+      if (diff < HOUR) { const m = Math.max(1, Math.round(diff / MIN)); return `${m} minute${m === 1 ? '' : 's'}`; }
+      if (diff < DAY) { const h = Math.round(diff / HOUR); return `${h} hour${h === 1 ? '' : 's'}`; }
+      const d = Math.floor(diff / DAY);
+      return `${d} day${d === 1 ? '' : 's'}`;
     }
     function exact(ts) {
       const d = new Date(ts);
@@ -222,9 +255,10 @@
       url,
       MIN, HOUR, DAY, NOW, svg, ICONS, icon, INDICATORS, INDICATOR_BY_KEY, BEHAVIOUR_KEYS,
       PRIORITIES, ME, REVIEWERS, REVIEWER_BY_ID, WORKSPACES, WORKSPACE_BY_ID,
+      CONCERN_LABEL, triggerLabel,
       candidates: () => CANDIDATES,
       makeCases, loadCases, saveChange, saveSequence, loadSequence,
-      MONTHS, clock, relative, exact,
+      MONTHS, clock, relative, waited, exact,
     };
   })();
 </script>
