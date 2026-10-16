@@ -73,12 +73,22 @@
       { id: 'ielts-mock', name: 'IELTS Academic Mock' },
     ];
     const WORKSPACE_BY_ID = Object.fromEntries(WORKSPACES.map(w => [w.id, w]));
+
+    // People on the client's side who can ask for a review of an AI-cleared candidate
+    const REQUESTERS = ['Ramesh Iyer', 'Fatima Sheikh', 'Joseph Mathew'];
+    // What the AI said and why the case is open, in words
+    const CONCERN_LABEL = { behaviour: 'Behaviour concern', evidence: 'Evidence concern' };
+    const triggerLabel = c => c.origin === 'requested' ? `Requested by ${c.requestedBy}` : CONCERN_LABEL[c.concern];
     let CANDIDATES = []; // filled by makeCases()
 
     // Filters (search qualifiers). Values are slugs so they read well in the search box.
     const QUALIFIERS = {
       priority: { label: 'Priority', title: 'Filter by priority', icon: 'priority', multi: true,
         values: () => PRIORITIES.map((p, i) => ({ value: p.toLowerCase(), label: p, match: c => c.priority === i })) },
+      // Candidate is search-only: finding a person is what the search box does
+      candidate: { label: 'Candidate', title: 'Filter by candidate', icon: 'reviewer', searchable: true, perView: true, searchOnly: true,
+        values: () => CANDIDATES.map(p => ({ value: p.identifier.toLowerCase(), label: p.name, avatar: p.avatar, search: `${p.name} ${p.identifier} ${p.email}`.toLowerCase(), match: c => c.identifier === p.identifier }))
+          .sort((a, b) => a.label.localeCompare(b.label)) },
       workspace: { label: 'Workspace', title: 'Filter by workspace', icon: 'workspace', searchable: true,
         values: () => WORKSPACES.map(w => ({ value: w.id, label: w.name, match: c => c.workspace === w.id })) },
       result: { label: 'Result', title: 'Filter by integrity result', icon: 'result',
@@ -86,16 +96,27 @@
           { value: 'clear', label: 'Clear', match: c => c.result === 'clear' },
           { value: 'flagged', label: 'Flagged', match: c => c.result === 'flagged' },
         ] },
-      reviewer: { label: 'Reviewer', title: 'Filter by reviewer', icon: 'reviewer', searchable: true, admin: true,
+      reviewer: { label: 'Reviewer', title: 'Filter by reviewer', icon: 'state_assigned', searchable: true, admin: true,
         values: () => REVIEWERS.map(r => ({ value: r.id, label: r.name, match: c => c.reviewer === r.id })) },
+      // How long an open case has waited
+      waiting: { label: 'Waiting', title: 'Filter by time waiting', icon: 'state_queued',
+        values: () => [['under-1d', 'Under 1 day', 0, DAY], ['1-3d', '1–3 days', DAY, 3 * DAY], ['3-7d', '3–7 days', 3 * DAY, 7 * DAY], ['7-14d', '7–14 days', 7 * DAY, 14 * DAY], ['over-14d', '14+ days', 14 * DAY, Infinity]]
+          .map(([value, label, from, to]) => ({ value, label, match: c => NOW - c.createdAt >= from && NOW - c.createdAt < to })) },
+      // Why the case exists: what AI found, or a review someone asked for
+      reason: { label: 'Reason', title: 'Filter by review reason', icon: 'flagged', searchOnly: true,
+        values: () => [
+          { value: 'behaviour', label: 'Behaviour concern', match: c => c.concern === 'behaviour' },
+          { value: 'evidence', label: 'Evidence concern', match: c => c.concern === 'evidence' },
+          { value: 'requested', label: 'Requested review', match: c => c.origin === 'requested' },
+        ] },
       indicator: { label: 'Indicator', title: 'Filter by indicator', icon: 'indicator', searchOnly: true,
         values: () => INDICATORS.map(i => ({ value: i.slug, label: i.label, match: c => c.indicators.includes(i.key) })) },
     };
     // Which filters can vary in each view
     const VIEW_FILTERS = {
-      mine: ['priority', 'workspace'],
-      unassigned: ['priority', 'workspace'],
-      open: ['priority', 'workspace', 'reviewer'],
+      mine: ['priority', 'workspace', 'waiting'],
+      unassigned: ['priority', 'workspace', 'waiting'],
+      open: ['priority', 'workspace', 'waiting', 'reviewer'],
       closed: ['result', 'workspace', 'reviewer'],
     };
 
@@ -103,9 +124,9 @@
       { key: 'mine', label: 'My assignments' },
       { key: 'unassigned', label: 'Unassigned' },
       { key: 'open', label: 'All open' },
-      { key: 'closed', label: 'Closed' },
+      { key: 'closed', label: 'Completed' },
     ];
-    // Until someone picks a sort, open views go by priority and Closed by most recent decision
+    // Until someone picks a sort, open views go by priority and Completed by most recent decision
     const defaultSort = view => view === 'closed' ? { by: 'time', order: 'newest' } : { by: 'priority', order: 'highest' };
     const ORDERS = { priority: [['highest', 'Highest first'], ['lowest', 'Lowest first']], time: [['oldest', 'Oldest first'], ['newest', 'Newest first']] };
     const PER_PAGE = 10;
@@ -189,6 +210,20 @@
         c.reason = flagged ? pick(REASONS_FLAG) : pick(REASONS_CLEAR);
         cases.push(c);
       }
+      // Why each case exists, worked out from its ID (no extra random draws).
+      // Most are AI-flagged: a behaviour concern when a behaviour anomaly was found, otherwise an evidence concern.
+      // The rest are reviews someone asked for even though AI cleared the candidate.
+      cases.forEach(c => {
+        const num = parseInt(c.id.slice(3), 10);
+        if ((Math.imul(num, 2654435761) >>> 0) % 100 < 15) {
+          c.origin = 'requested';
+          c.requestedBy = REQUESTERS[num % REQUESTERS.length];
+          c.concern = null;
+        } else {
+          c.origin = 'ai_flagged';
+          c.concern = c.indicators.some(k => BEHAVIOUR_KEYS.includes(k)) ? 'behaviour' : 'evidence';
+        }
+      });
       return cases;
     }
 
@@ -208,6 +243,14 @@
       if (diff < 31 * DAY) return `${Math.floor(diff / (7 * DAY))} weeks ago`;
       const d = new Date(ts);
       return `on ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+    }
+    // How long something has waited, without "ago": "5 hours", "1 day", "12 days"
+    function waited(ts) {
+      const diff = NOW - ts;
+      if (diff < HOUR) { const m = Math.max(1, Math.round(diff / MIN)); return `${m} minute${m === 1 ? '' : 's'}`; }
+      if (diff < DAY) { const h = Math.round(diff / HOUR); return `${h} hour${h === 1 ? '' : 's'}`; }
+      const d = Math.floor(diff / DAY);
+      return `${d} day${d === 1 ? '' : 's'}`;
     }
     function exact(ts) {
       const d = new Date(ts);
@@ -430,7 +473,7 @@
         // ---------- sorting ----------
         get sort() { return this.sortChoice || defaultSort(this.view); },
         get sortOptions() {
-          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed' : 'Case age' };
+          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed date' : 'Case age' };
           const priority = { by: 'priority', label: 'Priority' };
           return this.view === 'closed' ? [time, priority] : [priority, time];
         },
@@ -476,7 +519,14 @@
         optionAvatar(key, o) { return key === 'reviewer' ? this.avatar(o.value) : o.avatar; },
         indicatorsFor(c) { return c.indicators.map(k => INDICATOR_BY_KEY[k]); },
         priorityLabel(c) { return PRIORITIES[c.priority]; },
-        relative, exact,
+        // The candidate's current integrity result and who produced it: AI until a reviewer decides
+        resultWord(c) {
+          const flagged = c.state === 'completed' ? c.result === 'flagged' : c.origin !== 'requested';
+          return flagged ? 'Flagged' : 'Clear';
+        },
+        resultBy(c) { return c.state === 'completed' ? this.reviewerName(c.reviewer) : 'AI'; },
+        triggerLabel,
+        relative, waited, exact,
         stateIcon(c) { return this.icons[`state_${c.state === 'completed' ? c.result : c.state}`]; },
         stateLabel(c) {
           if (c.state === 'queued') return 'Queued: waiting for a reviewer';

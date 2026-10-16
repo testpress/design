@@ -229,7 +229,7 @@
               class="inline-flex items-center gap-x-1.5 py-1.5 px-2 rounded-lg text-sm text-muted-foreground-1 hover:text-foreground hover:bg-muted-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
               aria-haspopup="menu">
         <span x-html="sortIcon"></span>
-        <span x-text="sortLabel"></span>
+        <span x-text="`Sort: ${sortLabel}`"></span>
         <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
       </button>
     </div>
@@ -312,7 +312,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-7677">
+         aria-describedby="tooltip-2546">
       <span tabindex="0" role="img" :aria-label="stateLabel(c)" :class="stateClass(c)" class="flex rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-html="stateIcon(c)"></span>
     </div>
 
@@ -320,7 +320,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-7677"
+         id="tooltip-2546"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -347,8 +347,16 @@
             <a :href="detailHref(c)" @click.stop class="font-semibold text-foreground hover:text-primary focus:outline-hidden focus-visible:underline" x-text="c.name"></a>
             <span class="hidden sm:inline text-sm text-muted-foreground-1" x-text="c.identifier"></span>
 
-            <!-- Indicators: one per type; hover, focus or tap shows the label -->
-            <span class="inline-flex items-center gap-x-1.5 sm:ms-1" @click.stop>
+            <!-- Current integrity result and why the case exists, in words. Colour stays on the state icon so the list stays calm. -->
+            <span class="text-sm text-muted-foreground-1 sm:ms-1">
+              <span class="font-medium text-foreground" x-text="resultWord(c)"></span>
+              <span x-text="`by ${resultBy(c)}`"></span>
+              <span aria-hidden="true">·</span>
+              <span x-text="triggerLabel(c)"></span>
+            </span>
+
+            <!-- Indicators back up the words: one per type; hover, focus or tap shows the label -->
+            <span class="inline-flex items-center gap-x-1.5" @click.stop>
               <template x-for="ind in indicatorsFor(c)" :key="ind.key">
                 
   
@@ -414,15 +422,15 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-8590">
-      <button type="button" :aria-label="ind.label" :class="ind.neutral ? 'text-muted-foreground-2' : 'text-muted-foreground-1'" class="inline-flex rounded-sm hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"><span x-html="ind.svg"></span></button>
+         aria-describedby="tooltip-3578">
+      <button type="button" :aria-label="ind.label" class="inline-flex rounded-sm text-muted-foreground-2 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"><span x-html="ind.svg"></span></button>
     </div>
 
     <!-- Tooltip Card (fixed, escapes overflow containers) -->
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-8590"
+         id="tooltip-3578"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -446,9 +454,9 @@
             </span>
           </div>
 
-          <!-- Meta line adapts to the view -->
+          <!-- Meta line: urgency and age first, then ownership and where it's from -->
           <p class="mt-1 text-[13px] leading-5 text-muted-foreground-1">
-            <!-- Priority leads on open cases: Critical and High read darker, the rest stay quiet -->
+            <!-- Open cases: priority (Critical and High read darker), how long the case has waited, who owns it -->
             <template x-if="c.state !== 'completed'">
               <span>
                 <template x-if="isAdmin">
@@ -462,28 +470,13 @@
                   <span :class="c.priority <= 1 ? 'text-foreground font-medium' : ''" x-text="`${priorityLabel(c)} priority`"></span>
                 </template>
                 <span aria-hidden="true">·</span>
-              </span>
-            </template>
-            <span x-text="c.id"></span>
-            <span aria-hidden="true">·</span>
-            <button type="button" @click.stop="setFilter('workspace', c.workspace)"
-                    class="hover:text-primary hover:underline focus:outline-hidden focus-visible:underline text-start"
-                    :title="`Show cases in ${workspaceName(c)}`" x-text="workspaceName(c)"></button>
-
-            <!-- Open cases -->
-            <template x-if="c.state !== 'completed'">
-              <span>
+                <span :title="`Opened ${exact(c.createdAt)}`" x-text="`Waiting ${waited(c.createdAt)}`"></span>
                 <span aria-hidden="true">·</span>
                 <template x-if="view === 'mine'">
-                  <span :title="exact(c.assignedAt)">assigned to you <span x-text="relative(c.assignedAt)"></span></span>
+                  <span :title="exact(c.assignedAt)">Assigned to you <span x-text="relative(c.assignedAt)"></span></span>
                 </template>
                 <template x-if="view !== 'mine'">
-                  <span :title="exact(c.createdAt)">opened <span x-text="relative(c.createdAt)"></span></span>
-                </template>
-
-                <template x-if="view === 'open' || view === 'unassigned'">
                   <span>
-                    <span aria-hidden="true">·</span>
                     <!-- Admins change the owner right here; reviewers just see it -->
                     <template x-if="isAdmin">
                       <button type="button" @click.stop="openMenu('assign', $event, { ids: [c.id] })"
@@ -500,19 +493,23 @@
                     </template>
                   </span>
                 </template>
+                <span aria-hidden="true">·</span>
               </span>
             </template>
 
-            <!-- Closed cases: final decision -->
+            <!-- Completed cases: when the decision was made (the decision itself is in the heading) -->
             <template x-if="c.state === 'completed'">
               <span>
+                <span :title="exact(c.completedAt)" x-text="`Completed ${relative(c.completedAt)}`"></span>
                 <span aria-hidden="true">·</span>
-                <span class="font-medium text-foreground" x-text="c.result === 'clear' ? 'Clear' : 'Flagged'"></span>
-                <span aria-hidden="true">·</span>
-                by <span x-text="reviewerName(c.reviewer)"></span>
-                <span :title="exact(c.completedAt)" x-text="relative(c.completedAt)"></span>
               </span>
             </template>
+
+            <button type="button" @click.stop="setFilter('workspace', c.workspace)"
+                    class="hover:text-primary hover:underline focus:outline-hidden focus-visible:underline text-start"
+                    :title="`Show cases in ${workspaceName(c)}`" x-text="workspaceName(c)"></button>
+            <span aria-hidden="true">·</span>
+            <span x-text="c.id"></span>
           </p>
         </div>
 
@@ -797,7 +794,7 @@
     
     
 
-    View closed cases
+    View completed cases
 
     
 
