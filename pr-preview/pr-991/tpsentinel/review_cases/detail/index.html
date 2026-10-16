@@ -941,7 +941,7 @@
         
           tab === 'activity' ? 'Activity' :
         
-          tab === 'history' ? 'History' :
+          tab === 'history' ? 'Review History' :
          'Select tab'
       "></span>
       <svg class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
@@ -998,7 +998,7 @@
                   @click="tab = 'history'; open = false"
                   >
             
-            <span>History</span>
+            <span>Review History</span>
           </button>
         
       
@@ -1085,7 +1085,7 @@
                 role="tab"
                 >
           
-          History
+          Review History
           
         </button>
       
@@ -1178,21 +1178,19 @@
     </div>
   </template>
 
-  <!-- Observed behaviour -->
-  <template x-if="behaviourConcerns.length">
+  <!-- Anomalies: behaviour and evidence gaps in one list, shown the same way -->
+  <template x-if="behaviourConcerns.length || evidenceConcerns.length">
     <div class="mt-6">
-      <h3 class="text-sm font-medium text-muted-foreground-1">Observed behaviour</h3>
-      <ul class="mt-2 divide-y divide-card-line">
+      <h3 class="text-sm font-medium text-muted-foreground-1">Anomalies</h3>
+      <ul class="mt-3 flex flex-col gap-6">
         <template x-for="k in behaviourConcerns" :key="k.key">
-          <li class="py-4 first:pt-2">
+          <li>
             <div class="flex gap-3">
               <span class="mt-0.5 text-muted-foreground-1" x-html="k.icon"></span>
               <div class="min-w-0 grow">
                 <div class="flex flex-wrap items-baseline gap-x-2">
                   <p class="font-medium text-foreground" x-text="k.label"></p>
-                  <span class="text-sm" :class="k.severity === 'High' ? 'font-medium text-foreground' : 'text-muted-foreground-1'" x-text="`${k.severity} severity`"></span>
                 </div>
-                <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="k.explanation"></p>
                 <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="k.timing"></p>
 
                 <template x-if="k.artifacts.length">
@@ -1238,27 +1236,20 @@
             </div>
           </li>
         </template>
-      </ul>
-    </div>
-  </template>
-
-  <!-- Evidence gaps: same weight as behaviour, kept separate -->
-  <template x-if="evidenceConcerns.length">
-    <div class="mt-6">
-      <h3 class="text-sm font-medium text-muted-foreground-1">Evidence gaps</h3>
-      <ul class="mt-2 divide-y divide-card-line">
         <template x-for="g in evidenceConcerns" :key="g.id">
-          <li class="py-4 first:pt-2 flex gap-3">
-            <span class="mt-0.5 text-muted-foreground-1" x-html="g.icon"></span>
-            <div class="min-w-0 grow">
-              <p class="font-medium text-foreground" x-text="g.label"></p>
-              <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="`${g.detail} Cause: ${g.cause}.`"></p>
-              <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="g.timing"></p>
-              <button type="button" @click="openGapSession(g)"
-                      class="mt-2 inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
-                <span x-text="`Open Session ${g.session}`"></span>
-                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-              </button>
+          <li>
+            <div class="flex gap-3">
+              <span class="mt-0.5 text-muted-foreground-1" x-html="g.icon"></span>
+              <div class="min-w-0 grow">
+                <p class="font-medium text-foreground" x-text="g.label"></p>
+                <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="g.timing"></p>
+                <p class="mt-2 text-sm text-muted-foreground-2" x-text="`${g.detail} Cause: ${g.cause}.`"></p>
+                <button type="button" @click="openGapSession(g)"
+                        class="mt-2 inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+                  <span x-text="`Open Session ${g.session}`"></span>
+                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
             </div>
           </li>
         </template>
@@ -1801,14 +1792,22 @@
 
     <!-- Session context: changes with Session navigation; the result and decision don't -->
 <section id="session-panel" class="bg-card border border-card-line shadow-2xs rounded-xl scroll-mt-20" aria-labelledby="session-heading">
-  <div class="flex items-center justify-between gap-2 p-4 sm:px-5 border-b border-card-line">
-    <h2 id="session-heading" class="text-base font-semibold text-foreground">Session</h2>
-    <div class="flex items-center gap-x-1">
+  <!-- Header: which session (title), when (one small line), and Previous / Next -->
+  <div class="flex items-center justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+    <div class="min-w-0">
+      <h2 id="session-heading" class="flex items-center gap-x-2 text-base font-semibold text-foreground">
+        <span>Session <span x-text="session.n"></span> <span class="font-normal text-muted-foreground-1" x-text="`of ${d.sessions.length}`"></span></span>
+        <!-- Status only when it isn't the usual "Completed" -->
+        <span x-show="session.status !== 'Completed'" class="py-0.5 px-1.5 rounded-md bg-surface text-xs font-medium text-surface-foreground" x-text="session.status"></span>
+      </h2>
+      <p class="text-xs text-muted-foreground-1 truncate"
+         x-text="`${day(session.start)}, ${span(session.start, session.end)} · ${dur(session.length)}${sessionIdx === d.sessions.length - 1 ? ' · latest' : ''}`"></p>
+    </div>
+    <div class="shrink-0 flex items-center">
       <button type="button" @click="prevSession()" :disabled="sessionIdx === 0" aria-label="Previous session"
               class="inline-flex items-center justify-center size-8 rounded-lg text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-40 disabled:pointer-events-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </button>
-      <span class="text-sm text-muted-foreground-1 whitespace-nowrap">Session <span class="font-medium text-foreground" x-text="session.n"></span> of <span x-text="d.sessions.length"></span></span>
       <button type="button" @click="nextSession()" :disabled="sessionIdx === d.sessions.length - 1" aria-label="Next session"
               class="inline-flex items-center justify-center size-8 rounded-lg text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-40 disabled:pointer-events-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -1816,17 +1815,14 @@
     </div>
   </div>
 
-  <div class="p-4 sm:p-5 flex flex-col gap-5">
-    <p class="text-sm text-muted-foreground-1">
-      <span class="text-foreground" x-text="session.status"></span> ·
-      <span x-text="`${day(session.start)}, ${span(session.start, session.end)}`"></span> ·
-      <span x-text="dur(session.length)"></span>
-      <span x-show="sessionIdx === d.sessions.length - 1"> · latest</span>
-    </p>
-
+  <div class="px-4 pb-4 pt-5 sm:px-5 sm:pb-5 flex flex-col gap-5">
     <!-- Identity check: reference stays fixed, captured image follows the Session -->
     <div>
-      <h3 class="text-sm font-medium text-muted-foreground-1">Identity check</h3>
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-sm font-medium text-muted-foreground-1">Identity check</h3>
+        <button type="button" @click="activityFilter = { session: '', type: 'session', q: 'Identity' }; tab = 'activity'"
+                class="text-xs text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">All checks</button>
+      </div>
       <div class="mt-2 grid grid-cols-2 gap-2">
         <figure>
           <img :src="identityImage" alt="Reference photo" class="w-full aspect-[4/3] rounded-lg object-cover bg-surface">
@@ -1842,10 +1838,8 @@
         <span class="text-muted-foreground-1" x-text="`· ${session.identity.score}% face match`"></span>
       </p>
       <p x-show="session.identity.status === 'Conditional'" class="mt-0.5 text-sm text-muted-foreground-2">
-        Between 80% and 98%, so a person should confirm it’s the same candidate. This is Session context, not an integrity concern.
+        An 80–98% match needs a person to confirm it’s the same candidate.
       </p>
-      <button type="button" @click="activityFilter = { session: '', type: 'session', q: 'Identity' }; tab = 'activity'"
-              class="mt-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">View all identity checks</button>
     </div>
 
     <!-- This Session's coverage -->
@@ -1867,14 +1861,21 @@
     <!-- Device and connection -->
     <div>
       <h3 class="text-sm font-medium text-muted-foreground-1">Device</h3>
-      <!-- Fixed label column so every value starts on the same line; long values truncate with a tooltip -->
-      <dl class="mt-1 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
-        <dt class="text-muted-foreground-1">Type</dt><dd class="text-foreground truncate" x-text="session.device.type"></dd>
-        <dt class="text-muted-foreground-1">OS</dt><dd class="text-foreground truncate" x-text="session.device.os"></dd>
-        <dt class="text-muted-foreground-1">Browser</dt><dd class="text-foreground truncate" x-text="session.device.browser"></dd>
-        <dt class="text-muted-foreground-1">SDK</dt><dd class="text-foreground truncate" x-text="session.device.sdk"></dd>
-        <dt class="text-muted-foreground-1">IP</dt><dd class="text-foreground tabular-nums truncate" x-text="session.device.ip"></dd>
-        <dt class="text-muted-foreground-1">Time zone</dt><dd class="text-foreground truncate" :title="session.device.timezone" x-text="session.device.timezone.split(' ')[0]"></dd>
+      <!-- Two columns of label-over-value pairs: uses the panel's full width, three short rows -->
+      <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
+        <template x-for="[label, value, title] in [
+            ['Type', session.device.type],
+            ['OS', session.device.os],
+            ['Browser', session.device.browser],
+            ['SDK', session.device.sdk],
+            ['IP', session.device.ip],
+            ['Time zone', session.device.timezone.split(' ')[0], session.device.timezone]
+          ]" :key="label">
+          <div class="min-w-0">
+            <dt class="text-xs text-muted-foreground-1" x-text="label"></dt>
+            <dd class="mt-0.5 text-sm text-foreground tabular-nums truncate" :title="title || value" x-text="value"></dd>
+          </div>
+        </template>
       </dl>
     </div>
 
@@ -1890,7 +1891,7 @@
 
 <!-- Latest assessment and recent case changes -->
 <section class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5" aria-labelledby="recent-history-heading">
-  <h2 id="recent-history-heading" class="text-base font-semibold text-foreground">Recent history</h2>
+  <h2 id="recent-history-heading" class="text-base font-semibold text-foreground">Recent review history</h2>
   <div class="mt-3">
     
 <div class="w-full ">
@@ -1942,7 +1943,7 @@
   </div>
   <button type="button" @click="resetHistory(); tab = 'history'"
           class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
-    View full history
+    View review history
     <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
   </button>
 </section>
@@ -2260,7 +2261,7 @@
       <div x-show="tab === 'history'" x-cloak>
 
 
-<section class="bg-card border border-card-line shadow-2xs rounded-xl" aria-label="History">
+<section class="bg-card border border-card-line shadow-2xs rounded-xl" aria-label="Review History">
   <div class="flex flex-wrap items-center gap-2 p-4 sm:px-5 border-b border-card-line">
     
 <div class="relative inline-flex" x-data="{ open: false }"
@@ -3378,13 +3379,13 @@
 
     // ---------- Vocabulary ----------
     const INDICATORS = [
-      { key: 'multi_face', slug: 'multiple-faces', label: 'Multiple faces', description: 'More than one face appeared on the webcam.' },
-      { key: 'no_face', slug: 'not-visible', label: 'Candidate not visible', description: 'No face was detected on the webcam.' },
-      { key: 'looking_away', slug: 'looking-away', label: 'Looking away', description: 'The candidate looked away from the screen for a while.' },
-      { key: 'phone_usage', slug: 'phone', label: 'Phone detected', description: 'A phone appeared on the webcam.' },
-      { key: 'browser_focus_lost', slug: 'focus-lost', label: 'Browser focus lost', description: 'The candidate switched tabs or windows.' },
-      { key: 'identity', slug: 'identity', label: 'Identity needs confirmation', description: 'Face match was between 80% and 98%, so a person has to confirm it.' },
-      { key: 'missing_evidence', slug: 'missing-evidence', label: 'Required evidence missing', description: 'A required recording or clip didn’t finish uploading or was removed.', neutral: true },
+      { key: 'multi_face', slug: 'multiple-faces', label: 'Multiple faces' },
+      { key: 'no_face', slug: 'not-visible', label: 'Candidate not visible' },
+      { key: 'looking_away', slug: 'looking-away', label: 'Looking away' },
+      { key: 'phone_usage', slug: 'phone', label: 'Phone detected' },
+      { key: 'browser_focus_lost', slug: 'focus-lost', label: 'Browser focus lost' },
+      { key: 'identity', slug: 'identity', label: 'Face match needs confirmation' },
+      { key: 'missing_evidence', slug: 'missing-evidence', label: 'Required evidence missing', neutral: true },
     ].map(i => ({ ...i, svg: icon(i.key, 'size-4') }));
     const INDICATOR_BY_KEY = Object.fromEntries(INDICATORS.map(i => [i.key, i]));
     const BEHAVIOUR_KEYS = ['multi_face', 'no_face', 'looking_away', 'phone_usage', 'browser_focus_lost'];
@@ -3595,13 +3596,6 @@
 
     // ---------- Vocabulary ----------
     const SEVERITY = ['High', 'Medium', 'Low'];
-    const EXPLAIN = {
-      multi_face: 'Another face appeared on the webcam while the candidate was answering.',
-      no_face: 'The candidate left the webcam frame, so no face was visible.',
-      looking_away: 'The candidate looked away from the screen for an extended stretch.',
-      phone_usage: 'A phone was visible on the webcam.',
-      browser_focus_lost: 'The candidate switched to another tab or window.',
-    };
     const CONTINUOUS = ['no_face', 'looking_away', 'browser_focus_lost', 'multi_face'];
     const ARTIFACT_STATE = {
       available: { label: 'Available' },
@@ -3964,7 +3958,7 @@
             } else {
               timing = `${sessions.length === 1 ? 'Session' : 'Sessions'} ${sessions.join(', ')} · ${day(evs[0].at)}${day(evs[0].at) !== day(evs[evs.length - 1].at) ? ` – ${day(evs[evs.length - 1].at)}` : ''}${longest ? ` · longest ${dur(longest)}` : ''}`;
             }
-            return { key, label: INDICATOR_BY_KEY[key].label, icon: ic(key, 'size-5'), severity, explanation: EXPLAIN[key], timing, events: evs, artifacts, latest: evs[evs.length - 1].at };
+            return { key, label: INDICATOR_BY_KEY[key].label, icon: ic(key, 'size-5'), severity, timing, events: evs, artifacts, latest: evs[evs.length - 1].at };
           }).sort((a, b) => rank(a.severity) - rank(b.severity) || b.latest - a.latest);
         },
         get evidenceConcerns() {
