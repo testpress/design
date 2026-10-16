@@ -1,0 +1,45 @@
+{#
+  TPSentinel component. Compact filter dropdowns for local filters, styled like the ui-system select
+  (toggle button, menu, check on the selected option), on Preline theme tokens.
+
+  filter_select(model, label, options_expr, all_label="All")
+    model:        Alpine expression the value is read from and written to (e.g. "evidenceFilter.session")
+    options_expr: Alpine expression returning [[value, label], ...]; values are compared as strings
+    all_label:    the "no filter" option, value ""
+  filter_search(model, placeholder)
+#}
+{% macro filter_select(model, label, options_expr, all_label="All") %}
+<div class="relative inline-flex" x-data="{ open: false }"
+     @click.outside="open = false" @keydown.escape.stop="open = false">
+  <button type="button" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox"
+          :class="{{ model }} ? 'text-foreground font-medium' : 'text-muted-foreground-1'"
+          class="relative inline-flex items-center min-w-32 py-1.5 ps-3 pe-8 bg-layer border border-layer-line rounded-lg text-sm text-start hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+    <span class="sr-only">{{ label }}: </span>
+    <span class="truncate" x-text="(({{ options_expr }}).find(o => String(o[0]) === String({{ model }})) || [null, '{{ all_label }}'])[1]"></span>
+    <svg class="absolute end-2.5 top-1/2 -translate-y-1/2 shrink-0 size-4 text-muted-foreground-1 transition-transform" :class="open && 'rotate-180'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+
+  <div x-show="open" x-cloak role="listbox" :aria-label="'{{ label }}'"
+       x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+       class="absolute z-50 top-full start-0 mt-1 min-w-full w-max max-w-72 max-h-72 overflow-y-auto p-1 bg-dropdown border border-dropdown-line rounded-lg shadow-xl [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb">
+    <template x-for="[v, l] in [['', '{{ all_label }}'], ...({{ options_expr }})]" :key="'opt-' + v">
+      <button type="button" role="option" :aria-selected="String({{ model }}) === String(v)"
+              @click="{{ model }} = v; open = false"
+              :class="String({{ model }}) === String(v) ? 'bg-dropdown-item-active font-medium text-foreground' : 'text-dropdown-item-foreground hover:bg-dropdown-item-hover'"
+              class="w-full flex items-center justify-between gap-x-3 py-2 px-3 rounded-lg text-sm text-start focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+        <span class="truncate" x-text="l"></span>
+        <svg x-show="String({{ model }}) === String(v)" class="shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+    </template>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro filter_search(model, placeholder) %}
+<label class="relative block grow sm:max-w-xs">
+  <span class="sr-only">{{ placeholder }}</span>
+  <svg class="absolute start-3 top-1/2 -translate-y-1/2 shrink-0 size-4 text-muted-foreground-1 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+  <input type="text" x-model="{{ model }}" placeholder="{{ placeholder }}"
+         class="py-1.5 ps-9 pe-3 block w-full bg-layer border border-layer-line rounded-lg text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:ring-1 focus:ring-primary">
+</label>
+{% endmacro %}

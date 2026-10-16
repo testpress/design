@@ -1,0 +1,222 @@
+{% from "src/tpsentinel/components/button.html" import button %}
+{% from "src/tpsentinel/components/tooltip.html" import tooltip %}
+{% from "src/tpsentinel/components/badge.html" import badge %}
+
+<div x-ref="list" class="bg-card border border-card-line shadow-2xs rounded-xl overflow-hidden scroll-mt-20">
+
+  <!-- Toolbar: views (or selection actions) on the left, filters and sort on the right -->
+  <div class="@container flex flex-wrap items-center gap-x-4 gap-y-2 min-h-14 py-2 ps-4 pe-2 bg-muted border-b border-card-line rounded-t-xl">
+    <div class="flex items-center gap-x-4 min-w-0">
+      <input type="checkbox"
+             x-show="selectable && simulate !== 'error' && pageCases.length"
+             :checked="allOnPageSelected"
+             :indeterminate="someOnPageSelected && !allOnPageSelected"
+             @change="toggleAll()"
+             aria-label="Select all cases on this page"
+             class="shrink-0 size-4 bg-transparent border-line-3 rounded-sm text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+
+      <!-- Views -->
+      <nav x-show="!selected.length" class="flex items-center gap-x-1 -ms-1 overflow-x-auto [scrollbar-width:none]" aria-label="Review case views">
+        <template x-for="v in views" :key="v.key">
+          <button type="button" @click="setView(v.key)"
+                  :aria-current="view === v.key ? 'page' : null"
+                  :class="view === v.key ? 'text-foreground font-semibold' : 'text-muted-foreground-1 hover:text-foreground'"
+                  class="shrink-0 inline-flex items-center gap-x-1.5 py-1.5 px-2 rounded-lg text-sm whitespace-nowrap focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+            <span x-text="v.label"></span>
+            {{ badge(x_text="tabCounts[v.key].toLocaleString()", size="xs", extra_classes="leading-4 tabular-nums") }}
+          </button>
+        </template>
+      </nav>
+
+      <!-- Selection actions -->
+      <div x-show="selected.length" x-cloak class="flex flex-wrap items-center gap-2">
+        <span class="text-sm font-medium text-foreground me-1" x-text="`${selected.length} selected`"></span>
+
+        <!-- Review in sequence: claim the unowned ones first if needed. Count = cases that will open -->
+        {{ button(size="sm", extra_attrs='x-show="selQueued.length" @click="assignAndReview()" x-text="`Assign & start review (${reviewableCount})`"') }}
+        {{ button(size="sm", extra_attrs='x-show="!selQueued.length && selMine.length" @click="reviewSelected()" x-text="`Review selected (${selMine.length})`"') }}
+        {{ button(size="sm", variant="secondary", extra_attrs='x-show="selQueued.length" @click="assignToMe(selQueued.map(c => c.id))" x-text="`Assign to me (${selQueued.length})`"') }}
+
+        <template x-if="isAdmin">
+          <div class="contents">
+            <button type="button" @click.stop="openMenu('assign', $event, { ids: selectedCases.map(c => c.id) })"
+                    class="inline-flex items-center gap-x-1 py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+              Assign reviewer
+              <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <button type="button" @click.stop="openMenu('priority', $event, { ids: selectedCases.map(c => c.id), width: 200 })"
+                    class="inline-flex items-center gap-x-1 py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+              Change priority
+              <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <button type="button" x-show="selectedAssignedCount" @click="unassign(selectedCases.map(c => c.id))"
+                    class="inline-flex items-center py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+              Unassign
+            </button>
+          </div>
+        </template>
+
+        <!-- Cases owned by someone else are left out of review actions; say so -->
+        <span x-show="!isAdmin && selOthers.length && reviewableCount" class="text-[13px] text-muted-foreground-1"
+              x-text="`${selOthers.length} ${selOthers.length === 1 ? 'case is' : 'cases are'} assigned to someone else and left out.`"></span>
+        <span x-show="!isAdmin && selOthers.length && !reviewableCount" class="text-[13px] text-muted-foreground-1">
+          These cases are assigned to other reviewers. You can review your own or unassigned cases.
+        </span>
+
+        <button type="button" @click="selected = []"
+                class="py-1.5 px-2 rounded-lg text-[13px] text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+          Clear selection
+        </button>
+      </div>
+    </div>
+
+    <!-- Filters and sort -->
+    <div x-show="!selected.length" class="flex items-center gap-x-0.5 ms-auto">
+      <!-- Narrow toolbar: one Filters button (each filter opens from its menu) -->
+      <button type="button" x-ref="filtersBtn"
+              @click.stop="openMenu('filters', $event, { width: 260 })"
+              :class="toolbarFilterCount ? 'text-foreground' : 'text-muted-foreground-1 hover:text-foreground'"
+              class="@5xl:hidden inline-flex items-center gap-x-1.5 py-1.5 px-2 rounded-lg text-sm hover:bg-muted-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+              aria-haspopup="menu">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/></svg>
+        Filters
+        <span x-show="toolbarFilterCount" class="size-1.5 rounded-full bg-primary" aria-label="active"></span>
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <!-- Wide toolbar: one button per filter -->
+      <template x-for="key in availableFilters" :key="key">
+        <button type="button"
+                @click.stop="openMenu('filter', $event, { key, searchable: !!qualifiers[key].searchable, width: qualifiers[key].searchable ? 300 : 240 })"
+                :class="filterValue(key) ? 'text-foreground' : 'text-muted-foreground-1 hover:text-foreground'"
+                class="hidden @5xl:inline-flex relative items-center gap-x-1 py-1.5 px-2 rounded-lg text-sm hover:bg-muted-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                aria-haspopup="menu">
+          <span x-text="qualifiers[key].label"></span>
+          <span x-show="filterValue(key)" class="size-1.5 rounded-full bg-primary" aria-label="active"></span>
+          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </template>
+
+      <button type="button" @click.stop="openMenu('sort', $event, { align: 'right', width: 220 })"
+              class="inline-flex items-center gap-x-1.5 py-1.5 px-2 rounded-lg text-sm text-muted-foreground-1 hover:text-foreground hover:bg-muted-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+              aria-haspopup="menu">
+        <span x-html="sortIcon"></span>
+        <span x-text="`Sort: ${sortLabel}`"></span>
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Rows -->
+  <ul x-show="simulate !== 'error' && pageCases.length" role="list">
+    <template x-for="c in pageCases" :key="c.id">
+      <li :class="isSelected(c.id) ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-muted-hover'"
+          @click="openCase(c)"
+          class="group flex items-start gap-x-3 py-3 ps-4 pe-3 cursor-pointer border-t border-card-line first:border-t-0">
+        <input type="checkbox" x-show="selectable"
+               :checked="isSelected(c.id)" @change="toggle(c.id)" @click.stop
+               :aria-label="`Select ${c.name}`"
+               class="mt-1 shrink-0 size-4 bg-transparent border-line-3 rounded-sm text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+
+        <!-- State: queued / assigned / completed clear / completed flagged; hover, focus or tap shows the label -->
+        <span class="shrink-0 flex items-center h-6" @click.stop>
+          {{ tooltip(
+            content='<span x-text="stateLabel(c)"></span>',
+            trigger='<span tabindex="0" role="img" :aria-label="stateLabel(c)" :class="stateClass(c)" class="flex rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-html="stateIcon(c)"></span>',
+            width="w-max max-w-60"
+          ) }}
+        </span>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-h-6">
+            <a :href="detailHref(c)" @click.stop="rememberList()" class="font-semibold text-foreground hover:text-primary focus:outline-hidden focus-visible:underline" x-text="c.name"></a>
+            <span class="hidden sm:inline text-sm text-muted-foreground-1" x-text="c.identifier"></span>
+
+            <!-- Current integrity result and why the case exists, in words. Colour stays on the state icon so the list stays calm. -->
+            <span class="text-sm text-muted-foreground-1 sm:ms-1">
+              <span class="font-medium text-foreground" x-text="resultWord(c)"></span>
+              <span x-text="`by ${resultBy(c)}`"></span>
+              <span aria-hidden="true">·</span>
+              <span x-text="triggerLabel(c)"></span>
+            </span>
+
+            <!-- Indicators back up the words: one per type; hover, focus or tap shows the label -->
+            <span class="inline-flex items-center gap-x-1.5" @click.stop>
+              <template x-for="ind in indicatorsFor(c)" :key="ind.key">
+                {{ tooltip(
+                  content='<span x-text="ind.label"></span>',
+                  trigger='<button type="button" :aria-label="ind.label" class="inline-flex rounded-sm text-muted-foreground-2 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"><span x-html="ind.svg"></span></button>',
+                  width="w-max max-w-60"
+                ) }}
+              </template>
+            </span>
+          </div>
+
+          <!-- Meta line: urgency and age first, then ownership and where it's from -->
+          <p class="mt-1 text-[13px] leading-5 text-muted-foreground-1">
+            <!-- Open cases: priority (Critical and High read darker), how long the case has waited, who owns it -->
+            <template x-if="c.state !== 'completed'">
+              <span>
+                <template x-if="isAdmin">
+                  <button type="button" @click.stop="openMenu('priority', $event, { ids: [c.id], width: 200 })"
+                          :class="c.priority <= 1 ? 'text-foreground font-medium' : ''"
+                          class="underline decoration-dotted underline-offset-2 hover:text-primary focus:outline-hidden focus-visible:text-primary"
+                          :aria-label="`${priorityLabel(c)} priority. Change priority`"
+                          x-text="`${priorityLabel(c)} priority`"></button>
+                </template>
+                <template x-if="!isAdmin">
+                  <span :class="c.priority <= 1 ? 'text-foreground font-medium' : ''" x-text="`${priorityLabel(c)} priority`"></span>
+                </template>
+                <span aria-hidden="true">·</span>
+                <span :title="`Opened ${exact(c.createdAt)}`" x-text="`Waiting ${waited(c.createdAt)}`"></span>
+                <span aria-hidden="true">·</span>
+                <template x-if="view === 'mine'">
+                  <span :title="exact(c.assignedAt)">Assigned to you <span x-text="relative(c.assignedAt)"></span></span>
+                </template>
+                <template x-if="view !== 'mine'">
+                  <span>
+                    <!-- Admins change the owner right here; reviewers just see it -->
+                    <template x-if="isAdmin">
+                      <button type="button" @click.stop="openMenu('assign', $event, { ids: [c.id] })"
+                              class="underline decoration-dotted underline-offset-2 hover:text-primary focus:outline-hidden focus-visible:text-primary"
+                              x-text="c.reviewer ? `Assigned to ${reviewerName(c.reviewer)}` : 'Unassigned'"></button>
+                    </template>
+                    <!-- Reviewers claim an unowned case right here -->
+                    <template x-if="!isAdmin && !c.reviewer">
+                      <button type="button" @click.stop="assignToMe([c.id])"
+                              class="underline decoration-dotted underline-offset-2 hover:text-primary focus:outline-hidden focus-visible:text-primary">Assign to me</button>
+                    </template>
+                    <template x-if="!isAdmin && c.reviewer">
+                      <span x-text="`Assigned to ${reviewerName(c.reviewer)}`"></span>
+                    </template>
+                  </span>
+                </template>
+                <span aria-hidden="true">·</span>
+              </span>
+            </template>
+
+            <!-- Completed cases: when the decision was made (the decision itself is in the heading) -->
+            <template x-if="c.state === 'completed'">
+              <span>
+                <span :title="exact(c.completedAt)" x-text="`Completed ${relative(c.completedAt)}`"></span>
+                <span aria-hidden="true">·</span>
+              </span>
+            </template>
+
+            <button type="button" @click.stop="setFilter('workspace', c.workspace)"
+                    class="hover:text-primary hover:underline focus:outline-hidden focus-visible:underline text-start"
+                    :title="`Show cases in ${workspaceName(c)}`" x-text="workspaceName(c)"></button>
+            <span aria-hidden="true">·</span>
+            <span x-text="c.id"></span>
+          </p>
+        </div>
+
+        <!-- Whole row opens the case -->
+        <svg class="self-center shrink-0 size-4 text-muted-foreground-2 group-hover:text-foreground transition-colors" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </li>
+    </template>
+  </ul>
+
+  {% include "./states.html" %}
+  {% include "./footer.html" %}
+</div>

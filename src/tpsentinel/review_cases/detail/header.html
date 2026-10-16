@@ -1,0 +1,121 @@
+{% from "src/tpsentinel/components/button.html" import button %}
+
+<!-- Back to the list, and Previous / Next in the queue this case was opened from -->
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <a :href="listHref" class="inline-flex items-center gap-x-1 -ms-1 py-1 px-1 rounded-lg text-sm text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    Review cases
+  </a>
+
+  <nav x-show="sequence" class="flex items-center gap-x-2" aria-label="Review case queue">
+    <a :href="prevHref || null" :aria-disabled="!prevHref"
+       :class="prevHref ? 'hover:bg-layer-hover' : 'opacity-40 pointer-events-none'"
+       class="inline-flex items-center gap-x-1 py-1.5 px-2.5 rounded-lg border border-layer-line bg-layer text-sm text-layer-foreground shadow-2xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      <span class="hidden sm:inline">Previous</span>
+    </a>
+    <span class="text-sm text-muted-foreground-1 whitespace-nowrap">
+      <span x-text="sequence?.label"></span> ·
+      <span class="font-medium text-foreground" x-text="position + 1"></span> of <span x-text="sequence?.ids.length"></span>
+    </span>
+    <a :href="nextHref || null" :aria-disabled="!nextHref"
+       :class="nextHref ? 'hover:bg-layer-hover' : 'opacity-40 pointer-events-none'"
+       class="inline-flex items-center gap-x-1 py-1.5 px-2.5 rounded-lg border border-layer-line bg-layer text-sm text-layer-foreground shadow-2xs focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+      <span class="hidden sm:inline">Next</span>
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </a>
+  </nav>
+</div>
+
+<!-- Candidate and workspace: two lines; contact details live in the Candidate card -->
+<div class="flex items-center gap-4">
+  <span x-data="{ failed: false }" class="shrink-0 relative inline-flex items-center justify-center size-12 rounded-full overflow-hidden bg-surface text-base font-semibold text-surface-foreground">
+    <img x-show="candidatePhoto && !failed" :src="candidatePhoto" @error="failed = true" :alt="c.name" class="size-full object-cover">
+    <span x-show="!candidatePhoto || failed" x-text="initialsOf(c.name)" aria-hidden="true"></span>
+  </span>
+  <div class="min-w-0">
+    <h1 class="text-lg md:text-xl font-semibold text-foreground" x-text="c.name"></h1>
+    <p class="mt-0.5 text-sm text-muted-foreground-1">
+      <span class="text-foreground" x-text="workspace"></span> ·
+      <span x-text="`${d.sessions.length} ${d.sessions.length === 1 ? 'session' : 'sessions'}, ${sessionSpanLabel}`"></span>
+    </p>
+  </div>
+</div>
+
+<!-- Result, review requirement, case state and priority, kept apart -->
+<div class="bg-card border border-card-line shadow-2xs rounded-xl">
+  <div class="flex flex-col lg:flex-row divide-y lg:divide-y-0 lg:divide-x divide-card-line">
+
+    <!-- Integrity result -->
+    <div class="p-4 sm:p-5 lg:flex-1">
+      <p class="text-xs text-muted-foreground-1">Integrity result</p>
+      <div class="mt-1.5 flex items-center gap-x-2">
+        <span :class="resultClass" x-html="resultIcon"></span>
+        <span class="text-base font-semibold text-foreground" x-text="resultLabel"></span>
+        <span class="text-sm text-muted-foreground-1" x-text="result.source === 'ai' ? 'by AI' : `by ${result.by}`"></span>
+      </div>
+      <p class="mt-1 text-sm text-muted-foreground-1">
+        Through Session <span x-text="result.through"></span> ·
+        <span :title="exact(result.at)" x-text="relative(result.at)"></span>
+      </p>
+    </div>
+
+    <!-- Review requirement + case state -->
+    <div class="p-4 sm:p-5 lg:flex-1">
+      <p class="text-xs text-muted-foreground-1">Review</p>
+      <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <template x-if="needsReview">
+          <span class="inline-flex items-center gap-x-1.5 py-0.5 px-2 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-400">Needs review</span>
+        </template>
+        <span class="text-sm font-medium text-foreground" x-text="caseLabel"></span>
+        <template x-if="c.state === 'assigned'">
+          <span class="inline-flex items-center gap-x-1.5 text-sm text-muted-foreground-1">
+            to
+            <img class="size-5 rounded-full object-cover" :src="avatar(c.reviewer)" alt="">
+            <span class="text-foreground" x-text="c.reviewer === 'divya' ? 'you' : reviewerFull(c.reviewer)"></span>
+          </span>
+        </template>
+        <template x-if="c.state === 'completed'">
+          <span class="text-sm text-muted-foreground-1">by <span class="text-foreground" x-text="reviewerFull(c.reviewer)"></span></span>
+        </template>
+      </div>
+      <!-- Why it's open, then case age before assignment age -->
+      <p class="mt-1 text-sm text-muted-foreground-1">
+        <span x-text="originLabel"></span> ·
+        <template x-if="c.state !== 'completed'"><span :title="`Opened ${exact(c.createdAt)}`" x-text="`waiting ${waited(c.createdAt)}`"></span></template>
+        <template x-if="c.state === 'assigned'"><span :title="exact(c.assignedAt)" x-text="` · assigned ${relative(c.assignedAt)}`"></span></template>
+        <template x-if="c.state === 'completed'"><span :title="exact(c.completedAt)" x-text="`completed ${relative(c.completedAt)}`"></span></template>
+      </p>
+    </div>
+
+    <!-- Priority -->
+    <div class="p-4 sm:p-5 lg:w-64">
+      <p class="text-xs text-muted-foreground-1">Priority</p>
+      <template x-if="isAdmin && needsReview">
+        <button type="button" @click.stop="openMenu('priority', $event)"
+                class="mt-1.5 inline-flex items-center gap-x-1 text-base font-semibold text-foreground rounded-sm underline decoration-dotted underline-offset-4 decoration-muted-foreground hover:text-primary focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+                aria-label="Change priority">
+          <span x-text="priorities[c.priority]"></span>
+          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </template>
+      <template x-if="!(isAdmin && needsReview)">
+        <p class="mt-1.5 text-base font-semibold text-foreground" x-text="priorities[c.priority]"></p>
+      </template>
+      <p class="mt-1 text-sm text-muted-foreground-1" x-text="priorityReason"></p>
+    </div>
+
+    <!-- Ownership action: one primary at a time (Submit lives at the bottom of Overview) -->
+    <div x-show="headerAction" class="p-4 sm:p-5 flex items-center lg:justify-end gap-2">
+      <template x-if="c.state === 'queued' && !isAdmin">
+        {{ button(text="Assign to me", extra_attrs='@click="assignToMe()" :disabled="condition === \'stale\'"') }}
+      </template>
+      <template x-if="c.state === 'queued' && isAdmin">
+        {{ button(text="Assign reviewer", extra_attrs='@click.stop="openMenu(\'assign\', $event)"') }}
+      </template>
+      <template x-if="c.state === 'assigned' && isAdmin">
+        {{ button(text="Reassign", variant="secondary", extra_attrs='@click.stop="openMenu(\'assign\', $event)"') }}
+      </template>
+    </div>
+  </div>
+</div>

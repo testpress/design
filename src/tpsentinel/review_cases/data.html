@@ -1,0 +1,262 @@
+{% raw %}
+<script>
+  // Review Cases mock data shared by the list and the case detail page, so both show the same cases.
+  // Changes made on either page (assign, priority, decisions) persist for the browser session.
+  window.SentinelReview = (function () {
+    const MIN = 60e3, HOUR = 60 * MIN, DAY = 24 * HOUR;
+    const NOW = Date.now();
+
+    // ---------- Icons (inline SVG: lucide markup doesn't render inside x-for) ----------
+    const svg = (paths, cls = 'size-4') => `<svg class="shrink-0 ${cls}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+    const ICONS = {
+      multi_face: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      no_face: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5"/><path d="m22 8-5 5"/>',
+      looking_away: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/>',
+      phone_usage: '<rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/>',
+      browser_focus_lost: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/>',
+      identity: '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01"/><path d="M15 9h.01"/>',
+      missing_evidence: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="m14.5 12.5-5 5"/><path d="m9.5 12.5 5 5"/>',
+      queued: '<path d="M10.1 2.18a10 10 0 0 1 3.8 0"/><path d="M13.9 21.82a10 10 0 0 1-3.8 0"/><path d="M17.61 3.72a10 10 0 0 1 2.69 2.7"/><path d="M2.18 13.9a10 10 0 0 1 0-3.8"/><path d="M20.28 17.61a10 10 0 0 1-2.7 2.69"/><path d="M21.82 10.1a10 10 0 0 1 0 3.8"/><path d="M3.72 6.39a10 10 0 0 1 2.7-2.69"/><path d="M6.39 20.28a10 10 0 0 1-2.69-2.7"/>',
+      assigned: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/>',
+      clear: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+      flagged: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
+      priority: '<path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/>',
+      workspace: '<rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
+      result: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+      reviewer: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+      sort_down: '<path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="M11 4h10"/><path d="M11 8h7"/><path d="M11 12h4"/>',
+      sort_up: '<path d="m3 8 4-4 4 4"/><path d="M7 4v16"/><path d="M11 12h4"/><path d="M11 16h7"/><path d="M11 20h10"/>',
+      toast_warning: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+      toast_info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+      // Case states (lucide: clock, user-round-check, shield-check, flag)
+      state_queued: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+      state_assigned: '<path d="M2 21a8 8 0 0 1 13.29-6"/><circle cx="10" cy="8" r="5"/><path d="m16 19 2 2 4-4"/>',
+      state_clear: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+      state_flagged: '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/>',
+      indicator: '<path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>',
+    };
+    const icon = (key, cls) => svg(ICONS[key], cls);
+
+    // ---------- Vocabulary ----------
+    const INDICATORS = [
+      { key: 'multi_face', slug: 'multiple-faces', label: 'Multiple faces' },
+      { key: 'no_face', slug: 'not-visible', label: 'Candidate not visible' },
+      { key: 'looking_away', slug: 'looking-away', label: 'Looking away' },
+      { key: 'phone_usage', slug: 'phone', label: 'Phone detected' },
+      { key: 'browser_focus_lost', slug: 'focus-lost', label: 'Browser focus lost' },
+      { key: 'identity', slug: 'identity', label: 'Face match needs confirmation' },
+      { key: 'missing_evidence', slug: 'missing-evidence', label: 'Required evidence missing', neutral: true },
+    ].map(i => ({ ...i, svg: icon(i.key, 'size-4') }));
+    const INDICATOR_BY_KEY = Object.fromEntries(INDICATORS.map(i => [i.key, i]));
+    const BEHAVIOUR_KEYS = ['multi_face', 'no_face', 'looking_away', 'phone_usage', 'browser_focus_lost'];
+
+    const PRIORITIES = ['Critical', 'High', 'Medium', 'Low', 'Routine'];
+    const ME = 'divya';
+    const REVIEWERS = [
+      { id: 'divya', name: 'Divya Menon', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80' },
+      { id: 'anita', name: 'Anita Kumar', avatar: 'https://images.unsplash.com/photo-1679412330254-90cb240038c5?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80' },
+      { id: 'rahul', name: 'Rahul Verma', avatar: 'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80' },
+      { id: 'sameer', name: 'Sameer Khan', avatar: 'https://images.unsplash.com/photo-1659482634023-2c4fda99ac0c?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80' },
+      { id: 'lakshmi', name: 'Lakshmi Narayanan', avatar: 'https://images.unsplash.com/photo-1520785643438-5bf77931f493?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80' },
+    ];
+    const REVIEWER_BY_ID = Object.fromEntries(REVIEWERS.map(r => [r.id, r]));
+    const WORKSPACES = [
+      { id: 'nism-8', name: 'NISM Series VIII: Equity Derivatives' },
+      { id: 'nism-5a', name: 'NISM Series V-A: Mutual Fund Distributors' },
+      { id: 'ca-mock-3', name: 'CA Foundation Mock Test 3' },
+      { id: 'neet-mock-12', name: 'NEET Full Mock 12' },
+      { id: 'bank-po', name: 'Bank PO Prelims Practice' },
+      { id: 'data-analytics', name: 'Data Analytics Certificate' },
+      { id: 'python-basics', name: 'Python for Beginners' },
+      { id: 'upsc-csat-2', name: 'UPSC CSAT Practice Test 2' },
+      { id: 'aml-kyc', name: 'AML and KYC Compliance Training' },
+      { id: 'gate-cs-4', name: 'GATE CS Mock 4' },
+      { id: 'cfa-l1', name: 'CFA Level I Prep Course' },
+      { id: 'ielts-mock', name: 'IELTS Academic Mock' },
+    ];
+    const WORKSPACE_BY_ID = Object.fromEntries(WORKSPACES.map(w => [w.id, w]));
+    let CANDIDATES = []; // filled by makeCases()
+
+    // People on the client's side who can ask for a review of an AI-cleared candidate
+    const REQUESTERS = ['Ramesh Iyer', 'Fatima Sheikh', 'Joseph Mathew'];
+    // Why a requested review got its priority (by priority index), so Critical never stands without a reason
+    const REQUEST_URGENCY = ['Certificate issuance is on hold until this is reviewed', 'Results are due to be published this week', 'Needed before the next batch’s results', 'Routine spot check', 'Routine spot check'];
+
+    // ---------- Mock data (seeded so reloads look the same) ----------
+    function makeCases() {
+      let seed = 20261013;
+      const rand = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      const pick = arr => arr[Math.floor(rand() * arr.length)];
+      const weighted = weights => { let r = rand() * weights.reduce((a, b) => a + b, 0); return weights.findIndex(w => (r -= w) < 0); };
+      const FIRST = ['Aarav', 'Priya', 'Rohan', 'Sneha', 'Karthik', 'Meera', 'Arjun', 'Kavya', 'Vikram', 'Ananya', 'Rahul', 'Ishita', 'Nikhil', 'Pooja', 'Siddharth', 'Divya', 'Harish', 'Neha', 'Manoj', 'Shreya', 'Aditya', 'Lavanya', 'Gaurav', 'Nandini', 'Suresh', 'Tanvi', 'Varun', 'Deepika', 'Imran', 'Fatima', 'Joseph', 'Riya'];
+      const LAST = ['Sharma', 'Iyer', 'Reddy', 'Nair', 'Patel', 'Gupta', 'Krishnan', 'Das', 'Menon', 'Joshi', 'Pillai', 'Bose', 'Rao', 'Mehta', 'Kulkarni', 'Banerjee', 'Shetty', 'Ahmed', 'Thomas', 'Chopra'];
+      const REASONS_CLEAR = ['Second face was a family member passing behind; candidate kept answering.', 'Phone was on the desk face down the whole time.', 'Looking away matches reading the question sheet allowed in this workspace.', 'Tab switch was to the allowed calculator page.', 'Identity confirmed against the admit card photo.', 'Missing clip re-uploaded; recording shows nothing unusual.'];
+      const REASONS_FLAG = ['Another person is seen prompting answers in two sessions.', 'Phone used repeatedly during the timed section.', 'Candidate left the frame for 6 minutes during the final exam.', 'Face in sessions 3 and 4 doesn’t match the registered candidate.', 'Screen recording missing for the final exam, so the attempt can’t be verified.', 'Required webcam evidence was deleted before review.'];
+
+      const cases = [];
+      let n = 2400;
+      CANDIDATES = [];
+      const ids = new Set(), names = new Set();
+      while (CANDIDATES.length < 220) {
+        const name = `${pick(FIRST)} ${pick(LAST)}`;
+        const identifier = `C-${10000 + Math.floor(rand() * 89999)}`;
+        // unique names so the candidate menu can show the name alone
+        if (ids.has(identifier) || names.has(name)) continue;
+        ids.add(identifier); names.add(name);
+        CANDIDATES.push({ name, identifier, email: `${name.toLowerCase().replace(' ', '.')}${Math.floor(rand() * 90 + 10)}@example.com`, avatar: `https://i.pravatar.cc/80?u=${identifier}` });
+      }
+      const make = (state) => {
+        const person = pick(CANDIDATES);
+        const ws = pick(WORKSPACES).id;
+        const indicators = [];
+        const behaviourCount = weighted([10, 45, 30, 15]);
+        while (indicators.length < behaviourCount) { const k = pick(BEHAVIOUR_KEYS); if (!indicators.includes(k)) indicators.push(k); }
+        if (rand() < 0.14) indicators.push('identity');
+        if (rand() < 0.12) indicators.push('missing_evidence');
+        if (!indicators.length) indicators.push('identity');
+        indicators.sort((a, b) => INDICATORS.findIndex(i => i.key === a) - INDICATORS.findIndex(i => i.key === b));
+        const c = {
+          id: `RC-${n++}`,
+          name: person.name,
+          identifier: person.identifier,
+          email: person.email,
+          workspace: ws,
+          indicators,
+          priority: weighted([5, 18, 37, 25, 15]),
+          state,
+          reviewer: null,
+          createdAt: 0, assignedAt: null, completedAt: null,
+          result: null, reason: null,
+        };
+        return c;
+      };
+      const openAt = () => NOW - Math.floor(rand() < 0.15 ? rand() * DAY : rand() * 21 * DAY + HOUR);
+
+      // 54 assigned to me, 80 unassigned, 116 assigned to others = 250 open (10 per page: 6, 8 and 25 pages)
+      for (let i = 0; i < 250; i++) {
+        const state = i < 134 && i >= 54 ? 'queued' : 'assigned';
+        const c = make(state);
+        c.createdAt = openAt();
+        if (state === 'assigned') {
+          c.reviewer = i < 54 ? ME : pick(REVIEWERS.slice(1)).id;
+          c.assignedAt = c.createdAt + Math.floor(rand() * (NOW - c.createdAt));
+        }
+        cases.push(c);
+      }
+      // One unassigned case gets claimed by someone else just before you act on it
+      const contested = cases.find(c => c.state === 'queued' && c.priority <= 2);
+      if (contested) contested.takenBy = 'rahul';
+
+      // 300 completed
+      for (let i = 0; i < 300; i++) {
+        const c = make('completed');
+        c.completedAt = NOW - Math.floor(rand() * 90 * DAY + 2 * HOUR);
+        c.createdAt = c.completedAt - Math.floor(rand() * 10 * DAY + HOUR);
+        c.assignedAt = c.createdAt + Math.floor(rand() * (c.completedAt - c.createdAt) * 0.5);
+        c.reviewer = pick(REVIEWERS).id;
+        const flagged = rand() < 0.35;
+        c.result = flagged ? 'flagged' : 'clear';
+        if (flagged && c.indicators.includes('missing_evidence')) rand(); // keeps the seeded mock data unchanged
+        c.reason = flagged ? pick(REASONS_FLAG) : pick(REASONS_CLEAR);
+        cases.push(c);
+      }
+      // Why each case exists, worked out from its ID so the list and the detail page agree (no extra random draws).
+      // Most are AI-flagged: a behaviour concern when a behaviour anomaly was found, otherwise an evidence concern.
+      // The rest are reviews someone asked for even though AI cleared the candidate.
+      cases.forEach(c => {
+        const num = parseInt(c.id.slice(3), 10);
+        const h = (Math.imul(num, 2654435761) >>> 0) % 100;
+        if (h < 15) {
+          c.origin = 'requested';
+          c.requestedBy = REQUESTERS[num % REQUESTERS.length];
+          c.urgency = REQUEST_URGENCY[c.priority];
+          c.concern = null;
+        } else {
+          c.origin = 'ai_flagged';
+          c.concern = c.indicators.some(k => BEHAVIOUR_KEYS.includes(k)) ? 'behaviour' : 'evidence';
+        }
+      });
+      return cases;
+    }
+
+    // What the AI said and why the case is open, in words
+    const CONCERN_LABEL = { behaviour: 'Behaviour concern', evidence: 'Evidence concern' };
+    function triggerLabel(c) { return c.origin === 'requested' ? `Requested by ${c.requestedBy}` : CONCERN_LABEL[c.concern]; }
+
+    // ---------- Time helpers ----------
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    function clock(d) {
+      const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
+      return `${h % 12 || 12}:${m} ${h < 12 ? 'am' : 'pm'}`;
+    }
+    function relative(ts) {
+      const diff = NOW - ts;
+      if (diff < HOUR) { const m = Math.max(1, Math.round(diff / MIN)); return `${m} minute${m === 1 ? '' : 's'} ago`; }
+      if (diff < DAY) { const h = Math.round(diff / HOUR); return `${h} hour${h === 1 ? '' : 's'} ago`; }
+      if (diff < 2 * DAY) return 'yesterday';
+      if (diff < 7 * DAY) return `${Math.floor(diff / DAY)} days ago`;
+      if (diff < 14 * DAY) return 'last week';
+      if (diff < 31 * DAY) return `${Math.floor(diff / (7 * DAY))} weeks ago`;
+      const d = new Date(ts);
+      return `on ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+    }
+    // How long something has waited, without "ago": "5 hours", "1 day", "12 days"
+    function waited(ts) {
+      const diff = NOW - ts;
+      if (diff < HOUR) { const m = Math.max(1, Math.round(diff / MIN)); return `${m} minute${m === 1 ? '' : 's'}`; }
+      if (diff < DAY) { const h = Math.round(diff / HOUR); return `${h} hour${h === 1 ? '' : 's'}`; }
+      const d = Math.floor(diff / DAY);
+      return `${d} day${d === 1 ? '' : 's'}`;
+    }
+    function exact(ts) {
+      const d = new Date(ts);
+      const sameYear = d.getFullYear() === new Date(NOW).getFullYear();
+      return `${MONTHS[d.getMonth()]} ${d.getDate()}${sameYear ? '' : ', ' + d.getFullYear()}, ${clock(d)}`;
+    }
+
+    // ---------- Changes made in this browser session ----------
+    const CHANGES_KEY = 'tpsentinel.reviewCases.changes';
+    function loadChanges() {
+      try { return JSON.parse(sessionStorage.getItem(CHANGES_KEY)) || {}; } catch (e) { return {}; }
+    }
+    function saveChange(id, fields) {
+      const all = loadChanges();
+      all[id] = Object.assign(all[id] || {}, fields);
+      try { sessionStorage.setItem(CHANGES_KEY, JSON.stringify(all)); } catch (e) { /* not remembered */ }
+    }
+    // Generated cases with this session's changes applied
+    function loadCases() {
+      const changes = loadChanges();
+      return makeCases().map(c => {
+        if (!changes[c.id]) return c;
+        Object.assign(c, changes[c.id]);
+        delete c.takenBy;
+        return c;
+      });
+    }
+
+    // Where the detail page's Previous/Next comes from: the list order or the selected cases
+    const SEQUENCE_KEY = 'tpsentinel.reviewCases.sequence';
+    function saveSequence(seq) {
+      try { sessionStorage.setItem(SEQUENCE_KEY, JSON.stringify(seq)); } catch (e) { /* no sequence */ }
+    }
+    function loadSequence() {
+      try { return JSON.parse(sessionStorage.getItem(SEQUENCE_KEY)); } catch (e) { return null; }
+    }
+
+    // PR previews live under /pr-preview/pr-N/; prefix links and images built in script
+    const BASE = (location.pathname.match(/^\/pr-preview\/pr-\d+/) || [''])[0];
+    const url = path => BASE + path;
+
+    return {
+      url,
+      MIN, HOUR, DAY, NOW, svg, ICONS, icon, INDICATORS, INDICATOR_BY_KEY, BEHAVIOUR_KEYS,
+      PRIORITIES, ME, REVIEWERS, REVIEWER_BY_ID, WORKSPACES, WORKSPACE_BY_ID,
+      CONCERN_LABEL, triggerLabel,
+      candidates: () => CANDIDATES,
+      makeCases, loadCases, saveChange, saveSequence, loadSequence,
+      MONTHS, clock, relative, waited, exact,
+    };
+  })();
+</script>
+{% endraw %}
