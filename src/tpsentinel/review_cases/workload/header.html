@@ -1,0 +1,46 @@
+{% from "src/tpsentinel/components/filter_select.html" import filter_select %}
+
+<!-- Review Cases navigation and view identity. Workspace and Priority scope the whole page, so they sit up here. -->
+<div class="flex flex-col gap-1">
+  <a :href="window.SentinelReview.url('/tpsentinel/review_cases/?view=open')"
+     class="inline-flex items-center gap-x-1 -ms-1 py-1 px-1 w-fit rounded-lg text-sm text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+    <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    Review cases
+  </a>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h1 class="text-lg md:text-xl font-semibold text-foreground">Reviewer workload</h1>
+    <div class="flex flex-wrap items-center gap-2">
+      {{ filter_select("workspace", "Workspace", "workspaceOptions", "All workspaces") }}
+      {{ filter_select("priority", "Priority", "priorityOptions", "All priorities") }}
+    </div>
+  </div>
+</div>
+
+<!-- Active scope: every total and row below is for these filters -->
+<div x-show="hasFilters" x-cloak class="-mt-1 flex flex-wrap items-center gap-2 text-sm">
+  <span class="text-muted-foreground-1">Showing workload for</span>
+  <template x-for="f in [['workspace', workspaceLabel], ['priority', priorityLabel === 'Critical and High' ? 'Critical and High priority' : priorityLabel + ' priority']].filter(f => $data[f[0]])" :key="f[0]">
+    <span class="inline-flex items-center gap-x-1 py-1 ps-2.5 pe-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-500/20 dark:text-primary-300">
+      <span class="truncate max-w-64" x-text="f[1]"></span>
+      <button type="button" @click="$data[f[0]] = ''" :aria-label="`Remove ${f[0]} filter`"
+              class="inline-flex justify-center items-center size-4 rounded-full hover:bg-primary-200 dark:hover:bg-primary-500/30 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+        <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </span>
+  </template>
+  <button type="button" @click="clearFilters()"
+          class="py-1 px-1.5 rounded-lg text-sm font-medium text-primary hover:text-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+    Clear all filters
+  </button>
+</div>
+
+<!-- Stale data: keep the last figures, say how old they are -->
+<div x-show="stale" x-cloak role="status"
+     class="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 px-4 rounded-xl border border-amber-200 bg-amber-50 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+  <p class="grow" x-text="`Couldn't refresh. These figures are from ${updatedLabel.replace('Updated ', '')} and may be out of date.`"></p>
+  <button type="button" @click="refresh()" :disabled="refreshing"
+          class="font-medium underline underline-offset-4 hover:no-underline disabled:opacity-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-amber-500 rounded">
+    Try again
+  </button>
+</div>

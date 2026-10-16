@@ -1,0 +1,226 @@
+{% raw %}
+<script>
+  (function () {
+    const SR = window.SentinelReview;
+    const { MIN, HOUR, DAY, NOW, PRIORITIES, ME, REVIEWERS, WORKSPACES, WORKSPACE_BY_ID, clock, exact } = SR;
+
+    const STORE_KEY = 'tpsentinel.reviewerWorkload';
+    const CASES_STORE_KEY = 'tpsentinel.reviewCases';
+    const HIGH = [0, 1]; // Critical, High
+    const PRIORITY_OPTIONS = [
+      ['critical-high', 'Critical and High'],
+      ...PRIORITIES.map(p => [p.toLowerCase(), p]),
+    ];
+    const SORTS = {
+      open: { label: 'Open cases', dir: 'desc' },
+      high: { label: 'High priority', dir: 'desc' },
+      oldest: { label: 'Oldest waiting', dir: 'asc' },
+      completed: { label: 'Completed today', dir: 'desc' },
+    };
+    const START_OF_TODAY = new Date(NOW).setHours(0, 0, 0, 0);
+
+    function load(key) {
+      try { return JSON.parse(sessionStorage.getItem(key)) || {}; } catch (e) { return {}; }
+    }
+
+    window.reviewerWorkloadPage = function () {
+      const stored = load(STORE_KEY);
+      return {
+        // prototype control: normal | none | unassigned_only | no_reviewers | stale | error | row_error
+        simulate: 'normal',
+
+        cases: SR.loadCases(),
+        refreshedAt: NOW,
+        refreshing: false,
+
+        search: typeof stored.search === 'string' ? stored.search : '',
+        workspace: stored.workspace || '',
+        priority: stored.priority || '',
+        sort: stored.sort && SORTS[stored.sort.by] ? stored.sort : { by: 'open', dir: 'desc' },
+
+        workspaceOptions: WORKSPACES.map(w => [w.id, w.name]),
+        priorityOptions: PRIORITY_OPTIONS,
+        sorts: SORTS,
+
+        init() {
+          // The view is admin-only; opening it directly in the prototype acts as an admin
+          const casesStore = load(CASES_STORE_KEY);
+          if (casesStore.role !== 'admin') {
+            try { sessionStorage.setItem(CASES_STORE_KEY, JSON.stringify(Object.assign(casesStore, { role: 'admin' }))); } catch (e) { /* not remembered */ }
+            window.dispatchEvent(new CustomEvent('review-cases-updated', { detail: { role: 'admin', counts: Object.assign({ mine: 54, unassigned: 80 }, casesStore.counts) } }));
+          }
+          ['search', 'workspace', 'priority', 'sort'].forEach(k => this.$watch(k, () => this.save()));
+        },
+        save() {
+          try { sessionStorage.setItem(STORE_KEY, JSON.stringify({ search: this.search, workspace: this.workspace, priority: this.priority, sort: this.sort })); } catch (e) { /* not remembered */ }
+        },
+        // Coming back from Review Cases: pick up assignments made there, summary and table together
+        reload() { this.cases = SR.loadCases(); this.refreshedAt = Date.now(); },
+        refresh() {
+          this.refreshing = true;
+          setTimeout(() => {
+            this.reload();
+            if (['stale', 'error', 'row_error'].includes(this.simulate)) this.simulate = 'normal';
+            this.refreshing = false;
+          }, 600);
+        },
+        viewAsReviewer() {
+          const casesStore = load(CASES_STORE_KEY);
+          try { sessionStorage.setItem(CASES_STORE_KEY, JSON.stringify(Object.assign(casesStore, { role: 'reviewer' }))); } catch (e) { /* not remembered */ }
+          location.href = SR.url('/tpsentinel/review_cases/');
+        },
+
+        // ---------- data in scope ----------
+        get reviewers() {
+          return this.simulate === 'no_reviewers' ? REVIEWERS.map(r => ({ ...r, accessLost: true })) : REVIEWERS;
+        },
+        get source() {
+          if (this.simulate === 'none') return this.cases.filter(c => c.state === 'completed');
+          if (this.simulate === 'unassigned_only') return this.cases.map(c => c.state === 'assigned' ? { ...c, state: 'queued', reviewer: null } : c);
+          return this.cases;
+        },
+        priorityMatch(c) {
+          if (!this.priority) return true;
+          if (this.priority === 'critical-high') return HIGH.includes(c.priority);
+          return PRIORITIES[c.priority].toLowerCase() === this.priority;
+        },
+        inScope(c) { return (!this.workspace || c.workspace === this.workspace) && this.priorityMatch(c); },
+        get openCases() { return this.source.filter(c => c.state !== 'completed' && this.inScope(c)); },
+        get completedToday() { return this.source.filter(c => c.state === 'completed' && c.completedAt >= START_OF_TODAY && this.inScope(c)); },
+
+        get summary() {
+          const open = this.openCases;
+          return {
+            open: open.length,
+            unassigned: open.filter(c => c.state === 'queued').length,
+            high: open.filter(c => HIGH.includes(c.priority)).length,
+            completed: this.completedToday.length,
+          };
+        },
+        measures(open, completed) {
+          return {
+            open: open.length,
+            high: open.filter(c => HIGH.includes(c.priority)).length,
+            oldest: open.length ? Math.min(...open.map(c => c.createdAt)) : null,
+            completed,
+          };
+        },
+        get unassignedRow() {
+          const open = this.openCases.filter(c => c.state === 'queued');
+          return open.length ? { id: 'unassigned', kind: 'unassigned', name: 'Unassigned', ...this.measures(open, null) } : null;
+        },
+        get reviewerRows() {
+          return this.reviewers.map(r => {
+            const open = this.openCases.filter(c => c.state === 'assigned' && c.reviewer === r.id);
+            const done = this.completedToday.filter(c => c.reviewer === r.id).length;
+            return {
+              ...r, kind: r.accessLost ? 'lost' : 'reviewer', you: r.id === ME,
+              error: this.simulate === 'row_error' && r.id === 'rahul',
+              ...this.measures(open, done),
+            };
+          });
+        },
+        // Ownership problems first, whatever the sort: Unassigned, then reviewers who lost access
+        get pinnedRows() {
+          const lost = this.reviewerRows.filter(r => r.kind === 'lost' && r.open).sort((a, b) => b.open - a.open);
+          return [this.unassignedRow, ...lost].filter(Boolean);
+        },
+        get eligibleRows() { return this.reviewerRows.filter(r => r.kind === 'reviewer'); },
+        get searchTerm() { return this.search.trim().toLowerCase(); },
+        get visibleRows() {
+          const q = this.searchTerm;
+          const rows = this.eligibleRows.filter(r => !q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
+          const { by, dir } = this.sort;
+          const sign = dir === 'asc' ? 1 : -1;
+          return rows.sort((a, b) => {
+            if (by === 'oldest') {
+              // Reviewers with nothing open go last either way
+              if (a.oldest === null || b.oldest === null) return (a.oldest === null) - (b.oldest === null);
+              return sign * (a.oldest - b.oldest);
+            }
+            return sign * (a[by] - b[by]) || b.open - a.open || a.name.localeCompare(b.name);
+          });
+        },
+        get rows() { return [...this.pinnedRows, ...this.visibleRows]; },
+
+        // ---------- sorting ----------
+        sortBy(by) {
+          this.sort = this.sort.by === by
+            ? { by, dir: this.sort.dir === 'asc' ? 'desc' : 'asc' }
+            : { by, dir: SORTS[by].dir };
+        },
+        ariaSort(by) { return this.sort.by === by ? (this.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'; },
+        get sortSentence() {
+          const { by, dir } = this.sort;
+          const order = by === 'oldest'
+            ? (dir === 'asc' ? 'longest waiting first' : 'shortest waiting first')
+            : (dir === 'desc' ? 'highest first' : 'lowest first');
+          return `Sorted by ${SORTS[by].label.toLowerCase()}, ${order}`;
+        },
+
+        // ---------- filters ----------
+        get hasFilters() { return !!(this.workspace || this.priority); },
+        get workspaceLabel() { return this.workspace ? WORKSPACE_BY_ID[this.workspace].name : ''; },
+        get priorityLabel() { return (PRIORITY_OPTIONS.find(o => o[0] === this.priority) || [])[1] || ''; },
+        clearFilters() { this.workspace = ''; this.priority = ''; },
+
+        // ---------- states ----------
+        get loadFailed() { return this.simulate === 'error'; },
+        get stale() { return this.simulate === 'stale'; },
+        get noOpenWork() { return !this.loadFailed && this.summary.open === 0; },
+        get noEligibleReviewers() { return !this.eligibleRows.length; },
+        get noAssignedWork() { return this.summary.open > 0 && this.summary.open === this.summary.unassigned; },
+        get updatedLabel() { return `Updated ${clock(new Date(this.refreshedAt))}`; },
+
+        // ---------- display ----------
+        waiting(ts) {
+          if (ts === null) return '—';
+          const diff = NOW - ts;
+          if (diff < HOUR) return `${Math.max(1, Math.round(diff / MIN))} min`;
+          if (diff < DAY) return `${Math.round(diff / HOUR)} h`;
+          const d = Math.floor(diff / DAY);
+          return `${d} day${d === 1 ? '' : 's'}`;
+        },
+        exact(ts) { return ts === null ? '' : exact(ts); },
+        initials(name) { return name.split(' ').map(p => p[0]).slice(0, 2).join(''); },
+        num(n) { return n.toLocaleString(); },
+
+        // ---------- links into Review Cases, carrying this view's scope ----------
+        // what: 'open' | 'high' | 'oldest' | 'completed'; row: a table row or null for the whole scope
+        casesHref(what, row) {
+          const parts = [];
+          let view = 'open', sort = '';
+          if (row && row.kind === 'unassigned') view = 'unassigned';
+          else if (row) parts.push(`reviewer:${row.id}`);
+          if (what === 'unassigned') view = 'unassigned';
+          if (what === 'completed') { view = 'closed'; sort = 'newest'; }
+          if (this.workspace) parts.push(`workspace:${this.workspace}`);
+          // Closed cases can't be filtered by priority in Review Cases
+          if (what !== 'completed') {
+            let p = this.priority === 'critical-high' ? 'critical,high' : this.priority;
+            if (what === 'high' && !['critical', 'high'].includes(p)) p = 'critical,high';
+            if (p) parts.push(`priority:${p}`);
+          }
+          if (what === 'oldest') sort = 'oldest';
+          const params = new URLSearchParams({ view, q: parts.join(' ') });
+          if (sort) params.set('sort', sort);
+          return SR.url(`/tpsentinel/review_cases/?${params}`);
+        },
+        // Says where a number leads before you follow it
+        casesTitle(what, row) {
+          const owner = !row ? '' : row.kind === 'unassigned' ? ' with no owner' : ` assigned to ${row.name}`;
+          const scope = this.hasFilters ? ' (current filters)' : '';
+          if (what === 'open') return `Open ${row ? row.open : this.summary.open} open cases${owner} in Review Cases${scope}`;
+          if (what === 'unassigned') return `Open ${this.summary.unassigned} unassigned cases in Review Cases${scope}`;
+          if (what === 'high') return `Open ${row ? row.high : this.summary.high} Critical and High priority cases${owner} in Review Cases${scope}`;
+          if (what === 'oldest') return `Open cases${owner}, oldest first, in Review Cases${scope}`;
+          return row ? `Open ${row.name}'s closed cases, newest first, in Review Cases` : 'Open closed cases, newest first, in Review Cases';
+        },
+        searchCasesHref() {
+          return SR.url(`/tpsentinel/review_cases/?${new URLSearchParams({ view: 'open', q: this.search.trim() })}`);
+        },
+      };
+    };
+  })();
+</script>
+{% endraw %}

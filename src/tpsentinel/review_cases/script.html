@@ -107,6 +107,16 @@
           const params = new URLSearchParams(location.search);
           const fromUrl = params.get('view');
           this.view = VIEWS.some(v => v.key === fromUrl) ? fromUrl : (stored.view || this.defaultView());
+          // Links from Reviewer Workload carry their scope (?q=reviewer:anita priority:critical,high&sort=oldest);
+          // after reading it the session store owns the search, so the URL keeps only the view
+          if (params.has('q') || params.has('sort')) {
+            if (params.has('q')) this.query = params.get('q');
+            const sortFromUrl = params.get('sort');
+            this.sortChoice = sortFromUrl === 'oldest' ? { by: 'time', order: 'oldest' } : sortFromUrl === 'newest' ? { by: 'time', order: 'newest' } : null;
+            const url = new URL(location.href);
+            url.searchParams.delete('q'); url.searchParams.delete('sort');
+            history.replaceState(null, '', url);
+          }
           this.$watch('query', () => {
             VIEWS.forEach(v => this.pages[v.key] = 1);
             this.pruneSelection();
@@ -528,7 +538,8 @@
         get assignOptions() {
           const s = (this.menu?.search || '').toLowerCase();
           const open = this.pool.filter(c => c.state === 'assigned');
-          return REVIEWERS
+          // Someone who lost review access can't be given cases
+          return REVIEWERS.filter(r => !r.accessLost)
             .map(r => ({ ...r, load: open.filter(c => c.reviewer === r.id).length, label: r.id === ME ? `${r.name} (you)` : r.name }))
             .filter(r => !s || r.name.toLowerCase().includes(s));
         },

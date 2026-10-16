@@ -1,0 +1,254 @@
+{% from "src/tpsentinel/components/filter_select.html" import filter_search %}
+{% from "src/tpsentinel/components/empty-state.html" import empty_state %}
+
+<!-- Reviewer workload table: the one place for Reviewer-level numbers -->
+<section class="bg-card border border-card-line rounded-xl" aria-labelledby="workload-table-heading">
+  <h2 id="workload-table-heading" class="sr-only">Workload by reviewer</h2>
+
+  <!-- Load failure: never shown as zeroes; search, filters and sorting stay -->
+  <div x-show="loadFailed" x-cloak>
+    {{ empty_state(
+      title="Couldn't load reviewer workload",
+      description="Your filters, search and sorting are kept. Try again in a moment.",
+      icon="cloud-off",
+      primary_action_text="Try again",
+      primary_action_attrs='@click.prevent="refresh()"',
+      compact=false,
+      wrap_card=false
+    ) }}
+  </div>
+
+  <!-- No open work in this scope -->
+  <div x-show="noOpenWork && !hasFilters" x-cloak>
+    {{ empty_state(
+      title="No cases are waiting for a decision",
+      description="Every case has been reviewed. New cases will appear here when they need a reviewer.",
+      icon="circle-check",
+      primary_action_text="View closed cases",
+      primary_action_attrs=':href="casesHref(\'completed\', null)"',
+      primary_action_href="#",
+      compact=false,
+      wrap_card=false
+    ) }}
+  </div>
+  <div x-show="noOpenWork && hasFilters" x-cloak>
+    {{ empty_state(
+      title="No open workload matches these filters",
+      description="There may be open cases outside this workspace or priority.",
+      icon="filter-x",
+      primary_action_text="Clear filters",
+      primary_action_attrs='@click.prevent="clearFilters()"',
+      compact=false,
+      wrap_card=false
+    ) }}
+  </div>
+
+  <template x-if="!loadFailed && !noOpenWork">
+    <div>
+      <!-- Toolbar: search reviewers; sorting lives in the column headers (and a menu on phones) -->
+      <div class="flex flex-wrap items-center justify-between gap-2 p-3 border-b border-card-line">
+        <div class="relative grow sm:max-w-xs">
+          {{ filter_search("search", "Search reviewers by name or email") }}
+          <button type="button" x-show="search" x-cloak @click="search = ''" aria-label="Clear search"
+                  class="absolute end-1.5 top-1/2 -translate-y-1/2 inline-flex justify-center items-center size-6 rounded-full text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+          </button>
+        </div>
+        <label class="sm:hidden flex items-center gap-x-2 text-sm text-muted-foreground-1">
+          Sort
+          <select x-model="sort.by" @change="sort = { by: $event.target.value, dir: sorts[$event.target.value].dir }"
+                  class="py-1.5 ps-3 pe-8 bg-layer border border-layer-line rounded-lg text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary">
+            <template x-for="(s, key) in sorts" :key="key">
+              <option :value="key" :selected="sort.by === key" x-text="s.label"></option>
+            </template>
+          </select>
+        </label>
+      </div>
+
+      <!-- Open cases exist, but nobody may review them -->
+      <div x-show="noEligibleReviewers" x-cloak class="flex flex-col sm:flex-row sm:items-center gap-3 py-4 px-4 border-b border-card-line bg-surface/50">
+        <span class="shrink-0 flex justify-center items-center size-9 rounded-full bg-surface text-muted-foreground-1">
+          <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5"/><path d="m22 8-5 5"/></svg>
+        </span>
+        <div class="grow">
+          <p class="text-sm font-medium text-foreground">No one can review cases right now</p>
+          <p class="text-sm text-muted-foreground-1">Open cases are waiting, but no reviewer has review access.</p>
+        </div>
+        <a href="#" class="shrink-0 inline-flex items-center py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary">
+          Manage reviewer access
+        </a>
+      </div>
+      <!-- Desktop and tablet: table (Completed today folds away below lg) -->
+      <div class="hidden sm:block overflow-x-auto">
+        <table class="min-w-full">
+          <thead>
+            <tr class="border-b border-card-line">
+              <th scope="col" class="py-2.5 ps-4 pe-3 text-start text-[13px] font-medium text-muted-foreground-1">Reviewer</th>
+              <template x-for="col in [['open', 'Open', ''], ['high', 'High priority', ''], ['oldest', 'Oldest waiting', ''], ['completed', 'Completed today', 'hidden lg:table-cell']]" :key="col[0]">
+                <th scope="col" :aria-sort="ariaSort(col[0])" :class="col[2]" class="py-2.5 px-3 text-end whitespace-nowrap">
+                  <button type="button" @click="sortBy(col[0])"
+                          :class="sort.by === col[0] ? 'text-foreground' : 'text-muted-foreground-1 hover:text-foreground'"
+                          class="group inline-flex items-center gap-x-1 -me-1 py-0.5 px-1 rounded-md text-[13px] font-medium focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+                    <span x-text="col[1]"></span>
+                    <svg class="shrink-0 size-3.5 transition" :class="[sort.by === col[0] ? 'opacity-100' : 'opacity-0 group-hover:opacity-60', sort.by === col[0] && sort.dir === 'asc' && 'rotate-180']"
+                         xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                  </button>
+                </th>
+              </template>
+              <th scope="col" class="py-2.5 ps-3 pe-4"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+
+          <tbody class="divide-y divide-card-line">
+            <template x-for="row in rows" :key="row.id">
+              <tr :class="row.kind === 'lost' ? 'bg-red-50/70 dark:bg-red-500/5' : 'hover:bg-layer-hover/60'">
+                <!-- Who -->
+                <td class="py-3 ps-4 pe-3">
+                  <div class="flex items-center gap-x-3 min-w-56">
+                    <template x-if="row.kind === 'unassigned'">
+                      <span class="shrink-0 flex justify-center items-center size-8 rounded-full border border-dashed border-muted-foreground-2 text-muted-foreground-1">
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.29-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg>
+                      </span>
+                    </template>
+                    <template x-if="row.kind !== 'unassigned'">
+                      <img :src="row.avatar" alt="" :class="row.kind === 'lost' && 'grayscale opacity-70'" class="shrink-0 size-8 rounded-full object-cover">
+                    </template>
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span class="font-medium text-sm text-foreground" x-text="row.name"></span>
+                        <span x-show="row.you" class="text-xs text-muted-foreground-1">(you)</span>
+                        <span x-show="row.kind === 'lost'" class="inline-flex items-center gap-x-1 py-0.5 px-1.5 rounded-md text-[11px] font-medium bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300">
+                          <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M5 5a1 1 0 0 0-1 1v7c0 5 3.5 7.5 7.67 8.94a1 1 0 0 0 .67.01c2.35-.82 4.48-1.97 5.9-3.71"/><path d="M9.309 3.652A12.252 12.252 0 0 0 11.24 2.28a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1v7a9.784 9.784 0 0 1-.08 1.264"/></svg>
+                          Review access lost
+                        </span>
+                      </div>
+                      <p x-show="row.email" class="text-xs text-muted-foreground-1 truncate" x-text="row.email"></p>
+                    </div>
+                  </div>
+                </td>
+
+                <!-- One reviewer's data failed: say so in the row, keep the rest -->
+                <template x-if="row.error">
+                  <td colspan="4" class="py-3 px-3 text-end text-sm text-muted-foreground-1">
+                    Couldn't load this reviewer's workload.
+                    <button type="button" @click="refresh()" class="ms-1 font-medium text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline">Retry</button>
+                  </td>
+                </template>
+
+                <template x-if="!row.error">
+                  <td class="py-3 px-3 text-end">
+                    <a x-show="row.open" :href="casesHref('open', row)" :title="casesTitle('open', row)"
+                       class="text-sm font-medium text-foreground tabular-nums hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline" x-text="num(row.open)"></a>
+                    <span x-show="!row.open" class="text-sm text-muted-foreground-2 tabular-nums">0</span>
+                  </td>
+                </template>
+                <template x-if="!row.error">
+                  <td class="py-3 px-3 text-end">
+                    <!-- Stronger emphasis only where ownership has failed -->
+                    <a x-show="row.high && row.kind !== 'reviewer'" :href="casesHref('high', row)" :title="casesTitle('high', row)"
+                       class="inline-flex items-center py-0.5 px-2 rounded-full text-xs font-semibold tabular-nums bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-500/15 dark:text-red-300 dark:hover:bg-red-500/25 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-red-500" x-text="num(row.high)"></a>
+                    <a x-show="row.high && row.kind === 'reviewer'" :href="casesHref('high', row)" :title="casesTitle('high', row)"
+                       class="text-sm text-foreground tabular-nums hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline" x-text="num(row.high)"></a>
+                    <span x-show="!row.high" class="text-sm text-muted-foreground-2 tabular-nums">0</span>
+                  </td>
+                </template>
+                <template x-if="!row.error">
+                  <td class="py-3 px-3 text-end whitespace-nowrap">
+                    <a x-show="row.oldest !== null" :href="casesHref('oldest', row)" :title="`Waiting since ${exact(row.oldest)}. ${casesTitle('oldest', row)}`"
+                       class="text-sm text-foreground tabular-nums hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline" x-text="waiting(row.oldest)"></a>
+                    <span x-show="row.oldest === null" class="text-sm text-muted-foreground-2">—</span>
+                  </td>
+                </template>
+                <template x-if="!row.error">
+                  <td class="hidden lg:table-cell py-3 px-3 text-end">
+                    <!-- Context, not a score: quieter than the open work -->
+                    <span x-show="row.completed === null" class="text-sm text-muted-foreground-2" title="Unassigned cases aren't completed">—</span>
+                    <a x-show="row.completed" :href="casesHref('completed', row)" :title="casesTitle('completed', row)"
+                       class="text-sm text-muted-foreground-1 tabular-nums hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline" x-text="num(row.completed || 0)"></a>
+                    <span x-show="row.completed === 0" class="text-sm text-muted-foreground-2 tabular-nums">0</span>
+                  </td>
+                </template>
+
+                <!-- Action -->
+                <td class="py-3 ps-3 pe-4 text-end whitespace-nowrap">
+                  <a x-show="row.kind === 'unassigned' && !noEligibleReviewers" :href="casesHref('open', row)" :title="casesTitle('open', row)"
+                     class="inline-flex items-center gap-x-1.5 py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary">
+                    Assign cases
+                  </a>
+                  <a x-show="row.kind === 'lost' && !noEligibleReviewers" :href="casesHref('open', row)" :title="casesTitle('open', row)"
+                     class="inline-flex items-center gap-x-1.5 py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary">
+                    Reassign cases
+                  </a>
+                  <a x-show="(row.kind === 'reviewer' || noEligibleReviewers) && !row.error && row.open" :href="casesHref('open', row)" :title="casesTitle('open', row)"
+                     class="inline-flex items-center gap-x-1 py-1.5 px-2.5 rounded-lg text-[13px] font-medium border border-layer-line bg-layer text-layer-foreground hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+                    View cases
+                  </a>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Phones: compact list, still comparable (open and high priority stay visible) -->
+      <ul class="sm:hidden divide-y divide-card-line">
+        <template x-for="row in rows" :key="'m-' + row.id">
+          <li :class="row.kind === 'lost' && 'bg-red-50/70 dark:bg-red-500/5'">
+            <a :href="casesHref('open', row)" :title="casesTitle('open', row)" class="flex items-center gap-x-3 py-3 px-4 focus:outline-hidden focus-visible:bg-layer-hover">
+              <template x-if="row.kind === 'unassigned'">
+                <span class="shrink-0 flex justify-center items-center size-8 rounded-full border border-dashed border-muted-foreground-2 text-muted-foreground-1">
+                  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.29-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg>
+                </span>
+              </template>
+              <template x-if="row.kind !== 'unassigned'">
+                <img :src="row.avatar" alt="" :class="row.kind === 'lost' && 'grayscale opacity-70'" class="shrink-0 size-8 rounded-full object-cover">
+              </template>
+              <div class="min-w-0 grow">
+                <p class="flex items-center gap-x-1.5 text-sm font-medium text-foreground">
+                  <span class="truncate" x-text="row.name"></span>
+                  <span x-show="row.you" class="text-xs font-normal text-muted-foreground-1">(you)</span>
+                </p>
+                <p x-show="row.kind === 'lost'" class="text-xs font-medium text-red-700 dark:text-red-400">Review access lost</p>
+                <p x-show="row.error" class="text-xs text-muted-foreground-1">Couldn't load this reviewer's workload</p>
+                <p x-show="!row.error && row.open" class="text-xs text-muted-foreground-1">
+                  Oldest <span x-text="waiting(row.oldest)"></span>
+                </p>
+              </div>
+              <div x-show="!row.error" class="shrink-0 text-end">
+                <p class="text-sm font-semibold text-foreground tabular-nums"><span x-text="num(row.open)"></span> <span class="font-normal text-muted-foreground-1">open</span></p>
+                <p class="text-xs tabular-nums" :class="row.high && row.kind !== 'reviewer' ? 'font-semibold text-red-700 dark:text-red-400' : 'text-muted-foreground-1'"><span x-text="num(row.high)"></span> high priority</p>
+              </div>
+              <svg class="shrink-0 size-4 text-muted-foreground-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </a>
+          </li>
+        </template>
+      </ul>
+
+      <!-- Search found no reviewer (Unassigned and access-lost rows above stay) -->
+      <div x-show="searchTerm && !visibleRows.length && !noEligibleReviewers" x-cloak class="py-8 px-4 text-center border-t border-card-line">
+        <p class="text-sm font-medium text-foreground">No reviewer matches “<span x-text="search.trim()"></span>”</p>
+        <p class="mt-1 text-sm text-muted-foreground-1">
+          Looking for a candidate, workspace or case ID?
+          <a :href="searchCasesHref()" class="font-medium text-primary hover:text-primary-hover hover:underline underline-offset-4">Search in Review Cases</a>
+        </p>
+        <button type="button" @click="search = ''"
+                class="mt-3 inline-flex items-center py-1.5 px-2.5 rounded-lg text-[13px] font-medium border border-layer-line bg-layer text-layer-foreground hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+          Clear search
+        </button>
+      </div>
+
+    </div>
+  </template>
+
+  <!-- Footer: active ordering and freshness -->
+  <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5 px-4 border-t border-card-line text-xs text-muted-foreground-1">
+    <p x-show="!loadFailed && !noOpenWork && !noEligibleReviewers" x-text="pinnedRows.length ? `${pinnedRows.length === 1 && unassignedRow ? 'Unassigned' : unassignedRow ? 'Unassigned and access-lost rows' : 'Access-lost rows'} first, then reviewers. ${sortSentence}.` : `${sortSentence}.`"></p>
+    <p class="ms-auto inline-flex items-center gap-x-2">
+      <span :class="stale && 'text-amber-700 dark:text-amber-400'" x-text="loadFailed ? 'Not updated' : updatedLabel"></span>
+      <button type="button" @click="refresh()" :disabled="refreshing" aria-label="Refresh workload"
+              class="inline-flex justify-center items-center size-6 rounded-md hover:bg-muted-hover hover:text-foreground disabled:opacity-50 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+        <svg class="shrink-0 size-3.5" :class="refreshing && 'animate-spin'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+      </button>
+    </p>
+  </div>
+</section>
