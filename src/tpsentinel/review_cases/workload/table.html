@@ -1,0 +1,139 @@
+{% from "src/tpsentinel/components/pagination.html" import pagination %}
+{% from "src/tpsentinel/components/filter_select.html" import filter_search %}
+{% from "src/tpsentinel/components/empty-state.html" import empty_state %}
+
+<!-- Details, plain (Preline users table): reviewers or workspaces, searchable, sortable, paginated -->
+<section id="workload-table" class="scroll-mt-20 bg-card border border-card-line shadow-2xs rounded-xl" x-show="!loadFailed" :class="stale && 'opacity-70'" aria-label="Workload details">
+  <!-- Header: tabs + search -->
+  <div class="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-3 border-b border-card-line">
+    <nav class="--prevent-on-load-init flex gap-x-5 -mb-px" role="tablist" aria-label="Show workload by">
+      <template x-for="t in [['reviewers', 'Reviewers'], ['workspaces', 'Workspaces']]" :key="t[0]">
+        <button type="button" role="tab" :aria-selected="tab === t[0]" @click="tab = t[0]"
+                :class="tab === t[0] ? 'border-primary text-foreground font-medium' : 'border-transparent text-muted-foreground-1 hover:text-foreground'"
+                class="inline-flex items-center gap-x-2 py-3 border-b-2 text-sm focus:outline-hidden focus-visible:text-foreground">
+          <span x-text="t[1]"></span>
+          <span x-show="ready" class="py-0.5 px-1.5 rounded-full bg-surface text-xs text-muted-foreground-1 tabular-nums" x-text="num(tabCounts[t[0]])"></span>
+        </button>
+      </template>
+    </nav>
+    <div class="relative w-full sm:w-64 pb-3 sm:pb-0">
+      <label class="relative block">
+        <span class="sr-only" x-text="tab === 'workspaces' ? 'Search workspaces' : 'Search reviewers'"></span>
+        <svg class="absolute start-3 top-1/2 -translate-y-1/2 shrink-0 size-4 text-muted-foreground-1 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" x-model="search" :placeholder="tab === 'workspaces' ? 'Search workspaces' : 'Search name or email'"
+               class="py-1.5 ps-9 pe-8 block w-full bg-layer border border-layer-line rounded-lg text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:ring-1 focus:ring-primary">
+      </label>
+      <button type="button" x-show="search" x-cloak @click="search = ''" aria-label="Clear search"
+              class="absolute end-1.5 top-[calc(50%-0.375rem)] sm:top-1/2 -translate-y-1/2 inline-flex justify-center items-center size-6 rounded-full text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" x-cloak class="p-5 flex flex-col gap-5 animate-pulse">
+    <template x-for="i in 6" :key="i"><div class="flex items-center gap-4"><div class="size-8 rounded-full bg-surface"></div><div class="h-3 w-40 rounded-full bg-surface"></div><div class="ms-auto h-3 w-64 rounded-full bg-surface"></div></div></template>
+  </div>
+
+  <!-- Nothing open -->
+  <div x-show="noOpenWork && !hasFilters" x-cloak>
+    {{ empty_state(title="No cases are waiting for a decision", description="Every case has been reviewed. New cases will appear here when they need a reviewer.", icon="circle-check", primary_action_text="View closed cases", primary_action_href="#", primary_action_attrs=':href="casesHref({ view: \'closed\', sort: \'newest\' })"', compact=true, wrap_card=false) }}
+  </div>
+  <div x-show="noOpenWork && hasFilters" x-cloak>
+    {{ empty_state(title="No open work matches these filters", description="There may be open cases outside this workspace or priority.", icon="filter-x", primary_action_text="Clear filters", primary_action_attrs='@click.prevent="clearFilters()"', compact=true, wrap_card=false) }}
+  </div>
+
+  <template x-if="ready && !noOpenWork">
+    <div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="border-b border-card-line">
+            <tr>
+              <th scope="col" class="py-2.5 ps-4 md:ps-5 pe-3 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground-1" x-text="tab === 'workspaces' ? 'Workspace' : 'Reviewer'"></th>
+              <template x-for="col in columns[tab]" :key="tab + col[0]">
+                <th scope="col" :class="col[2]" :aria-sort="ariaSort(col[0])" class="py-2.5 px-3 text-end whitespace-nowrap">
+                  <button type="button" @click="sortBy(col[0])"
+                          :class="sort.by === col[0] ? 'text-foreground' : 'text-muted-foreground-1 hover:text-foreground'"
+                          class="group inline-flex items-center gap-x-1 text-xs font-medium uppercase tracking-wide focus:outline-hidden focus-visible:underline">
+                    <span x-text="col[1]"></span>
+                    <svg class="shrink-0 size-3.5" :class="[sort.by === col[0] ? '' : 'opacity-0 group-hover:opacity-60', sort.by === col[0] && sort.dir === 'asc' && 'rotate-180']" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                  </button>
+                </th>
+              </template>
+              <th scope="col" class="py-2.5 ps-3 pe-4 md:pe-5"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-card-line">
+            <template x-for="row in pageRows" :key="tab + row.id">
+              <tr class="hover:bg-layer-hover/50">
+                <!-- Who / which workspace -->
+                <td class="py-3 ps-4 md:ps-5 pe-3">
+                  <div class="flex items-center gap-x-3 min-w-48">
+                    <template x-if="row.kind === 'unassigned'">
+                      <span class="shrink-0 flex justify-center items-center size-8 rounded-full border border-dashed border-muted-foreground-2 text-muted-foreground-1">
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.29-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg>
+                      </span>
+                    </template>
+                    <template x-if="row.kind === 'reviewer' && row.avatar">
+                      <img :src="row.avatar" alt="" class="shrink-0 size-8 rounded-full object-cover">
+                    </template>
+                    <template x-if="row.kind === 'reviewer' && !row.avatar">
+                      <span class="shrink-0 flex justify-center items-center size-8 rounded-full bg-surface text-xs font-medium text-muted-foreground-1" x-text="initials(row.name)"></span>
+                    </template>
+                    <div class="min-w-0">
+                      <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <a :href="rowHref(row)" class="text-sm font-medium text-foreground hover:text-primary focus:outline-hidden focus-visible:underline" x-text="row.name"></a>
+                        <span x-show="row.you" class="text-xs text-muted-foreground-1">(you)</span>
+                      </p>
+                      <p x-show="row.email" class="text-xs text-muted-foreground-1 truncate" x-text="row.email"></p>
+                      <p x-show="row.kind === 'unassigned'" class="text-xs text-muted-foreground-1">No reviewer yet</p>
+                    </div>
+                  </div>
+                </td>
+                <!-- Numbers: each opens its cases -->
+                <template x-for="col in columns[tab]" :key="tab + row.id + col[0]">
+                  <td :class="col[2]" class="py-3 px-3 text-end whitespace-nowrap">
+                    <a x-show="row[col[0]] && col[0] !== 'oldest'" :href="rowCellHref(row, col[0])"
+                       class="text-sm tabular-nums hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline"
+                       :class="col[0] === 'open' ? 'font-medium text-foreground' : 'text-foreground'" x-text="cell(row, col[0])"></a>
+                    <a x-show="col[0] === 'oldest' && row.oldest" :href="rowCellHref(row, 'oldest')"
+                       @mouseenter="showTip($event, 'Oldest waiting case', [['Opened', exact(row.oldest)]], 'Click to see the oldest first')" @mouseleave="hideTip()"
+                       class="text-sm tabular-nums text-foreground hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline" x-text="cell(row, 'oldest')"></a>
+                    <span x-show="!row[col[0]]" class="text-sm tabular-nums text-muted-foreground-2" x-text="row[col[0]] === null ? '—' : '0'"></span>
+                  </td>
+                </template>
+                <!-- Actions: text links, like Preline tables -->
+                <td class="py-3 ps-3 pe-4 md:pe-5 text-end whitespace-nowrap">
+                  <div class="inline-flex items-center gap-x-4 text-sm font-medium">
+                    <button type="button" x-show="row.kind === 'unassigned' && eligible.length" @click="openMove('unassigned', row.high ? 'high' : 'all')" class="text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline">Assign</button>
+                    <button type="button" x-show="row.kind === 'reviewer' && row.open && eligible.length > 1" @click="openMove(row.id)" class="text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline">Move</button>
+                    <button type="button" x-show="row.kind === 'workspace' && row.unowned && eligible.length" @click="openMove('unassigned', 'all', row.id)" class="text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline">Assign</button>
+                    <a :href="rowHref(row)" class="text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:underline">View</a>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Search found nothing (pinned rows may still show above) -->
+      <div x-show="search.trim() && !rows.filter(r => r.kind === 'reviewer' || r.kind === 'workspace').length" class="py-8 px-4 text-center border-t border-card-line">
+        <p class="text-sm font-medium text-foreground">No <span x-text="tab === 'workspaces' ? 'workspace' : 'reviewer'"></span> matches “<span x-text="search.trim()"></span>”</p>
+        <p class="mt-1 text-sm text-muted-foreground-1" x-show="tab === 'reviewers'">Looking for a candidate or case? <a :href="window.SentinelReview.url(`/tpsentinel/review_cases/?${new URLSearchParams({ view: 'open', q: search.trim() })}`)" class="font-medium text-primary hover:underline underline-offset-4">Search in Review Cases</a></p>
+        <button type="button" @click="search = ''" class="mt-3 py-1.5 px-2.5 rounded-lg text-[13px] font-medium border border-layer-line bg-layer text-layer-foreground hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">Clear search</button>
+      </div>
+
+      <!-- Nobody to give work to -->
+      <div x-show="!eligible.length" class="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 border-t border-card-line">
+        <p class="grow text-sm text-muted-foreground-1">No reviewer has review access, so cases can't be assigned or moved yet.</p>
+        <a href="#" class="shrink-0 text-sm font-medium text-primary hover:text-primary-hover">Manage reviewer access</a>
+      </div>
+
+      <!-- Pagination -->
+      <div x-show="rows.length > 8" class="px-4 md:px-5 py-3 border-t border-card-line">
+        {{ pagination(show_go_to=false, x_items="pageItems", x_current="page", x_last="pageCount", x_go="goPage", x_from="rangeFrom", x_to="rangeTo", x_total="rows.length") }}
+      </div>
+    </div>
+  </template>
+</section>

@@ -1,0 +1,67 @@
+<!-- Two compact chart cards: one colour for the chart, plain text for the list. Details live in the table below. -->
+<div class="grid lg:grid-cols-2 gap-4" x-show="!loadFailed" :class="stale && 'opacity-70'">
+
+  <!-- How long open cases have waited (single colour; split shown on hover) -->
+  <section class="flex flex-col bg-card border border-card-line shadow-2xs rounded-xl" aria-labelledby="ages-heading">
+    <div class="px-4 md:px-5 pt-4 md:pt-5">
+      <h2 id="ages-heading" class="font-medium text-foreground">How long open cases have waited</h2>
+    </div>
+    <div x-show="loading" x-cloak class="m-5 h-40 flex items-end gap-4 animate-pulse">
+      <template x-for="h in [40, 70, 55, 85, 60]" :key="h"><div class="grow rounded bg-surface" :style="`height: ${h}%`"></div></template>
+    </div>
+    <template x-if="ready">
+      <div class="grow flex flex-col px-4 md:px-5 pb-4 md:pb-5">
+        <p x-show="noOpenWork" class="mt-6 text-sm text-muted-foreground-1">Nothing is waiting.</p>
+        <div x-show="!noOpenWork" class="grow min-h-44 mt-4 grid grid-cols-5 gap-3 sm:gap-5" role="list">
+          <template x-for="a in ages" :key="a.key">
+            <a :href="casesHref({ waiting: a.key, sort: 'oldest' })" role="listitem"
+               :aria-label="`${a.label}: ${num(a.total)} open, ${num(a.unowned)} unassigned. Open in Review Cases`"
+               @mouseenter="ageTip($event, a)" @mouseleave="hideTip()" @focus="ageTip($event, a)" @blur="hideTip()"
+               class="group flex flex-col items-center gap-y-1.5 rounded-lg focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+              <span class="text-xs font-medium text-foreground tabular-nums" x-text="num(a.total)"></span>
+              <span class="w-full grow flex flex-col justify-end">
+                <span class="w-full rounded-t-md bg-primary-300 group-hover:bg-primary-400 dark:bg-primary-800 dark:group-hover:bg-primary-700 transition-colors" :style="`height: ${Math.max(a.total ? 2 : 0, (a.total / ageMax) * 100)}%`"></span>
+              </span>
+              <span class="text-xs text-muted-foreground-1 whitespace-nowrap" x-text="a.short"></span>
+            </a>
+          </template>
+        </div>
+      </div>
+    </template>
+  </section>
+
+  <!-- Busiest workspaces: plain list; the full list is a table tab -->
+  <section class="flex flex-col bg-card border border-card-line shadow-2xs rounded-xl" aria-labelledby="ws-heading">
+    <div class="px-4 md:px-5 pt-4 md:pt-5">
+      <h2 id="ws-heading" class="font-medium text-foreground">Busiest workspaces</h2>
+    </div>
+    <div x-show="loading" x-cloak class="m-5 flex flex-col gap-4 animate-pulse">
+      <template x-for="w in [90, 75, 60, 50, 40]" :key="w"><div class="h-3 rounded bg-surface" :style="`width: ${w}%`"></div></template>
+    </div>
+    <template x-if="ready">
+      <div class="grow flex flex-col">
+        <p x-show="noOpenWork" class="mx-5 mt-6 text-sm text-muted-foreground-1">Nothing is waiting.</p>
+        <ul x-show="!noOpenWork" class="mt-2 px-2 md:px-3">
+          <li class="grid grid-cols-[minmax(0,1fr)_5rem_6rem] gap-x-3 px-2 pb-1 text-xs text-muted-foreground-1" aria-hidden="true">
+            <span></span><span class="text-end">Open</span><span class="text-end">Unassigned</span>
+          </li>
+          <template x-for="w in topWorkspaces.slice(0, 5)" :key="w.id">
+            <li>
+              <button type="button" @click="workspace = w.id" :aria-label="`Focus the page on ${w.name}`"
+                      class="w-full grid grid-cols-[minmax(0,1fr)_5rem_6rem] items-center gap-x-3 py-2 px-2 rounded-lg text-sm text-start hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+                <span class="truncate text-foreground" x-text="w.name"></span>
+                <span class="text-end font-medium text-foreground tabular-nums" x-text="num(w.open)"></span>
+                <span class="text-end tabular-nums" :class="w.unowned ? 'text-foreground' : 'text-muted-foreground-2'" x-text="num(w.unowned)"></span>
+              </button>
+            </li>
+          </template>
+        </ul>
+        <button type="button" x-show="!noOpenWork && topWorkspaces.length > 5" @click="showWorkspaces()"
+                class="mt-auto py-3 px-4 md:px-5 w-full inline-flex justify-between items-center text-sm text-muted-foreground-2 border-t border-card-footer hover:bg-layer-hover focus:outline-hidden focus-visible:bg-layer-hover rounded-b-xl">
+          <span x-text="`View all ${topWorkspaces.length} workspaces`"></span>
+          <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </template>
+  </section>
+</div>

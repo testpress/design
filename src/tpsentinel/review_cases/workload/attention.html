@@ -1,112 +1,109 @@
-<!-- Pressure at a glance: ownership problems first, each with the action that fixes it; calm when there's nothing to do -->
-{% set card = "flex flex-col p-4 sm:p-5 bg-card border border-card-line rounded-xl" %}
-{% set label = "text-sm font-medium text-muted-foreground-1" %}
-{% set big = "mt-2 text-2xl font-semibold text-foreground tabular-nums" %}
-{% set detail = "mt-1 text-sm text-muted-foreground-1" %}
-{% set ok_icon = '<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>' %}
-{% set primary_btn = "inline-flex items-center gap-x-1.5 py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary" %}
-{% set text_link = "inline-flex items-center gap-x-1 py-1.5 px-1 rounded-lg text-[13px] font-medium text-primary hover:text-primary-hover hover:underline underline-offset-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" %}
+<!-- KPI cards (Preline "KPI card with icon and link"): neutral, one number each, one footer action. Colour only for the backlog trend. -->
+{% set card = "flex flex-col bg-card border border-card-line shadow-2xs rounded-xl" %}
+{% set body = "p-4 md:p-5 flex justify-between gap-x-3" %}
+{% set label = "text-xs uppercase tracking-wide text-muted-foreground-1" %}
+{% set value = "mt-1 text-xl sm:text-2xl font-medium text-foreground tabular-nums" %}
+{% set sub = "mt-1 text-sm text-muted-foreground-1" %}
+{% set chip = "shrink-0 flex justify-center items-center size-10 rounded-full bg-surface text-muted-foreground-1" %}
+{% set foot = "mt-auto py-3 px-4 md:px-5 w-full inline-flex justify-between items-center text-sm border-t border-card-footer hover:bg-layer-hover focus:outline-hidden focus-visible:bg-layer-hover rounded-b-xl" %}
+{% set chevron = '<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>' %}
 
 <!-- Loading -->
 <div x-show="loading" x-cloak class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4" aria-busy="true" aria-label="Loading workload">
   <template x-for="i in 4" :key="i">
-    <div class="{{ card }} gap-3 animate-pulse">
-      <div class="h-3 w-28 rounded-full bg-surface"></div>
-      <div class="h-6 w-20 rounded-full bg-surface"></div>
+    <div class="{{ card }} p-5 gap-3 animate-pulse">
+      <div class="h-3 w-24 rounded-full bg-surface"></div>
+      <div class="h-6 w-16 rounded-full bg-surface"></div>
       <div class="h-3 w-40 rounded-full bg-surface"></div>
     </div>
   </template>
 </div>
 
-<section x-show="ready" aria-label="Needs attention" class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4" :class="stale && 'opacity-70'">
+<section x-show="ready" aria-label="Workload summary" class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4" :class="stale && 'opacity-70'">
 
-  <!-- 1. Work with no owner -->
+  <!-- Unassigned -->
   <div class="{{ card }}">
-    <template x-if="unassignedCases.length">
-      <div class="flex flex-col grow">
-        <p class="flex items-center gap-x-2 {{ label }}">
-          
-          Waiting for a reviewer
-        </p>
-        <p class="{{ big }}" x-text="plural(unassignedCases.length, 'case')"></p>
-        <p class="{{ detail }}">
-          <template x-if="lanes[0].high"><span><span class="font-medium text-foreground" x-text="`${num(lanes[0].high)} high priority`"></span> · </span></template>oldest waiting <span x-text="waiting(lanes[0].oldest)"></span>
-        </p>
-        <div class="mt-auto pt-4 flex items-center gap-x-3">
-          <button type="button" x-show="eligible.length" @click="openMove('unassigned', lanes[0].high ? 'high' : 'all')" class="{{ primary_btn }}">Assign cases</button>
-          <a :href="casesHref({ view: 'unassigned' })" class="{{ text_link }}">View</a>
-        </div>
-      </div>
-    </template>
-    <template x-if="!unassignedCases.length">
+    <div class="{{ body }}">
       <div>
-        <p class="flex items-center gap-x-2 {{ label }}"><span class="text-muted-foreground-1">{{ ok_icon | safe }}</span>Every case has a reviewer</p>
-        <p class="{{ detail }}">New cases that need a reviewer will show up here.</p>
+        <p class="{{ label }}">Unassigned</p>
+        <h3 class="{{ value }}" x-text="num(unassignedCases.length)"></h3>
+        <p class="{{ sub }}" x-show="unassignedCases.length"
+           x-text="[highCount(unassignedCases) && `${num(highCount(unassignedCases))} high priority`, unassignedCases.length && `oldest ${waiting(Math.min(...unassignedCases.map(c => c.createdAt)))}`].filter(Boolean).join(' · ')"></p>
+        <p class="{{ sub }}" x-show="!unassignedCases.length">Every case has a reviewer.</p>
       </div>
-    </template>
+      <span class="{{ chip }}"><svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.29-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg></span>
+    </div>
+    <button type="button" x-show="unassignedCases.length && eligible.length" @click="openMove('unassigned', highCount(unassignedCases) ? 'high' : 'all')"
+            class="{{ foot }} font-medium text-primary">Assign cases {{ chevron | safe }}</button>
   </div>
 
-  <!-- 2. Owners who can't review -->
+  <!-- High-priority work (or, when nobody has review access, that) -->
   <div class="{{ card }}">
     <template x-if="!eligible.length && openCases.length">
       <div class="flex flex-col grow">
-        <p class="flex items-center gap-x-2 {{ label }}">No one can review</p>
-        <p class="{{ big }}" x-text="plural(openCases.length, 'case')"></p>
-        <p class="{{ detail }}">are waiting, but no reviewer has review access.</p>
-        <div class="mt-auto pt-4"><a href="#" class="{{ primary_btn }}">Manage reviewer access</a></div>
-      </div>
-    </template>
-    <template x-if="eligible.length && lostCases.length">
-      <div class="flex flex-col grow">
-        <p class="flex items-center gap-x-2 {{ label }}">Owner lost review access</p>
-        <p class="{{ big }}" x-text="plural(lostCases.length, 'case')"></p>
-        <p class="{{ detail }}">
-          with <span class="font-medium text-foreground" x-text="lostOwners.map(r => r.name).join(', ')"></span>
-          <template x-if="lostCases.filter(c => c.priority <= 1).length">
-            <span>· <span class="font-medium text-foreground" x-text="`${lostCases.filter(c => c.priority <= 1).length} high priority`"></span></span>
-          </template>
-        </p>
-        <div class="mt-auto pt-4 flex items-center gap-x-3">
-          <button type="button" @click="openMove(lostOwners[0].id)" class="{{ primary_btn }}">Reassign cases</button>
-          <a :href="casesHref({ reviewer: lostOwners[0].id })" class="{{ text_link }}">View</a>
+        <div class="{{ body }}">
+          <div>
+            <p class="{{ label }}">No one can review</p>
+            <h3 class="{{ value }}" x-text="num(openCases.length)"></h3>
+            <p class="{{ sub }}">Open cases are waiting, but no reviewer has review access.</p>
+          </div>
+          <span class="{{ chip }}"><svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m17 8 5 5"/><path d="m22 8-5 5"/></svg></span>
         </div>
+        <a href="#" class="{{ foot }} font-medium text-primary">Manage reviewer access {{ chevron | safe }}</a>
       </div>
     </template>
-    <template x-if="eligible.length && !lostCases.length">
-      <div>
-        <p class="flex items-center gap-x-2 {{ label }}"><span class="text-muted-foreground-1">{{ ok_icon | safe }}</span>All owners can review</p>
-        <p class="{{ detail }}">Nobody holds cases they're no longer allowed to review.</p>
-      </div>
-    </template>
-  </div>
-
-  <!-- 3. Work that's been waiting long -->
-  <div class="{{ card }}">
-    <template x-if="longWaiting.length">
+    <template x-if="eligible.length || !openCases.length">
       <div class="flex flex-col grow">
-        <p class="flex items-center gap-x-2 {{ label }}">Waiting over a week</p>
-        <p class="{{ big }}" x-text="plural(longWaiting.length, 'case')"></p>
-        <p class="{{ detail }}" x-text="[[longWaiting.filter(c => c.state === 'queued').length, 'unassigned'], [longWaiting.filter(c => c.state === 'assigned').length, 'with reviewers']].filter(p => p[0]).map(p => `${num(p[0])} ${p[1]}`).join(' · ')"></p>
-        <div class="mt-auto pt-4"><a :href="casesHref({ sort: 'oldest' })" class="{{ text_link }} -ms-1">View oldest first</a></div>
-      </div>
-    </template>
-    <template x-if="!longWaiting.length">
-      <div>
-        <p class="flex items-center gap-x-2 {{ label }}"><span class="text-muted-foreground-1">{{ ok_icon | safe }}</span>Nothing waiting over a week</p>
-        <p class="{{ detail }}">Every open case was opened in the last 7 days.</p>
+        <div class="{{ body }}">
+          <div>
+            <p class="{{ label }}">High priority open</p>
+            <h3 class="{{ value }}" x-text="num(highCases.length)"></h3>
+            <p class="{{ sub }}" x-show="highCases.length"
+               x-text="[[highCases.filter(c => c.priority === 0).length, 'critical'], [highCases.filter(c => c.state === 'queued').length, 'unassigned']].filter(p => p[0]).map(p => `${num(p[0])} ${p[1]}`).join(' · ') || 'All with reviewers'"></p>
+            <p class="{{ sub }}" x-show="!highCases.length">No Critical or High cases are open.</p>
+          </div>
+          <span class="{{ chip }}"><svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h.01"/><path d="M7 20v-4"/><path d="M12 20v-8"/><path d="M17 20V8"/></svg></span>
+        </div>
+        <a x-show="highCases.length" :href="casesHref({ high: true })" class="{{ foot }} text-muted-foreground-2">View high priority {{ chevron | safe }}</a>
       </div>
     </template>
   </div>
 
-  <!-- 4. Today's flow: is the backlog growing? -->
+  <!-- Waiting over a week -->
   <div class="{{ card }}">
-    <p class="{{ label }}">Today</p>
-    <div class="mt-2 flex items-baseline gap-x-4">
-      <p><span class="text-2xl font-semibold text-foreground tabular-nums" x-text="num(today.created)"></span> <span class="text-sm text-muted-foreground-1">new</span></p>
-      <p><span class="text-2xl font-semibold text-foreground tabular-nums" x-text="num(today.decided)"></span> <span class="text-sm text-muted-foreground-1">decided</span></p>
+    <div class="{{ body }}">
+      <div>
+        <p class="{{ label }}">Waiting over 7 days</p>
+        <h3 class="{{ value }}" x-text="num(longWaiting.length)"></h3>
+        <p class="{{ sub }}" x-show="longWaiting.length"
+           x-text="[[longWaiting.filter(c => c.state === 'queued').length, 'unassigned'], [longWaiting.filter(c => c.state === 'assigned').length, 'with reviewers']].filter(p => p[0]).map(p => `${num(p[0])} ${p[1]}`).join(' · ')"></p>
+        <p class="{{ sub }}" x-show="!longWaiting.length">Every open case is under a week old.</p>
+      </div>
+      <span class="{{ chip }}"><svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></span>
     </div>
-    <p class="{{ detail }}"
-       x-text="today.change > 0 ? `Open work grew by ${num(today.change)} since midnight.` : today.change < 0 ? `Open work shrank by ${num(-today.change)} since midnight.` : 'Open work held steady since midnight.'"></p>
-    <div class="mt-auto pt-4"><a :href="casesHref({ view: 'closed', sort: 'newest' })" class="{{ text_link }} -ms-1">View today's decisions</a></div>
+    <a x-show="longWaiting.length" :href="casesHref({ sort: 'oldest' })" class="{{ foot }} text-muted-foreground-2">View oldest first {{ chevron | safe }}</a>
+  </div>
+
+  <!-- Today: is the backlog growing? -->
+  <div class="{{ card }}">
+    <div class="{{ body }}">
+      <div>
+        <p class="{{ label }}">Decided today</p>
+        <div class="mt-1 flex items-center gap-x-2">
+          <h3 class="text-xl sm:text-2xl font-medium text-foreground tabular-nums" x-text="num(today.decided)"></h3>
+          <!-- Trend: backlog grew (red) or shrank (green) since midnight -->
+          <span x-show="today.change" class="inline-flex items-center gap-x-1 text-sm"
+                :class="today.change > 0 ? 'text-red-600 dark:text-red-500' : 'text-green-600 dark:text-green-500'"
+                @mouseenter="showTip($event, 'Since midnight', [['New cases', today.created], ['Decided', today.decided]], today.change > 0 ? 'More came in than were decided' : 'More were decided than came in')" @mouseleave="hideTip()">
+            <svg x-show="today.change > 0" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <svg x-show="today.change < 0" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+            <span x-text="`backlog ${today.change > 0 ? '+' : '−'}${num(Math.abs(today.change))}`"></span>
+          </span>
+        </div>
+        <p class="{{ sub }}" x-text="`${num(today.created)} new since midnight`"></p>
+      </div>
+      <span class="{{ chip }}"><svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>
+    </div>
+    <a :href="casesHref({ view: 'closed', sort: 'newest' })" class="{{ foot }} text-muted-foreground-2">View today's decisions {{ chevron | safe }}</a>
   </div>
 </section>
