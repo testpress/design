@@ -3,7 +3,7 @@
   (function () {
     const {
       MIN, HOUR, DAY, NOW, svg, ICONS, icon, INDICATORS, INDICATOR_BY_KEY, BEHAVIOUR_KEYS,
-      PRIORITIES, ME, REVIEWERS, REVIEWER_BY_ID, WORKSPACES, WORKSPACE_BY_ID, clock, relative, exact,
+      PRIORITIES, ME, REVIEWERS, REVIEWER_BY_ID, WORKSPACES, WORKSPACE_BY_ID, triggerLabel, clock, relative, waited, exact,
     } = window.SentinelReview;
 
     // Filters (search qualifiers). Values are slugs so they read well in the search box.
@@ -19,6 +19,13 @@
         ] },
       reviewer: { label: 'Reviewer', title: 'Filter by reviewer', icon: 'reviewer', searchable: true, admin: true,
         values: () => REVIEWERS.map(r => ({ value: r.id, label: r.name, match: c => c.reviewer === r.id })) },
+      // Why the case exists: what AI found, or a review someone asked for
+      reason: { label: 'Reason', title: 'Filter by review reason', icon: 'flagged', searchOnly: true,
+        values: () => [
+          { value: 'behaviour', label: 'Behaviour concern', match: c => c.concern === 'behaviour' },
+          { value: 'evidence', label: 'Evidence concern', match: c => c.concern === 'evidence' },
+          { value: 'requested', label: 'Requested review', match: c => c.origin === 'requested' },
+        ] },
       indicator: { label: 'Indicator', title: 'Filter by indicator', icon: 'indicator', searchOnly: true,
         values: () => INDICATORS.map(i => ({ value: i.slug, label: i.label, match: c => c.indicators.includes(i.key) })) },
     };
@@ -34,9 +41,11 @@
       { key: 'mine', label: 'My assignments' },
       { key: 'unassigned', label: 'Unassigned' },
       { key: 'open', label: 'All open' },
-      { key: 'closed', label: 'Closed' },
+      { key: 'closed', label: 'Completed' },
     ];
-    // Until someone picks a sort, open views go by priority and Closed by most recent decision
+    // How the detail page names the queue its Previous / Next walks through
+    const QUEUE_NAMES = { mine: 'My assignments', unassigned: 'Unassigned cases', open: 'All open cases', closed: 'Completed cases' };
+    // Until someone picks a sort, open views go by priority and Completed by most recent decision
     const defaultSort = view => view === 'closed' ? { by: 'time', order: 'newest' } : { by: 'priority', order: 'highest' };
     const ORDERS = { priority: [['highest', 'Highest first'], ['lowest', 'Lowest first']], time: [['oldest', 'Oldest first'], ['newest', 'Newest first']] };
     const PER_PAGE = 10;
@@ -258,7 +267,7 @@
         // ---------- sorting ----------
         get sort() { return this.sortChoice || defaultSort(this.view); },
         get sortOptions() {
-          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed' : 'Case age' };
+          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed date' : 'Case age' };
           const priority = { by: 'priority', label: 'Priority' };
           return this.view === 'closed' ? [time, priority] : [priority, time];
         },
@@ -304,7 +313,14 @@
         optionAvatar(key, o) { return key === 'reviewer' ? this.avatar(o.value) : o.avatar; },
         indicatorsFor(c) { return c.indicators.map(k => INDICATOR_BY_KEY[k]); },
         priorityLabel(c) { return PRIORITIES[c.priority]; },
-        relative, exact,
+        // The candidate's current integrity result and who produced it: AI until a reviewer decides
+        resultWord(c) {
+          const flagged = c.state === 'completed' ? c.result === 'flagged' : c.origin !== 'requested';
+          return flagged ? 'Flagged' : 'Clear';
+        },
+        resultBy(c) { return c.state === 'completed' ? this.reviewerName(c.reviewer) : 'AI'; },
+        triggerLabel,
+        relative, waited, exact,
         stateIcon(c) { return this.icons[`state_${c.state === 'completed' ? c.result : c.state}`]; },
         stateLabel(c) {
           if (c.state === 'queued') return 'Queued: waiting for a reviewer';
@@ -332,7 +348,7 @@
         },
         // Opening a row: the detail page's Previous/Next follows this list's filters and order
         rememberList() {
-          const label = VIEWS.find(v => v.key === this.view).label;
+          const label = QUEUE_NAMES[this.view] + (this.query.trim() ? ', filtered' : '');
           window.SentinelReview.saveSequence({ source: 'list', view: this.view, label, ids: this.filtered.map(c => c.id) });
         },
 

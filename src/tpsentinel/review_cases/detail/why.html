@@ -5,23 +5,20 @@
 
   <!-- Primary reason -->
   <div class="mt-3 p-4 rounded-lg bg-muted">
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="inline-flex items-center py-0.5 px-2 rounded-md text-xs font-medium bg-surface text-surface-foreground" x-text="originLabel"></span>
-    </div>
-    <p class="mt-2 text-sm text-foreground" x-text="summary"></p>
+    <p class="text-sm text-foreground" x-text="summary"></p>
     <template x-if="d.request">
       <p class="mt-2 ps-3 border-s-2 border-line-3 text-sm text-muted-foreground-2">
-        <span x-text="`“${d.request.note}”`"></span> <span class="text-muted-foreground-1" x-text="`— logged by ${d.request.by}`"></span>
+        <span x-text="`“${d.request.note}”`"></span> <span class="text-muted-foreground-1" x-text="`— ${d.request.by}`"></span>
       </p>
     </template>
   </div>
 
-  <!-- Client request: the evidence they asked to check comes first -->
+  <!-- Requested review: the evidence they asked to check comes first. It covers every Session, latest first. -->
   <template x-if="d.request">
     <div class="mt-6">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h3 class="text-sm font-medium text-muted-foreground-1"
-            x-text="`Requested: ${d.request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings'}, Session ${d.request.session}`"></h3>
+            x-text="`Requested evidence: ${d.request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings'} · all ${d.sessions.length} sessions`"></h3>
         <button type="button" @click="openRequestedEvidence()"
                 class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
           Open in Evidence
@@ -32,20 +29,21 @@
         <template x-for="a in requestedEvidence.slice(0, 8)" :key="a.id">
           <div>
             {% include "./artifact_thumb.html" %}
-            <p class="mt-1 text-xs text-muted-foreground-1" x-text="dayTime(a.at)"></p>
+            <p class="mt-1 text-xs text-muted-foreground-1" x-text="`Session ${a.session} · ${day(a.at)}`"></p>
           </div>
         </template>
       </div>
       <p x-show="!requestedEvidence.length" class="mt-2 text-sm text-muted-foreground-2">
-        Nothing of this kind was collected in this session. See Evidence coverage below.
+        Nothing of this kind was collected for this candidate. See Evidence coverage below.
       </p>
     </div>
   </template>
 
-  <!-- Anomalies: behaviour and evidence gaps in one list, shown the same way -->
-  <template x-if="behaviourConcerns.length || evidenceConcerns.length">
+  <!-- Behaviour concerns: what AI saw. On a requested review AI didn't flag these, so they're labelled as other findings. -->
+  <template x-if="behaviourConcerns.length">
     <div class="mt-6">
-      <h3 class="text-sm font-medium text-muted-foreground-1">Anomalies</h3>
+      <h3 class="text-sm font-medium text-muted-foreground-1" x-text="d.request ? 'Other anomalies AI recorded' : 'Behaviour concerns'"></h3>
+      <p x-show="d.request" class="mt-0.5 text-xs text-muted-foreground-1">AI recorded these but didn’t flag the candidate.</p>
       <ul class="mt-3 flex flex-col gap-6">
         <template x-for="k in behaviourConcerns" :key="k.key">
           <li>
@@ -77,6 +75,15 @@
             </div>
           </li>
         </template>
+      </ul>
+    </div>
+  </template>
+
+  <!-- Evidence concerns: required evidence that's missing or incomplete -->
+  <template x-if="evidenceConcerns.length">
+    <div class="mt-6">
+      <h3 class="text-sm font-medium text-muted-foreground-1">Evidence concerns</h3>
+      <ul class="mt-3 flex flex-col gap-6">
         <template x-for="g in evidenceConcerns" :key="g.id">
           <li>
             <div class="flex gap-3">
