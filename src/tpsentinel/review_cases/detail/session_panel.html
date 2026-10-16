@@ -1,13 +1,21 @@
 <!-- Session context: changes with Session navigation; the result and decision don't -->
 <section id="session-panel" class="bg-card border border-card-line shadow-2xs rounded-xl scroll-mt-20" aria-labelledby="session-heading">
-  <div class="flex items-center justify-between gap-2 p-4 sm:px-5 border-b border-card-line">
-    <h2 id="session-heading" class="text-base font-semibold text-foreground">Session</h2>
-    <div class="flex items-center gap-x-1">
+  <!-- Header: which session (title), when (one small line), and Previous / Next -->
+  <div class="flex items-center justify-between gap-3 px-4 pt-4 sm:px-5 sm:pt-5">
+    <div class="min-w-0">
+      <h2 id="session-heading" class="flex items-center gap-x-2 text-base font-semibold text-foreground">
+        <span>Session <span x-text="session.n"></span> <span class="font-normal text-muted-foreground-1" x-text="`of ${d.sessions.length}`"></span></span>
+        <!-- Status only when it isn't the usual "Completed" -->
+        <span x-show="session.status !== 'Completed'" class="py-0.5 px-1.5 rounded-md bg-surface text-xs font-medium text-surface-foreground" x-text="session.status"></span>
+      </h2>
+      <p class="text-xs text-muted-foreground-1 truncate"
+         x-text="`${day(session.start)}, ${span(session.start, session.end)} · ${dur(session.length)}${sessionIdx === d.sessions.length - 1 ? ' · latest' : ''}`"></p>
+    </div>
+    <div class="shrink-0 flex items-center">
       <button type="button" @click="prevSession()" :disabled="sessionIdx === 0" aria-label="Previous session"
               class="inline-flex items-center justify-center size-8 rounded-lg text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-40 disabled:pointer-events-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </button>
-      <span class="text-sm text-muted-foreground-1 whitespace-nowrap">Session <span class="font-medium text-foreground" x-text="session.n"></span> of <span x-text="d.sessions.length"></span></span>
       <button type="button" @click="nextSession()" :disabled="sessionIdx === d.sessions.length - 1" aria-label="Next session"
               class="inline-flex items-center justify-center size-8 rounded-lg text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-40 disabled:pointer-events-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
@@ -15,17 +23,14 @@
     </div>
   </div>
 
-  <div class="p-4 sm:p-5 flex flex-col gap-5">
-    <p class="text-sm text-muted-foreground-1">
-      <span class="text-foreground" x-text="session.status"></span> ·
-      <span x-text="`${day(session.start)}, ${span(session.start, session.end)}`"></span> ·
-      <span x-text="dur(session.length)"></span>
-      <span x-show="sessionIdx === d.sessions.length - 1"> · latest</span>
-    </p>
-
+  <div class="px-4 pb-4 pt-5 sm:px-5 sm:pb-5 flex flex-col gap-5">
     <!-- Identity check: reference stays fixed, captured image follows the Session -->
     <div>
-      <h3 class="text-sm font-medium text-muted-foreground-1">Identity check</h3>
+      <div class="flex items-center justify-between gap-2">
+        <h3 class="text-sm font-medium text-muted-foreground-1">Identity check</h3>
+        <button type="button" @click="activityFilter = { session: '', type: 'session', q: 'Identity' }; tab = 'activity'"
+                class="text-xs text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">All checks</button>
+      </div>
       <div class="mt-2 grid grid-cols-2 gap-2">
         <figure>
           <img :src="identityImage" alt="Reference photo" class="w-full aspect-[4/3] rounded-lg object-cover bg-surface">
@@ -41,10 +46,8 @@
         <span class="text-muted-foreground-1" x-text="`· ${session.identity.score}% face match`"></span>
       </p>
       <p x-show="session.identity.status === 'Conditional'" class="mt-0.5 text-sm text-muted-foreground-2">
-        Between 80% and 98%, so a person should confirm it’s the same candidate. This is Session context, not an integrity concern.
+        An 80–98% match needs a person to confirm it’s the same candidate.
       </p>
-      <button type="button" @click="activityFilter = { session: '', type: 'session', q: 'Identity' }; tab = 'activity'"
-              class="mt-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">View all identity checks</button>
     </div>
 
     <!-- This Session's coverage -->
@@ -66,14 +69,21 @@
     <!-- Device and connection -->
     <div>
       <h3 class="text-sm font-medium text-muted-foreground-1">Device</h3>
-      <!-- Fixed label column so every value starts on the same line; long values truncate with a tooltip -->
-      <dl class="mt-1 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm">
-        <dt class="text-muted-foreground-1">Type</dt><dd class="text-foreground truncate" x-text="session.device.type"></dd>
-        <dt class="text-muted-foreground-1">OS</dt><dd class="text-foreground truncate" x-text="session.device.os"></dd>
-        <dt class="text-muted-foreground-1">Browser</dt><dd class="text-foreground truncate" x-text="session.device.browser"></dd>
-        <dt class="text-muted-foreground-1">SDK</dt><dd class="text-foreground truncate" x-text="session.device.sdk"></dd>
-        <dt class="text-muted-foreground-1">IP</dt><dd class="text-foreground tabular-nums truncate" x-text="session.device.ip"></dd>
-        <dt class="text-muted-foreground-1">Time zone</dt><dd class="text-foreground truncate" :title="session.device.timezone" x-text="session.device.timezone.split(' ')[0]"></dd>
+      <!-- Two columns of label-over-value pairs: uses the panel's full width, three short rows -->
+      <dl class="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
+        <template x-for="[label, value, title] in [
+            ['Type', session.device.type],
+            ['OS', session.device.os],
+            ['Browser', session.device.browser],
+            ['SDK', session.device.sdk],
+            ['IP', session.device.ip],
+            ['Time zone', session.device.timezone.split(' ')[0], session.device.timezone]
+          ]" :key="label">
+          <div class="min-w-0">
+            <dt class="text-xs text-muted-foreground-1" x-text="label"></dt>
+            <dd class="mt-0.5 text-sm text-foreground tabular-nums truncate" :title="title || value" x-text="value"></dd>
+          </div>
+        </template>
       </dl>
     </div>
 
