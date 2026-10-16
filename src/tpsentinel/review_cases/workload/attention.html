@@ -1,0 +1,112 @@
+<!-- Pressure at a glance: ownership problems first, each with the action that fixes it; calm when there's nothing to do -->
+{% set card = "flex flex-col p-4 sm:p-5 bg-card border border-card-line rounded-xl" %}
+{% set label = "text-sm font-medium text-muted-foreground-1" %}
+{% set big = "mt-2 text-2xl font-semibold text-foreground tabular-nums" %}
+{% set detail = "mt-1 text-sm text-muted-foreground-1" %}
+{% set ok_icon = '<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>' %}
+{% set primary_btn = "inline-flex items-center gap-x-1.5 py-1.5 px-2.5 rounded-lg text-[13px] font-medium bg-primary text-primary-foreground hover:bg-primary-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary" %}
+{% set text_link = "inline-flex items-center gap-x-1 py-1.5 px-1 rounded-lg text-[13px] font-medium text-primary hover:text-primary-hover hover:underline underline-offset-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" %}
+
+<!-- Loading -->
+<div x-show="loading" x-cloak class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4" aria-busy="true" aria-label="Loading workload">
+  <template x-for="i in 4" :key="i">
+    <div class="{{ card }} gap-3 animate-pulse">
+      <div class="h-3 w-28 rounded-full bg-surface"></div>
+      <div class="h-6 w-20 rounded-full bg-surface"></div>
+      <div class="h-3 w-40 rounded-full bg-surface"></div>
+    </div>
+  </template>
+</div>
+
+<section x-show="ready" aria-label="Needs attention" class="grid sm:grid-cols-2 xl:grid-cols-4 gap-4" :class="stale && 'opacity-70'">
+
+  <!-- 1. Work with no owner -->
+  <div class="{{ card }}">
+    <template x-if="unassignedCases.length">
+      <div class="flex flex-col grow">
+        <p class="flex items-center gap-x-2 {{ label }}">
+          <span class="size-2 rounded-full bg-amber-500"></span>
+          Waiting for a reviewer
+        </p>
+        <p class="{{ big }}" x-text="plural(unassignedCases.length, 'case')"></p>
+        <p class="{{ detail }}">
+          <template x-if="lanes[0].high"><span><span class="font-medium text-red-700 dark:text-red-400" x-text="`${num(lanes[0].high)} high priority`"></span> · </span></template>oldest waiting <span x-text="waiting(lanes[0].oldest)"></span>
+        </p>
+        <div class="mt-auto pt-4 flex items-center gap-x-3">
+          <button type="button" x-show="eligible.length" @click="openMove('unassigned', lanes[0].high ? 'high' : 'all')" class="{{ primary_btn }}">Assign cases</button>
+          <a :href="casesHref({ view: 'unassigned' })" class="{{ text_link }}">View</a>
+        </div>
+      </div>
+    </template>
+    <template x-if="!unassignedCases.length">
+      <div>
+        <p class="flex items-center gap-x-2 {{ label }}"><span class="text-teal-600 dark:text-teal-400">{{ ok_icon | safe }}</span>Every case has a reviewer</p>
+        <p class="{{ detail }}">New cases that need a reviewer will show up here.</p>
+      </div>
+    </template>
+  </div>
+
+  <!-- 2. Owners who can't review -->
+  <div class="{{ card }}" :class="(lostCases.length || (!eligible.length && openCases.length)) && 'border-red-200 dark:border-red-500/30'">
+    <template x-if="!eligible.length && openCases.length">
+      <div class="flex flex-col grow">
+        <p class="flex items-center gap-x-2 {{ label }}"><span class="size-2 rounded-full bg-red-500"></span>No one can review</p>
+        <p class="{{ big }}" x-text="plural(openCases.length, 'case')"></p>
+        <p class="{{ detail }}">are waiting, but no reviewer has review access.</p>
+        <div class="mt-auto pt-4"><a href="#" class="{{ primary_btn }}">Manage reviewer access</a></div>
+      </div>
+    </template>
+    <template x-if="eligible.length && lostCases.length">
+      <div class="flex flex-col grow">
+        <p class="flex items-center gap-x-2 {{ label }}"><span class="size-2 rounded-full bg-red-500"></span>Owner lost review access</p>
+        <p class="{{ big }}" x-text="plural(lostCases.length, 'case')"></p>
+        <p class="{{ detail }}">
+          with <span class="font-medium text-foreground" x-text="lostOwners.map(r => r.name).join(', ')"></span>
+          <template x-if="lostCases.filter(c => c.priority <= 1).length">
+            <span>· <span class="font-medium text-red-700 dark:text-red-400" x-text="`${lostCases.filter(c => c.priority <= 1).length} high priority`"></span></span>
+          </template>
+        </p>
+        <div class="mt-auto pt-4 flex items-center gap-x-3">
+          <button type="button" @click="openMove(lostOwners[0].id)" class="{{ primary_btn }}">Reassign cases</button>
+          <a :href="casesHref({ reviewer: lostOwners[0].id })" class="{{ text_link }}">View</a>
+        </div>
+      </div>
+    </template>
+    <template x-if="eligible.length && !lostCases.length">
+      <div>
+        <p class="flex items-center gap-x-2 {{ label }}"><span class="text-teal-600 dark:text-teal-400">{{ ok_icon | safe }}</span>All owners can review</p>
+        <p class="{{ detail }}">Nobody holds cases they're no longer allowed to review.</p>
+      </div>
+    </template>
+  </div>
+
+  <!-- 3. Work that's been waiting long -->
+  <div class="{{ card }}">
+    <template x-if="longWaiting.length">
+      <div class="flex flex-col grow">
+        <p class="flex items-center gap-x-2 {{ label }}"><span class="size-2 rounded-full bg-amber-500"></span>Waiting over a week</p>
+        <p class="{{ big }}" x-text="plural(longWaiting.length, 'case')"></p>
+        <p class="{{ detail }}" x-text="[[longWaiting.filter(c => c.state === 'queued').length, 'unassigned'], [longWaiting.filter(c => c.state === 'assigned').length, 'with reviewers']].filter(p => p[0]).map(p => `${num(p[0])} ${p[1]}`).join(' · ')"></p>
+        <div class="mt-auto pt-4"><a :href="casesHref({ sort: 'oldest' })" class="{{ text_link }} -ms-1">View oldest first</a></div>
+      </div>
+    </template>
+    <template x-if="!longWaiting.length">
+      <div>
+        <p class="flex items-center gap-x-2 {{ label }}"><span class="text-teal-600 dark:text-teal-400">{{ ok_icon | safe }}</span>Nothing waiting over a week</p>
+        <p class="{{ detail }}">Every open case was opened in the last 7 days.</p>
+      </div>
+    </template>
+  </div>
+
+  <!-- 4. Today's flow: is the backlog growing? -->
+  <div class="{{ card }}">
+    <p class="{{ label }}">Today</p>
+    <div class="mt-2 flex items-baseline gap-x-4">
+      <p><span class="text-2xl font-semibold text-foreground tabular-nums" x-text="num(today.created)"></span> <span class="text-sm text-muted-foreground-1">new</span></p>
+      <p><span class="text-2xl font-semibold text-foreground tabular-nums" x-text="num(today.decided)"></span> <span class="text-sm text-muted-foreground-1">decided</span></p>
+    </div>
+    <p class="{{ detail }}"
+       x-text="today.change > 0 ? `Open work grew by ${num(today.change)} since midnight.` : today.change < 0 ? `Open work shrank by ${num(-today.change)} since midnight.` : 'Open work held steady since midnight.'"></p>
+    <div class="mt-auto pt-4"><a :href="casesHref({ view: 'closed', sort: 'newest' })" class="{{ text_link }} -ms-1">View today's decisions</a></div>
+  </div>
+</section>
