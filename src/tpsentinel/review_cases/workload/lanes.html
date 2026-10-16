@@ -65,7 +65,7 @@
         <span>Owner</span>
         <span>Open cases</span>
         <span class="text-end">Oldest</span>
-        <span class="text-end" title="Decisions submitted since midnight">Done today</span>
+        <span class="text-end"><span class="cursor-default underline decoration-dotted underline-offset-4" @mouseenter="showTip($event, 'Done today', [['Decisions submitted since', '12:00 am IST']], 'Context only, not a performance score')" @mouseleave="hideTip()">Done today</span></span>
         <span class="sr-only">Actions</span>
       </div>
 
@@ -107,12 +107,18 @@
             <!-- Bar: same scale for every owner; average marker for reference -->
             <div class="col-span-2 sm:col-span-1 flex items-center gap-x-3 min-w-0">
               <div class="relative grow h-5">
-                <a :href="laneHref(l)" :title="mixTitle(l)" class="absolute inset-y-0 start-0 flex rounded overflow-hidden focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" :style="`width: ${pct(l.open)}`">
+                <a :href="laneHref(l)" :aria-label="`${l.name}: ${mixTitle(l)}`"
+                   @mouseenter="showTip($event, l.name, [...l.mix.map(m => [m.label, m.n, m.dot]), ['Oldest waiting', waiting(l.oldest)]], `${num(l.open)} open · click to see them`)" @mouseleave="hideTip()"
+                   @focus="showTip($event, l.name, [...l.mix.map(m => [m.label, m.n, m.dot]), ['Oldest waiting', waiting(l.oldest)]], `${num(l.open)} open · click to see them`)" @blur="hideTip()"
+                   class="absolute inset-y-0 start-0 flex rounded overflow-hidden focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" :style="`width: ${pct(l.open)}`">
                   <template x-for="m in l.mix" :key="m.key">
                     <span x-show="m.n" :class="m.bar" class="h-full border-e-2 border-card last:border-e-0" :style="`width: ${l.open ? (m.n / l.open) * 100 : 0}%`"></span>
                   </template>
                 </a>
-                <span x-show="average" class="absolute -inset-y-1 border-s border-dashed border-muted-foreground-1 pointer-events-none" :style="`inset-inline-start: ${pct(average)}`" aria-hidden="true"></span>
+                <span x-show="average" class="absolute -inset-y-1 -ms-1.5 w-3 flex justify-center cursor-default" :style="`inset-inline-start: ${pct(average)}`" aria-hidden="true"
+                      @mouseenter="showTip($event, 'Team average', [['Open cases per reviewer', average]], 'For reference only, not a target')" @mouseleave="hideTip()">
+                  <span class="h-full border-s border-dashed border-muted-foreground-1"></span>
+                </span>
               </div>
               <span class="shrink-0 w-24 text-sm tabular-nums">
                 <span class="font-semibold text-foreground" x-text="num(l.open)"></span>
@@ -121,8 +127,9 @@
             </div>
 
             <!-- Oldest -->
-            <p class="sm:text-end text-xs sm:text-sm tabular-nums" :title="l.oldest ? `Waiting since ${exact(l.oldest)}` : ''">
-              <span class="sm:hidden text-muted-foreground-1">Oldest </span><span :class="l.oldest === null ? 'text-muted-foreground-2' : 'text-foreground'" x-text="waiting(l.oldest)"></span>
+            <p class="sm:text-end text-xs sm:text-sm tabular-nums">
+              <span class="sm:hidden text-muted-foreground-1">Oldest </span><span :class="l.oldest === null ? 'text-muted-foreground-2' : 'text-foreground cursor-default'" x-text="waiting(l.oldest)"
+                    @mouseenter="l.oldest && showTip($event, 'Oldest waiting case', [['Opened', exact(l.oldest)]])" @mouseleave="hideTip()"></span>
             </p>
             <!-- Done today: context, not a score -->
             <p class="text-end text-xs sm:text-sm tabular-nums text-muted-foreground-1">
