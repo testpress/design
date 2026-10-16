@@ -73,6 +73,12 @@
       { id: 'ielts-mock', name: 'IELTS Academic Mock' },
     ];
     const WORKSPACE_BY_ID = Object.fromEntries(WORKSPACES.map(w => [w.id, w]));
+
+    // People on the client's side who can ask for a review of an AI-cleared candidate
+    const REQUESTERS = ['Ramesh Iyer', 'Fatima Sheikh', 'Joseph Mathew'];
+    // What the AI said and why the case is open, in words
+    const CONCERN_LABEL = { behaviour: 'Behaviour concern', evidence: 'Evidence concern' };
+    const triggerLabel = c => c.origin === 'requested' ? `Requested by ${c.requestedBy}` : CONCERN_LABEL[c.concern];
     let CANDIDATES = []; // filled by makeCases()
 
     // Filters (search qualifiers). Values are slugs so they read well in the search box.
@@ -88,6 +94,13 @@
         ] },
       reviewer: { label: 'Reviewer', title: 'Filter by reviewer', icon: 'reviewer', searchable: true, admin: true,
         values: () => REVIEWERS.map(r => ({ value: r.id, label: r.name, match: c => c.reviewer === r.id })) },
+      // Why the case exists: what AI found, or a review someone asked for
+      reason: { label: 'Reason', title: 'Filter by review reason', icon: 'flagged', searchOnly: true,
+        values: () => [
+          { value: 'behaviour', label: 'Behaviour concern', match: c => c.concern === 'behaviour' },
+          { value: 'evidence', label: 'Evidence concern', match: c => c.concern === 'evidence' },
+          { value: 'requested', label: 'Requested review', match: c => c.origin === 'requested' },
+        ] },
       indicator: { label: 'Indicator', title: 'Filter by indicator', icon: 'indicator', searchOnly: true,
         values: () => INDICATORS.map(i => ({ value: i.slug, label: i.label, match: c => c.indicators.includes(i.key) })) },
     };
@@ -103,9 +116,9 @@
       { key: 'mine', label: 'My assignments' },
       { key: 'unassigned', label: 'Unassigned' },
       { key: 'open', label: 'All open' },
-      { key: 'closed', label: 'Closed' },
+      { key: 'closed', label: 'Completed' },
     ];
-    // Until someone picks a sort, open views go by priority and Closed by most recent decision
+    // Until someone picks a sort, open views go by priority and Completed by most recent decision
     const defaultSort = view => view === 'closed' ? { by: 'time', order: 'newest' } : { by: 'priority', order: 'highest' };
     const ORDERS = { priority: [['highest', 'Highest first'], ['lowest', 'Lowest first']], time: [['oldest', 'Oldest first'], ['newest', 'Newest first']] };
     const PER_PAGE = 10;
@@ -189,6 +202,20 @@
         c.reason = flagged ? pick(REASONS_FLAG) : pick(REASONS_CLEAR);
         cases.push(c);
       }
+      // Why each case exists, worked out from its ID (no extra random draws).
+      // Most are AI-flagged: a behaviour concern when a behaviour anomaly was found, otherwise an evidence concern.
+      // The rest are reviews someone asked for even though AI cleared the candidate.
+      cases.forEach(c => {
+        const num = parseInt(c.id.slice(3), 10);
+        if ((Math.imul(num, 2654435761) >>> 0) % 100 < 15) {
+          c.origin = 'requested';
+          c.requestedBy = REQUESTERS[num % REQUESTERS.length];
+          c.concern = null;
+        } else {
+          c.origin = 'ai_flagged';
+          c.concern = c.indicators.some(k => BEHAVIOUR_KEYS.includes(k)) ? 'behaviour' : 'evidence';
+        }
+      });
       return cases;
     }
 
@@ -208,6 +235,14 @@
       if (diff < 31 * DAY) return `${Math.floor(diff / (7 * DAY))} weeks ago`;
       const d = new Date(ts);
       return `on ${MONTHS[d.getMonth()]} ${d.getDate()}`;
+    }
+    // How long something has waited, without "ago": "5 hours", "1 day", "12 days"
+    function waited(ts) {
+      const diff = NOW - ts;
+      if (diff < HOUR) { const m = Math.max(1, Math.round(diff / MIN)); return `${m} minute${m === 1 ? '' : 's'}`; }
+      if (diff < DAY) { const h = Math.round(diff / HOUR); return `${h} hour${h === 1 ? '' : 's'}`; }
+      const d = Math.floor(diff / DAY);
+      return `${d} day${d === 1 ? '' : 's'}`;
     }
     function exact(ts) {
       const d = new Date(ts);
@@ -430,7 +465,7 @@
         // ---------- sorting ----------
         get sort() { return this.sortChoice || defaultSort(this.view); },
         get sortOptions() {
-          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed' : 'Case age' };
+          const time = { by: 'time', label: this.view === 'mine' ? 'Assigned for' : this.view === 'closed' ? 'Completed date' : 'Case age' };
           const priority = { by: 'priority', label: 'Priority' };
           return this.view === 'closed' ? [time, priority] : [priority, time];
         },
@@ -476,7 +511,14 @@
         optionAvatar(key, o) { return key === 'reviewer' ? this.avatar(o.value) : o.avatar; },
         indicatorsFor(c) { return c.indicators.map(k => INDICATOR_BY_KEY[k]); },
         priorityLabel(c) { return PRIORITIES[c.priority]; },
-        relative, exact,
+        // The candidate's current integrity result and who produced it: AI until a reviewer decides
+        resultWord(c) {
+          const flagged = c.state === 'completed' ? c.result === 'flagged' : c.origin !== 'requested';
+          return flagged ? 'Flagged' : 'Clear';
+        },
+        resultBy(c) { return c.state === 'completed' ? this.reviewerName(c.reviewer) : 'AI'; },
+        triggerLabel,
+        relative, waited, exact,
         stateIcon(c) { return this.icons[`state_${c.state === 'completed' ? c.result : c.state}`]; },
         stateLabel(c) {
           if (c.state === 'queued') return 'Queued: waiting for a reviewer';
