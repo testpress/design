@@ -59,7 +59,7 @@
     };
 
     const COURSES = [
-      { id: 1, title: "Prelims GS", products: ["UPSC Essential + Mentorship", "UPSC Prelims Crash Course"] },
+      { id: 1, title: "Prelims GS", products: ["UPSC Essential + Mentorship", "UPSC Prelims Crash Course", "Prelims Test Series + GS", "UPSC Foundation 2027", "GS Hindi Medium", "Weekend Batch 2026"] },
       { id: 2, title: "CSAT", products: ["UPSC Essential + Mentorship"] },
       { id: 3, title: "Mains GS", products: ["UPSC Essential + Mentorship", "Mains Answer Writing"] },
       { id: 4, title: "Current affairs", products: ["UPSC Essential + Mentorship", "Current Affairs Monthly"] },
@@ -96,6 +96,8 @@
         // shared profile and (on a course page) this course's subject and video.
         editing: null,
         isNew: false,
+        // The shared profile shows as a preview until the admin chooses to edit it.
+        editingProfile: false,
         form: null,
         errors: {},
 
@@ -111,7 +113,7 @@
 
         init() {
           this.refreshIcons();
-          ["empty", "links", "profiles", "editing", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
+          ["empty", "links", "profiles", "editing", "editingProfile", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
         },
 
         refreshIcons() {
@@ -201,6 +203,7 @@
               ...s,
               added: !this.empty && this.links.some((l) => l.courseId === this.courseId && l.userId === s.id),
               hasProfile: this.isFaculty(s.id),
+              elsewhere: this.teaching(s.id).filter((t) => t.courseId !== this.courseId).map((t) => t.course.title),
             }))
             .sort((a, b) => a.added - b.added);
         },
@@ -224,6 +227,7 @@
           const link = this.links.find((l) => l.courseId === this.courseId && l.userId === userId);
           this.editing = this.staffMember(userId);
           this.isNew = isNew;
+          this.editingProfile = !this.profiles[userId];
           this.errors = {};
           this.form = {
             ...clone(profile),
@@ -232,7 +236,6 @@
             subject: link ? link.subject : "",
             video: link && link.video ? { ...link.video } : null,
           };
-          this.$dispatch("set-uploaded-file", { name: "intro_video", files: [] });
           this.$dispatch("open-drawer-faculty-form");
         },
 
@@ -240,6 +243,12 @@
         get sharedWith() {
           if (!this.editing) return [];
           return this.teaching(this.editing.id).filter((t) => t.courseId !== this.courseId);
+        },
+
+        pickVideo(event) {
+          const file = event.target.files && event.target.files[0];
+          if (file) this.form.video = { name: file.name, duration: "Processing…" };
+          event.target.value = "";
         },
 
         addItem(list) {
@@ -257,17 +266,19 @@
         save() {
           this.errors = {};
           if (!this.form.subject.trim()) this.errors.subject = "Add the subject they teach in this course.";
-          if (!this.form.short_description.trim()) this.errors.short_description = "Add a one-line introduction. Students see it on the faculty card.";
+          if (this.editingProfile && !this.form.short_description.trim()) this.errors.short_description = "Add a one-line introduction for the faculty card.";
           if (Object.keys(this.errors).length) return;
 
-          const clean = (items) => items.map((i) => i.trim()).filter(Boolean);
-          this.profiles[this.editing.id] = {
-            short_description: this.form.short_description.trim(),
-            bio: this.form.bio.trim(),
-            years_of_experience: this.form.years_of_experience ? Number(this.form.years_of_experience) : null,
-            qualifications: clean(this.form.qualifications),
-            highlights: clean(this.form.highlights),
-          };
+          if (this.editingProfile) {
+            const clean = (items) => items.map((i) => i.trim()).filter(Boolean);
+            this.profiles[this.editing.id] = {
+              short_description: this.form.short_description.trim(),
+              bio: this.form.bio.trim(),
+              years_of_experience: this.form.years_of_experience ? Number(this.form.years_of_experience) : null,
+              qualifications: clean(this.form.qualifications),
+              highlights: clean(this.form.highlights),
+            };
+          }
 
           const link = this.links.find((l) => l.courseId === this.courseId && l.userId === this.editing.id);
           if (link) {
