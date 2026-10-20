@@ -57,6 +57,13 @@
       // How many plans to show: 3 (all) or 2 (Basic and Premium), to preview the 2-column grid.
       planCount: 3,
       hasBenefits: true,
+      // Faculty in this product: "many" (all courses), "one" (a single-teacher product) or "none".
+      facultyMode: "many",
+
+      // Faculty section: first 4 cards, then "Show all". The profile drawer shows one person.
+      showAllFaculty: false,
+      profile: null,
+      profileVideo: null,
 
       // Product sold without plans: one price for the whole product.
       product: { price: 23000, strike_through_price: 79000, validity: "Valid till 28 May 2026" },
@@ -83,6 +90,38 @@
         refreshIcons();
         this.$watch("hasPlans", refreshIcons);
         this.$watch("hasBenefits", refreshIcons);
+        this.$watch("facultyMode", refreshIcons);
+        this.$watch("showAllFaculty", refreshIcons);
+        this.$watch("profile", refreshIcons);
+      },
+
+      get faculty() {
+        if (this.facultyMode === "none") return [];
+        const courses = this.facultyMode === "one" ? [PRODUCT_COURSES[1]] : PRODUCT_COURSES;
+        return resolveFaculty(courses);
+      },
+
+      // Courses the faculty list was built from. "Teaches in this product" only helps when there are several.
+      get facultyCourseCount() {
+        return this.facultyMode === "one" ? 1 : PRODUCT_COURSES.length;
+      },
+
+      get visibleFaculty() {
+        return this.showAllFaculty ? this.faculty : this.faculty.slice(0, 4);
+      },
+
+      // "Taught by" line in the hero: first name, then the count of the rest.
+      get taughtBy() {
+        const [first, ...rest] = this.faculty;
+        if (!first) return "";
+        return rest.length ? `${first.name} and ${rest.length} more` : first.name;
+      },
+
+      // profileVideo is the course link whose intro video plays in the drawer.
+      openProfile(person) {
+        this.profile = person;
+        this.profileVideo = person.teaches.find((t) => t.video) || null;
+        this.$dispatch("open-drawer-faculty-profile");
       },
 
       get plans() {
