@@ -81,7 +81,7 @@
 
     const clone = (value) => JSON.parse(JSON.stringify(value));
 
-    window.facultyAdmin = function ({ courseId = null } = {}) {
+    window.facultyAdmin = function ({ courseId }) {
       return {
         staff: STAFF,
         courses: COURSES,
@@ -91,8 +91,6 @@
 
         // Prototype switch: show the empty state.
         empty: false,
-
-        search: "",
 
         // Drawer: the person being added or edited, with a working copy of their
         // shared profile and (on a course page) this course's subject and video.
@@ -104,10 +102,6 @@
         // Add-faculty picker.
         pickerSearch: "",
 
-        // Add to courses (faculty list): course id -> subject.
-        assigning: null,
-        assignForm: {},
-
         removing: null,
 
         // Reorder (course page).
@@ -117,7 +111,7 @@
 
         init() {
           this.refreshIcons();
-          ["empty", "links", "profiles", "editing", "search", "pickerSearch", "assigning", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
+          ["empty", "links", "profiles", "editing", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
         },
 
         refreshIcons() {
@@ -168,20 +162,6 @@
           return "No " + gaps.slice(0, 2).join(", ") + " and " + (gaps.length - 2) + " more";
         },
 
-        // ---- Faculty list (all courses) ----
-
-        get faculty() {
-          if (this.empty) return [];
-          const q = this.search.trim().toLowerCase();
-          return this.staff
-            .filter((s) => this.isFaculty(s.id))
-            .filter((s) => !q || s.name.toLowerCase().includes(q) || this.teaching(s.id).some((t) => t.subject.toLowerCase().includes(q) || t.course.title.toLowerCase().includes(q)));
-        },
-
-        get facultyCount() {
-          return this.empty ? 0 : Object.keys(this.profiles).length;
-        },
-
         // ---- One course ----
 
         get courseFaculty() {
@@ -212,15 +192,14 @@
 
         // ---- Add faculty picker ----
 
-        // On a course page: everyone not already in this course.
-        // On the faculty list: everyone without a profile yet.
+        // Everyone not already in this course; those with a profile from another course are marked.
         get pickable() {
           const q = this.pickerSearch.trim().toLowerCase();
           return this.staff
             .filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
             .map((s) => ({
               ...s,
-              added: this.courseId ? this.links.some((l) => l.courseId === this.courseId && l.userId === s.id) : this.isFaculty(s.id),
+              added: !this.empty && this.links.some((l) => l.courseId === this.courseId && l.userId === s.id),
               hasProfile: this.isFaculty(s.id),
             }))
             .sort((a, b) => a.added - b.added);
@@ -242,7 +221,7 @@
 
         openDrawer(userId, isNew = false) {
           const profile = this.profiles[userId] || { short_description: "", bio: "", years_of_experience: null, qualifications: [], highlights: [] };
-          const link = this.courseId ? this.links.find((l) => l.courseId === this.courseId && l.userId === userId) : null;
+          const link = this.links.find((l) => l.courseId === this.courseId && l.userId === userId);
           this.editing = this.staffMember(userId);
           this.isNew = isNew;
           this.errors = {};
@@ -277,7 +256,7 @@
 
         save() {
           this.errors = {};
-          if (this.courseId && !this.form.subject.trim()) this.errors.subject = "Add the subject they teach in this course.";
+          if (!this.form.subject.trim()) this.errors.subject = "Add the subject they teach in this course.";
           if (!this.form.short_description.trim()) this.errors.short_description = "Add a one-line introduction. Students see it on the faculty card.";
           if (Object.keys(this.errors).length) return;
 
@@ -290,14 +269,12 @@
             highlights: clean(this.form.highlights),
           };
 
-          if (this.courseId) {
-            const link = this.links.find((l) => l.courseId === this.courseId && l.userId === this.editing.id);
-            if (link) {
-              link.subject = this.form.subject.trim();
-              link.video = this.form.video;
-            } else {
-              this.links.push({ courseId: this.courseId, userId: this.editing.id, subject: this.form.subject.trim(), video: this.form.video });
-            }
+          const link = this.links.find((l) => l.courseId === this.courseId && l.userId === this.editing.id);
+          if (link) {
+            link.subject = this.form.subject.trim();
+            link.video = this.form.video;
+          } else {
+            this.links.push({ courseId: this.courseId, userId: this.editing.id, subject: this.form.subject.trim(), video: this.form.video });
           }
 
           const name = this.editing.name;
@@ -305,39 +282,7 @@
           this.$dispatch("close-drawer-faculty-form");
           this.$dispatch("toast", {
             title: added ? `${name} added` : "Changes saved",
-            description: this.courseId
-              ? (added ? "Students see them on this course's product pages." : "Product pages show the update.")
-              : (added ? "Add them to courses to show them to students." : "Every course they teach in shows the update."),
-            variant: "success",
-          });
-        },
-
-        // ---- Add to courses (faculty list) ----
-
-        openAssign(userId) {
-          this.assigning = this.staffMember(userId);
-          this.assignForm = {};
-          this.$dispatch("open-modal-assign-courses");
-        },
-
-        toggleAssign(courseId) {
-          if (courseId in this.assignForm) delete this.assignForm[courseId];
-          else this.assignForm[courseId] = "";
-          this.assignForm = { ...this.assignForm };
-        },
-
-        get assignCount() {
-          return Object.keys(this.assignForm).length;
-        },
-
-        saveAssign() {
-          const entries = Object.entries(this.assignForm);
-          if (!entries.length || entries.some(([, subject]) => !subject.trim())) return;
-          entries.forEach(([id, subject]) => this.links.push({ courseId: Number(id), userId: this.assigning.id, subject: subject.trim(), video: null }));
-          this.$dispatch("close-modal-assign-courses");
-          this.$dispatch("toast", {
-            title: `Added to ${entries.length} ${entries.length === 1 ? "course" : "courses"}`,
-            description: "Open a course's Faculty page to add an intro video or change the order.",
+            description: added ? "Students see them on this course's product pages." : "Product pages show the update.",
             variant: "success",
           });
         },
@@ -346,20 +291,13 @@
 
         askRemove(userId) {
           this.removing = this.staffMember(userId);
-          this.$dispatch(this.courseId ? "open-modal-remove-from-course" : "open-modal-remove-faculty");
+          this.$dispatch("open-modal-remove-from-course");
         },
 
         confirmRemove() {
           const id = this.removing.id;
-          if (this.courseId) {
-            this.links = this.links.filter((l) => !(l.courseId === this.courseId && l.userId === id));
-            this.$dispatch("toast", { title: `${this.removing.name} removed from ${this.currentCourse.title}`, description: "Their profile and other courses are unchanged.", variant: "success" });
-          } else {
-            this.links = this.links.filter((l) => l.userId !== id);
-            delete this.profiles[id];
-            this.profiles = { ...this.profiles };
-            this.$dispatch("toast", { title: `${this.removing.name} is no longer faculty`, description: "Their account and course access are unchanged.", variant: "success" });
-          }
+          this.links = this.links.filter((l) => !(l.courseId === this.courseId && l.userId === id));
+          this.$dispatch("toast", { title: `${this.removing.name} removed from ${this.currentCourse.title}`, description: "Their profile and other courses are unchanged.", variant: "success" });
           this.removing = null;
         },
       };
