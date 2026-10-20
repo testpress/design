@@ -1,7 +1,7 @@
 <script>
-  // Course faculty, admin side. Two jobs on one page:
-  // - Who teaches this course: subject and intro video here (a small modal).
-  // - Their profile, shared by every course they teach in (a drawer).
+  // Course faculty, admin side. One drawer per person holds both:
+  // - what applies to this course (subject, intro video), and
+  // - their profile, shared by every course they teach in.
   // Faculty are existing staff and mentor users. Nothing here changes course access.
   (() => {
     const photo = (id) => `https://images.unsplash.com/photo-${id}?w=160&h=160&fit=crop&crop=faces&q=80`;
@@ -96,20 +96,17 @@
 
         pickerSearch: "",
 
-        // Profile drawer.
+        // The drawer: who, and a working copy of their course details and profile.
         editing: null,
+        isNew: false,
         form: null,
         errors: {},
-
-        // Course assignment modal.
-        assigning: null,
-        assign: { subject: "", video: null, isNew: false },
 
         removing: null,
 
         init() {
           this.refreshIcons();
-          ["empty", "noProducts", "links", "profiles", "editing", "assigning", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
+          ["empty", "noProducts", "links", "profiles", "editing", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
         },
 
         refreshIcons() {
@@ -186,58 +183,36 @@
         pick(person) {
           if (person.added) return;
           this.$dispatch("close-modal-pick-faculty");
-          this.openAssign(person.id, true);
+          this.openEditor(person.id, true);
         },
 
-        // ---- Course assignment (subject, intro video) ----
+        // ---- One drawer: this course's subject and intro, then the shared profile ----
 
-        openAssign(userId, isNew = false) {
+        openEditor(userId, isNew = false) {
+          const profile = this.profiles[userId] || blankProfile();
           const link = this.links.find((l) => l.courseId === this.courseId && l.userId === userId);
-          this.assigning = this.staffMember(userId);
-          this.assign = { subject: link ? link.subject : "", video: link && link.video ? { ...link.video } : null, isNew };
+          this.editing = this.staffMember(userId);
+          this.isNew = isNew;
+          this.errors = {};
+          this.form = {
+            ...clone(profile),
+            subject: link ? link.subject : "",
+            video: link && link.video ? { ...link.video } : null,
+          };
+          if (!this.form.highlights.length) this.form.highlights = [""];
+          if (!this.form.qualifications.length) this.form.qualifications = [""];
           this.$dispatch("set-uploaded-file", { name: "intro_video", files: [] });
-          setTimeout(() => this.$dispatch("open-modal-assign-faculty"), 60);
+          setTimeout(() => this.$dispatch("open-drawer-faculty-editor"), 60);
+        },
+
+        // Other courses that use the same profile.
+        get sharedWith() {
+          return this.editing ? this.teaching(this.editing.id).filter((t) => t.courseId !== this.courseId).map((t) => t.course.title) : [];
         },
 
         pickVideo(event) {
           const file = event.target.files && event.target.files[0];
-          if (file) this.assign.video = { name: file.name, duration: "uploading…", uploaded: true };
-        },
-
-        saveAssign() {
-          if (!this.assign.subject.trim()) return;
-          const person = this.assigning;
-          const link = this.links.find((l) => l.courseId === this.courseId && l.userId === person.id);
-          if (link) {
-            link.subject = this.assign.subject.trim();
-            link.video = this.assign.video;
-          } else {
-            this.links.push({ courseId: this.courseId, userId: person.id, subject: this.assign.subject.trim(), video: this.assign.video });
-          }
-          this.links = [...this.links];
-
-          const needsProfile = !this.hasProfile(person.id);
-          this.$dispatch("toast", {
-            title: this.assign.isNew ? `${person.name} added` : "Saved",
-            description: this.assign.isNew && needsProfile ? "Complete their profile so students know who they are." : "",
-            variant: "success",
-          });
-        },
-
-        // ---- Profile drawer ----
-
-        openProfile(userId) {
-          const profile = this.profiles[userId] || blankProfile();
-          this.editing = this.staffMember(userId);
-          this.errors = {};
-          this.form = { ...clone(profile) };
-          if (!this.form.highlights.length) this.form.highlights = [""];
-          if (!this.form.qualifications.length) this.form.qualifications = [""];
-          setTimeout(() => this.$dispatch("open-drawer-faculty-profile"), 60);
-        },
-
-        get profileCourses() {
-          return this.editing ? this.teaching(this.editing.id).map((t) => t.course.title) : [];
+          if (file) this.form.video = { name: file.name, duration: "uploading…", uploaded: true };
         },
 
         addItem(list) {
@@ -252,17 +227,23 @@
           this.form[list].splice(index, 1);
         },
 
-        saveProfile() {
+        save() {
           this.errors = {};
-          if (!this.form.short_description.trim()) {
-            this.errors.short_description = "Add a one-line introduction.";
+          if (!this.form.subject.trim()) this.errors.subject = "Add the subject they teach here.";
+          if (!this.form.short_description.trim()) this.errors.short_description = "Add a one-line introduction.";
+          if (Object.keys(this.errors).length) {
+            this.$nextTick(() => {
+              const first = document.querySelector('#faculty-editor [aria-invalid="true"]');
+              first && first.focus();
+            });
             return;
           }
+
           const clean = (items) => items.map((i) => i.trim()).filter(Boolean);
-          const isNew = !this.hasProfile(this.editing.id);
+          const id = this.editing.id;
           this.profiles = {
             ...this.profiles,
-            [this.editing.id]: {
+            [id]: {
               short_description: this.form.short_description.trim(),
               bio: this.form.bio.trim(),
               years_of_experience: this.form.years_of_experience ? Number(this.form.years_of_experience) : null,
@@ -270,8 +251,17 @@
               highlights: clean(this.form.highlights),
             },
           };
-          this.$dispatch("close-drawer-faculty-profile");
-          this.$dispatch("toast", { title: isNew ? "Profile created" : "Profile saved", variant: "success" });
+          const link = this.links.find((l) => l.courseId === this.courseId && l.userId === id);
+          if (link) {
+            link.subject = this.form.subject.trim();
+            link.video = this.form.video;
+            this.links = [...this.links];
+          } else {
+            this.links = [...this.links, { courseId: this.courseId, userId: id, subject: this.form.subject.trim(), video: this.form.video }];
+          }
+
+          this.$dispatch("close-drawer-faculty-editor");
+          this.$dispatch("toast", { title: this.isNew ? `${this.editing.name} added` : "Saved", variant: "success" });
         },
 
         // ---- Remove ----

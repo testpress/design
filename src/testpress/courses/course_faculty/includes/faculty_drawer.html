@@ -1,9 +1,16 @@
-{# The profile students see. One per person, shared by every course they teach in.
-   Opened from a course's Faculty page. #}
+{# Add or edit one faculty member of this course, all in one place:
+   what applies to this course (subject, intro video), then the profile shared by every course they teach in.
+   Gray body with white groups, each named for where students see it. #}
 {% from "../../../../ui-system/components/drawer.html" import drawer %}
 {% from "../../../../ui-system/components/input.html" import input %}
 {% from "../../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../../ui-system/components/upload.html" import upload %}
 {% from "../../../../ui-system/components/button.html" import button %}
+
+{% set group = "p-5 space-y-5 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700" %}
+{% set group_title = "text-sm font-semibold text-gray-800 dark:text-neutral-200" %}
+{% set label = "block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200" %}
+{% set field_error = "mt-1.5 text-xs text-red-600 dark:text-red-500" %}
 
 {% macro list_editor(key, title, placeholder, add_text) %}
   <div>
@@ -29,25 +36,67 @@
   </div>
 {% endmacro %}
 
-{% call drawer(id="faculty-profile", placement="right", size="md") %}
+{% call drawer(id="faculty-editor", placement="right", size="md") %}
   <template x-if="editing && form">
     <div class="flex-1 min-h-0 flex flex-col">
 
       <div class="shrink-0 px-6 py-4 flex items-center gap-x-3 border-b border-gray-200 dark:border-neutral-700">
+        <template x-if="editing.photo">
+          <img :src="editing.photo" alt="" class="shrink-0 size-10 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+        </template>
+        <template x-if="!editing.photo">
+          <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(editing.name)"></span>
+        </template>
         <div class="min-w-0 flex-1">
-          <h3 id="faculty-profile-title" class="font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="editing.name"></h3>
-          <p class="text-sm text-gray-500 truncate dark:text-neutral-400" x-text="profileCourses.length ? 'Shown in ' + profileCourses.join(', ') : editing.role + ' · ' + editing.email"></p>
+          <h3 id="faculty-editor-title" class="font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="editing.name"></h3>
+          <p class="text-sm text-gray-500 truncate dark:text-neutral-400" x-text="editing.role + ' · ' + editing.email"></p>
         </div>
         <button type="button" @click="open = false" class="shrink-0 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Close">
           <i data-lucide="x" class="size-4"></i>
         </button>
       </div>
 
-      {# Gray body with white groups, each named for where students see it #}
       <div class="flex-1 min-h-0 overflow-y-auto bg-gray-50 dark:bg-neutral-900">
         <div class="p-5 space-y-4">
-          <section class="p-5 space-y-5 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
-            <h4 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">On the faculty card</h4>
+
+          {# This course only #}
+          <section class="{{ group }}">
+            <h4 class="{{ group_title }}">In <span x-text="currentCourse.title"></span></h4>
+
+            <div>
+              <label for="faculty_subject" class="{{ label }}">Subject <span class="text-red-500">*</span></label>
+              {{ input(name="faculty_subject", placeholder="e.g. Polity, or Polity and Governance", x_model="form.subject", extra_attrs='maxlength="80" :aria-invalid="!!errors.subject"') }}
+              <p x-show="errors.subject" class="{{ field_error }}" x-text="errors.subject"></p>
+            </div>
+
+            <div>
+              <template x-if="form.video && !form.video.uploaded">
+                <div>
+                  <p class="{{ label }}">Intro video</p>
+                  <div class="p-3 flex items-center gap-x-3 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+                    <span class="shrink-0 size-8 flex justify-center items-center rounded-lg bg-gray-900 text-white dark:bg-neutral-700"><i data-lucide="play" class="size-3.5 fill-current"></i></span>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="form.video && form.video.name"></p>
+                      <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="form.video && form.video.duration"></p>
+                    </div>
+                    <button type="button" @click="form.video = null" class="shrink-0 text-sm font-medium text-gray-600 hover:text-red-600 focus:outline-none focus:underline dark:text-neutral-400">Remove</button>
+                  </div>
+                </div>
+              </template>
+              <div x-show="!form.video || form.video.uploaded" @change.capture="pickVideo($event)">
+                {{ upload(name="intro_video", id="intro-video", label="Intro video (optional)", max_size="500MB", accepted_formats="mp4,mov,webm", icon="clapperboard", dropzone_title="Drop a video here or", help_text="For this course only. Under 2 minutes, up to 500 MB.") }}
+              </div>
+            </div>
+          </section>
+
+          {# Shared profile #}
+          <div class="pt-2 px-1 flex items-baseline justify-between gap-x-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-neutral-400">Profile</p>
+            <p x-show="sharedWith.length" class="min-w-0 truncate text-xs text-gray-500 dark:text-neutral-400">Also shown in <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="sharedWith.join(', ')"></span></p>
+          </div>
+
+          <section class="{{ group }}">
+            <h4 class="{{ group_title }}">On the faculty card</h4>
 
             <div class="flex items-center gap-x-4">
               <template x-if="editing.photo">
@@ -72,8 +121,8 @@
             </div>
           </section>
 
-          <section class="p-5 space-y-5 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
-            <h4 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">In their full profile</h4>
+          <section class="{{ group }}">
+            <h4 class="{{ group_title }}">In their full profile</h4>
 
             {{ list_editor("highlights", "Highlights", "e.g. Mentored 120+ selections in CSE", "Add highlight") }}
 
@@ -86,7 +135,7 @@
 
       <div class="shrink-0 px-6 py-4 flex justify-end gap-x-2 border-t border-gray-200 bg-white dark:bg-neutral-800 dark:border-neutral-700">
         {{ button(text="Cancel", variant="ghost", extra_attrs='@click="open = false"') }}
-        {{ button(text="Save profile", extra_attrs='@click="saveProfile()"') }}
+        {{ button(text="<span x-text=\"isNew ? 'Add to course' : 'Save'\"></span>", extra_attrs='@click="save()"') }}
       </div>
     </div>
   </template>
