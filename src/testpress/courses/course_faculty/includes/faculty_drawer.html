@@ -117,29 +117,49 @@
 
             <div>
               <label for="faculty_subject" class="{{ label }}">Subjects <span class="text-red-500">*</span></label>
-              {# Chips: one per subject. Enter or comma adds another. #}
-              <div @click="$refs.subjectInput.focus()"
-                class="min-h-[2.75rem] px-2 py-1.5 flex flex-wrap items-center gap-1.5 bg-white border rounded-lg cursor-text focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800"
-                :class="errors.subject ? 'border-red-500' : 'border-gray-200 dark:border-neutral-700'">
-                <template x-for="(subject, index) in form.subjects" :key="subject">
-                  <span class="inline-flex items-center gap-x-1 py-1 ps-2.5 pe-1 rounded-md bg-gray-100 text-sm text-gray-800 dark:bg-neutral-700 dark:text-neutral-200">
-                    <span x-text="subject"></span>
-                    <button type="button" @click.stop="removeSubject(index)" class="size-5 inline-flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 hover:text-gray-800 focus:outline-none dark:hover:bg-neutral-600" :aria-label="'Remove ' + subject">
-                      <i data-lucide="x" class="size-3.5"></i>
-                    </button>
-                  </span>
-                </template>
-                <input id="faculty_subject" type="text" x-ref="subjectInput" x-model="subjectDraft" maxlength="60" autocomplete="off"
-                  :aria-invalid="!!errors.subject"
-                  :placeholder="form.subjects.length ? 'Add another subject' : 'Type a subject, e.g. Polity'"
-                  @keydown.enter.prevent="addSubject()"
-                  @keydown="if ($event.key === ',') { $event.preventDefault(); addSubject(); }"
-                  @keydown.backspace="if (!subjectDraft && form.subjects.length) removeSubject(form.subjects.length - 1)"
-                  @blur="addSubject()"
-                  class="flex-1 min-w-[10rem] p-1 border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white">
+              {# Chips, with subjects used before in a menu below. Type to filter, or to create a new one. #}
+              <div class="relative" @click.outside="subjectMenu = false">
+                <div @click="$refs.subjectInput.focus(); subjectMenu = true"
+                  class="min-h-[2.75rem] px-2 py-1.5 flex flex-wrap items-center gap-1.5 bg-white border rounded-lg cursor-text focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800"
+                  :class="errors.subject ? 'border-red-500' : 'border-gray-200 dark:border-neutral-700'">
+                  <template x-for="(subject, index) in form.subjects" :key="subject">
+                    <span class="inline-flex items-center gap-x-1 py-1 ps-2.5 pe-1 rounded-md bg-gray-100 text-sm text-gray-800 dark:bg-neutral-700 dark:text-neutral-200">
+                      <span x-text="subject"></span>
+                      <button type="button" @click.stop="removeSubject(index)" class="size-5 inline-flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 hover:text-gray-800 focus:outline-none dark:hover:bg-neutral-600" :aria-label="'Remove ' + subject">
+                        <i data-lucide="x" class="size-3.5"></i>
+                      </button>
+                    </span>
+                  </template>
+                  <input id="faculty_subject" type="text" x-ref="subjectInput" x-model="subjectDraft" maxlength="60" autocomplete="off"
+                    role="combobox" aria-autocomplete="list" aria-controls="subject-options" :aria-expanded="subjectMenu"
+                    :aria-invalid="!!errors.subject"
+                    :placeholder="form.subjects.length ? 'Add another subject' : 'Choose or type a subject'"
+                    @focus="subjectMenu = true"
+                    @input="subjectMenu = true; subjectActive = 0"
+                    @keydown="subjectKey($event)"
+                    class="flex-1 min-w-[10rem] p-1 border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white">
+                  <i data-lucide="chevron-down" class="shrink-0 me-1 size-4 text-gray-400 pointer-events-none"></i>
+                </div>
+
+                <ul id="subject-options" role="listbox" x-show="subjectMenu && subjectOptions.length" x-cloak
+                  class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto p-1 bg-white border border-gray-200 rounded-lg shadow-lg dark:bg-neutral-800 dark:border-neutral-700">
+                  <template x-for="(option, index) in subjectOptions" :key="(option.create ? 'new-' : '') + option.value">
+                    <li role="option" :aria-selected="index === subjectActive"
+                      @mousedown.prevent="chooseSubject(option)" @mouseenter="subjectActive = index"
+                      class="flex items-center gap-x-2 px-2.5 py-2 rounded-md text-sm cursor-pointer"
+                      :class="index === subjectActive ? 'bg-gray-100 dark:bg-neutral-700' : ''">
+                      <template x-if="option.create">
+                        <span class="inline-flex items-center gap-x-2 text-gray-800 dark:text-neutral-200"><i data-lucide="plus" class="size-4 text-gray-500"></i><span>Create “<span class="font-medium" x-text="option.label"></span>”</span></span>
+                      </template>
+                      <template x-if="!option.create">
+                        <span class="text-gray-800 dark:text-neutral-200" x-text="option.label"></span>
+                      </template>
+                    </li>
+                  </template>
+                </ul>
               </div>
               <p x-show="errors.subject" class="{{ field_error }}" x-text="errors.subject"></p>
-              <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Teaches more than one? Press Enter after each subject.</p>
+              <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Choose one or more. Not in the list? Type it and press Enter.</p>
             </div>
 
             <div>
