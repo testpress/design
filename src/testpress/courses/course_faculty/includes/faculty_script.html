@@ -1,7 +1,7 @@
 <script>
-  // Course faculty, admin side. Two jobs, two places:
-  // - Faculty (Courses > Faculty): the profile students see, one per person, shared by every course.
-  // - Course > Faculty: who teaches this course, their subject and intro video here, and the order.
+  // Course faculty, admin side. Two jobs on one page:
+  // - Who teaches this course: subject and intro video here, and the order (a small modal).
+  // - Their profile, shared by every course they teach in (a drawer).
   // Faculty are existing staff and mentor users. Nothing here changes course access.
   (() => {
     const photo = (id) => `https://images.unsplash.com/photo-${id}?w=160&h=160&fit=crop&crop=faces&q=80`;
@@ -82,7 +82,7 @@
     const clone = (value) => JSON.parse(JSON.stringify(value));
     const blankProfile = () => ({ short_description: "", bio: "", years_of_experience: null, qualifications: [], highlights: [] });
 
-    window.facultyAdmin = function ({ courseId = null } = {}) {
+    window.facultyAdmin = function ({ courseId }) {
       return {
         staff: STAFF,
         courses: COURSES,
@@ -94,7 +94,6 @@
         empty: false,
         noProducts: false,
 
-        search: "",
         pickerSearch: "",
 
         // Profile drawer.
@@ -116,7 +115,7 @@
 
         init() {
           this.refreshIcons();
-          ["empty", "noProducts", "links", "profiles", "editing", "assigning", "pickerSearch", "search", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
+          ["empty", "noProducts", "links", "profiles", "editing", "assigning", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
         },
 
         refreshIcons() {
@@ -160,18 +159,6 @@
           return gaps.length <= 2 ? "No " + gaps.join(" or ") : "No " + gaps.slice(0, 2).join(", ") + " and " + (gaps.length - 2) + " more";
         },
 
-        // ---- Faculty profiles page ----
-
-        get profileCount() {
-          return this.empty ? 0 : Object.keys(this.profiles).length;
-        },
-
-        get faculty() {
-          if (this.empty) return [];
-          const q = this.search.trim().toLowerCase();
-          return this.staff.filter((s) => this.hasProfile(s.id)).filter((s) => !q || s.name.toLowerCase().includes(q));
-        },
-
         // ---- One course ----
 
         get courseFaculty() {
@@ -180,7 +167,7 @@
         },
 
         get productCount() {
-          return !this.courseId || this.noProducts ? 0 : this.currentCourse.products.length;
+          return this.noProducts ? 0 : this.currentCourse.products.length;
         },
 
         reorder(rows) {
@@ -214,12 +201,8 @@
           return this.staff
             .filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
             .map((s) => {
-              const inCourse = this.courseId && !this.empty && this.links.some((l) => l.courseId === this.courseId && l.userId === s.id);
-              const profiled = !this.empty && this.hasProfile(s.id);
-              const added = this.courseId ? inCourse : profiled;
-              let note = "";
-              if (added) note = "Added";
-              else if (this.courseId && !profiled) note = "No profile yet";
+              const added = !this.empty && this.links.some((l) => l.courseId === this.courseId && l.userId === s.id);
+              const note = added ? "Added" : (this.hasProfile(s.id) ? "" : "No profile yet");
               return { ...s, added, note };
             })
             .sort((a, b) => a.added - b.added);
@@ -234,8 +217,7 @@
         pick(person) {
           if (person.added) return;
           this.$dispatch("close-modal-pick-faculty");
-          if (this.courseId) this.openAssign(person.id, true);
-          else this.openProfile(person.id);
+          this.openAssign(person.id, true);
         },
 
         // ---- Course assignment (subject, intro video) ----
@@ -330,20 +312,13 @@
 
         askRemove(userId) {
           this.removing = this.staffMember(userId);
-          this.$dispatch(this.courseId ? "open-modal-remove-from-course" : "open-modal-delete-profile");
+          this.$dispatch("open-modal-remove-from-course");
         },
 
         confirmRemove() {
           const id = this.removing.id;
-          if (this.courseId) {
-            this.links = this.links.filter((l) => !(l.courseId === this.courseId && l.userId === id));
-            this.$dispatch("toast", { title: `${this.removing.name} removed`, variant: "success" });
-          } else {
-            this.links = this.links.filter((l) => l.userId !== id);
-            const { [id]: _, ...rest } = this.profiles;
-            this.profiles = rest;
-            this.$dispatch("toast", { title: "Profile deleted", variant: "success" });
-          }
+          this.links = this.links.filter((l) => !(l.courseId === this.courseId && l.userId === id));
+          this.$dispatch("toast", { title: `${this.removing.name} removed`, variant: "success" });
           this.removing = null;
         },
       };
