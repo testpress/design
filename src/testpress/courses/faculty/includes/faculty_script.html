@@ -1,8 +1,8 @@
 <script>
-  // Admin side of course faculty. Faculty are existing staff and mentor users.
-  // A person's profile is shared by every course they teach in; each course
-  // keeps its own subject, intro video and order (the course-instructor link).
-  // Nothing here grants access to a course: that stays in Add Staffs.
+  // Course faculty, admin side. Two jobs, two places:
+  // - Faculty (Courses > Faculty): the profile students see, one per person, shared by every course.
+  // - Course > Faculty: who teaches this course, their subject and intro video here, and the order.
+  // Faculty are existing staff and mentor users. Nothing here changes course access.
   (() => {
     const photo = (id) => `https://images.unsplash.com/photo-${id}?w=160&h=160&fit=crop&crop=faces&q=80`;
 
@@ -18,7 +18,7 @@
       { id: 9, name: "Neha Kapoor", email: "neha.kapoor@upscprep.com", role: "Staff", photo: photo("1517841905240-472988babdf9") },
     ];
 
-    // Shared profiles, keyed by user id. Someone with a profile is "faculty".
+    // Profiles, keyed by user id.
     const PROFILES = {
       1: {
         short_description: "Former civil servant who teaches polity through landmark judgements and real cases.",
@@ -56,6 +56,7 @@
         highlights: ["Evaluated 25,000+ mains answers"],
       },
       6: { short_description: "Daily current affairs and monthly revision for Prelims and Mains.", bio: "", years_of_experience: null, qualifications: [], highlights: [] },
+      9: { short_description: "Geography through maps, field examples and previous-year questions.", bio: "", years_of_experience: 6, qualifications: ["MA, Geography, JNU"], highlights: [] },
     };
 
     const COURSES = [
@@ -63,7 +64,6 @@
       { id: 2, title: "CSAT", products: ["UPSC Essential + Mentorship"] },
       { id: 3, title: "Mains GS", products: ["UPSC Essential + Mentorship", "Mains Answer Writing"] },
       { id: 4, title: "Current affairs", products: ["UPSC Essential + Mentorship", "Current Affairs Monthly"] },
-      { id: 5, title: "Essay and Ethics Workshop", products: [] },
     ];
 
     const video = (name, duration) => ({ name, duration });
@@ -80,8 +80,9 @@
     ];
 
     const clone = (value) => JSON.parse(JSON.stringify(value));
+    const blankProfile = () => ({ short_description: "", bio: "", years_of_experience: null, qualifications: [], highlights: [] });
 
-    window.facultyAdmin = function ({ courseId }) {
+    window.facultyAdmin = function ({ courseId = null } = {}) {
       return {
         staff: STAFF,
         courses: COURSES,
@@ -89,31 +90,33 @@
         links: clone(LINKS),
         courseId,
 
-        // Prototype switch: show the empty state.
+        // Prototype switches.
         empty: false,
+        noProducts: false,
 
-        // Drawer: the person being added or edited, with a working copy of their
-        // shared profile and (on a course page) this course's subject and video.
+        search: "",
+        pickerSearch: "",
+
+        // Profile drawer.
         editing: null,
-        isNew: false,
-        // The shared profile shows as a preview until the admin chooses to edit it.
-        editingProfile: false,
         form: null,
         errors: {},
+        // Set when the profile drawer follows "add to course" for someone without a profile.
+        addedTo: null,
 
-        // Add-faculty picker.
-        pickerSearch: "",
+        // Course assignment modal.
+        assigning: null,
+        assign: { subject: "", video: null, isNew: false },
 
         removing: null,
 
-        // Reorder (course page).
         dragId: null,
         dragReady: null,
         overId: null,
 
         init() {
           this.refreshIcons();
-          ["empty", "links", "profiles", "editing", "editingProfile", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
+          ["empty", "noProducts", "links", "profiles", "editing", "assigning", "pickerSearch", "search", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
         },
 
         refreshIcons() {
@@ -128,7 +131,7 @@
           return name.replace(/^Dr\.\s*/, "").split(" ").map((w) => w[0]).slice(0, 2).join("");
         },
 
-        isFaculty(userId) {
+        hasProfile(userId) {
           return !!this.profiles[userId];
         },
 
@@ -140,28 +143,33 @@
           return this.course(this.courseId);
         },
 
-        // Courses a person teaches in, with their subject there.
         teaching(userId) {
           return this.links.filter((l) => l.userId === userId).map((l) => ({ ...l, course: this.course(l.courseId) }));
         },
 
-        // Short, specific list of what the product page will be missing.
-        missing(userId) {
+        // What the student card will be missing, in a few words.
+        gapText(userId) {
           const p = this.profiles[userId];
-          if (!p) return [];
+          if (!p) return "No profile yet";
           const gaps = [];
           if (!this.staffMember(userId).photo) gaps.push("photo");
-          if (!p.short_description) gaps.push("short description");
-          if (!p.bio) gaps.push("about");
           if (!p.highlights.length) gaps.push("highlights");
+          if (!p.bio) gaps.push("about");
           if (!p.qualifications.length) gaps.push("qualifications");
-          return gaps;
+          if (!gaps.length) return "";
+          return gaps.length <= 2 ? "No " + gaps.join(" or ") : "No " + gaps.slice(0, 2).join(", ") + " and " + (gaps.length - 2) + " more";
         },
 
-        missingText(userId) {
-          const gaps = this.missing(userId);
-          if (gaps.length <= 2) return "No " + gaps.join(" or ");
-          return "No " + gaps.slice(0, 2).join(", ") + " and " + (gaps.length - 2) + " more";
+        // ---- Faculty profiles page ----
+
+        get profileCount() {
+          return this.empty ? 0 : Object.keys(this.profiles).length;
+        },
+
+        get faculty() {
+          if (this.empty) return [];
+          const q = this.search.trim().toLowerCase();
+          return this.staff.filter((s) => this.hasProfile(s.id)).filter((s) => !q || s.name.toLowerCase().includes(q));
         },
 
         // ---- One course ----
@@ -171,13 +179,21 @@
           return this.links.filter((l) => l.courseId === this.courseId).map((l) => ({ ...l, person: this.staffMember(l.userId) }));
         },
 
+        get productCount() {
+          return !this.courseId || this.noProducts ? 0 : this.currentCourse.products.length;
+        },
+
+        reorder(rows) {
+          this.links = [...this.links.filter((l) => l.courseId !== this.courseId), ...rows];
+          this.$dispatch("toast", { title: "Order saved", variant: "success" });
+        },
+
         move(index, step) {
           const rows = this.links.filter((l) => l.courseId === this.courseId);
           const target = index + step;
           if (target < 0 || target >= rows.length) return;
           [rows[index], rows[target]] = [rows[target], rows[index]];
-          this.links = [...this.links.filter((l) => l.courseId !== this.courseId), ...rows];
-          this.$dispatch("toast", { title: "Order saved", description: "Students see faculty in this order.", variant: "success" });
+          this.reorder(rows);
         },
 
         dropOn(userId) {
@@ -188,67 +204,90 @@
           if (from < 0 || to < 0 || from === to) return;
           const [row] = rows.splice(from, 1);
           rows.splice(to, 0, row);
-          this.links = [...this.links.filter((l) => l.courseId !== this.courseId), ...rows];
-          this.$dispatch("toast", { title: "Order saved", description: "Students see faculty in this order.", variant: "success" });
+          this.reorder(rows);
         },
 
-        // ---- Add faculty picker ----
+        // ---- Picker ----
 
-        // Everyone not already in this course; those with a profile from another course are marked.
         get pickable() {
           const q = this.pickerSearch.trim().toLowerCase();
           return this.staff
             .filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
-            .map((s) => ({
-              ...s,
-              added: !this.empty && this.links.some((l) => l.courseId === this.courseId && l.userId === s.id),
-              hasProfile: this.isFaculty(s.id),
-              elsewhere: this.teaching(s.id).filter((t) => t.courseId !== this.courseId).map((t) => t.course.title),
-            }))
+            .map((s) => {
+              const inCourse = this.courseId && !this.empty && this.links.some((l) => l.courseId === this.courseId && l.userId === s.id);
+              const profiled = !this.empty && this.hasProfile(s.id);
+              const added = this.courseId ? inCourse : profiled;
+              let note = "";
+              if (added) note = "Added";
+              else if (this.courseId && !profiled) note = "No profile yet";
+              return { ...s, added, note };
+            })
             .sort((a, b) => a.added - b.added);
         },
 
         openPicker() {
           this.pickerSearch = "";
           this.$dispatch("open-modal-pick-faculty");
-          this.$nextTick(() => setTimeout(() => this.$refs.pickerSearch && this.$refs.pickerSearch.focus(), 50));
+          setTimeout(() => this.$refs.pickerSearch && this.$refs.pickerSearch.focus(), 80);
         },
 
         pick(person) {
           if (person.added) return;
           this.$dispatch("close-modal-pick-faculty");
-          this.openDrawer(person.id, true);
+          if (this.courseId) this.openAssign(person.id, true);
+          else this.openProfile(person.id);
         },
 
-        // ---- Drawer ----
+        // ---- Course assignment (subject, intro video) ----
 
-        openDrawer(userId, isNew = false) {
-          const profile = this.profiles[userId] || { short_description: "", bio: "", years_of_experience: null, qualifications: [], highlights: [] };
+        openAssign(userId, isNew = false) {
           const link = this.links.find((l) => l.courseId === this.courseId && l.userId === userId);
-          this.editing = this.staffMember(userId);
-          this.isNew = isNew;
-          this.editingProfile = !this.profiles[userId];
-          this.errors = {};
-          this.form = {
-            ...clone(profile),
-            qualifications: [...profile.qualifications],
-            highlights: [...profile.highlights],
-            subject: link ? link.subject : "",
-            video: link && link.video ? { ...link.video } : null,
-          };
-          this.$dispatch("open-drawer-faculty-form");
-        },
-
-        // Other courses this person teaches in (the profile is shared with them).
-        get sharedWith() {
-          if (!this.editing) return [];
-          return this.teaching(this.editing.id).filter((t) => t.courseId !== this.courseId);
+          this.assigning = this.staffMember(userId);
+          this.assign = { subject: link ? link.subject : "", video: link && link.video ? { ...link.video } : null, isNew };
+          setTimeout(() => this.$dispatch("open-modal-assign-faculty"), 60);
         },
 
         pickVideo(event) {
           const file = event.target.files && event.target.files[0];
-          if (file) this.form.video = { name: file.name, duration: "Processing…" };
+          if (file) this.assign.video = { name: file.name, duration: "Processing…" };
           event.target.value = "";
+        },
+
+        saveAssign() {
+          if (!this.assign.subject.trim()) return;
+          const person = this.assigning;
+          const link = this.links.find((l) => l.courseId === this.courseId && l.userId === person.id);
+          if (link) {
+            link.subject = this.assign.subject.trim();
+            link.video = this.assign.video;
+          } else {
+            this.links.push({ courseId: this.courseId, userId: person.id, subject: this.assign.subject.trim(), video: this.assign.video });
+          }
+          this.links = [...this.links];
+
+          // New and no profile yet: go straight on to it, so the student card isn't empty.
+          if (this.assign.isNew && !this.hasProfile(person.id)) {
+            this.openProfile(person.id, this.currentCourse.title);
+            return;
+          }
+          this.$dispatch("toast", { title: this.assign.isNew ? `${person.name} added` : "Saved", variant: "success" });
+        },
+
+        // ---- Profile drawer ----
+
+        openProfile(userId, addedTo = null) {
+          this.addedTo = addedTo;
+          const profile = this.profiles[userId] || blankProfile();
+          this.editing = this.staffMember(userId);
+          this.errors = {};
+          this.form = { ...clone(profile) };
+          if (!this.form.highlights.length) this.form.highlights = [""];
+          if (!this.form.qualifications.length) this.form.qualifications = [""];
+          setTimeout(() => this.$dispatch("open-drawer-faculty-profile"), 60);
+        },
+
+        get profileCourses() {
+          return this.editing ? this.teaching(this.editing.id).map((t) => t.course.title) : [];
         },
 
         addItem(list) {
@@ -263,52 +302,48 @@
           this.form[list].splice(index, 1);
         },
 
-        save() {
+        saveProfile() {
           this.errors = {};
-          if (!this.form.subject.trim()) this.errors.subject = "Add the subject they teach in this course.";
-          if (this.editingProfile && !this.form.short_description.trim()) this.errors.short_description = "Add a one-line introduction for the faculty card.";
-          if (Object.keys(this.errors).length) return;
-
-          if (this.editingProfile) {
-            const clean = (items) => items.map((i) => i.trim()).filter(Boolean);
-            this.profiles[this.editing.id] = {
+          if (!this.form.short_description.trim()) {
+            this.errors.short_description = "Add a one-line introduction.";
+            return;
+          }
+          const clean = (items) => items.map((i) => i.trim()).filter(Boolean);
+          const isNew = !this.hasProfile(this.editing.id);
+          this.profiles = {
+            ...this.profiles,
+            [this.editing.id]: {
               short_description: this.form.short_description.trim(),
               bio: this.form.bio.trim(),
               years_of_experience: this.form.years_of_experience ? Number(this.form.years_of_experience) : null,
               qualifications: clean(this.form.qualifications),
               highlights: clean(this.form.highlights),
-            };
-          }
-
-          const link = this.links.find((l) => l.courseId === this.courseId && l.userId === this.editing.id);
-          if (link) {
-            link.subject = this.form.subject.trim();
-            link.video = this.form.video;
-          } else {
-            this.links.push({ courseId: this.courseId, userId: this.editing.id, subject: this.form.subject.trim(), video: this.form.video });
-          }
-
-          const name = this.editing.name;
-          const added = this.isNew;
-          this.$dispatch("close-drawer-faculty-form");
-          this.$dispatch("toast", {
-            title: added ? `${name} added` : "Changes saved",
-            description: added ? "Students see them on this course's product pages." : "Product pages show the update.",
-            variant: "success",
-          });
+            },
+          };
+          this.$dispatch("close-drawer-faculty-profile");
+          const title = this.addedTo ? `${this.editing.name} added` : (isNew ? "Profile created" : "Profile saved");
+          this.addedTo = null;
+          this.$dispatch("toast", { title, variant: "success" });
         },
 
         // ---- Remove ----
 
         askRemove(userId) {
           this.removing = this.staffMember(userId);
-          this.$dispatch("open-modal-remove-from-course");
+          this.$dispatch(this.courseId ? "open-modal-remove-from-course" : "open-modal-delete-profile");
         },
 
         confirmRemove() {
           const id = this.removing.id;
-          this.links = this.links.filter((l) => !(l.courseId === this.courseId && l.userId === id));
-          this.$dispatch("toast", { title: `${this.removing.name} removed from ${this.currentCourse.title}`, description: "Their profile and other courses are unchanged.", variant: "success" });
+          if (this.courseId) {
+            this.links = this.links.filter((l) => !(l.courseId === this.courseId && l.userId === id));
+            this.$dispatch("toast", { title: `${this.removing.name} removed`, variant: "success" });
+          } else {
+            this.links = this.links.filter((l) => l.userId !== id);
+            const { [id]: _, ...rest } = this.profiles;
+            this.profiles = rest;
+            this.$dispatch("toast", { title: "Profile deleted", variant: "success" });
+          }
           this.removing = null;
         },
       };

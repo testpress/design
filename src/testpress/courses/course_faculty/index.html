@@ -13,12 +13,13 @@ date: 2026-10-20
 {% from "../../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../../ui-system/components/empty-state.html" import empty_state %}
 {% from "../../../ui-system/components/toast.html" import toast_provider %}
-{% from "./includes/nav.html" import course_nav %}
+{% from "../faculty/includes/nav.html" import course_nav %}
+{% from "../faculty/includes/sample_card.html" import sample_card %}
 
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
 
 {% block content %}
-<div x-data="Object.assign(facultyAdmin({ courseId: 1 }), { noProducts: false })" class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
+<div x-data="facultyAdmin({ courseId: 1 })" class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
 
   <div class="py-6 px-2 sm:px-6 lg:py-0 lg:px-0 lg:col-span-3">
     {{ course_nav("faculty") }}
@@ -27,61 +28,38 @@ date: 2026-10-20
   <main class="space-y-5 px-4 sm:px-6 lg:px-0 lg:col-span-9 pb-16">
     <div class="space-y-2">
       {{ breadcrumb({ items: [ { label: "Courses", href: "#" }, { label: "Prelims GS", href: "#" }, { label: "Faculty" } ] }) }}
-
       {% set header_actions %}
         <div x-show="courseFaculty.length">{{ button(text="Add faculty", icon="plus", extra_attrs='@click="openPicker()"') }}</div>
       {% endset %}
-      {{ page_header(
-        title="Faculty",
-        description="Shown to students on this course's product pages. Doesn't give access to the course.",
-        actions=header_actions
-      ) }}
+      {{ page_header(title="Faculty", description="Shown to students on this course's product pages. Doesn't give access to the course.", actions=header_actions) }}
     </div>
 
     <div x-show="noProducts" x-cloak class="flex items-start gap-x-3 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-sm dark:bg-amber-500/10 dark:border-amber-500/30">
       <i data-lucide="triangle-alert" class="shrink-0 mt-0.5 size-4 text-amber-600 dark:text-amber-500"></i>
-      <p class="text-amber-900 dark:text-amber-200">This course isn't in any product yet, so students won't see its faculty. Add it to a product from Store.</p>
+      <p class="text-amber-900 dark:text-amber-200">This course isn't in any product yet, so students won't see its faculty.</p>
     </div>
 
-    {# Empty: the ui-system empty state, with a sample faculty card as the picture of what students will see #}
     <div x-show="!courseFaculty.length" x-cloak>
-      {% set sample_card %}
-        <div class="relative w-64 mb-5" aria-hidden="true">
-          <div class="absolute inset-x-4 -bottom-2 h-full rounded-xl bg-white border border-gray-200 dark:bg-neutral-800 dark:border-neutral-700"></div>
-          <div class="relative p-3 rounded-xl bg-white border border-gray-200 shadow-sm text-start dark:bg-neutral-800 dark:border-neutral-700">
-            <div class="flex items-center gap-x-2.5">
-              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=96&h=96&fit=crop&crop=faces&q=80" alt="" class="size-9 rounded-full object-cover">
-              <div class="min-w-0">
-                <p class="text-xs font-semibold text-gray-800 dark:text-neutral-200">Dr. Ananya Rao</p>
-                <p class="text-[11px] text-gray-500 dark:text-neutral-400">Polity · 14 years teaching</p>
-              </div>
-            </div>
-            <p class="mt-2 text-[11px] leading-4 text-gray-500 dark:text-neutral-400">Former civil servant who teaches polity through landmark judgements.</p>
-          </div>
-        </div>
-      {% endset %}
       {{ empty_state(
         title="Show students who teaches this course",
         description="Pick the staff and mentors who teach Prelims GS and add each one's subject. They'll show on every product page for this course.",
-        illustration=sample_card,
+        illustration=sample_card(),
         primary_action_text="Add faculty",
         primary_action_icon="plus",
         primary_action_attrs='@click="openPicker()"'
       ) }}
     </div>
 
-    {# The list #}
     <div x-show="courseFaculty.length" x-cloak>
       {% call card(padding="p-0", extra_classes="overflow-hidden") %}
         <div class="px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-gray-200 dark:border-neutral-700">
           <p class="text-sm text-gray-500 dark:text-neutral-400">Students see faculty in this order. Drag to change it.</p>
 
-          {# Every product page this course is on; scales to any number #}
-          <div x-show="!noProducts">
+          <div x-show="productCount">
             {% set products_trigger %}
               <button type="button" class="inline-flex items-center gap-x-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none focus:underline dark:text-neutral-300 dark:hover:text-white">
                 <i data-lucide="store" class="size-4 text-gray-400"></i>
-                <span x-text="'On ' + currentCourse.products.length + ' product ' + (currentCourse.products.length === 1 ? 'page' : 'pages')"></span>
+                <span x-text="'On ' + productCount + ' product ' + (productCount === 1 ? 'page' : 'pages')"></span>
                 <i data-lucide="chevron-down" class="size-4 text-gray-400"></i>
               </button>
             {% endset %}
@@ -118,7 +96,7 @@ date: 2026-10-20
                 <i data-lucide="grip-vertical" class="size-4"></i>
               </button>
 
-              <button type="button" @click="openDrawer(row.userId)" class="min-w-0 flex-1 flex items-center gap-x-3 text-left focus:outline-none after:absolute after:inset-0 after:content-['']" :aria-label="'Edit ' + row.person.name">
+              <button type="button" @click="openAssign(row.userId)" class="min-w-0 flex-1 flex items-center gap-x-3 text-left focus:outline-none after:absolute after:inset-0 after:content-['']" :aria-label="'Edit ' + row.person.name + ' in this course'">
                 <template x-if="row.person.photo">
                   <img :src="row.person.photo" alt="" class="shrink-0 size-10 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
                 </template>
@@ -131,10 +109,10 @@ date: 2026-10-20
                 </span>
               </button>
 
-              {# Only what's worth noticing: an intro exists, or the profile has gaps #}
+              {# Only what's worth noticing #}
               <div class="hidden sm:flex shrink-0 items-center gap-x-5 text-sm text-gray-500 dark:text-neutral-400">
-                <span x-show="missing(row.userId).length" class="inline-flex items-center gap-x-1.5">
-                  <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true"></span><span x-text="missingText(row.userId)"></span>
+                <span x-show="gapText(row.userId)" class="inline-flex items-center gap-x-1.5">
+                  <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true"></span><span x-text="gapText(row.userId)"></span>
                 </span>
                 <span x-show="row.video" class="inline-flex items-center gap-x-1.5">
                   <i data-lucide="circle-play" class="size-4 text-gray-400"></i><span x-text="row.video && row.video.duration"></span>
@@ -144,9 +122,11 @@ date: 2026-10-20
               <div class="relative z-10 shrink-0">
                 {{ dropdown(
                   trigger="ellipsis-vertical",
-                  width="large",
+                  width="w-56",
                   items=[
-                    { label: "Edit", icon: "pencil", attrs: '@click="open = false; openDrawer(row.userId)"' },
+                    { label: "Edit subject and video", icon: "pencil", attrs: '@click="open = false; openAssign(row.userId)"' },
+                    { label: "Edit profile", icon: "user-round-pen", attrs: '@click="open = false; openProfile(row.userId)"' },
+                    { divider: true },
                     { label: "Move up", icon: "arrow-up", attrs: '@click="open = false; move(index, -1)" :disabled="index === 0" :class="index === 0 ? \'opacity-50 pointer-events-none\' : \'\'"' },
                     { label: "Move down", icon: "arrow-down", attrs: '@click="open = false; move(index, 1)" :disabled="index === courseFaculty.length - 1" :class="index === courseFaculty.length - 1 ? \'opacity-50 pointer-events-none\' : \'\'"' },
                     { divider: true },
@@ -161,35 +141,15 @@ date: 2026-10-20
     </div>
   </main>
 
-  {% include "./includes/faculty_drawer.html" %}
-  {% include "./includes/faculty_modals.html" %}
-
-  {# Prototype only: state switcher, bottom right. Opens on load so reviewers see the states. #}
-  {% set state_trigger %}
-    <button type="button" class="size-8 inline-flex justify-center items-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none transition dark:bg-neutral-800 dark:border-neutral-700" aria-label="Prototype states"
-      x-init="setTimeout(() => { open = true; setTimeout(() => updatePosition(), 150); }, 300)" @click="setTimeout(() => updatePosition(), 150)">
-      <i data-lucide="sliders-horizontal" class="size-4"></i>
-    </button>
-  {% endset %}
-  <div class="fixed bottom-3 right-3 z-50">
-    {% call dropdown(trigger=state_trigger, placement="top-end", width="large") %}
-      <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Prototype state</p>
-      <button type="button" @click="empty = false; noProducts = false; open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
-        Faculty added<span x-show="!empty && !noProducts"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
-      </button>
-      <button type="button" @click="empty = true; noProducts = false; open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
-        No faculty yet<span x-show="empty && !noProducts"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
-      </button>
-      <button type="button" @click="empty = false; noProducts = true; open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
-        Course not in a product<span x-show="noProducts"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
-      </button>
-    {% endcall %}
-  </div>
+  {% include "../faculty/includes/profile_drawer.html" %}
+  {% set course = true %}
+  {% include "../faculty/includes/faculty_modals.html" %}
+  {% include "../faculty/includes/prototype_menu.html" %}
 
   {{ toast_provider() }}
 </div>
 {% endblock content %}
 
 {% block script %}
-  {% include "./includes/faculty_script.html" %}
+  {% include "../faculty/includes/faculty_script.html" %}
 {% endblock script %}

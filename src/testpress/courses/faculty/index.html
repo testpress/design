@@ -1,0 +1,115 @@
+---
+title: Faculty
+tags: testpress
+date: 2026-10-20
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% from "../../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../../ui-system/components/page-header.html" import page_header %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/card.html" import card %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/toast.html" import toast_provider %}
+{% from "./includes/nav.html" import courses_nav %}
+{% from "./includes/sample_card.html" import sample_card %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+<div x-data="facultyAdmin()" class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
+
+  <div class="py-6 px-2 sm:px-6 lg:py-0 lg:px-0 lg:col-span-3">
+    {{ courses_nav("faculty") }}
+  </div>
+
+  <main class="space-y-5 px-4 sm:px-6 lg:px-0 lg:col-span-9 pb-16">
+    <div class="space-y-2">
+      {{ breadcrumb({ items: [ { label: "Courses", href: "#" }, { label: "Faculty" } ] }) }}
+      {% set header_actions %}
+        <div x-show="profileCount">{{ button(text="Add faculty", icon="plus", extra_attrs='@click="openPicker()"') }}</div>
+      {% endset %}
+      {{ page_header(title="Faculty", description="The profiles students see on product pages. Add faculty to a course from that course's Faculty page.", actions=header_actions) }}
+    </div>
+
+    <div x-show="!profileCount" x-cloak>
+      {{ empty_state(
+        title="No faculty profiles yet",
+        description="Give each teacher a photo, a short introduction and their highlights. Then add them to the courses they teach.",
+        illustration=sample_card(),
+        primary_action_text="Add faculty",
+        primary_action_icon="plus",
+        primary_action_attrs='@click="openPicker()"'
+      ) }}
+    </div>
+
+    <div x-show="profileCount" x-cloak>
+      {% call card(padding="p-0", extra_classes="overflow-hidden") %}
+        <div class="px-4 py-3 flex items-center justify-between gap-x-4 border-b border-gray-200 dark:border-neutral-700">
+          <div class="w-full max-w-xs">
+            {{ input(name="faculty_list_search", placeholder="Search faculty", icon="search", x_model="search", padding_class="py-1.5", extra_attrs='autocomplete="off"') }}
+          </div>
+          <p class="shrink-0 text-sm text-gray-500 dark:text-neutral-400" x-text="profileCount + ' faculty'"></p>
+        </div>
+
+        <ul class="divide-y divide-gray-200 dark:divide-neutral-700">
+          <template x-for="person in faculty" :key="person.id">
+            <li class="relative flex items-center gap-x-4 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-neutral-700/30">
+              <button type="button" @click="openProfile(person.id)" class="min-w-0 flex-1 flex items-center gap-x-3 text-left focus:outline-none after:absolute after:inset-0 after:content-['']" :aria-label="'Edit profile of ' + person.name">
+                <template x-if="person.photo">
+                  <img :src="person.photo" alt="" class="shrink-0 size-10 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+                </template>
+                <template x-if="!person.photo">
+                  <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(person.name)"></span>
+                </template>
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="person.name"></span>
+                  <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="profiles[person.id].short_description"></span>
+                </span>
+              </button>
+
+              <div class="hidden md:block shrink-0 w-56 text-sm">
+                <p class="truncate" :class="teaching(person.id).length ? 'text-gray-700 dark:text-neutral-300' : 'text-gray-400 dark:text-neutral-500'"
+                  x-text="teaching(person.id).length ? teaching(person.id).map((t) => t.course.title).join(', ') : 'Not in a course yet'"></p>
+                <p x-show="gapText(person.id)" class="mt-0.5 flex items-center gap-x-1.5 text-xs text-gray-500 dark:text-neutral-400">
+                  <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true"></span><span x-text="gapText(person.id)"></span>
+                </p>
+              </div>
+
+              <div class="relative z-10 shrink-0">
+                {{ dropdown(
+                  trigger="ellipsis-vertical",
+                  width="medium",
+                  items=[
+                    { label: "Edit profile", icon: "pencil", attrs: '@click="open = false; openProfile(person.id)"' },
+                    { divider: true },
+                    { label: "Delete profile", icon: "trash-2", variant: "danger", attrs: '@click="open = false; askRemove(person.id)"' }
+                  ]
+                ) }}
+              </div>
+            </li>
+          </template>
+          <li x-show="profileCount && !faculty.length" class="px-4 py-12 text-center text-sm text-gray-500 dark:text-neutral-400">
+            No faculty match “<span x-text="search"></span>”.
+            <button type="button" @click="search = ''" class="ms-1 font-medium text-gray-700 underline underline-offset-4 dark:text-neutral-300">Clear</button>
+          </li>
+        </ul>
+      {% endcall %}
+    </div>
+  </main>
+
+  {% include "./includes/profile_drawer.html" %}
+  {% set course = false %}
+  {% include "./includes/faculty_modals.html" %}
+  {% include "./includes/prototype_menu.html" %}
+
+  {{ toast_provider() }}
+</div>
+{% endblock content %}
+
+{% block script %}
+  {% include "./includes/faculty_script.html" %}
+{% endblock script %}

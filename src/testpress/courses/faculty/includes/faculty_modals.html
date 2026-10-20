@@ -1,0 +1,103 @@
+{# Modals for the Faculty pages. Pass `course=true` from a course's Faculty page. #}
+{% from "../../../../ui-system/components/modal.html" import modal %}
+{% from "../../../../ui-system/components/input.html" import input %}
+
+{% macro avatar(expr, size="size-9", text="text-xs") %}
+  <template x-if="{{ expr }}.photo">
+    <img :src="{{ expr }}.photo" alt="" class="shrink-0 {{ size }} rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+  </template>
+  <template x-if="!{{ expr }}.photo">
+    <span class="shrink-0 {{ size }} inline-flex items-center justify-center rounded-full bg-gray-100 {{ text }} font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials({{ expr }}.name)"></span>
+  </template>
+{% endmacro %}
+
+{% set members_link %}<a href="#members" target="_blank" rel="noopener" class="inline-flex items-center gap-x-1 font-medium text-gray-800 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-500 dark:text-neutral-200 dark:decoration-neutral-600">Add them in Members<i data-lucide="external-link" class="size-3.5"></i></a>{% endset %}
+
+{# Pick a staff member or mentor. No footer: picking is the action. #}
+{% call modal(id="pick-faculty", title="Add faculty", description="Pick from your staff and mentors.", show_cancel=false, confirm_text="") %}
+  <div class="-mt-1">
+    {{ input(name="faculty_search", placeholder="Search by name or email", icon="search", x_model="pickerSearch", x_ref="pickerSearch", extra_attrs='autocomplete="off"') }}
+
+    <ul x-show="pickable.length" class="mt-3 -mx-2 max-h-80 overflow-y-auto">
+      <template x-for="person in pickable" :key="person.id">
+        <li>
+          <button type="button" @click="pick(person)" :disabled="person.added"
+            class="w-full flex items-center gap-x-3 px-2 py-2 rounded-lg text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:hover:bg-transparent disabled:cursor-default disabled:opacity-60 dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
+            {{ avatar("person") }}
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="person.name"></span>
+              <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person.role + ' · ' + person.email"></span>
+            </span>
+            <span class="shrink-0 text-xs text-gray-500 dark:text-neutral-400" x-text="person.note"></span>
+          </button>
+        </li>
+      </template>
+    </ul>
+
+    <div x-show="!pickable.length" class="py-10 text-center">
+      <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">No staff or mentor matches “<span x-text="pickerSearch"></span>”</p>
+      <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">{{ members_link | safe }}</p>
+    </div>
+
+    <p x-show="pickable.length" class="mt-3 pt-3 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">Not listed? {{ members_link | safe }}</p>
+  </div>
+{% endcall %}
+
+{% if course %}
+  {# This course only: subject and intro video. Small on purpose; the profile lives in its own drawer. #}
+  {% call modal(id="assign-faculty", title="Teaching in Prelims GS", show_cancel=true, cancel_text="Cancel", confirm_text="Save", confirm_attrs=':disabled="!assign.subject.trim()"') %}
+    <template x-if="assigning">
+      <div class="space-y-5">
+        <div class="flex items-center gap-x-3">
+          {{ avatar("assigning", "size-10", "text-sm") }}
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="assigning.name"></p>
+            <p class="text-sm text-gray-500 truncate dark:text-neutral-400" x-text="assigning.role + ' · ' + assigning.email"></p>
+          </div>
+        </div>
+
+        <div>
+          <label for="assign_subject" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Subject</label>
+          {{ input(name="assign_subject", placeholder="e.g. Polity, or Polity and Governance", x_model="assign.subject", extra_attrs='maxlength="80" @keydown.enter="assign.subject.trim() && ($dispatch(\'modal-confirmed-assign-faculty\'), $dispatch(\'close-modal-assign-faculty\'))"') }}
+        </div>
+
+        <div>
+          <p class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Intro video <span class="font-normal text-gray-500 dark:text-neutral-400">· optional</span></p>
+          <input type="file" x-ref="introVideo" accept="video/mp4,video/quicktime,video/webm" class="hidden" @change="pickVideo($event)">
+          <div x-show="assign.video" class="flex items-center gap-x-3">
+            <span class="shrink-0 w-14 aspect-video inline-flex items-center justify-center rounded-md bg-gray-900 text-white dark:bg-neutral-700"><i data-lucide="play" class="size-3 fill-current"></i></span>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm text-gray-800 truncate dark:text-neutral-200" x-text="assign.video && assign.video.name"></p>
+              <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="assign.video && assign.video.duration"></p>
+            </div>
+            <button type="button" @click="$refs.introVideo.click()" class="shrink-0 text-sm font-medium text-gray-600 hover:text-gray-800 focus:outline-none focus:underline dark:text-neutral-400">Replace</button>
+            <button type="button" @click="assign.video = null" class="shrink-0 text-sm font-medium text-gray-600 hover:text-red-600 focus:outline-none focus:underline dark:text-neutral-400">Remove</button>
+          </div>
+          <button type="button" x-show="!assign.video" @click="$refs.introVideo.click()"
+            class="w-full flex items-center gap-x-3 px-3 py-2.5 rounded-lg border border-dashed border-gray-300 text-left hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:border-primary-600 dark:border-neutral-600 dark:hover:bg-neutral-700/40">
+            <span class="shrink-0 size-8 inline-flex items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-400"><i data-lucide="clapperboard" class="size-4"></i></span>
+            <span class="min-w-0">
+              <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Upload a video</span>
+              <span class="block text-xs text-gray-500 dark:text-neutral-400">A short hello to students, under 2 minutes</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </template>
+  {% endcall %}
+  <div @modal-confirmed-assign-faculty.window="saveAssign()"></div>
+
+  {% call modal(id="remove-from-course", title="Remove from this course?", variant="danger", confirm_text="Remove", cancel_text="Cancel") %}
+    <p class="text-gray-800 dark:text-neutral-200" x-show="removing"><span class="font-medium" x-text="removing && removing.name"></span> won't be shown for <span x-text="currentCourse.title"></span>. Their profile stays.</p>
+  {% endcall %}
+  <div @modal-confirmed-remove-from-course.window="confirmRemove()"></div>
+{% else %}
+  {% call modal(id="delete-profile", title="Delete profile?", variant="danger", confirm_text="Delete profile", cancel_text="Cancel") %}
+    <template x-if="removing">
+      <p class="text-gray-800 dark:text-neutral-200">
+        Students will no longer see <span class="font-medium" x-text="removing.name"></span><template x-if="teaching(removing.id).length"><span> in <span x-text="teaching(removing.id).map((t) => t.course.title).join(', ')"></span></span></template>. Their account stays.
+      </p>
+    </template>
+  {% endcall %}
+  <div @modal-confirmed-delete-profile.window="confirmRemove()"></div>
+{% endif %}

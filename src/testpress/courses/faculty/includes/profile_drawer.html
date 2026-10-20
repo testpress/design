@@ -1,0 +1,90 @@
+{# The profile students see. One per person, shared by every course they teach in.
+   Opened from Faculty (all profiles) and from a course's Faculty page. #}
+{% from "../../../../ui-system/components/drawer.html" import drawer %}
+{% from "../../../../ui-system/components/input.html" import input %}
+{% from "../../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../../ui-system/components/button.html" import button %}
+
+{% macro list_editor(key, title, placeholder, add_text) %}
+  <div>
+    <p class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">{{ title }}</p>
+    <ul class="space-y-2" data-list="{{ key }}">
+      <template x-for="(item, index) in form.{{ key }}" :key="index">
+        <li class="relative">
+          <input type="text" x-model="form.{{ key }}[index]" placeholder="{{ placeholder }}" maxlength="120"
+            :aria-label="'{{ title }} ' + (index + 1)"
+            @keydown.enter.prevent="addItem('{{ key }}')"
+            class="py-2 ps-3 pe-9 block w-full bg-white border border-gray-200 rounded-lg sm:text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-700 focus:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:placeholder:text-neutral-500">
+          <button type="button" x-show="form.{{ key }}.length > 1 || form.{{ key }}[index]" @click="removeItem('{{ key }}', index)" aria-label="Remove"
+            class="absolute inset-y-0 end-0 px-2.5 inline-flex items-center text-gray-400 hover:text-gray-700 focus:outline-none focus:text-gray-700 dark:hover:text-neutral-200">
+            <i data-lucide="x" class="size-4"></i>
+          </button>
+        </li>
+      </template>
+    </ul>
+    <button type="button" @click="addItem('{{ key }}')"
+      class="mt-2 inline-flex items-center gap-x-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 focus:outline-none focus:underline dark:text-neutral-400 dark:hover:text-neutral-200">
+      <i data-lucide="plus" class="size-4"></i>{{ add_text }}
+    </button>
+  </div>
+{% endmacro %}
+
+{% call drawer(id="faculty-profile", placement="right", size="md") %}
+  <template x-if="editing && form">
+    <div class="flex-1 min-h-0 flex flex-col">
+
+      <div class="shrink-0 px-6 py-4 flex items-center gap-x-3 border-b border-gray-200 dark:border-neutral-700">
+        <div class="min-w-0 flex-1">
+          <h3 id="faculty-profile-title" class="font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="editing.name"></h3>
+          <p class="text-sm text-gray-500 truncate dark:text-neutral-400" x-text="profileCourses.length && !addedTo ? 'Shown in ' + profileCourses.join(', ') : editing.role + ' · ' + editing.email"></p>
+        </div>
+        <button type="button" @click="open = false" class="shrink-0 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Close">
+          <i data-lucide="x" class="size-4"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        {# Straight after adding someone to a course #}
+        <div x-show="addedTo" class="mx-6 mt-5 flex items-start gap-x-2.5 px-3 py-2.5 rounded-lg bg-emerald-50 text-sm text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200">
+          <i data-lucide="circle-check" class="shrink-0 mt-0.5 size-4 text-emerald-600 dark:text-emerald-500"></i>
+          <p>Added to <span class="font-medium" x-text="addedTo"></span>. Now tell students who they are.</p>
+        </div>
+
+        <div class="px-6 py-6 space-y-6">
+          <div class="flex items-center gap-x-4">
+            <template x-if="editing.photo">
+              <img :src="editing.photo" alt="" class="shrink-0 size-16 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+            </template>
+            <template x-if="!editing.photo">
+              <span class="shrink-0 size-16 inline-flex items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-400 dark:border-neutral-600"><i data-lucide="image-plus" class="size-5"></i></span>
+            </template>
+            {{ button(text="<span x-text=\"editing.photo ? 'Change photo' : 'Add photo'\"></span>", variant="secondary", size="sm") }}
+          </div>
+
+          <div>
+            {{ textarea(name="faculty_short_description", label="Short description", rows="2", placeholder="e.g. Former civil servant who teaches polity through landmark judgements", required=true, x_model="form.short_description", extra_attrs='maxlength="140" :aria-invalid="!!errors.short_description"') }}
+            <div class="mt-1.5 flex justify-between gap-x-3 text-xs">
+              <p class="text-red-600 dark:text-red-500" x-text="errors.short_description || ''"></p>
+              <span class="shrink-0 text-gray-400 dark:text-neutral-500" x-text="form.short_description.length + '/140'"></span>
+            </div>
+          </div>
+
+          <div class="w-36">
+            {{ input(name="faculty_years", label="Years teaching", type="number", placeholder="e.g. 12", x_model="form.years_of_experience", extra_attrs='min="0" max="60"') }}
+          </div>
+
+          {{ list_editor("highlights", "Highlights", "e.g. Mentored 120+ selections in CSE", "Add highlight") }}
+
+          {{ list_editor("qualifications", "Qualifications", "e.g. MA, History, University of Delhi", "Add qualification") }}
+
+          {{ textarea(name="faculty_bio", label="About", rows="4", placeholder="How they teach, their background and who they help most.", x_model="form.bio") }}
+        </div>
+      </div>
+
+      <div class="shrink-0 px-6 py-4 flex justify-end gap-x-2 border-t border-gray-200 bg-white dark:bg-neutral-800 dark:border-neutral-700">
+        {{ button(text="<span x-text=\"addedTo ? 'Skip for now' : 'Cancel'\"></span>", variant="ghost", extra_attrs='@click="open = false; addedTo = null"') }}
+        {{ button(text="Save profile", extra_attrs='@click="saveProfile()"') }}
+      </div>
+    </div>
+  </template>
+{% endcall %}
