@@ -1,0 +1,190 @@
+---
+title: Course Faculty
+tags: testpress
+date: 2026-10-20
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% from "../../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../../ui-system/components/page-header.html" import page_header %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/card.html" import card %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/toast.html" import toast_provider %}
+{% from "../faculty/includes/nav.html" import course_nav %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+<div x-data="Object.assign(facultyAdmin({ courseId: 1 }), { noProducts: false })" class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
+
+  <div class="py-6 px-2 sm:px-6 lg:py-0 lg:px-0 lg:col-span-3">
+    {{ course_nav("faculty") }}
+  </div>
+
+  <main class="space-y-5 px-4 sm:px-6 lg:px-0 lg:col-span-9 pb-16">
+    <div class="space-y-2">
+      {{ breadcrumb({ items: [ { label: "Courses", href: "#" }, { label: "Prelims GS", href: "#" }, { label: "Faculty" } ] }) }}
+
+      {% set preview_trigger %}
+        <button type="button" class="py-2 px-3 inline-flex items-center gap-x-1.5 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700"
+          :disabled="noProducts">
+          <i data-lucide="eye" class="size-4"></i>Preview<i data-lucide="chevron-down" class="size-4 text-gray-500"></i>
+        </button>
+      {% endset %}
+      {% set header_actions %}
+        {% call dropdown(trigger=preview_trigger, width="large") %}
+          <p class="px-2 pt-1 pb-1.5 text-xs text-gray-500 dark:text-neutral-400">Open the product page as students see it</p>
+          <template x-for="name in currentCourse.products" :key="name">
+            <a href="{{ '/testpress/product_detail/' | url }}" target="_blank" class="flex items-center justify-between gap-x-3 py-2 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
+              <span class="truncate" x-text="name"></span><i data-lucide="external-link" class="shrink-0 size-3.5 text-gray-400"></i>
+            </a>
+          </template>
+        {% endcall %}
+        {{ button(text="Add faculty", icon="plus", extra_attrs='@click="openPicker()"') }}
+      {% endset %}
+      {{ page_header(
+        title="Faculty",
+        description="Who students see teaching this course, on product pages. Doesn't give course access.",
+        actions=header_actions
+      ) }}
+    </div>
+
+    {# Where these faculty show. Answers "will students see this?" before anyone asks. #}
+    <div x-show="!noProducts" class="flex items-start gap-x-3 px-4 py-3 rounded-xl border border-gray-200 bg-white text-sm dark:bg-neutral-800 dark:border-neutral-700">
+      <i data-lucide="store" class="shrink-0 mt-0.5 size-4 text-gray-400"></i>
+      <p class="text-gray-600 dark:text-neutral-400">
+        Shown on <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="currentCourse.products.join(', ')"></span>.
+        To let staff edit this course, use <a href="#" class="font-medium text-gray-800 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-500 dark:text-neutral-200 dark:decoration-neutral-600">Add Staffs</a>.
+      </p>
+    </div>
+    <div x-show="noProducts" x-cloak class="flex items-start gap-x-3 px-4 py-3 rounded-xl border border-amber-200 bg-amber-50 text-sm dark:bg-amber-500/10 dark:border-amber-500/30">
+      <i data-lucide="triangle-alert" class="shrink-0 mt-0.5 size-4 text-amber-600 dark:text-amber-500"></i>
+      <p class="text-amber-900 dark:text-amber-200">This course isn't in any product yet, so students won't see its faculty. Add it to a product from Store.</p>
+    </div>
+
+    <div x-show="!courseFaculty.length" x-cloak>
+      {{ empty_state(
+        title="No faculty for this course yet",
+        description="Add the people students should see on the product page, with the subject each one teaches here.",
+        icon="graduation-cap",
+        primary_action_text="Add faculty",
+        primary_action_icon="plus",
+        primary_action_attrs='@click="openPicker()"'
+      ) }}
+    </div>
+
+    <div x-show="courseFaculty.length" x-cloak class="space-y-2">
+      {% call card(padding="p-0", extra_classes="overflow-hidden") %}
+        <ul>
+          <template x-for="(row, index) in courseFaculty" :key="row.userId">
+            <li class="relative flex items-center gap-x-3 px-4 py-3.5 border-b border-gray-200 dark:border-neutral-700"
+              :draggable="dragReady === row.userId"
+              @dragstart="dragId = row.userId; $event.dataTransfer.effectAllowed = 'move'"
+              @dragover.prevent="overId = row.userId"
+              @dragleave="if (overId === row.userId) overId = null"
+              @drop.prevent="dropOn(row.userId)"
+              @dragend="dragId = null; overId = null; dragReady = null"
+              :class="{ 'opacity-40': dragId === row.userId, 'bg-gray-50 dark:bg-neutral-700/40': overId === row.userId && dragId !== row.userId }">
+
+              <button type="button"
+                class="relative z-10 shrink-0 -ms-1.5 p-1 rounded-md text-gray-400 cursor-grab hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                @mousedown="dragReady = row.userId" @mouseup="dragReady = null"
+                :aria-label="'Reorder ' + row.person.name + '. Use the up and down arrow keys.'"
+                @keydown.arrow-up.prevent="move(index, -1); $nextTick(() => $el.focus())"
+                @keydown.arrow-down.prevent="move(index, 1); $nextTick(() => $el.focus())">
+                <i data-lucide="grip-vertical" class="size-4"></i>
+              </button>
+
+              <button type="button" @click="openDrawer(row.userId)" class="min-w-0 flex-1 flex items-center gap-x-3 text-left focus:outline-none after:absolute after:inset-0 after:content-['']" :aria-label="'Edit ' + row.person.name">
+                <template x-if="row.person.photo">
+                  <img :src="row.person.photo" alt="" class="shrink-0 size-10 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+                </template>
+                <template x-if="!row.person.photo">
+                  <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(row.person.name)"></span>
+                </template>
+                <span class="min-w-0">
+                  <span class="block text-sm font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="row.person.name"></span>
+                  <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="row.subject"></span>
+                </span>
+              </button>
+
+              {# Intro video and profile gaps, from md up; the drawer shows both on small screens #}
+              <div class="hidden md:flex shrink-0 w-40 items-center gap-x-1.5 text-sm text-gray-600 dark:text-neutral-400">
+                <template x-if="row.video">
+                  <span class="inline-flex items-center gap-x-1.5"><i data-lucide="circle-play" class="size-4 text-gray-400"></i>Intro · <span x-text="row.video.duration"></span></span>
+                </template>
+                <template x-if="!row.video">
+                  <span class="text-gray-400 dark:text-neutral-500">No intro video</span>
+                </template>
+              </div>
+              <div class="hidden md:block shrink-0 w-44 text-sm">
+                <span x-show="!missing(row.userId).length" class="inline-flex items-center gap-x-1.5 text-gray-600 dark:text-neutral-400">
+                  <i data-lucide="circle-check" class="size-4 text-emerald-600 dark:text-emerald-500"></i>Profile complete
+                </span>
+                <span x-show="missing(row.userId).length" class="inline-flex items-start gap-x-1.5 text-gray-600 dark:text-neutral-400">
+                  <span class="shrink-0 mt-1.5 size-2 rounded-full bg-amber-500" aria-hidden="true"></span><span x-text="missingText(row.userId)"></span>
+                </span>
+              </div>
+
+              <div class="relative z-10 shrink-0">
+                {{ dropdown(
+                  trigger="ellipsis-vertical",
+                  width="large",
+                  items=[
+                    { label: "Edit", icon: "pencil", attrs: '@click="open = false; openDrawer(row.userId)"' },
+                    { label: "Move up", icon: "arrow-up", attrs: '@click="open = false; move(index, -1)" :disabled="index === 0" :class="index === 0 ? \'opacity-50 pointer-events-none\' : \'\'"' },
+                    { label: "Move down", icon: "arrow-down", attrs: '@click="open = false; move(index, 1)" :disabled="index === courseFaculty.length - 1" :class="index === courseFaculty.length - 1 ? \'opacity-50 pointer-events-none\' : \'\'"' },
+                    { divider: true },
+                    { label: "Remove from course", icon: "user-minus", variant: "danger", attrs: '@click="open = false; askRemove(row.userId)"' }
+                  ]
+                ) }}
+              </div>
+            </li>
+          </template>
+        </ul>
+
+        {# Add: reads as the next row of the list, like Benefits #}
+        <button type="button" @click="openPicker()" class="w-full flex items-center gap-x-3 px-4 py-3 text-left text-sm text-gray-500 hover:bg-gray-50 hover:text-gray-700 focus:outline-none focus:bg-gray-50 dark:text-neutral-400 dark:hover:bg-neutral-700/40">
+          <span class="shrink-0 flex justify-center items-center size-6 rounded-md border border-dashed border-gray-300 text-gray-400 dark:border-neutral-600"><i data-lucide="plus" class="size-3.5"></i></span>
+          Add faculty
+        </button>
+      {% endcall %}
+      <p class="px-1 text-xs text-gray-500 dark:text-neutral-500">Students see faculty in this order. Drag to change it.</p>
+    </div>
+  </main>
+
+  {% include "../faculty/includes/faculty_drawer.html" %}
+  {% include "../faculty/includes/faculty_modals.html" %}
+
+  {# Prototype only: barely visible state switcher, bottom right. #}
+  {% set state_trigger %}
+    <button type="button" class="size-8 inline-flex justify-center items-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none transition dark:bg-neutral-800 dark:border-neutral-700" aria-label="Prototype states">
+      <i data-lucide="sliders-horizontal" class="size-4"></i>
+    </button>
+  {% endset %}
+  <div class="fixed bottom-3 right-3 z-50">
+    {% call dropdown(trigger=state_trigger, placement="top-end", width="large") %}
+      <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Prototype state</p>
+      <button type="button" @click="empty = false; noProducts = false; open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
+        Faculty added<span x-show="!empty && !noProducts"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
+      </button>
+      <button type="button" @click="empty = true; noProducts = false; open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
+        No faculty yet<span x-show="empty"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
+      </button>
+      <button type="button" @click="empty = false; noProducts = true; open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
+        Course not in a product<span x-show="noProducts"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
+      </button>
+    {% endcall %}
+  </div>
+
+  {{ toast_provider() }}
+</div>
+{% endblock content %}
+
+{% block script %}
+  {% include "../../../ui-system/scripts/upload_script.html" %}
+  {% include "../faculty/includes/faculty_script.html" %}
+{% endblock script %}

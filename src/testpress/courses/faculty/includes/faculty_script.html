@@ -1,0 +1,368 @@
+<script>
+  // Admin side of course faculty. Faculty are existing staff and mentor users.
+  // A person's profile is shared by every course they teach in; each course
+  // keeps its own subject, intro video and order (the course-instructor link).
+  // Nothing here grants access to a course: that stays in Add Staffs.
+  (() => {
+    const photo = (id) => `https://images.unsplash.com/photo-${id}?w=160&h=160&fit=crop&crop=faces&q=80`;
+
+    const STAFF = [
+      { id: 1, name: "Dr. Ananya Rao", email: "ananya.rao@upscprep.com", role: "Staff", photo: photo("1494790108377-be9c29b29330") },
+      { id: 2, name: "Rahul Mehta", email: "rahul.mehta@upscprep.com", role: "Staff", photo: photo("1506794778202-cad84cf45f1d") },
+      { id: 3, name: "Kavya Iyer", email: "kavya.iyer@upscprep.com", role: "Mentor", photo: photo("1438761681033-6461ffad8d80") },
+      { id: 4, name: "Arjun Nair", email: "arjun.nair@upscprep.com", role: "Staff", photo: photo("1500648767791-00dcc994a43e") },
+      { id: 5, name: "Meera Krishnan", email: "meera.k@upscprep.com", role: "Mentor", photo: photo("1534528741775-53994a69daeb") },
+      { id: 6, name: "Sandeep Joshi", email: "sandeep.joshi@upscprep.com", role: "Staff", photo: null },
+      { id: 7, name: "Priya Sharma", email: "priya.sharma@upscprep.com", role: "Staff", photo: photo("1544005313-94ddf0286df2") },
+      { id: 8, name: "Vikram Singh", email: "vikram.singh@upscprep.com", role: "Mentor", photo: null },
+      { id: 9, name: "Neha Kapoor", email: "neha.kapoor@upscprep.com", role: "Staff", photo: photo("1517841905240-472988babdf9") },
+    ];
+
+    // Shared profiles, keyed by user id. Someone with a profile is "faculty".
+    const PROFILES = {
+      1: {
+        short_description: "Former civil servant who teaches polity through landmark judgements and real cases.",
+        bio: "Ananya spent six years in the state civil service before moving to teaching full time. Her classes connect each article of the Constitution to the judgements and news stories that UPSC actually asks about.",
+        years_of_experience: 14,
+        qualifications: ["PhD, Political Science, JNU", "UGC-NET (JRF)"],
+        highlights: ["Taught 40,000+ aspirants since 2011", "Mentored 120+ selections in CSE 2019–2025", "Author of “Indian Polity Made Simple” (2021)"],
+      },
+      2: {
+        short_description: "Makes ancient and modern history easy to revise with timelines and maps.",
+        bio: "Rahul has taught history for the civil services for over a decade, known for one-page timelines and map-based revision.",
+        years_of_experience: 11,
+        qualifications: ["MA, History, University of Delhi"],
+        highlights: ["Cleared UPSC Mains twice"],
+      },
+      3: {
+        short_description: "Economist who explains the budget and the Economic Survey in plain language.",
+        bio: "Kavya worked as a research analyst before teaching. Her economy classes start from everyday examples.",
+        years_of_experience: 9,
+        qualifications: ["MA, Economics, Madras School of Economics"],
+        highlights: [],
+      },
+      4: {
+        short_description: "Quant and reasoning coach focused on speed and accuracy for CSAT.",
+        bio: "Arjun has coached CSAT and banking aspirants since 2017.",
+        years_of_experience: 8,
+        qualifications: ["B.Tech, IIT Madras"],
+        highlights: ["99.6 percentile in CAT 2016"],
+      },
+      5: {
+        short_description: "Guides essay and ethics answer writing with weekly evaluated practice.",
+        bio: "Meera reviews every practice answer herself in the first month.",
+        years_of_experience: 16,
+        qualifications: ["MA, Philosophy, University of Hyderabad"],
+        highlights: ["Evaluated 25,000+ mains answers"],
+      },
+      6: { short_description: "Daily current affairs and monthly revision for Prelims and Mains.", bio: "", years_of_experience: null, qualifications: [], highlights: [] },
+    };
+
+    const COURSES = [
+      { id: 1, title: "Prelims GS", products: ["UPSC Essential + Mentorship", "UPSC Prelims Crash Course"] },
+      { id: 2, title: "CSAT", products: ["UPSC Essential + Mentorship"] },
+      { id: 3, title: "Mains GS", products: ["UPSC Essential + Mentorship", "Mains Answer Writing"] },
+      { id: 4, title: "Current affairs", products: ["UPSC Essential + Mentorship", "Current Affairs Monthly"] },
+      { id: 5, title: "Essay and Ethics Workshop", products: [] },
+    ];
+
+    const video = (name, duration) => ({ name, duration });
+    // Course-instructor links, in each course's order.
+    const LINKS = [
+      { courseId: 1, userId: 1, subject: "Polity", video: video("ananya-polity-intro.mp4", "1:42") },
+      { courseId: 1, userId: 2, subject: "History, Art and Culture", video: video("rahul-history-intro.mp4", "2:05") },
+      { courseId: 1, userId: 3, subject: "Economy", video: null },
+      { courseId: 2, userId: 4, subject: "Quant and Reasoning", video: video("arjun-csat-intro.mp4", "1:18") },
+      { courseId: 3, userId: 5, subject: "Ethics and Essay", video: null },
+      { courseId: 3, userId: 1, subject: "Governance", video: video("ananya-governance-intro.mp4", "1:55") },
+      { courseId: 3, userId: 3, subject: "Economy", video: null },
+      { courseId: 4, userId: 6, subject: "Current Affairs", video: null },
+    ];
+
+    const clone = (value) => JSON.parse(JSON.stringify(value));
+
+    window.facultyAdmin = function ({ courseId = null } = {}) {
+      return {
+        staff: STAFF,
+        courses: COURSES,
+        profiles: clone(PROFILES),
+        links: clone(LINKS),
+        courseId,
+
+        // Prototype switch: show the empty state.
+        empty: false,
+
+        search: "",
+
+        // Drawer: the person being added or edited, with a working copy of their
+        // shared profile and (on a course page) this course's subject and video.
+        editing: null,
+        isNew: false,
+        form: null,
+        errors: {},
+
+        // Add-faculty picker.
+        pickerSearch: "",
+
+        // Add to courses (faculty list): course id -> subject.
+        assigning: null,
+        assignForm: {},
+
+        removing: null,
+
+        // Reorder (course page).
+        dragId: null,
+        dragReady: null,
+        overId: null,
+
+        init() {
+          this.refreshIcons();
+          ["empty", "links", "profiles", "editing", "search", "pickerSearch", "assigning", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
+        },
+
+        refreshIcons() {
+          this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        },
+
+        staffMember(userId) {
+          return this.staff.find((s) => s.id === userId);
+        },
+
+        initials(name) {
+          return name.replace(/^Dr\.\s*/, "").split(" ").map((w) => w[0]).slice(0, 2).join("");
+        },
+
+        isFaculty(userId) {
+          return !!this.profiles[userId];
+        },
+
+        course(id) {
+          return this.courses.find((c) => c.id === id);
+        },
+
+        get currentCourse() {
+          return this.course(this.courseId);
+        },
+
+        // Courses a person teaches in, with their subject there.
+        teaching(userId) {
+          return this.links.filter((l) => l.userId === userId).map((l) => ({ ...l, course: this.course(l.courseId) }));
+        },
+
+        // Short, specific list of what the product page will be missing.
+        missing(userId) {
+          const p = this.profiles[userId];
+          if (!p) return [];
+          const gaps = [];
+          if (!this.staffMember(userId).photo) gaps.push("photo");
+          if (!p.short_description) gaps.push("short description");
+          if (!p.bio) gaps.push("about");
+          if (!p.highlights.length) gaps.push("highlights");
+          if (!p.qualifications.length) gaps.push("qualifications");
+          return gaps;
+        },
+
+        missingText(userId) {
+          const gaps = this.missing(userId);
+          if (gaps.length <= 2) return "No " + gaps.join(" or ");
+          return "No " + gaps.slice(0, 2).join(", ") + " and " + (gaps.length - 2) + " more";
+        },
+
+        // ---- Faculty list (all courses) ----
+
+        get faculty() {
+          if (this.empty) return [];
+          const q = this.search.trim().toLowerCase();
+          return this.staff
+            .filter((s) => this.isFaculty(s.id))
+            .filter((s) => !q || s.name.toLowerCase().includes(q) || this.teaching(s.id).some((t) => t.subject.toLowerCase().includes(q) || t.course.title.toLowerCase().includes(q)));
+        },
+
+        get facultyCount() {
+          return this.empty ? 0 : Object.keys(this.profiles).length;
+        },
+
+        // ---- One course ----
+
+        get courseFaculty() {
+          if (this.empty) return [];
+          return this.links.filter((l) => l.courseId === this.courseId).map((l) => ({ ...l, person: this.staffMember(l.userId) }));
+        },
+
+        move(index, step) {
+          const rows = this.links.filter((l) => l.courseId === this.courseId);
+          const target = index + step;
+          if (target < 0 || target >= rows.length) return;
+          [rows[index], rows[target]] = [rows[target], rows[index]];
+          this.links = [...this.links.filter((l) => l.courseId !== this.courseId), ...rows];
+          this.$dispatch("toast", { title: "Order saved", description: "Students see faculty in this order.", variant: "success" });
+        },
+
+        dropOn(userId) {
+          const rows = this.links.filter((l) => l.courseId === this.courseId);
+          const from = rows.findIndex((l) => l.userId === this.dragId);
+          const to = rows.findIndex((l) => l.userId === userId);
+          this.dragId = this.overId = this.dragReady = null;
+          if (from < 0 || to < 0 || from === to) return;
+          const [row] = rows.splice(from, 1);
+          rows.splice(to, 0, row);
+          this.links = [...this.links.filter((l) => l.courseId !== this.courseId), ...rows];
+          this.$dispatch("toast", { title: "Order saved", description: "Students see faculty in this order.", variant: "success" });
+        },
+
+        // ---- Add faculty picker ----
+
+        // On a course page: everyone not already in this course.
+        // On the faculty list: everyone without a profile yet.
+        get pickable() {
+          const q = this.pickerSearch.trim().toLowerCase();
+          return this.staff
+            .filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
+            .map((s) => ({
+              ...s,
+              added: this.courseId ? this.links.some((l) => l.courseId === this.courseId && l.userId === s.id) : this.isFaculty(s.id),
+              hasProfile: this.isFaculty(s.id),
+            }))
+            .sort((a, b) => a.added - b.added);
+        },
+
+        openPicker() {
+          this.pickerSearch = "";
+          this.$dispatch("open-modal-pick-faculty");
+          this.$nextTick(() => setTimeout(() => this.$refs.pickerSearch && this.$refs.pickerSearch.focus(), 50));
+        },
+
+        pick(person) {
+          if (person.added) return;
+          this.$dispatch("close-modal-pick-faculty");
+          this.openDrawer(person.id, true);
+        },
+
+        // ---- Drawer ----
+
+        openDrawer(userId, isNew = false) {
+          const profile = this.profiles[userId] || { short_description: "", bio: "", years_of_experience: null, qualifications: [], highlights: [] };
+          const link = this.courseId ? this.links.find((l) => l.courseId === this.courseId && l.userId === userId) : null;
+          this.editing = this.staffMember(userId);
+          this.isNew = isNew;
+          this.errors = {};
+          this.form = {
+            ...clone(profile),
+            qualifications: [...profile.qualifications],
+            highlights: [...profile.highlights],
+            subject: link ? link.subject : "",
+            video: link && link.video ? { ...link.video } : null,
+          };
+          this.$dispatch("set-uploaded-file", { name: "intro_video", files: [] });
+          this.$dispatch("open-drawer-faculty-form");
+        },
+
+        // Other courses this person teaches in (the profile is shared with them).
+        get sharedWith() {
+          if (!this.editing) return [];
+          return this.teaching(this.editing.id).filter((t) => t.courseId !== this.courseId);
+        },
+
+        addItem(list) {
+          this.form[list].push("");
+          this.$nextTick(() => {
+            const inputs = document.querySelectorAll(`[data-list="${list}"] input`);
+            inputs.length && inputs[inputs.length - 1].focus();
+          });
+        },
+
+        removeItem(list, index) {
+          this.form[list].splice(index, 1);
+        },
+
+        save() {
+          this.errors = {};
+          if (this.courseId && !this.form.subject.trim()) this.errors.subject = "Add the subject they teach in this course.";
+          if (!this.form.short_description.trim()) this.errors.short_description = "Add a one-line introduction. Students see it on the faculty card.";
+          if (Object.keys(this.errors).length) return;
+
+          const clean = (items) => items.map((i) => i.trim()).filter(Boolean);
+          this.profiles[this.editing.id] = {
+            short_description: this.form.short_description.trim(),
+            bio: this.form.bio.trim(),
+            years_of_experience: this.form.years_of_experience ? Number(this.form.years_of_experience) : null,
+            qualifications: clean(this.form.qualifications),
+            highlights: clean(this.form.highlights),
+          };
+
+          if (this.courseId) {
+            const link = this.links.find((l) => l.courseId === this.courseId && l.userId === this.editing.id);
+            if (link) {
+              link.subject = this.form.subject.trim();
+              link.video = this.form.video;
+            } else {
+              this.links.push({ courseId: this.courseId, userId: this.editing.id, subject: this.form.subject.trim(), video: this.form.video });
+            }
+          }
+
+          const name = this.editing.name;
+          const added = this.isNew;
+          this.$dispatch("close-drawer-faculty-form");
+          this.$dispatch("toast", {
+            title: added ? `${name} added` : "Changes saved",
+            description: this.courseId
+              ? (added ? "Students see them on this course's product pages." : "Product pages show the update.")
+              : (added ? "Add them to courses to show them to students." : "Every course they teach in shows the update."),
+            variant: "success",
+          });
+        },
+
+        // ---- Add to courses (faculty list) ----
+
+        openAssign(userId) {
+          this.assigning = this.staffMember(userId);
+          this.assignForm = {};
+          this.$dispatch("open-modal-assign-courses");
+        },
+
+        toggleAssign(courseId) {
+          if (courseId in this.assignForm) delete this.assignForm[courseId];
+          else this.assignForm[courseId] = "";
+          this.assignForm = { ...this.assignForm };
+        },
+
+        get assignCount() {
+          return Object.keys(this.assignForm).length;
+        },
+
+        saveAssign() {
+          const entries = Object.entries(this.assignForm);
+          if (!entries.length || entries.some(([, subject]) => !subject.trim())) return;
+          entries.forEach(([id, subject]) => this.links.push({ courseId: Number(id), userId: this.assigning.id, subject: subject.trim(), video: null }));
+          this.$dispatch("close-modal-assign-courses");
+          this.$dispatch("toast", {
+            title: `Added to ${entries.length} ${entries.length === 1 ? "course" : "courses"}`,
+            description: "Open a course's Faculty page to add an intro video or change the order.",
+            variant: "success",
+          });
+        },
+
+        // ---- Remove ----
+
+        askRemove(userId) {
+          this.removing = this.staffMember(userId);
+          this.$dispatch(this.courseId ? "open-modal-remove-from-course" : "open-modal-remove-faculty");
+        },
+
+        confirmRemove() {
+          const id = this.removing.id;
+          if (this.courseId) {
+            this.links = this.links.filter((l) => !(l.courseId === this.courseId && l.userId === id));
+            this.$dispatch("toast", { title: `${this.removing.name} removed from ${this.currentCourse.title}`, description: "Their profile and other courses are unchanged.", variant: "success" });
+          } else {
+            this.links = this.links.filter((l) => l.userId !== id);
+            delete this.profiles[id];
+            this.profiles = { ...this.profiles };
+            this.$dispatch("toast", { title: `${this.removing.name} is no longer faculty`, description: "Their account and course access are unchanged.", variant: "success" });
+          }
+          this.removing = null;
+        },
+      };
+    };
+  })();
+</script>

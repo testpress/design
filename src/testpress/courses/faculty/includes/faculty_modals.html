@@ -1,0 +1,124 @@
+{# Modals shared by the faculty list and a course's Faculty page. #}
+{% from "../../../../ui-system/components/modal.html" import modal %}
+{% from "../../../../ui-system/components/input.html" import input %}
+{% from "../../../../ui-system/components/badge.html" import badge %}
+
+{# Pick a staff member or mentor. Faculty are existing users; this never creates an account. #}
+{% call modal(id="pick-faculty", title="Add faculty", description="Pick a staff member or mentor. This doesn't change what they can access.", show_cancel=false, confirm_text="Close") %}
+  <div class="-mt-1">
+    {{ input(name="faculty_search", placeholder="Search by name or email", icon="search", x_model="pickerSearch", x_ref="pickerSearch", extra_attrs='autocomplete="off"') }}
+
+    <ul class="mt-3 -mx-2 max-h-80 overflow-y-auto">
+      <template x-for="person in pickable" :key="person.id">
+        <li>
+          <button type="button" @click="pick(person)" :disabled="person.added"
+            class="w-full flex items-center gap-x-3 px-2 py-2.5 rounded-lg text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:hover:bg-transparent disabled:cursor-default dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
+            <template x-if="person.photo">
+              <img :src="person.photo" alt="" class="shrink-0 size-9 rounded-full object-cover bg-gray-100" :class="person.added && 'opacity-50'">
+            </template>
+            <template x-if="!person.photo">
+              <span class="shrink-0 size-9 inline-flex items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" :class="person.added && 'opacity-50'" x-text="initials(person.name)"></span>
+            </template>
+            <span class="min-w-0 flex-1" :class="person.added && 'opacity-60'">
+              <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="person.name"></span>
+              <span class="block text-xs text-gray-500 truncate dark:text-neutral-400"><span x-text="person.role"></span> · <span x-text="person.email"></span></span>
+            </span>
+            <span class="shrink-0 text-xs">
+              <span x-show="person.added" class="text-gray-500 dark:text-neutral-400" x-text="courseId ? 'Already added' : 'Already faculty'"></span>
+              <span x-show="!person.added && person.hasProfile && courseId" class="inline-flex items-center gap-x-1 text-gray-500 dark:text-neutral-400"><i data-lucide="circle-check" class="size-3.5 text-emerald-600 dark:text-emerald-500"></i>Profile ready</span>
+            </span>
+          </button>
+        </li>
+      </template>
+      <li x-show="!pickable.length" class="px-2 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+        No staff or mentor matches “<span x-text="pickerSearch"></span>”.
+      </li>
+    </ul>
+    <p class="mt-3 text-xs text-gray-500 dark:text-neutral-500">Not listed? Add them as staff or a mentor in Members first.</p>
+  </div>
+{% endcall %}
+
+{# Faculty list: add one person to several courses at once. Each course needs its own subject. #}
+{% call modal(id="assign-courses", title="Add to courses", show_cancel=true, confirm_text="Add to courses", confirm_attrs=':disabled="!assignCount || Object.values(assignForm).some((s) => !s.trim())"') %}
+  <template x-if="assigning">
+    <div>
+      <p class="-mt-1 text-sm text-gray-500 dark:text-neutral-400">Pick the courses <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="assigning.name"></span> teaches in, and the subject in each.</p>
+      <ul class="mt-4 border border-gray-200 rounded-lg divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+        <template x-for="c in courses" :key="c.id">
+          <li class="px-3 py-2.5">
+            <template x-if="teaching(assigning.id).some((t) => t.courseId === c.id)">
+              <div class="flex items-center justify-between gap-x-3 opacity-60">
+                <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="c.title"></span>
+                <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="'Teaches ' + teaching(assigning.id).find((t) => t.courseId === c.id).subject"></span>
+              </div>
+            </template>
+            <template x-if="!teaching(assigning.id).some((t) => t.courseId === c.id)">
+              <div>
+                <label class="flex items-center gap-x-3 cursor-pointer">
+                  <input type="checkbox" :checked="c.id in assignForm" @change="toggleAssign(c.id)"
+                    class="shrink-0 size-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-600">
+                  <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="c.title"></span>
+                  <span x-show="!c.products.length" class="ms-auto text-xs text-amber-700 dark:text-amber-500">Not in a product yet</span>
+                </label>
+                <div x-show="c.id in assignForm" class="mt-2 ps-7">
+                  <input type="text" x-model="assignForm[c.id]" placeholder="Subject, e.g. Polity" maxlength="80" :aria-label="'Subject in ' + c.title"
+                    class="py-1.5 px-3 block w-full bg-white border border-gray-200 rounded-lg sm:text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-700 focus:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white">
+                </div>
+              </div>
+            </template>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </template>
+{% endcall %}
+<div @modal-confirmed-assign-courses.window="saveAssign()"></div>
+
+{# Remove from one course: the profile and other courses stay. #}
+{% call modal(id="remove-from-course", title="Remove from this course?", variant="danger", confirm_text="Remove", cancel_text="Cancel") %}
+  <template x-if="removing && currentCourse">
+    <div>
+      <p class="text-gray-800 dark:text-neutral-200"><span class="font-medium" x-text="removing.name"></span> won't be shown on product pages for <span x-text="currentCourse.title"></span>.</p>
+      <p class="mt-2 text-gray-500 dark:text-neutral-400">Their profile, their other courses and their access to this course stay the same.</p>
+    </div>
+  </template>
+{% endcall %}
+<div @modal-confirmed-remove-from-course.window="confirmRemove()"></div>
+
+{# Remove from faculty entirely. #}
+{% call modal(id="remove-faculty", title="Remove from faculty?", variant="danger", confirm_text="Remove from faculty", cancel_text="Cancel") %}
+  <template x-if="removing">
+    <div>
+      <p class="text-gray-800 dark:text-neutral-200">
+        <span class="font-medium" x-text="removing.name"></span>'s profile will be deleted<template x-if="teaching(removing.id).length"><span> and they'll be taken off <span x-text="teaching(removing.id).length"></span> <span x-text="teaching(removing.id).length === 1 ? 'course' : 'courses'"></span></span></template>.
+      </p>
+      <p class="mt-2 text-gray-500 dark:text-neutral-400">Their account and what they can access stay the same.</p>
+    </div>
+  </template>
+{% endcall %}
+<div @modal-confirmed-remove-faculty.window="confirmRemove()"></div>
+
+{# How it works: the display-only rule, said once and plainly. #}
+{% call modal(id="about-faculty", title="About faculty", confirm_text="Got it", show_cancel=false) %}
+  <div class="space-y-5">
+    <section>
+      <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">What faculty do</h3>
+      <ul class="mt-2 space-y-1.5 list-disc ps-5 text-gray-600 dark:text-neutral-400">
+        <li>Faculty tell students who teaches a course, before they buy it.</li>
+        <li>They show on the product page of every product that includes the course, with their subject and intro video.</li>
+        <li>Someone who teaches in several courses appears once, with all their subjects.</li>
+      </ul>
+    </section>
+    <section>
+      <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">What faculty don't change</h3>
+      <p class="mt-2 text-gray-600 dark:text-neutral-400">Faculty are for display only. Adding or removing someone doesn't give or take away access to a course. To let staff edit a course, use Add Staffs.</p>
+    </section>
+    <section>
+      <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">Shared profile, per-course details</h3>
+      <ul class="mt-2 space-y-1.5 list-disc ps-5 text-gray-600 dark:text-neutral-400">
+        <li>Photo, description, qualifications, highlights and about are shared by every course the person teaches in.</li>
+        <li>Subject, intro video and order are set separately in each course.</li>
+      </ul>
+    </section>
+  </div>
+{% endcall %}

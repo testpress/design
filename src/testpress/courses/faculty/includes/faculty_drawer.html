@@ -1,0 +1,158 @@
+{# Add or edit one faculty member. Used by the faculty list and by a course's Faculty page.
+   On a course page the drawer starts with what applies to this course only (subject, intro video),
+   then the profile shared by every course they teach in. #}
+{% from "../../../../ui-system/components/drawer.html" import drawer %}
+{% from "../../../../ui-system/components/input.html" import input %}
+{% from "../../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../../ui-system/components/upload.html" import upload %}
+{% from "../../../../ui-system/components/button.html" import button %}
+{% from "../../../../ui-system/components/badge.html" import badge %}
+
+{% set section_heading = "text-sm font-semibold text-gray-800 dark:text-neutral-200" %}
+{% set field_error = "mt-1.5 text-xs text-red-600 dark:text-red-500" %}
+
+{# A list of short lines (qualifications, highlights). One line per item: the product page shows them as a list. #}
+{% macro list_editor(key, label, placeholder, add_text, help) %}
+  <div>
+    <p class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">{{ label }}</p>
+    <ul class="space-y-2" data-list="{{ key }}">
+      <template x-for="(item, index) in form.{{ key }}" :key="index">
+        <li class="flex items-center gap-x-2">
+          <input type="text" x-model="form.{{ key }}[index]" placeholder="{{ placeholder }}" maxlength="120"
+            :aria-label="'{{ label }} ' + (index + 1)"
+            @keydown.enter.prevent="addItem('{{ key }}')"
+            class="py-2 px-3 block w-full bg-white border border-gray-200 rounded-lg sm:text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-700 focus:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:placeholder:text-neutral-500">
+          <button type="button" @click="removeItem('{{ key }}', index)" :aria-label="'Remove ' + (form.{{ key }}[index] || 'this line')"
+            class="shrink-0 size-9 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:bg-gray-100 dark:hover:bg-neutral-700 dark:hover:text-neutral-300">
+            <i data-lucide="x" class="size-4"></i>
+          </button>
+        </li>
+      </template>
+    </ul>
+    <button type="button" @click="addItem('{{ key }}')"
+      class="mt-2 inline-flex items-center gap-x-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 focus:outline-none focus:underline dark:text-neutral-400 dark:hover:text-neutral-200">
+      <i data-lucide="plus" class="size-4"></i>{{ add_text }}
+    </button>
+    <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-500">{{ help }}</p>
+  </div>
+{% endmacro %}
+
+{% call drawer(id="faculty-form", placement="right", size="md", title="Faculty") %}
+  <template x-if="editing && form">
+    <div class="flex-1 min-h-0 flex flex-col">
+      <div class="flex-1 min-h-0 overflow-y-auto">
+
+        {# Who #}
+        <div class="px-6 py-5 flex items-center gap-x-3.5 border-b border-gray-200 dark:border-neutral-700">
+          <template x-if="editing.photo">
+            <img :src="editing.photo" alt="" class="shrink-0 size-12 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+          </template>
+          <template x-if="!editing.photo">
+            <span class="shrink-0 size-12 inline-flex items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(editing.name)"></span>
+          </template>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="editing.name"></p>
+            <p class="text-sm text-gray-500 truncate dark:text-neutral-400"><span x-text="editing.role"></span> · <span x-text="editing.email"></span></p>
+          </div>
+        </div>
+
+        {# This course only #}
+        <template x-if="courseId">
+          <section class="px-6 py-6 space-y-5 border-b border-gray-200 dark:border-neutral-700">
+            <div>
+              <h3 class="{{ section_heading }}">In <span x-text="currentCourse.title"></span></h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Only for this course.</p>
+            </div>
+
+            <div>
+              {{ input(name="faculty_subject", label="Subject", placeholder="e.g. Polity", required=true, x_model="form.subject", extra_attrs='maxlength="80" :aria-invalid="!!errors.subject"') }}
+              <p x-show="errors.subject" class="{{ field_error }}" x-text="errors.subject"></p>
+              <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-500">Teaching more than one subject here? List them, like “Polity, Governance”.</p>
+            </div>
+
+            <div>
+              <p class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Intro video <span class="font-normal text-gray-500 dark:text-neutral-400">(optional)</span></p>
+              <template x-if="form.video">
+                <div class="p-3 flex items-center gap-x-3 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+                  <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-lg bg-gray-900 text-white dark:bg-neutral-700">
+                    <i data-lucide="play" class="size-4 fill-current"></i>
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="form.video.name"></p>
+                    <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="form.video.duration"></p>
+                  </div>
+                  <button type="button" @click="form.video = null; $dispatch('set-uploaded-file', { name: 'intro_video', files: [] })"
+                    class="shrink-0 py-1.5 px-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-red-600 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-red-500">
+                    Remove
+                  </button>
+                </div>
+              </template>
+              <div x-show="!form.video" @change="const f = $event.target.files && $event.target.files[0]; if (f) form.video = { name: f.name, duration: 'Processing…' }">
+                {{ upload(name="intro_video", id="intro-video", max_size="500MB", accepted_formats="mp4,mov,webm", icon="clapperboard", dropzone_title="Drop a video here or", help_text="Up to 2 minutes works best. MP4, MOV or WebM, up to 500 MB.") }}
+              </div>
+            </div>
+          </section>
+        </template>
+
+        {# Shared profile #}
+        <section class="px-6 py-6 space-y-5">
+          <div>
+            <div class="flex items-center gap-x-2">
+              <h3 class="{{ section_heading }}">Faculty profile</h3>
+              {{ badge(text="Shared", size="xs", variant="info", icon="link") }}
+            </div>
+            <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+              <template x-if="sharedWith.length">
+                <span>Also shown for <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="sharedWith.map((t) => t.course.title).join(', ')"></span>. Changes here show there too.</span>
+              </template>
+              <template x-if="!sharedWith.length">
+                <span>The same profile shows in every course they teach in.</span>
+              </template>
+            </p>
+          </div>
+
+          {# Photo comes from their account #}
+          <div class="flex items-center gap-x-3">
+            <template x-if="editing.photo">
+              <img :src="editing.photo" alt="" class="shrink-0 size-16 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+            </template>
+            <template x-if="!editing.photo">
+              <span class="shrink-0 size-16 inline-flex items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-400 dark:border-neutral-600 dark:text-neutral-500"><i data-lucide="image-plus" class="size-5"></i></span>
+            </template>
+            <div>
+              {{ button(text="<span x-text=\"editing.photo ? 'Change photo' : 'Upload photo'\"></span>", variant="secondary", size="sm") }}
+              <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-500">Uses their account photo. A clear, square headshot looks best.</p>
+            </div>
+          </div>
+
+          <div>
+            {{ textarea(name="faculty_short_description", label="Short description", rows="2", placeholder="e.g. Former civil servant who teaches polity through landmark judgements", required=true, x_model="form.short_description", extra_attrs='maxlength="140" :aria-invalid="!!errors.short_description"') }}
+            <div class="mt-1.5 flex justify-between gap-x-3 text-xs">
+              <p x-show="errors.short_description" class="text-red-600 dark:text-red-500" x-text="errors.short_description"></p>
+              <p x-show="!errors.short_description" class="text-gray-500 dark:text-neutral-500">Shown on the faculty card, under their name.</p>
+              <span class="shrink-0 text-gray-400 dark:text-neutral-500" x-text="form.short_description.length + '/140'"></span>
+            </div>
+          </div>
+
+          <div class="max-w-40">
+            {{ input(name="faculty_years", label="Years teaching", type="number", placeholder="e.g. 12", x_model="form.years_of_experience", extra_attrs='min="0" max="60"') }}
+          </div>
+
+          {{ list_editor("qualifications", "Qualifications", "e.g. MA, History, University of Delhi", "Add qualification", "Degrees and certifications. One per line.") }}
+
+          {{ list_editor("highlights", "Highlights", "e.g. Mentored 120+ selections in CSE", "Add highlight", "Results, books, past institutes or student reach. Put the strongest first.") }}
+
+          <div>
+            {{ textarea(name="faculty_bio", label="About", rows="5", placeholder="How they teach, their background and who they help most.", x_model="form.bio") }}
+            <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-500">Shown in their full profile on the product page.</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="shrink-0 px-6 py-4 flex justify-end gap-x-2 border-t border-gray-200 bg-white dark:bg-neutral-800 dark:border-neutral-700">
+        {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}
+        {{ button(text="<span x-text=\"isNew ? (courseId ? 'Add to course' : 'Add faculty') : 'Save changes'\"></span>", extra_attrs='@click="save()"') }}
+      </div>
+    </div>
+  </template>
+{% endcall %}
