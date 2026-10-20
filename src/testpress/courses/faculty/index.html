@@ -1,0 +1,363 @@
+---
+title: Faculty
+tags: testpress
+date: 2026-10-20
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% from "../../../ui-system/components/page-header.html" import page_header %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/toast.html" import toast_provider %}
+{% from "../../../ui-system/components/popover.html" import popover %}
+{% from "./includes/avatar.html" import avatar %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+<div x-data="facultyList()"
+     @modal-confirmed-remove-instructor.window="confirmRemove()"
+     class="max-w-7xl mx-auto sm:px-6 lg:px-8 py-10 space-y-5">
+
+  <main class="space-y-5">
+    <div class="px-4 sm:px-0">
+      {% set header_actions %}
+        <span x-show="instructors.length" x-cloak>
+          {{ button(text="Add instructor", icon="plus", extra_attrs='@click="openAdd()"') }}
+        </span>
+      {% endset %}
+      {{ page_header(
+        title="Faculty",
+        description="Students see these instructors on a course's page before they buy it.",
+        actions=header_actions
+      ) }}
+    </div>
+
+    {# Instructors. Adapted from the Preline "Basic User Directory Table". #}
+    <div x-show="instructors.length" x-cloak>
+      {% set header %}
+        {{ table_th(text="Instructor") }}
+        {{ table_th(text="Subjects taught") }}
+        {{ table_th(text="Experience") }}
+        {{ table_th(text="Assigned courses") }}
+        {{ table_th(class="text-end") }}
+      {% endset %}
+
+      {# Filter button and drawer, as on live_classes. #}
+      {% set filters %}
+        <button type="button" @click.prevent="$dispatch('open-drawer-faculty-filter')" class="whitespace-nowrap py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+          <i data-lucide="filter" class="shrink-0 size-3.5"></i>
+          Filter
+          <span x-show="activeFilterCount" x-cloak class="inline-flex items-center justify-center size-4 rounded-full bg-primary-600 text-[10px] font-semibold text-white" x-text="activeFilterCount"></span>
+        </button>
+      {% endset %}
+
+      {% set pager %}
+        <div class="flex flex-wrap justify-between items-center gap-3">
+          {# Left side of ui-system pagination: "Go to" page input. #}
+          <div class="flex items-center gap-x-4">
+            <input type="number" placeholder="Go to" min="1" :max="pageCount" aria-label="Go to page"
+              @keydown.enter.prevent="const n = parseInt($event.target.value, 10); if (n >= 1 && n <= pageCount) page = n; $event.target.value = ''"
+              @change="const n = parseInt($event.target.value, 10); if (n >= 1 && n <= pageCount) page = n; $event.target.value = ''"
+              class="min-h-9 py-1.5 px-2 block w-14 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm text-center text-gray-800 dark:text-neutral-200 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:border-primary-500 focus:ring-primary-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" style="-moz-appearance: textfield;">
+          </div>
+          {# Markup of ui-system/components/pagination.html, with the pages driven by Alpine. #}
+          <nav class="flex items-center -space-x-px" aria-label="Pagination">
+            <button type="button" @click="page--" :disabled="page === 1" class="min-h-9 min-w-9 py-2 px-2.5 inline-flex justify-center items-center gap-x-1.5 text-sm rounded-s-lg border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" aria-label="Previous">
+              <i data-lucide="chevron-left" class="shrink-0 size-3.5"></i>
+            </button>
+            <template x-for="n in pageCount" :key="n">
+              <button type="button" @click="page = n" :aria-current="n === page ? 'page' : null" x-text="n"
+                class="min-h-9 min-w-9 flex justify-center items-center border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 py-2 px-3 text-sm focus:outline-none"
+                :class="n === page ? 'bg-gray-50 dark:bg-neutral-700' : 'hover:bg-gray-50 dark:hover:bg-neutral-700 focus:bg-gray-50 dark:focus:bg-neutral-700'"></button>
+            </template>
+            <button type="button" @click="page++" :disabled="page === pageCount" class="min-h-9 min-w-9 py-2 px-2.5 inline-flex justify-center items-center gap-x-1.5 text-sm rounded-e-lg border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" aria-label="Next">
+              <i data-lucide="chevron-right" class="shrink-0 size-3.5"></i>
+            </button>
+          </nav>
+        </div>
+      {% endset %}
+
+      {# Popover contents, filled by Alpine for each row. #}
+      {# Tags and "+N more" as in batches/list and report_cards/admin/list: the rest show in a popover. #}
+      {% set subjects_more %}
+        <span class="pl-1.5 text-gray-500 text-xs font-medium whitespace-nowrap cursor-default dark:text-neutral-400" x-text="'+' + (person.subjects.length - 3) + ' more'"></span>
+      {% endset %}
+      {% set subjects_rest %}
+        <ul class="py-2 px-3 space-y-1 list-disc list-inside text-sm text-gray-800 dark:text-neutral-200">
+          <template x-for="subject in person.subjects.slice(3)" :key="subject">
+            <li x-text="subject"></li>
+          </template>
+        </ul>
+      {% endset %}
+      {# "N Courses" tag with the list on hover, as in limeread/library/includes/table_item.html (Groups). #}
+      {% set courses_trigger %}
+        <span class="rounded-md px-2 py-1 text-xs bg-gray-100 text-gray-800 cursor-help dark:bg-neutral-700 dark:text-neutral-200" x-text="person.courses.length + (person.courses.length === 1 ? ' Course' : ' Courses')"></span>
+      {% endset %}
+      {% set courses_list %}
+        <div class="p-3">
+          <ul class="space-y-1 list-disc ps-4">
+            <template x-for="course in person.courses" :key="course">
+              <li class="text-sm text-gray-800 marker:text-gray-400 dark:text-neutral-200 dark:marker:text-neutral-600">
+                <a href="#" class="hover:underline text-gray-800 dark:text-neutral-200" x-text="course"></a>
+              </li>
+            </template>
+          </ul>
+          <a :href="profileUrl(person.id)" class="mt-3 pt-2 flex items-center gap-x-1 border-t border-gray-200 text-xs font-medium text-primary-600 hover:underline dark:border-neutral-700 dark:text-primary-500">Manage assigned courses<i data-lucide="chevron-right" class="size-3.5"></i></a>
+        </div>
+      {% endset %}
+
+      {% call table(padded=true, search_enabled=true, search_placeholder="Search instructors", search_x_model="search", filters=filters, table_header=header, pagination=pager, pagination_x_show="pageCount > 1", table_container_classes="sm:rounded-b-xl") %}
+        <template x-for="person in paged" :key="person.id">
+          <tr>
+            {% call table_td() %}
+              <div class="flex items-center gap-x-3">
+                {{ avatar("person", size="size-8", text="text-xs") }}
+                <div class="flex flex-col">
+                  <a :href="profileUrl(person.id)" class="inline-block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors" x-text="person.name"></a>
+                  <span class="mt-0.5 text-xs text-gray-500 dark:text-neutral-500" x-text="person.email"></span>
+                </div>
+              </div>
+            {% endcall %}
+            {% call table_td() %}
+              <div class="flex flex-nowrap items-center gap-1">
+                <template x-for="subject in person.subjects.slice(0, 3)" :key="subject">
+                  <span class="rounded-md px-2 py-1 text-xs bg-gray-100 text-gray-800 truncate max-w-40 dark:bg-neutral-700 dark:text-neutral-200" x-text="subject"></span>
+                </template>
+                <template x-if="person.subjects.length > 3">
+                  {{ popover(trigger=subjects_more, content=subjects_rest, trigger_type="hover", placement="bottom", width="w-auto max-w-xs") }}
+                </template>
+                <span x-show="!person.subjects.length" class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+              </div>
+            {% endcall %}
+            {% call table_td() %}
+              <span x-show="person.years_of_experience" class="text-sm text-gray-800 dark:text-neutral-200" x-text="person.years_of_experience + (person.years_of_experience === 1 ? ' year' : ' years')"></span>
+              <span x-show="!person.years_of_experience" class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+            {% endcall %}
+            {% call table_td() %}
+              <template x-if="person.courses.length">
+                {{ popover(trigger=courses_trigger, content=courses_list, trigger_type="hover", placement="bottom", width="w-48") }}
+              </template>
+              <template x-if="!person.courses.length">
+<span class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+              </template>
+            {% endcall %}
+            {# Edit button with a menu, as the View button in live_classes/includes/list.html. #}
+            {% call table_td(class="text-end") %}
+              <div class="flex justify-end items-center -space-x-px">
+                <a :href="profileUrl(person.id)" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-s-lg rounded-e-none border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                  Edit
+                </a>
+                {% set row_menu_trigger %}
+                  <div class="relative inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white shadow-2xs hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:hover:bg-neutral-700">
+                    <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-label="More actions">
+                      <svg class="pointer-events-none shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                    </button>
+                  </div>
+                {% endset %}
+                {{ dropdown(trigger=row_menu_trigger, placement="bottom-end", width="large", items=[
+                  { label: "Remove from faculty", icon: "trash-2", variant: "danger", x_on: '@click="askRemove(person); open = false"' }
+                ]) }}
+              </div>
+            {% endcall %}
+          </tr>
+        </template>
+        <tr x-show="!filtered.length">
+          <td colspan="5" class="px-5 py-12 text-center">
+            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">No instructors match these filters</p>
+            <button type="button" @click="search = ''; clearFilters()" class="mt-1 text-sm font-medium text-primary-600 hover:underline focus:outline-none focus:underline dark:text-primary-500">Clear filters</button>
+          </td>
+        </tr>
+      {% endcall %}
+    </div>
+
+    {# No instructors yet: shows the card students will see, so the admin knows what to fill in. #}
+    <div x-show="!instructors.length" x-cloak>
+      {% set sample %}{% include "./includes/sample_card.html" %}{% endset %}
+      {{ empty_state(
+        title="Add your first instructor",
+        description="Students see each instructor like this on the course's page, before they buy.",
+        illustration=sample,
+        primary_action_text="Add instructor",
+        primary_action_icon="plus",
+        primary_action_attrs='@click="openAdd()"'
+      ) }}
+    </div>
+  </main>
+
+  {# Pick a staff member. Picking one opens their new profile. #}
+  {% call modal(id="add-instructor", title="Add instructor", confirm_text="", show_cancel=false) %}
+    <div class="-m-5">
+      <div class="px-5 py-4">
+        {{ input(name="staff_search", placeholder="Search staff by name or email", icon="search", variant="solid", x_model="staffSearch", extra_attrs="autofocus") }}
+      </div>
+      <ul class="max-h-80 overflow-y-auto border-t border-gray-200 divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+        <template x-for="person in staffResults" :key="person.id">
+          <li>
+            <button type="button" :disabled="person.added" @click="window.location = profileUrl(person.id, true)"
+              class="w-full flex items-center gap-x-3 px-5 py-3 text-start hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:hover:bg-transparent disabled:cursor-default dark:hover:bg-neutral-700/40 dark:focus:bg-neutral-700/40">
+              {{ avatar("person", size="size-9") }}
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm font-medium truncate" :class="person.added ? 'text-gray-500 dark:text-neutral-500' : 'text-gray-800 dark:text-neutral-200'" x-text="person.name"></span>
+                <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="person.email"></span>
+              </span>
+              <span x-show="person.added">{{ badge(text="Added", size="xs") }}</span>
+              <i x-show="!person.added" data-lucide="chevron-right" class="shrink-0 size-4 text-gray-400"></i>
+            </button>
+          </li>
+        </template>
+        <li x-show="!staffResults.length" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+          No staff match “<span x-text="staffSearch"></span>”
+        </li>
+      </ul>
+      <p class="px-5 py-3 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
+        Not in the list? <a href="#" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline dark:text-primary-500">Add them as staff</a> first.
+      </p>
+    </div>
+  {% endcall %}
+
+  {% call modal(id="remove-instructor", title="Remove from faculty?", variant="danger", confirm_text="Remove", cancel_text="Cancel") %}
+    <p class="text-gray-800 dark:text-neutral-200">
+      <span class="font-medium" x-text="removing && removing.name"></span>’s profile will be deleted<template x-if="removing && removing.courses.length"><span>, and students will no longer see them in <span x-text="removing.courses.join(', ')"></span></span></template>.
+    </p>
+    <p class="mt-2 text-gray-500 dark:text-neutral-400">Their staff account and course access stay the same.</p>
+  {% endcall %}
+
+  {% include "./includes/filter_drawer.html" %}
+  {% include "./includes/prototype_menu.html" %}
+  {{ toast_provider() }}
+</div>
+{% endblock content %}
+
+{% block script %}
+  {% include "../../../ui-system/scripts/select_script.html" %}
+  {% include "./includes/faculty_data.html" %}
+  <script>
+    function facultyList() {
+      return {
+        profiles: {},
+        links: [],
+        search: "",
+        filters: { subject: "", course: "", experience: "" },
+        pending: { subject: "", course: "", experience: "" },
+        page: 1,
+        perPage: 10,
+        staffSearch: "",
+        removing: null,
+
+        init() {
+          this.profiles = facultyStore.load();
+          this.links = facultyStore.loadLinks();
+          this.$watch("search", () => (this.page = 1));
+          this.$watch("filters", () => (this.page = 1));
+          const message = facultyStore.flash();
+          if (message) this.$nextTick(() => this.$dispatch("toast", { title: message, variant: "success" }));
+          this.refreshIcons();
+          this.$watch("paged", () => this.refreshIcons());
+          this.$watch("staffSearch", () => this.refreshIcons());
+        },
+
+        refreshIcons() {
+          this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        },
+
+        get instructors() {
+          return STAFF.filter((s) => this.profiles[s.id]).map((s) => {
+            return {
+              subjects: [],
+              ...s,
+              ...this.profiles[s.id],
+              courses: [...new Set(linksFor(s.id, this.links).map((l) => l.course))],
+            };
+          }).sort((a, b) => a.name.replace(/^Dr\.\s*/, "").localeCompare(b.name.replace(/^Dr\.\s*/, "")));
+        },
+
+        get filtered() {
+          const q = this.search.trim().toLowerCase();
+          const { subject, course, experience } = this.filters;
+          const inRange = (y) => experience === "0-5" ? y <= 5 : experience === "5-10" ? y > 5 && y <= 10 : y > 10;
+          return this.instructors
+            .filter((p) => !subject || p.subjects.includes(subject))
+            .filter((p) => !course || (course === "__none" ? !p.courses.length : p.courses.includes(course)))
+            .filter((p) => !experience || (p.years_of_experience && inRange(p.years_of_experience)))
+            .filter((p) => !q || (p.name + " " + p.email + " " + p.subjects.join(" ")).toLowerCase().includes(q));
+        },
+
+        get activeFilterCount() {
+          return Object.values(this.filters).filter(Boolean).length;
+        },
+
+        applyFilters() {
+          this.filters = { ...this.pending };
+        },
+
+        // Resets the drawer's selects too; they keep their own selection.
+        clearFilters() {
+          this.pending = { subject: "", course: "", experience: "" };
+          this.filters = { ...this.pending };
+          document.querySelectorAll("[data-filter-select] > div").forEach((el) => el.dispatchEvent(new CustomEvent("set-selected-values", { detail: "" })));
+        },
+
+        get pageCount() {
+          return Math.max(1, Math.ceil(this.filtered.length / this.perPage));
+        },
+
+        get paged() {
+          const page = Math.min(this.page, this.pageCount);
+          return this.filtered.slice((page - 1) * this.perPage, page * this.perPage);
+        },
+
+
+        get staffResults() {
+          const q = this.staffSearch.trim().toLowerCase();
+          return STAFF
+            .filter((s) => !q || (s.name + " " + s.email).toLowerCase().includes(q))
+            .map((s) => ({ ...s, photo: this.profiles[s.id] ? this.profiles[s.id].photo : null, added: !!this.profiles[s.id] }))
+            .sort((a, b) => a.added - b.added);
+        },
+
+        openAdd() {
+          this.staffSearch = "";
+          this.$dispatch("open-modal-add-instructor");
+        },
+
+        askRemove(person) {
+          this.removing = person;
+          this.$dispatch("open-modal-remove-instructor");
+        },
+
+        confirmRemove() {
+          if (!this.removing) return;
+          const name = this.removing.name;
+          const next = { ...this.profiles };
+          delete next[this.removing.id];
+          this.profiles = next;
+          facultyStore.save(next);
+          this.links = this.links.filter((l) => l.instructor !== this.removing.id);
+          facultyStore.saveLinks(this.links);
+          this.removing = null;
+          this.$dispatch("toast", { title: `${name} removed from faculty`, variant: "success" });
+        },
+
+        setState(state) {
+          try { sessionStorage.setItem(FACULTY_KEY + "-no-courses", state === "no-courses" ? "1" : ""); } catch (e) {}
+          facultyStore.reset();
+          if (state === "empty") facultyStore.save({});
+          if (state === "no-courses") facultyStore.saveLinks([]);
+          this.profiles = facultyStore.load();
+          this.links = facultyStore.loadLinks();
+          this.search = "";
+          this.clearFilters();
+          this.page = 1;
+          this.refreshIcons();
+        },
+      };
+    }
+  </script>
+{% endblock script %}
