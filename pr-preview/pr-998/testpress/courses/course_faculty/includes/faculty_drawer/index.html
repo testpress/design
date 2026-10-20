@@ -1,0 +1,913 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div x-data="{ 
+        open: false,
+        init() {
+            this.$watch('open', value => {
+                if (value) {
+                    document.body.classList.add('overflow-hidden');
+                } else {
+                    document.body.classList.remove('overflow-hidden');
+                }
+            });
+        }
+     }" 
+     @open-drawer-faculty-editor.window="open = true" 
+     @close-drawer-faculty-editor.window="open = false"
+     @keydown.window.escape="open = false">
+
+    
+    <div x-show="open" 
+         x-cloak 
+         x-transition:enter="transition-opacity ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-in duration-300"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         @click="open = false"
+         class="fixed inset-0 bg-gray-900/50 dark:bg-neutral-900/80 backdrop-blur-sm z-[80]"></div>
+    
+
+    <div id="faculty-editor" 
+         x-show="open"
+         x-cloak
+         x-transition:enter="transition ease-out duration-300 transform"
+         x-transition:enter-start="translate-x-full"
+         x-transition:enter-end="translate-x-0 translate-y-0"
+         x-transition:leave="transition ease-in duration-300 transform"
+         x-transition:leave-start="translate-x-0 translate-y-0"
+         x-transition:leave-end="translate-x-full"
+         
+         class="fixed z-[81] bg-white dark:bg-neutral-800 flex flex-col shadow-xl top-0 right-0 h-full border-l border-gray-200 dark:border-neutral-700 max-w-[480px] w-full "
+         role="dialog" 
+         tabindex="-1"
+         aria-labelledby="faculty-editor-title">
+        
+        <!-- Header -->
+        
+
+        <!-- Body & Footer (caller handles overflow and sticky elements) -->
+        <div class="flex flex-col flex-1 overflow-hidden">
+            
+  
+  <template x-if="picking">
+    <div class="flex-1 min-h-0 flex flex-col">
+      <div class="shrink-0 px-6 py-4 flex items-start gap-x-3 border-b border-gray-200 dark:border-neutral-700">
+        <div class="min-w-0 flex-1">
+          <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Add faculty</h3>
+          <p class="text-sm text-gray-500 dark:text-neutral-400">Who teaches <span x-text="currentCourse.title"></span>? Pick a teacher from your staff.</p>
+        </div>
+        <button type="button" @click="open = false" class="shrink-0 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Close">
+          <i data-lucide="x" class="size-4"></i>
+        </button>
+      </div>
+      <div class="shrink-0 px-6 pt-4">
+        
+<div class="w-full">
+  
+
+  <div class="relative w-full" x-data="{ inputValue: '' }">
+    
+      
+        <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+          <i data-lucide="search" class="w-4 h-4 text-gray-400"></i>
+        </div>
+      
+    
+    
+    
+    
+      
+    
+
+    <input type="text" 
+           id="faculty_search" 
+           name="faculty_search"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none ps-9  "
+           placeholder="Search by name or email"
+           
+           
+           x-model="pickerSearch"
+           x-ref="pickerSearch"
+           autocomplete="off">
+           
+    
+  </div>
+  
+  
+</div>
+
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <ul x-show="pickable.length">
+          <template x-for="person in pickable" :key="person.id">
+            <li>
+              <button type="button" @click="pick(person)" :disabled="person.added"
+                class="w-full flex items-center gap-x-3 px-2 py-2.5 rounded-lg text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:hover:bg-transparent disabled:cursor-default disabled:opacity-60 dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
+                <template x-if="person.photo">
+                  <img :src="person.photo" alt="" class="shrink-0 size-9 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+                </template>
+                <template x-if="!person.photo">
+                  <span class="shrink-0 size-9 inline-flex items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(person.name)"></span>
+                </template>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="person.name"></span>
+                  <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person.role + ' · ' + person.email"></span>
+                </span>
+                <span class="shrink-0 max-w-[45%] truncate text-xs text-gray-500 dark:text-neutral-400" x-text="person.note"></span>
+              </button>
+            </li>
+          </template>
+        </ul>
+        <div x-show="!pickable.length" class="py-12 text-center">
+          <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">No staff or mentor matches “<span x-text="pickerSearch"></span>”</p>
+        </div>
+      </div>
+      <div class="shrink-0 px-6 py-4 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
+        Can't find them?
+        <a href="#members" target="_blank" rel="noopener" class="inline-flex items-center gap-x-1 font-medium text-gray-800 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-500 dark:text-neutral-200 dark:decoration-neutral-600">Add them as staff first<i data-lucide="external-link" class="size-3.5"></i></a>
+      </div>
+    </div>
+  </template>
+
+  
+  <template x-if="!picking && editing && form">
+    <div class="flex-1 min-h-0 flex flex-col">
+
+      <div class="shrink-0 px-6 py-4 flex items-center gap-x-3 border-b border-gray-200 dark:border-neutral-700">
+        <button type="button" x-show="isNew" @click="backToPicker()" class="shrink-0 -ms-2 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Pick someone else">
+          <i data-lucide="arrow-left" class="size-4"></i>
+        </button>
+        <template x-if="editing.photo">
+          <img :src="editing.photo" alt="" class="shrink-0 size-10 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+        </template>
+        <template x-if="!editing.photo">
+          <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(editing.name)"></span>
+        </template>
+        <div class="min-w-0 flex-1">
+          <h3 id="faculty-editor-title" class="font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="editing.name"></h3>
+          <p class="text-sm text-gray-500 truncate dark:text-neutral-400" x-text="editing.role + ' · ' + editing.email"></p>
+        </div>
+        <button type="button" @click="open = false" class="shrink-0 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Close">
+          <i data-lucide="x" class="size-4"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 min-h-0 overflow-y-auto bg-gray-50 dark:bg-neutral-900">
+        <div class="p-5 space-y-4">
+
+          
+          <section class="p-5 space-y-5 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+            <div>
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">What they teach in <span x-text="currentCourse.title"></span></h4>
+              <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Students see this next to their name before buying <span x-text="currentCourse.title"></span>.</p>
+            </div>
+
+            <div>
+              <label for="faculty_subject" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Subjects <span class="text-red-500">*</span></label>
+              
+              <div class="relative" @click.outside="subjectMenu = false">
+                <div @click="$refs.subjectInput.focus(); subjectMenu = true"
+                  class="min-h-[2.75rem] px-2 py-1.5 flex flex-wrap items-center gap-1.5 bg-white border rounded-lg cursor-text focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800"
+                  :class="errors.subject ? 'border-red-500' : 'border-gray-200 dark:border-neutral-700'">
+                  <template x-for="(subject, index) in form.subjects" :key="subject">
+                    <span class="inline-flex items-center gap-x-1 py-1 ps-2.5 pe-1 rounded-md bg-gray-100 text-sm text-gray-800 dark:bg-neutral-700 dark:text-neutral-200">
+                      <span x-text="subject"></span>
+                      <button type="button" @click.stop="removeSubject(index)" class="size-5 inline-flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 hover:text-gray-800 focus:outline-none dark:hover:bg-neutral-600" :aria-label="'Remove ' + subject">
+                        <i data-lucide="x" class="size-3.5"></i>
+                      </button>
+                    </span>
+                  </template>
+                  <input id="faculty_subject" type="text" x-ref="subjectInput" x-model="subjectDraft" maxlength="60" autocomplete="off"
+                    role="combobox" aria-autocomplete="list" aria-controls="subject-options" :aria-expanded="subjectMenu"
+                    :aria-invalid="!!errors.subject"
+                    :placeholder="form.subjects.length ? 'Add another subject' : 'Choose or type a subject'"
+                    @focus="subjectMenu = true"
+                    @input="subjectMenu = true; subjectActive = 0"
+                    @keydown="subjectKey($event)"
+                    class="flex-1 min-w-[10rem] p-1 border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white">
+                </div>
+
+                <ul id="subject-options" role="listbox" x-show="subjectMenu && subjectOptions.length" x-cloak
+                  class="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto p-1 bg-white border border-gray-200 rounded-lg shadow-lg dark:bg-neutral-800 dark:border-neutral-700">
+                  <template x-for="(option, index) in subjectOptions" :key="(option.create ? 'new-' : '') + option.value">
+                    <li role="option" :aria-selected="index === subjectActive"
+                      @mousedown.prevent="chooseSubject(option)" @mouseenter="subjectActive = index"
+                      class="flex items-center gap-x-2 px-2.5 py-2 rounded-md text-sm cursor-pointer"
+                      :class="index === subjectActive ? 'bg-gray-100 dark:bg-neutral-700' : ''">
+                      <template x-if="option.create">
+                        <span class="inline-flex items-center gap-x-2 text-gray-800 dark:text-neutral-200"><i data-lucide="plus" class="size-4 text-gray-500"></i><span>Create “<span class="font-medium" x-text="option.label"></span>”</span></span>
+                      </template>
+                      <template x-if="!option.create">
+                        <span class="text-gray-800 dark:text-neutral-200" x-text="option.label"></span>
+                      </template>
+                    </li>
+                  </template>
+                </ul>
+              </div>
+              <p x-show="errors.subject" class="mt-1.5 text-xs text-red-600 dark:text-red-500" x-text="errors.subject"></p>
+              <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Pick from the list, or type a new subject and press Enter.</p>
+            </div>
+
+            <div>
+              
+              <template x-if="form.video && !form.video.uploaded">
+                <div>
+                  <div class="mb-2 flex items-center justify-between gap-x-3">
+                    <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">Intro video</p>
+                    <button type="button" @click="form.video = null" class="inline-flex items-center gap-x-1 text-sm font-medium text-gray-600 hover:text-red-600 focus:outline-none focus:underline dark:text-neutral-400 dark:hover:text-red-500">
+                      <i data-lucide="trash-2" class="size-3.5"></i>Remove
+                    </button>
+                  </div>
+                  <video src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" controls playsinline preload="metadata" class="w-full aspect-video rounded-xl bg-black object-contain"></video>
+                </div>
+              </template>
+              <div x-show="!form.video || form.video.uploaded" @change.capture="pickVideo($event)">
+                
+
+
+<div class="w-full" 
+     x-data="fileUpload({ multiple: false, maxSize: '500MB', acceptedFormats: 'mp4,mov,webm'.split(',') })"
+     @set-uploaded-file.window="if ($event.detail.name === 'intro_video') { files = $event.detail.files || []; }">
+  
+    <label class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+      Intro video (optional)
+    </label>
+  
+
+  <!-- Upload Area -->
+  <div x-show="multiple || files.length === 0"
+    @dragover.prevent="isDragging = true"
+    @dragleave.prevent="isDragging = false"
+    @drop.prevent="isDragging = false; handleDrop($event)"
+    @click="$refs.fileInput.click()"
+    :class="isDragging ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-950/20' : 'border-gray-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 hover:border-gray-400 dark:hover:border-neutral-500'"
+    class="cursor-pointer p-8 flex justify-center border border-dashed rounded-xl transition-all duration-200">
+    
+    <input type="file" name="intro_video" x-ref="fileInput" class="hidden" @change="handleFileSelect"  >
+    
+    <div class="text-center">
+      <span class="inline-flex justify-center items-center size-12 text-gray-400 dark:text-neutral-500 mx-auto">
+        <i data-lucide="clapperboard" stroke-width="1" class="shrink-0 size-10"></i>
+      </span>
+
+      <div class="mt-2 flex flex-wrap justify-center text-sm/6 text-gray-600 dark:text-neutral-400">
+        <span class="pe-1 font-medium text-gray-800 dark:text-neutral-200">
+          Drop a video here or
+        </span>
+        <span class="bg-white dark:bg-neutral-800 font-semibold text-primary-600 dark:text-primary-500 hover:text-primary-700 dark:hover:text-primary-600 rounded-lg decoration-2 hover:underline">browse</span>
+      </div>
+
+      <p class="mt-1 text-xs text-gray-400 dark:text-neutral-500">
+        
+          A short video of them saying hello to students. Keep it under 2 minutes.
+        
+      </p>
+    </div>
+  </div>
+
+  <!-- Global Error Message (rendered standard below upload card) -->
+  <p class="mt-1.5 text-xs text-red-500" x-text="errorMessage" x-show="errorMessage" x-cloak></p>
+
+  <!-- Previews -->
+  <div class="mt-4 space-y-2" x-show="files.length > 0" x-transition>
+    <template x-for="(file, index) in files" :key="index">
+      <div class="p-3 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-xl">
+        <div :class="file.status === 'uploading' ? 'mb-2' : ''" class="flex justify-between items-center">
+          <div class="flex items-center gap-x-3">
+            <!-- File Icon -->
+            <span class="size-8 flex justify-center items-center bg-gray-50 dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 text-gray-500 dark:text-neutral-400 rounded-lg">
+              <i data-lucide="file-text" class="shrink-0 size-4"></i>
+            </span>
+            <div>
+              <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">
+                <span class="truncate inline-block max-w-[180px] sm:max-w-xs align-bottom" x-text="file.name"></span>
+              </p>
+              <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="file.size"></p>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="inline-flex items-center gap-x-2">
+            <!-- Cancel Button (Uploading) -->
+            <div x-show="file.status === 'uploading'">
+              <div class="inline-flex">
+                
+                
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'top';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-4214">
+      
+                  <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none" aria-label="Cancel upload">
+                    <i data-lucide="pause" class="shrink-0 size-4"></i>
+                  </button>
+                
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-4214"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal whitespace-nowrap">
+
+      Cancel upload
+
+      <!-- Arrow -->
+      
+        <span class="absolute top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
+  </div>
+
+              </div>
+            </div>
+
+            <!-- Action Options once Uploaded (Success/Error) -->
+            <div x-show="file.status === 'success'">
+              <div class="inline-flex items-center gap-x-2">
+                <!-- Replace & Delete Icons -->
+                <div class="inline-flex">
+                  
+                  
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'top';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-7911">
+      
+                    <button type="button" @click.stop="replaceIndex = index; $refs.fileInput.click()" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Replace file">
+                      <i data-lucide="refresh-cw" class="shrink-0 size-4"></i>
+                    </button>
+                  
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-7911"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal whitespace-nowrap">
+
+      Replace file
+
+      <!-- Arrow -->
+      
+        <span class="absolute top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
+  </div>
+
+                </div>
+
+                <div class="inline-flex">
+                  
+                  
+  
+  
+  
+  
+  
+
+  <div x-data="{
+         active: false,
+         top: 0, left: 0,
+         arrowOffset: '50%',
+         updatePosition() {
+           const trigger = this.$refs.trigger;
+           const tip = this.$refs.tip;
+           if (!trigger || !tip) return;
+           const r = trigger.getBoundingClientRect();
+           const placement = 'top';
+           const gap = 8;
+           // Force display to measure real dimensions (tip may still be hidden via x-show)
+           const wasHidden = tip.style.display === 'none' || getComputedStyle(tip).display === 'none';
+           if (wasHidden) tip.style.setProperty('display', 'block', 'important');
+           const tipW = tip.offsetWidth || 100;
+           const tipH = tip.offsetHeight || 28;
+           if (wasHidden) tip.style.removeProperty('display');
+           console.log('[tooltip] placement:', placement, '| trigger rect:', r, '| tipW:', tipW, '| tipH:', tipH);
+           if (placement === 'top') {
+             this.top  = r.top - tipH - gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'bottom') {
+             this.top  = r.bottom + gap;
+             this.left = r.left + (r.width - tipW) / 2;
+           } else if (placement === 'left') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.left - tipW - gap;
+           } else if (placement === 'right') {
+             this.top  = r.top + (r.height - tipH) / 2;
+             this.left = r.right + gap;
+           }
+           // Clamp to viewport
+           const minL = 8, maxL = window.innerWidth - tipW - 8;
+           const origLeft = this.left;
+           this.left = Math.max(minL, Math.min(this.left, maxL));
+           if (placement === 'top' || placement === 'bottom') {
+             const triggerCenter = r.left + r.width / 2;
+             const shift = triggerCenter - this.left;
+             this.arrowOffset = Math.max(8, Math.min(shift, tipW - 8)) + 'px';
+           }
+           console.log('[tooltip] final top:', this.top, '| left:', this.left);
+         }
+       }"
+       @mouseenter="active = true; $nextTick(() => updatePosition())"
+       @mouseleave="active = false"
+       @focusin="active = true; $nextTick(() => updatePosition())"
+       @focusout="active = false"
+       @click="active = !active; if(active) $nextTick(() => updatePosition())"
+       @click.outside="active = false"
+       @keydown.escape.window="active = false"
+       @scroll.window.capture.passive="if(active) updatePosition()"
+       @resize.window.passive="if(active) updatePosition()"
+       class="relative inline-flex items-center align-middle cursor-pointer">
+
+    <!-- Trigger -->
+    <div x-ref="trigger"
+         class="inline-flex items-center justify-center"
+         aria-describedby="tooltip-3178">
+      
+                    <button type="button" @click.stop="removeFile(index)" class="relative text-gray-400 hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-500 dark:hover:text-white dark:focus:text-white disabled:opacity-50 disabled:pointer-events-none cursor-pointer" aria-label="Delete file">
+                      <i data-lucide="trash-2" class="shrink-0 size-4"></i>
+                    </button>
+                  
+    </div>
+
+    <!-- Tooltip Card (fixed, escapes overflow containers) -->
+    <div x-show="active"
+         x-cloak
+         x-ref="tip"
+         id="tooltip-3178"
+         role="tooltip"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-100"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         :style="{ top: top + 'px', left: left + 'px' }"
+         class="fixed z-[9999] py-1.5 px-2.5 bg-gray-900 dark:bg-white text-xs font-medium text-white dark:text-neutral-800 rounded-md shadow-2xs break-words whitespace-normal whitespace-nowrap">
+
+      Delete file
+
+      <!-- Arrow -->
+      
+        <span class="absolute top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-white" :style="{ left: arrowOffset }"></span>
+      
+    </div>
+  </div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Bar (Only when uploading) -->
+        <div class="flex items-center gap-x-3 whitespace-nowrap mt-2" x-show="file.status === 'uploading'">
+          <div class="flex w-full h-2 bg-gray-200 dark:bg-neutral-600 rounded-full overflow-hidden" role="progressbar" :aria-valuenow="file.progress" aria-valuemin="0" aria-valuemax="100">
+            <div class="flex flex-col justify-center rounded-full overflow-hidden bg-primary-600 dark:bg-primary-500 text-xs text-white text-center whitespace-nowrap transition-all duration-200" :style="`width: ${file.progress}%`"></div>
+          </div>
+          <div class="w-10 text-end">
+            <span class="text-sm text-gray-800 dark:text-neutral-200">
+              <span x-text="file.progress"></span>%
+            </span>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+              </div>
+            </div>
+          </section>
+
+          
+          <section class="p-5 space-y-5 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+            <div>
+              <h4 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">About <span x-text="editing.name.replace(/^Dr\.\s*/, '').split(' ')[0]"></span></h4>
+              <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+                <template x-if="sharedWith.length"><span>Students see this on every course this teacher takes: <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="[currentCourse.title, ...sharedWith].join(', ')"></span>. Changing it here changes it there too.</span></template>
+                <template x-if="!sharedWith.length"><span>Students see this on every course this teacher takes. You only fill it once.</span></template>
+              </p>
+            </div>
+
+
+            <div class="flex items-center gap-x-4">
+              <template x-if="editing.photo">
+                <img :src="editing.photo" alt="" class="shrink-0 size-14 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+              </template>
+              <template x-if="!editing.photo">
+                <span class="shrink-0 size-14 inline-flex items-center justify-center rounded-full border border-dashed border-gray-300 text-gray-400 dark:border-neutral-600"><i data-lucide="image-plus" class="size-5"></i></span>
+              </template>
+              
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-white border border-gray-200 text-gray-800 shadow-2xs hover:bg-gray-50 focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700"   >
+  
+
+    
+    
+
+    <span x-text="editing.photo ? 'Change photo' : 'Add photo'"></span>
+
+    
+
+  
+    </button>
+  
+
+
+            </div>
+
+            <div>
+              
+<div class="w-full">
+  
+    <label for="faculty_short_description" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+      Short description <span class="text-red-500">*</span>
+    </label>
+  
+
+  <div class="relative w-full">
+    <textarea id="faculty_short_description" 
+              name="faculty_short_description"
+              rows="2"
+              class="py-2 px-3 sm:py-3 sm:px-4 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500  "
+              placeholder="One line on who they are, e.g. Former civil servant who teaches polity through landmark judgements"
+              required
+              
+              x-model="form.short_description"
+              
+              maxlength="140" :aria-invalid="!!errors.short_description"></textarea>
+  </div>
+  
+  
+</div>
+
+              <div class="mt-1.5 flex justify-between gap-x-3 text-xs">
+                <p class="text-red-600 dark:text-red-500" x-text="errors.short_description || ''"></p>
+                <span class="shrink-0 text-gray-400 dark:text-neutral-500" x-text="form.short_description.length + '/140'"></span>
+              </div>
+            </div>
+
+            <div class="w-36">
+              
+<div class="w-full">
+  
+    <label for="faculty_years" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+      Years teaching
+    </label>
+  
+
+  <div class="relative w-full" x-data="{ inputValue: '' }">
+    
+    
+    
+    
+      
+    
+
+    <input type="number" 
+           id="faculty_years" 
+           name="faculty_years"
+           class="py-2 sm:py-2.5 px-3 block w-full bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-white placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none   "
+           placeholder="e.g. 12"
+           
+           
+           x-model="form.years_of_experience"
+           
+           min="0" max="60">
+           
+    
+  </div>
+  
+  
+</div>
+
+            </div>
+
+            
+  <div>
+    <div class="mb-2 flex items-center justify-between gap-x-3">
+      <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">Highlights</p>
+      <button type="button" @click="addItem('highlights')" :aria-label="'Add highlight'"
+        class="inline-flex items-center gap-x-1 text-sm font-medium text-primary-600 hover:text-primary-700 focus:outline-none focus:underline dark:text-primary-400">
+        <i data-lucide="plus" class="size-3.5"></i>Add
+      </button>
+    </div>
+    <ul class="space-y-2" data-list="highlights">
+      <template x-for="(item, index) in form.highlights" :key="index">
+        <li class="relative">
+          <input type="text" x-model="form.highlights[index]" placeholder="e.g. Mentored 120+ selections in CSE" maxlength="120"
+            :aria-label="'Highlights ' + (index + 1)"
+            @keydown.enter.prevent="addItem('highlights')"
+            class="py-2 ps-3 pe-9 block w-full bg-white border border-gray-200 rounded-lg sm:text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-700 focus:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:placeholder:text-neutral-500">
+          <button type="button" x-show="form.highlights.length > 1 || form.highlights[index]" @click="removeItem('highlights', index)" aria-label="Remove"
+            class="absolute inset-y-0 end-0 px-2.5 inline-flex items-center text-gray-400 hover:text-gray-700 focus:outline-none focus:text-gray-700 dark:hover:text-neutral-200">
+            <i data-lucide="x" class="size-4"></i>
+          </button>
+        </li>
+      </template>
+    </ul>
+  </div>
+
+
+            
+  <div>
+    <div class="mb-2 flex items-center justify-between gap-x-3">
+      <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">Qualifications</p>
+      <button type="button" @click="addItem('qualifications')" :aria-label="'Add qualification'"
+        class="inline-flex items-center gap-x-1 text-sm font-medium text-primary-600 hover:text-primary-700 focus:outline-none focus:underline dark:text-primary-400">
+        <i data-lucide="plus" class="size-3.5"></i>Add
+      </button>
+    </div>
+    <ul class="space-y-2" data-list="qualifications">
+      <template x-for="(item, index) in form.qualifications" :key="index">
+        <li class="relative">
+          <input type="text" x-model="form.qualifications[index]" placeholder="e.g. MA, History, University of Delhi" maxlength="120"
+            :aria-label="'Qualifications ' + (index + 1)"
+            @keydown.enter.prevent="addItem('qualifications')"
+            class="py-2 ps-3 pe-9 block w-full bg-white border border-gray-200 rounded-lg sm:text-sm text-gray-800 placeholder:text-gray-400 focus:border-primary-700 focus:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:placeholder:text-neutral-500">
+          <button type="button" x-show="form.qualifications.length > 1 || form.qualifications[index]" @click="removeItem('qualifications', index)" aria-label="Remove"
+            class="absolute inset-y-0 end-0 px-2.5 inline-flex items-center text-gray-400 hover:text-gray-700 focus:outline-none focus:text-gray-700 dark:hover:text-neutral-200">
+            <i data-lucide="x" class="size-4"></i>
+          </button>
+        </li>
+      </template>
+    </ul>
+  </div>
+
+
+            
+<div class="w-full">
+  
+    <label for="faculty_bio" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+      About
+    </label>
+  
+
+  <div class="relative w-full">
+    <textarea id="faculty_bio" 
+              name="faculty_bio"
+              rows="4"
+              class="py-2 px-3 sm:py-3 sm:px-4 block w-full bg-white dark:bg-neutral-800 border-gray-200 dark:border-neutral-700 rounded-lg sm:text-sm text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:border-primary-700 dark:focus:border-primary-600 focus:z-10 focus:ring-primary-700 dark:focus:ring-primary-600 disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500  "
+              placeholder="How they teach, their background and who they help most."
+              
+              
+              x-model="form.bio"
+              
+              ></textarea>
+  </div>
+  
+  
+</div>
+
+          </section>
+        </div>
+      </div>
+
+      <div class="shrink-0 px-6 py-4 flex justify-end gap-x-2 border-t border-gray-200 bg-white dark:bg-neutral-800 dark:border-neutral-700">
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm border border-transparent text-gray-500 hover:bg-gray-100 hover:text-gray-800 focus:bg-gray-100 focus:text-gray-800 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-300 dark:focus:bg-neutral-800 dark:focus:text-neutral-300"   @click="open = false">
+  
+
+    
+    
+
+    Cancel
+
+    
+
+  
+    </button>
+  
+
+
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:bg-primary-700 dark:focus:ring-offset-neutral-800"   @click="save()">
+  
+
+    
+    
+
+    <span x-text="isNew ? 'Add to course' : 'Save'"></span>
+
+    
+
+  
+    </button>
+  
+
+
+      </div>
+    </div>
+  </template>
+
+        </div>
+
+    </div>
+</div>
+
