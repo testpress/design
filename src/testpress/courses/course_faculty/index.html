@@ -9,7 +9,6 @@ date: 2026-10-20
 {% from "../../../ui-system/components/breadcrumbs.html" import breadcrumb %}
 {% from "../../../ui-system/components/page-header.html" import page_header %}
 {% from "../../../ui-system/components/button.html" import button %}
-{% from "../../../ui-system/components/card.html" import card %}
 {% from "../../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../../ui-system/components/empty-state.html" import empty_state %}
 {% from "../../../ui-system/components/toast.html" import toast_provider %}
@@ -50,94 +49,75 @@ date: 2026-10-20
       ) }}
     </div>
 
-    <div x-show="courseFaculty.length" x-cloak>
-      {% call card(padding="p-0", extra_classes="overflow-hidden") %}
-        <div class="px-4 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-gray-200 dark:border-neutral-700">
-          <p class="text-sm text-gray-500 dark:text-neutral-400">Students see faculty in this order. Drag to change it.</p>
-
-          <div x-show="productCount">
-            {% set products_trigger %}
-              <button type="button" class="inline-flex items-center gap-x-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none focus:underline dark:text-neutral-300 dark:hover:text-white">
-                <i data-lucide="store" class="size-4 text-gray-400"></i>
-                <span x-text="'On ' + productCount + ' product ' + (productCount === 1 ? 'page' : 'pages')"></span>
-                <i data-lucide="chevron-down" class="size-4 text-gray-400"></i>
-              </button>
-            {% endset %}
-            {% call dropdown(trigger=products_trigger, width="w-72") %}
-              <p class="px-2 pt-1 pb-1.5 text-xs text-gray-500 dark:text-neutral-400">Open a product page as students see it</p>
-              <div class="max-h-64 overflow-y-auto">
-                <template x-for="name in currentCourse.products" :key="name">
-                  <a href="{{ '/testpress/product_detail/' | url }}" target="_blank" rel="noopener" class="flex items-center justify-between gap-x-3 py-2 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
-                    <span class="truncate" x-text="name"></span><i data-lucide="external-link" class="shrink-0 size-3.5 text-gray-400"></i>
-                  </a>
-                </template>
-              </div>
-            {% endcall %}
-          </div>
+    {# Faculty as cards, close to what students see. Click a card for its subject and intro here. #}
+    <div x-show="courseFaculty.length" x-cloak class="space-y-3">
+      <div class="flex items-center justify-between gap-x-4">
+        <p class="text-sm text-gray-500 dark:text-neutral-400" x-text="courseFaculty.length + ' faculty'"></p>
+        <div x-show="productCount">
+          {% set products_trigger %}
+            <button type="button" class="inline-flex items-center gap-x-1.5 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none focus:underline dark:text-neutral-300 dark:hover:text-white">
+              <i data-lucide="store" class="size-4 text-gray-400"></i>
+              <span x-text="'On ' + productCount + ' product ' + (productCount === 1 ? 'page' : 'pages')"></span>
+              <i data-lucide="chevron-down" class="size-4 text-gray-400"></i>
+            </button>
+          {% endset %}
+          {% call dropdown(trigger=products_trigger, width="w-72") %}
+            <p class="px-2 pt-1 pb-1.5 text-xs text-gray-500 dark:text-neutral-400">Open a product page as students see it</p>
+            <div class="max-h-64 overflow-y-auto">
+              <template x-for="name in currentCourse.products" :key="name">
+                <a href="{{ '/testpress/product_detail/' | url }}" target="_blank" rel="noopener" class="flex items-center justify-between gap-x-3 py-2 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">
+                  <span class="truncate" x-text="name"></span><i data-lucide="external-link" class="shrink-0 size-3.5 text-gray-400"></i>
+                </a>
+              </template>
+            </div>
+          {% endcall %}
         </div>
+      </div>
 
-        <ul class="divide-y divide-gray-200 dark:divide-neutral-700">
-          <template x-for="(row, index) in courseFaculty" :key="row.userId">
-            <li class="relative flex items-center gap-x-3 px-4 py-3.5 hover:bg-gray-50 dark:hover:bg-neutral-700/30"
-              :draggable="dragReady === row.userId"
-              @dragstart="dragId = row.userId; $event.dataTransfer.effectAllowed = 'move'"
-              @dragover.prevent="overId = row.userId"
-              @dragleave="if (overId === row.userId) overId = null"
-              @drop.prevent="dropOn(row.userId)"
-              @dragend="dragId = null; overId = null; dragReady = null"
-              :class="{ 'opacity-40': dragId === row.userId, 'bg-gray-50 dark:bg-neutral-700/40': overId === row.userId && dragId !== row.userId }">
+      <ul class="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <template x-for="row in courseFaculty" :key="row.userId">
+          <li class="relative flex flex-col p-5 bg-white border border-gray-200 rounded-xl hover:border-gray-300 hover:shadow-sm transition dark:bg-neutral-800 dark:border-neutral-700 dark:hover:border-neutral-600">
+            <button type="button" @click="openAssign(row.userId)" class="flex items-center gap-x-3 pe-8 text-left focus:outline-none after:absolute after:inset-0 after:rounded-xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-primary-500" :aria-label="'Edit ' + row.person.name + ' in this course'">
+              <template x-if="row.person.photo">
+                <img :src="row.person.photo" alt="" class="shrink-0 size-12 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+              </template>
+              <template x-if="!row.person.photo">
+                <span class="shrink-0 size-12 inline-flex items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(row.person.name)"></span>
+              </template>
+              <span class="min-w-0">
+                <span class="block font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="row.person.name"></span>
+                <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="row.subject"></span>
+              </span>
+            </button>
 
-              <button type="button"
-                class="relative z-10 shrink-0 -ms-1.5 p-1 rounded-md text-gray-300 cursor-grab hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:text-neutral-600 dark:hover:text-neutral-300"
-                @mousedown="dragReady = row.userId" @mouseup="dragReady = null"
-                :aria-label="'Reorder ' + row.person.name + '. Use the up and down arrow keys.'"
-                @keydown.arrow-up.prevent="move(index, -1); $nextTick(() => $el.focus())"
-                @keydown.arrow-down.prevent="move(index, 1); $nextTick(() => $el.focus())">
-                <i data-lucide="grip-vertical" class="size-4"></i>
+            <p class="mt-4 text-sm line-clamp-2"
+              :class="profiles[row.userId] ? 'text-gray-600 dark:text-neutral-400' : 'text-gray-400 dark:text-neutral-500'"
+              x-text="profiles[row.userId] ? profiles[row.userId].short_description : 'No introduction yet'"></p>
+
+            <div class="mt-auto pt-4 flex items-center justify-between gap-x-3 text-sm">
+              <span x-show="row.video" class="min-w-0 inline-flex items-center gap-x-1.5 whitespace-nowrap overflow-hidden text-gray-600 dark:text-neutral-400"><i data-lucide="circle-play" class="shrink-0 size-4 text-gray-400"></i><span x-text="row.video && (row.video.uploaded ? 'Uploading…' : 'Intro ' + row.video.duration)"></span></span>
+              <span x-show="!row.video" class="min-w-0 truncate text-gray-400 dark:text-neutral-500">No intro video</span>
+              <button type="button" x-show="nextStep(row.userId)" @click="openProfile(row.userId)"
+                class="relative z-10 shrink-0 inline-flex items-center gap-x-1 whitespace-nowrap font-medium text-primary-600 hover:text-primary-700 focus:outline-none focus:underline dark:text-primary-400">
+                <span x-text="nextStep(row.userId)"></span><i data-lucide="arrow-right" class="size-4"></i>
               </button>
+            </div>
 
-              <button type="button" @click="openAssign(row.userId)" class="min-w-0 flex-1 flex items-center gap-x-3 text-left focus:outline-none after:absolute after:inset-0 after:content-['']" :aria-label="'Edit ' + row.person.name + ' in this course'">
-                <template x-if="row.person.photo">
-                  <img :src="row.person.photo" alt="" class="shrink-0 size-10 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
-                </template>
-                <template x-if="!row.person.photo">
-                  <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(row.person.name)"></span>
-                </template>
-                <span class="min-w-0">
-                  <span class="block text-sm font-semibold text-gray-800 truncate dark:text-neutral-200" x-text="row.person.name"></span>
-                  <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="row.subject"></span>
-                </span>
-              </button>
-
-              {# Only what's worth noticing #}
-              <div class="hidden sm:flex shrink-0 items-center gap-x-5 text-sm text-gray-500 dark:text-neutral-400">
-                <span x-show="gapText(row.userId)" class="inline-flex items-center gap-x-1.5">
-                  <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true"></span><span x-text="gapText(row.userId)"></span>
-                </span>
-                <span x-show="row.video" class="inline-flex items-center gap-x-1.5">
-                  <i data-lucide="circle-play" class="size-4 text-gray-400"></i><span x-text="row.video && row.video.duration"></span>
-                </span>
-              </div>
-
-              <div class="relative z-10 shrink-0">
-                {{ dropdown(
-                  trigger="ellipsis-vertical",
-                  width="w-56",
-                  items=[
-                    { label: "Edit subject and video", icon: "pencil", attrs: '@click="open = false; openAssign(row.userId)"' },
-                    { label: "Edit profile", icon: "user-round-pen", attrs: '@click="open = false; openProfile(row.userId)"' },
-                    { divider: true },
-                    { label: "Move up", icon: "arrow-up", attrs: '@click="open = false; move(index, -1)" :disabled="index === 0" :class="index === 0 ? \'opacity-50 pointer-events-none\' : \'\'"' },
-                    { label: "Move down", icon: "arrow-down", attrs: '@click="open = false; move(index, 1)" :disabled="index === courseFaculty.length - 1" :class="index === courseFaculty.length - 1 ? \'opacity-50 pointer-events-none\' : \'\'"' },
-                    { divider: true },
-                    { label: "Remove from course", icon: "user-minus", variant: "danger", attrs: '@click="open = false; askRemove(row.userId)"' }
-                  ]
-                ) }}
-              </div>
-            </li>
-          </template>
-        </ul>
-      {% endcall %}
+            <div class="absolute top-4 end-3 z-10">
+              {{ dropdown(
+                trigger="ellipsis-vertical",
+                width="w-56",
+                items=[
+                  { label: "Edit subject and video", icon: "pencil", attrs: '@click="open = false; openAssign(row.userId)"' },
+                  { label: "Edit profile", icon: "user-round-pen", attrs: '@click="open = false; openProfile(row.userId)"' },
+                  { divider: true },
+                  { label: "Remove from course", icon: "user-minus", variant: "danger", attrs: '@click="open = false; askRemove(row.userId)"' }
+                ]
+              ) }}
+            </div>
+          </li>
+        </template>
+      </ul>
     </div>
   </main>
 
@@ -150,5 +130,6 @@ date: 2026-10-20
 {% endblock content %}
 
 {% block script %}
+  {% include "../../../ui-system/scripts/upload_script.html" %}
   {% include "./includes/faculty_script.html" %}
 {% endblock script %}

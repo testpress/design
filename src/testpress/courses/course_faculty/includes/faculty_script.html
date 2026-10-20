@@ -1,6 +1,6 @@
 <script>
   // Course faculty, admin side. Two jobs on one page:
-  // - Who teaches this course: subject and intro video here, and the order (a small modal).
+  // - Who teaches this course: subject and intro video here (a small modal).
   // - Their profile, shared by every course they teach in (a drawer).
   // Faculty are existing staff and mentor users. Nothing here changes course access.
   (() => {
@@ -100,18 +100,12 @@
         editing: null,
         form: null,
         errors: {},
-        // Set when the profile drawer follows "add to course" for someone without a profile.
-        addedTo: null,
 
         // Course assignment modal.
         assigning: null,
         assign: { subject: "", video: null, isNew: false },
 
         removing: null,
-
-        dragId: null,
-        dragReady: null,
-        overId: null,
 
         init() {
           this.refreshIcons();
@@ -146,17 +140,15 @@
           return this.links.filter((l) => l.userId === userId).map((l) => ({ ...l, course: this.course(l.courseId) }));
         },
 
-        // What the student card will be missing, in a few words.
-        gapText(userId) {
+        // The one thing to do next so the student card is complete, as a button label.
+        nextStep(userId) {
           const p = this.profiles[userId];
-          if (!p) return "No profile yet";
-          const gaps = [];
-          if (!this.staffMember(userId).photo) gaps.push("photo");
-          if (!p.highlights.length) gaps.push("highlights");
-          if (!p.bio) gaps.push("about");
-          if (!p.qualifications.length) gaps.push("qualifications");
-          if (!gaps.length) return "";
-          return gaps.length <= 2 ? "No " + gaps.join(" or ") : "No " + gaps.slice(0, 2).join(", ") + " and " + (gaps.length - 2) + " more";
+          if (!p) return "Complete profile";
+          if (!this.staffMember(userId).photo) return "Add photo";
+          if (!p.highlights.length) return "Add highlights";
+          if (!p.bio) return "Add about";
+          if (!p.qualifications.length) return "Add qualifications";
+          return "";
         },
 
         // ---- One course ----
@@ -170,30 +162,6 @@
           return this.noProducts ? 0 : this.currentCourse.products.length;
         },
 
-        reorder(rows) {
-          this.links = [...this.links.filter((l) => l.courseId !== this.courseId), ...rows];
-          this.$dispatch("toast", { title: "Order saved", variant: "success" });
-        },
-
-        move(index, step) {
-          const rows = this.links.filter((l) => l.courseId === this.courseId);
-          const target = index + step;
-          if (target < 0 || target >= rows.length) return;
-          [rows[index], rows[target]] = [rows[target], rows[index]];
-          this.reorder(rows);
-        },
-
-        dropOn(userId) {
-          const rows = this.links.filter((l) => l.courseId === this.courseId);
-          const from = rows.findIndex((l) => l.userId === this.dragId);
-          const to = rows.findIndex((l) => l.userId === userId);
-          this.dragId = this.overId = this.dragReady = null;
-          if (from < 0 || to < 0 || from === to) return;
-          const [row] = rows.splice(from, 1);
-          rows.splice(to, 0, row);
-          this.reorder(rows);
-        },
-
         // ---- Picker ----
 
         get pickable() {
@@ -202,7 +170,8 @@
             .filter((s) => !q || s.name.toLowerCase().includes(q) || s.email.toLowerCase().includes(q))
             .map((s) => {
               const added = !this.empty && this.links.some((l) => l.courseId === this.courseId && l.userId === s.id);
-              const note = added ? "Added" : (this.hasProfile(s.id) ? "" : "No profile yet");
+              const elsewhere = this.teaching(s.id).filter((t) => t.courseId !== this.courseId).map((t) => t.course.title);
+              const note = added ? "Added" : (elsewhere.length ? "Teaches " + elsewhere.join(", ") : "");
               return { ...s, added, note };
             })
             .sort((a, b) => a.added - b.added);
@@ -226,13 +195,13 @@
           const link = this.links.find((l) => l.courseId === this.courseId && l.userId === userId);
           this.assigning = this.staffMember(userId);
           this.assign = { subject: link ? link.subject : "", video: link && link.video ? { ...link.video } : null, isNew };
+          this.$dispatch("set-uploaded-file", { name: "intro_video", files: [] });
           setTimeout(() => this.$dispatch("open-modal-assign-faculty"), 60);
         },
 
         pickVideo(event) {
           const file = event.target.files && event.target.files[0];
-          if (file) this.assign.video = { name: file.name, duration: "Processing…" };
-          event.target.value = "";
+          if (file) this.assign.video = { name: file.name, duration: "uploading…", uploaded: true };
         },
 
         saveAssign() {
@@ -247,18 +216,17 @@
           }
           this.links = [...this.links];
 
-          // New and no profile yet: go straight on to it, so the student card isn't empty.
-          if (this.assign.isNew && !this.hasProfile(person.id)) {
-            this.openProfile(person.id, this.currentCourse.title);
-            return;
-          }
-          this.$dispatch("toast", { title: this.assign.isNew ? `${person.name} added` : "Saved", variant: "success" });
+          const needsProfile = !this.hasProfile(person.id);
+          this.$dispatch("toast", {
+            title: this.assign.isNew ? `${person.name} added` : "Saved",
+            description: this.assign.isNew && needsProfile ? "Complete their profile so students know who they are." : "",
+            variant: "success",
+          });
         },
 
         // ---- Profile drawer ----
 
-        openProfile(userId, addedTo = null) {
-          this.addedTo = addedTo;
+        openProfile(userId) {
           const profile = this.profiles[userId] || blankProfile();
           this.editing = this.staffMember(userId);
           this.errors = {};
@@ -303,9 +271,7 @@
             },
           };
           this.$dispatch("close-drawer-faculty-profile");
-          const title = this.addedTo ? `${this.editing.name} added` : (isNew ? "Profile created" : "Profile saved");
-          this.addedTo = null;
-          this.$dispatch("toast", { title, variant: "success" });
+          this.$dispatch("toast", { title: isNew ? "Profile created" : "Profile saved", variant: "success" });
         },
 
         // ---- Remove ----
