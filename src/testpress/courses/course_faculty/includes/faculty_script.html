@@ -95,6 +95,8 @@
         noProducts: false,
 
         pickerSearch: "",
+        picking: false,
+        subjectDraft: "",
 
         // The drawer: who, and a working copy of their course details and profile.
         editing: null,
@@ -106,7 +108,7 @@
 
         init() {
           this.refreshIcons();
-          ["empty", "noProducts", "links", "profiles", "editing", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
+          ["empty", "noProducts", "links", "profiles", "editing", "picking", "pickerSearch", "form"].forEach((key) => this.$watch(key, () => this.refreshIcons()));
         },
 
         refreshIcons() {
@@ -174,21 +176,27 @@
             .sort((a, b) => a.added - b.added);
         },
 
+        // Add faculty: the drawer opens on "pick a person", then the same drawer shows the form.
         openPicker() {
           this.pickerSearch = "";
-          this.$dispatch("open-modal-pick-faculty");
-          setTimeout(() => this.$refs.pickerSearch && this.$refs.pickerSearch.focus(), 80);
+          this.picking = true;
+          this.$dispatch("open-drawer-faculty-editor");
+          setTimeout(() => this.$refs.pickerSearch && this.$refs.pickerSearch.focus(), 350);
         },
 
         pick(person) {
           if (person.added) return;
-          this.$dispatch("close-modal-pick-faculty");
-          this.openEditor(person.id, true);
+          this.openEditor(person.id, true, true);
+        },
+
+        backToPicker() {
+          this.picking = true;
         },
 
         // ---- One drawer: this course's subject and intro, then the shared profile ----
 
-        openEditor(userId, isNew = false) {
+        openEditor(userId, isNew = false, fromPicker = false) {
+          this.picking = false;
           const profile = this.profiles[userId] || blankProfile();
           const link = this.links.find((l) => l.courseId === this.courseId && l.userId === userId);
           this.editing = this.staffMember(userId);
@@ -196,18 +204,36 @@
           this.errors = {};
           this.form = {
             ...clone(profile),
-            subject: link ? link.subject : "",
+            subjects: link ? link.subject.split(",").map((t) => t.trim()).filter(Boolean) : [],
             video: link && link.video ? { ...link.video } : null,
           };
           if (!this.form.highlights.length) this.form.highlights = [""];
           if (!this.form.qualifications.length) this.form.qualifications = [""];
+          this.subjectDraft = "";
           this.$dispatch("set-uploaded-file", { name: "intro_video", files: [] });
-          setTimeout(() => this.$dispatch("open-drawer-faculty-editor"), 60);
+          if (fromPicker) {
+            setTimeout(() => this.$refs.subjectInput && this.$refs.subjectInput.focus(), 80);
+          } else {
+            setTimeout(() => this.$dispatch("open-drawer-faculty-editor"), 60);
+          }
         },
 
         // Other courses that use the same profile.
         get sharedWith() {
           return this.editing ? this.teaching(this.editing.id).filter((t) => t.courseId !== this.courseId).map((t) => t.course.title) : [];
+        },
+
+        // Subjects: each one a chip. Enter or comma adds; Backspace on an empty box removes the last.
+        addSubject() {
+          const value = this.subjectDraft.replace(/,$/, "").trim();
+          if (value && !this.form.subjects.some((t) => t.toLowerCase() === value.toLowerCase())) this.form.subjects.push(value);
+          this.subjectDraft = "";
+          delete this.errors.subject;
+          this.refreshIcons();
+        },
+
+        removeSubject(index) {
+          this.form.subjects.splice(index, 1);
         },
 
         pickVideo(event) {
@@ -217,6 +243,7 @@
 
         addItem(list) {
           this.form[list].push("");
+          this.refreshIcons();
           this.$nextTick(() => {
             const inputs = document.querySelectorAll(`[data-list="${list}"] input`);
             inputs.length && inputs[inputs.length - 1].focus();
@@ -229,7 +256,8 @@
 
         save() {
           this.errors = {};
-          if (!this.form.subject.trim()) this.errors.subject = "Add the subject they teach here.";
+          this.addSubject();
+          if (!this.form.subjects.length) this.errors.subject = "Add at least one subject they teach in this course.";
           if (!this.form.short_description.trim()) this.errors.short_description = "Add a one-line introduction.";
           if (Object.keys(this.errors).length) {
             this.$nextTick(() => {
@@ -253,11 +281,11 @@
           };
           const link = this.links.find((l) => l.courseId === this.courseId && l.userId === id);
           if (link) {
-            link.subject = this.form.subject.trim();
+            link.subject = this.form.subjects.join(", ");
             link.video = this.form.video;
             this.links = [...this.links];
           } else {
-            this.links = [...this.links, { courseId: this.courseId, userId: id, subject: this.form.subject.trim(), video: this.form.video }];
+            this.links = [...this.links, { courseId: this.courseId, userId: id, subject: this.form.subjects.join(", "), video: this.form.video }];
           }
 
           this.$dispatch("close-drawer-faculty-editor");

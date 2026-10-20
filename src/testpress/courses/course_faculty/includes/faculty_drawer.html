@@ -35,10 +35,61 @@
 {% endmacro %}
 
 {% call drawer(id="faculty-editor", placement="right", size="md") %}
-  <template x-if="editing && form">
+  {# Step 1 of adding: pick a person #}
+  <template x-if="picking">
+    <div class="flex-1 min-h-0 flex flex-col">
+      <div class="shrink-0 px-6 py-4 flex items-start gap-x-3 border-b border-gray-200 dark:border-neutral-700">
+        <div class="min-w-0 flex-1">
+          <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Add faculty</h3>
+          <p class="text-sm text-gray-500 dark:text-neutral-400">Who teaches <span x-text="currentCourse.title"></span>? Pick from your staff and mentors.</p>
+        </div>
+        <button type="button" @click="open = false" class="shrink-0 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Close">
+          <i data-lucide="x" class="size-4"></i>
+        </button>
+      </div>
+      <div class="shrink-0 px-6 pt-4">
+        {{ input(name="faculty_search", placeholder="Search by name or email", icon="search", x_model="pickerSearch", x_ref="pickerSearch", extra_attrs='autocomplete="off"') }}
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
+        <ul x-show="pickable.length">
+          <template x-for="person in pickable" :key="person.id">
+            <li>
+              <button type="button" @click="pick(person)" :disabled="person.added"
+                class="w-full flex items-center gap-x-3 px-2 py-2.5 rounded-lg text-left hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:hover:bg-transparent disabled:cursor-default disabled:opacity-60 dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
+                <template x-if="person.photo">
+                  <img :src="person.photo" alt="" class="shrink-0 size-9 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
+                </template>
+                <template x-if="!person.photo">
+                  <span class="shrink-0 size-9 inline-flex items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="initials(person.name)"></span>
+                </template>
+                <span class="min-w-0 flex-1">
+                  <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="person.name"></span>
+                  <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person.role + ' · ' + person.email"></span>
+                </span>
+                <span class="shrink-0 max-w-[45%] truncate text-xs text-gray-500 dark:text-neutral-400" x-text="person.note"></span>
+              </button>
+            </li>
+          </template>
+        </ul>
+        <div x-show="!pickable.length" class="py-12 text-center">
+          <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">No staff or mentor matches “<span x-text="pickerSearch"></span>”</p>
+        </div>
+      </div>
+      <div class="shrink-0 px-6 py-4 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
+        Not listed? Faculty must be staff or mentors.
+        <a href="#members" target="_blank" rel="noopener" class="inline-flex items-center gap-x-1 font-medium text-gray-800 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-500 dark:text-neutral-200 dark:decoration-neutral-600">Add them in Members<i data-lucide="external-link" class="size-3.5"></i></a>
+      </div>
+    </div>
+  </template>
+
+  {# Step 2 (or editing): the form #}
+  <template x-if="!picking && editing && form">
     <div class="flex-1 min-h-0 flex flex-col">
 
       <div class="shrink-0 px-6 py-4 flex items-center gap-x-3 border-b border-gray-200 dark:border-neutral-700">
+        <button type="button" x-show="isNew" @click="backToPicker()" class="shrink-0 -ms-2 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Pick someone else">
+          <i data-lucide="arrow-left" class="size-4"></i>
+        </button>
         <template x-if="editing.photo">
           <img :src="editing.photo" alt="" class="shrink-0 size-10 rounded-full object-cover bg-gray-100 dark:bg-neutral-700">
         </template>
@@ -60,14 +111,35 @@
           {# This course only #}
           <section class="{{ group }}">
             <div>
-              <h4 class="{{ group_title }}">In <span x-text="currentCourse.title"></span></h4>
-              <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">What they teach here. Shown only on this course's product pages.</p>
+              <h4 class="{{ group_title }}">What they teach in <span x-text="currentCourse.title"></span></h4>
+              <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Students see this next to their name on <span x-text="currentCourse.title"></span>'s product pages.</p>
             </div>
 
             <div>
-              <label for="faculty_subject" class="{{ label }}">Subject <span class="text-red-500">*</span></label>
-              {{ input(name="faculty_subject", placeholder="e.g. Polity, or Polity and Governance", x_model="form.subject", extra_attrs='maxlength="80" :aria-invalid="!!errors.subject"') }}
+              <label for="faculty_subject" class="{{ label }}">Subjects <span class="text-red-500">*</span></label>
+              {# Chips: one per subject. Enter or comma adds another. #}
+              <div @click="$refs.subjectInput.focus()"
+                class="min-h-[2.75rem] px-2 py-1.5 flex flex-wrap items-center gap-1.5 bg-white border rounded-lg cursor-text focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800"
+                :class="errors.subject ? 'border-red-500' : 'border-gray-200 dark:border-neutral-700'">
+                <template x-for="(subject, index) in form.subjects" :key="subject">
+                  <span class="inline-flex items-center gap-x-1 py-1 ps-2.5 pe-1 rounded-md bg-gray-100 text-sm text-gray-800 dark:bg-neutral-700 dark:text-neutral-200">
+                    <span x-text="subject"></span>
+                    <button type="button" @click.stop="removeSubject(index)" class="size-5 inline-flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 hover:text-gray-800 focus:outline-none dark:hover:bg-neutral-600" :aria-label="'Remove ' + subject">
+                      <i data-lucide="x" class="size-3.5"></i>
+                    </button>
+                  </span>
+                </template>
+                <input id="faculty_subject" type="text" x-ref="subjectInput" x-model="subjectDraft" maxlength="60" autocomplete="off"
+                  :aria-invalid="!!errors.subject"
+                  :placeholder="form.subjects.length ? 'Add another subject' : 'Type a subject, e.g. Polity'"
+                  @keydown.enter.prevent="addSubject()"
+                  @keydown="if ($event.key === ',') { $event.preventDefault(); addSubject(); }"
+                  @keydown.backspace="if (!subjectDraft && form.subjects.length) removeSubject(form.subjects.length - 1)"
+                  @blur="addSubject()"
+                  class="flex-1 min-w-[10rem] p-1 border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white">
+              </div>
               <p x-show="errors.subject" class="{{ field_error }}" x-text="errors.subject"></p>
+              <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Teaches more than one? Press Enter after each subject.</p>
             </div>
 
             <div>
@@ -85,7 +157,7 @@
                 </div>
               </template>
               <div x-show="!form.video || form.video.uploaded" @change.capture="pickVideo($event)">
-                {{ upload(name="intro_video", id="intro-video", label="Intro video (optional)", max_size="500MB", accepted_formats="mp4,mov,webm", icon="clapperboard", dropzone_title="Drop a video here or", help_text="For this course only. Under 2 minutes, up to 500 MB.") }}
+                {{ upload(name="intro_video", id="intro-video", label="Intro video (optional)", max_size="500MB", accepted_formats="mp4,mov,webm", icon="clapperboard", dropzone_title="Drop a video here or", help_text="A short hello from them, played from their card. Under 2 minutes, up to 500 MB.") }}
               </div>
             </div>
           </section>
@@ -93,9 +165,10 @@
           {# Shared profile #}
           <section class="{{ group }}">
             <div>
-              <h4 class="{{ group_title }}">Faculty profile</h4>
+              <h4 class="{{ group_title }}">About <span x-text="editing.name.replace(/^Dr\.\s*/, '').split(' ')[0]"></span></h4>
               <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
-                Who they are, so students trust who's teaching. The same in every course they teach<template x-if="sharedWith.length"><span>, including <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="sharedWith.join(', ')"></span></span></template>.
+                <template x-if="sharedWith.length"><span>Students see this on every course they teach: <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="[currentCourse.title, ...sharedWith].join(', ')"></span>. A change here updates all of them.</span></template>
+                <template x-if="!sharedWith.length"><span>Students see this on every course they teach. You only fill it once.</span></template>
               </p>
             </div>
 
