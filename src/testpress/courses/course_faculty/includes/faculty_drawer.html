@@ -45,7 +45,7 @@
       <div class="shrink-0 px-6 py-4 flex items-start gap-x-3 border-b border-gray-200 dark:border-neutral-700">
         <div class="min-w-0 flex-1">
           <h3 class="font-semibold text-gray-800 dark:text-neutral-200">Add faculty</h3>
-          <p class="text-sm text-gray-500 dark:text-neutral-400">Who teaches <span x-text="currentCourse.title"></span>? Pick from your staff and mentors.</p>
+          <p class="text-sm text-gray-500 dark:text-neutral-400">Who teaches <span x-text="currentCourse.title"></span>? Pick a teacher from your staff.</p>
         </div>
         <button type="button" @click="open = false" class="shrink-0 size-8 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700" aria-label="Close">
           <i data-lucide="x" class="size-4"></i>
@@ -80,8 +80,8 @@
         </div>
       </div>
       <div class="shrink-0 px-6 py-4 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
-        Not listed? Faculty must be staff or mentors.
-        <a href="#members" target="_blank" rel="noopener" class="inline-flex items-center gap-x-1 font-medium text-gray-800 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-500 dark:text-neutral-200 dark:decoration-neutral-600">Add them in Members<i data-lucide="external-link" class="size-3.5"></i></a>
+        Can't find them?
+        <a href="#members" target="_blank" rel="noopener" class="inline-flex items-center gap-x-1 font-medium text-gray-800 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-500 dark:text-neutral-200 dark:decoration-neutral-600">Add them as staff first<i data-lucide="external-link" class="size-3.5"></i></a>
       </div>
     </div>
   </template>
@@ -142,7 +142,6 @@
                     @input="subjectMenu = true; subjectActive = 0"
                     @keydown="subjectKey($event)"
                     class="flex-1 min-w-[10rem] p-1 border-0 bg-transparent text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white">
-                  <i data-lucide="chevron-down" class="shrink-0 me-1 size-4 text-gray-400 pointer-events-none"></i>
                 </div>
 
                 <ul id="subject-options" role="listbox" x-show="subjectMenu && subjectOptions.length" x-cloak
@@ -163,25 +162,36 @@
                 </ul>
               </div>
               <p x-show="errors.subject" class="{{ field_error }}" x-text="errors.subject"></p>
-              <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Choose one or more. Not in the list? Type it and press Enter.</p>
+              <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Pick from the list, or type a new subject and press Enter.</p>
             </div>
 
             <div>
               <template x-if="form.video && !form.video.uploaded">
-                <div>
+                <div x-data="{ watching: false }">
                   <p class="{{ label }}">Intro video</p>
-                  <div class="p-3 flex items-center gap-x-3 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
-                    <span class="shrink-0 size-8 flex justify-center items-center rounded-lg bg-gray-900 text-white dark:bg-neutral-700"><i data-lucide="play" class="size-3.5 fill-current"></i></span>
-                    <div class="min-w-0 flex-1">
-                      <p class="text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="form.video && form.video.name"></p>
-                      <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="form.video && form.video.duration"></p>
+                  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden dark:bg-neutral-800 dark:border-neutral-700">
+                    <div x-show="watching" class="bg-black">
+                      <video x-ref="introPlayer" src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" :poster="editing.photo" controls playsinline preload="metadata" class="w-full aspect-video object-contain"></video>
                     </div>
-                    <button type="button" @click="form.video = null" class="shrink-0 text-sm font-medium text-gray-600 hover:text-red-600 focus:outline-none focus:underline dark:text-neutral-400">Remove</button>
+                    <div class="p-3 flex items-center gap-x-3">
+                      <button type="button" @click="watching = !watching; $nextTick(() => watching ? $refs.introPlayer.play() : $refs.introPlayer.pause())"
+                        class="shrink-0 size-8 flex justify-center items-center rounded-lg bg-gray-900 text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 dark:bg-neutral-700"
+                        :aria-label="watching ? 'Hide video' : 'Watch video'">
+                        <i x-show="!watching" data-lucide="play" class="size-3.5 fill-current"></i>
+                        <i x-show="watching" data-lucide="x" class="size-3.5"></i>
+                      </button>
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="form.video && form.video.name"></p>
+                        <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="form.video && form.video.duration"></p>
+                      </div>
+                      <button type="button" x-show="!watching" @click="watching = true; $nextTick(() => $refs.introPlayer.play())" class="shrink-0 text-sm font-medium text-gray-700 hover:text-gray-900 focus:outline-none focus:underline dark:text-neutral-300">Watch</button>
+                      <button type="button" @click="form.video = null" class="shrink-0 text-sm font-medium text-gray-600 hover:text-red-600 focus:outline-none focus:underline dark:text-neutral-400">Remove</button>
+                    </div>
                   </div>
                 </div>
               </template>
               <div x-show="!form.video || form.video.uploaded" @change.capture="pickVideo($event)">
-                {{ upload(name="intro_video", id="intro-video", label="Intro video (optional)", max_size="500MB", accepted_formats="mp4,mov,webm", icon="clapperboard", dropzone_title="Drop a video here or", help_text="A short hello from them, played from their card. Under 2 minutes, up to 500 MB.") }}
+                {{ upload(name="intro_video", id="intro-video", label="Intro video (optional)", max_size="500MB", accepted_formats="mp4,mov,webm", icon="clapperboard", dropzone_title="Drop a video here or", help_text="A short video of them saying hello to students. Keep it under 2 minutes.") }}
               </div>
             </div>
           </section>
@@ -191,8 +201,8 @@
             <div>
               <h4 class="{{ group_title }}">About <span x-text="editing.name.replace(/^Dr\.\s*/, '').split(' ')[0]"></span></h4>
               <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
-                <template x-if="sharedWith.length"><span>Students see this on every course they teach: <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="[currentCourse.title, ...sharedWith].join(', ')"></span>. A change here updates all of them.</span></template>
-                <template x-if="!sharedWith.length"><span>Students see this on every course they teach. You only fill it once.</span></template>
+                <template x-if="sharedWith.length"><span>Students see this on every course this teacher takes: <span class="font-medium text-gray-700 dark:text-neutral-300" x-text="[currentCourse.title, ...sharedWith].join(', ')"></span>. Changing it here changes it there too.</span></template>
+                <template x-if="!sharedWith.length"><span>Students see this on every course this teacher takes. You only fill it once.</span></template>
               </p>
             </div>
 
