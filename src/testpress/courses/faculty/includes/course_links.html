@@ -20,7 +20,7 @@
   ] %}
   {% call drawer(id="course-link", placement="right", size="md") %}
     <div class="py-3 px-6 flex justify-between items-center border-b border-gray-200 dark:border-neutral-700 shrink-0">
-      <h3 class="font-medium text-gray-800 dark:text-neutral-200" x-text="draft.isNew ? 'Assign course' : draft.course"></h3>
+      <h3 class="font-medium text-gray-800 dark:text-neutral-200" x-text="fixedCourse ? (draft.isNew ? 'Add ' + (person ? person.name : 'instructor') : (person ? person.name : '')) : (draft.isNew ? 'Assign course' : draft.course)"></h3>
       <button type="button" @click="open = false" class="size-8 inline-flex shrink-0 justify-center items-center rounded-full border border-gray-200 text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700">
         <span class="sr-only">Close drawer</span>
         <i data-lucide="x" class="size-4 shrink-0"></i>
@@ -28,7 +28,7 @@
     </div>
 
     <div class="flex-1 overflow-y-auto bg-gray-50 dark:bg-neutral-900/50 p-4 space-y-4">
-      <div x-show="draft.isNew" class="p-4 bg-white rounded-xl border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700">
+      <div x-show="draft.isNew && !fixedCourse" class="p-4 bg-white rounded-xl border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700">
         <h5 class="mb-3 font-medium text-sm text-gray-800 dark:text-neutral-200">Course <span class="text-red-500">*</span></h5>
         <template x-if="availableCourses.length">
           <div id="course-select" @change="if ($event.target.tagName === 'SELECT') { draft.course = $event.target.closest('[x-data]')._x_dataStack[0].selected; errors.course = ''; }">
@@ -85,16 +85,16 @@
         <button type="button" @click="open = false" class="flex-1 py-2 px-3 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300">
           Cancel
         </button>
-        <button type="button" @click="if (saveDraft()) open = false" class="flex-1 py-2 px-3 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-primary-600 text-white hover:bg-primary-700" x-text="draft.isNew ? 'Assign course' : 'Save changes'">
+        <button type="button" @click="if (saveDraft()) open = false" class="flex-1 py-2 px-3 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-primary-600 text-white hover:bg-primary-700" x-text="draft.isNew ? (fixedCourse ? 'Add to course' : 'Assign course') : 'Save changes'">
           Save changes
         </button>
       </div>
     </div>
   {% endcall %}
 
-  {% call modal(id="unassign-course", title="Unassign from course?", variant="danger", confirm_text="Unassign", cancel_text="Cancel") %}
+  {% call modal(id="unassign-course", title="Remove from course?", variant="danger", confirm_text="Remove", cancel_text="Cancel") %}
     <p class="text-gray-800 dark:text-neutral-200">
-      Students will no longer see <span class="font-medium" x-text="person ? person.name : 'this instructor'"></span> on <span class="font-medium" x-text="unassigning && unassigning.course"></span>’s page.
+      Students will no longer see <span class="font-medium" x-text="person ? person.name : 'this instructor'"></span> on <span class="font-medium" x-text="unassigning && unassigning.course"></span>.
     </p>
     <p class="mt-2 text-gray-500 dark:text-neutral-400">Their subjects and intro video for this course are removed. Their profile and other courses stay the same.</p>
   {% endcall %}
@@ -105,6 +105,8 @@
       const blankDraft = () => ({ isNew: true, course: "", subjects: [], video: null, videoUrl: null, visible: true });
 
       return {
+        // Set on a course's Faculty page: the drawer is for that course, and picks no course.
+        fixedCourse: null,
         allLinks: facultyStore.loadLinks(),
         draft: blankDraft(),
         errors: { course: "", subjects: "" },
@@ -151,6 +153,7 @@
 
         saveDraft() {
           this.draftPlaying = false;
+          if (this.fixedCourse) this.draft.course = this.fixedCourse;
           if (this.draft.isNew && !this.draft.course) this.errors.course = "Pick a course.";
           if (!this.draft.subjects.length) this.errors.subjects = "Add the subjects they teach in this course.";
           if (this.errors.course || this.errors.subjects) return false;
@@ -160,7 +163,10 @@
           if (i >= 0) all[i] = link; else all.push(link);
           facultyStore.saveLinks(all);
           this.allLinks = all;
-          this.$dispatch("toast", { title: this.draft.isNew ? `Assigned to ${link.course}` : `${link.course} updated`, variant: "success" });
+          const title = this.fixedCourse
+            ? (this.draft.isNew ? `${this.person.name} added to ${link.course}` : `${this.person.name} updated`)
+            : (this.draft.isNew ? `Assigned to ${link.course}` : `${link.course} updated`);
+          this.$dispatch("toast", { title, variant: "success" });
           return true;
         },
 
@@ -176,7 +182,7 @@
           facultyStore.saveLinks(all);
           this.allLinks = all;
           this.unassigning = null;
-          this.$dispatch("toast", { title: `Unassigned from ${course}`, variant: "success" });
+          this.$dispatch("toast", { title: this.fixedCourse ? `${this.person.name} removed from ${course}` : `Unassigned from ${course}`, variant: "success" });
         },
       };
     }
