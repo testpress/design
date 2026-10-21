@@ -1,0 +1,81 @@
+<!-- Evidence coverage: did TPSentinel collect what the policy expected? Then a few recent items. -->
+<section class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5" aria-labelledby="coverage-heading">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 id="coverage-heading" class="text-base font-semibold text-foreground">Evidence coverage</h2>
+    <span class="text-sm text-muted-foreground-1">All <span x-text="d.sessions.length"></span> sessions</span>
+  </div>
+
+  <!-- Section-level error (prototype): the rest of the page keeps working -->
+  <template x-if="condition === 'error'">
+    <div class="mt-3 p-4 rounded-lg bg-muted">
+      <p class="text-sm font-medium text-foreground">Couldn’t load evidence coverage</p>
+      <p class="mt-1 text-sm text-muted-foreground-2">The anomalies, sessions and history on this page are up to date. Submitting a decision is blocked until coverage loads, because a gap can change the decision.</p>
+      <button type="button" @click="setCondition('normal')" class="mt-2 text-sm font-medium text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">Try again</button>
+    </div>
+  </template>
+
+  <template x-if="condition !== 'error'">
+    <div>
+      <dl class="mt-3 divide-y divide-card-line">
+        <template x-for="row in coverage" :key="row.key">
+          <div class="py-2.5 grid grid-cols-[auto_1fr] sm:grid-cols-[auto_12rem_6rem_1fr] items-center gap-x-3 gap-y-0.5">
+            <span class="text-muted-foreground-1" x-html="row.icon"></span>
+            <dt class="text-sm text-foreground" x-text="row.label"></dt>
+            <dd class="col-start-2 sm:col-start-auto text-sm font-medium" :class="coverageClass(row)" x-text="row.status"></dd>
+            <dd class="col-start-2 sm:col-start-auto text-sm text-muted-foreground-1" x-text="row.measure"></dd>
+          </div>
+        </template>
+      </dl>
+      <div x-show="evidenceConcerns.length" class="mt-1">
+        <button type="button" @click="openGapSession(evidenceConcerns[0])"
+                class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+          View evidence gaps
+          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Recent evidence -->
+  <div class="mt-6">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-sm font-medium text-muted-foreground-1">Recent evidence</h3>
+      <button type="button" @click="resetEvidence(); tab = 'evidence'"
+              class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
+        View all evidence
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+    <div class="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <template x-for="a in recentMedia" :key="a.id">
+        <div>
+          <!-- One Artifact thumbnail. Expects `a` in scope. States other than Available are plain text, not fake media. -->
+<button type="button" @click="openViewer(a)" :disabled="a.state !== 'available'"
+        :aria-label="`${artifactLabel(a)}, Session ${a.session}${a.state !== 'available' ? ', ' + stateLabel(a) : ''}`"
+        class="group relative block w-full aspect-video rounded-lg overflow-hidden bg-surface border border-card-line text-start disabled:cursor-default focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+  <template x-if="a.state === 'available' && a.media !== 'audio'">
+    <img :src="a.poster || a.src" alt="" loading="lazy" class="size-full object-cover transition-transform group-hover:scale-[1.02]">
+  </template>
+  <template x-if="a.state === 'available' && a.media === 'audio'">
+    <span class="flex size-full items-center justify-center text-muted-foreground-1" x-html="icons.mic"></span>
+  </template>
+  <template x-if="a.state !== 'available'">
+    <span class="flex size-full flex-col items-center justify-center gap-1 p-2 text-center">
+      <span class="text-xs font-medium text-foreground" x-text="stateLabel(a)"></span>
+      <span class="text-[11px] leading-4 text-muted-foreground-1 line-clamp-2" x-text="stateNote(a)"></span>
+    </span>
+  </template>
+  <template x-if="a.state === 'available' && a.media === 'video'">
+    <span class="absolute inset-0 flex items-center justify-center">
+      <span class="flex items-center justify-center size-9 rounded-full bg-black/55 text-white" x-html="ic('play', 'size-4 ms-0.5 fill-current')"></span>
+    </span>
+  </template>
+  <span x-show="a.state === 'available'" class="absolute bottom-1.5 start-1.5 py-0.5 px-1.5 rounded-md bg-black/60 text-[11px] font-medium text-white" x-text="artifactLabel(a)"></span>
+</button>
+
+          <p class="mt-1 text-xs text-muted-foreground-1" x-text="`Session ${a.session} · ${dayTime(a.at)}`"></p>
+        </div>
+      </template>
+    </div>
+  </div>
+</section>
