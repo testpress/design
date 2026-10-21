@@ -2,7 +2,7 @@
 <script>
   (function () {
     const SR = window.SentinelReview;
-    const { MIN, HOUR, DAY, NOW, svg, ICONS, INDICATOR_BY_KEY, BEHAVIOUR_KEYS, PRIORITIES, ME, REVIEWERS, REVIEWER_BY_ID, WORKSPACE_BY_ID, MONTHS, clock, relative, exact } = SR;
+    const { MIN, HOUR, DAY, NOW, svg, ICONS, INDICATOR_BY_KEY, BEHAVIOUR_KEYS, PRIORITIES, ME, REVIEWERS, REVIEWER_BY_ID, WORKSPACE_BY_ID, CONCERN_LABEL, MONTHS, clock, relative, waited, exact } = SR;
 
     // ---------- Icons used on this page (lucide paths) ----------
     const I = {
@@ -34,12 +34,10 @@
       upload_failed: { label: 'Upload failed', note: 'The upload failed, so this file was never stored.' },
       retention: { label: 'Removed by retention', note: 'Deleted by the workspace’s retention policy.' },
     };
+    // A Flagged decision names its concern type; the reviewer's note is the reason
     const FLAG_REASONS = [
-      ['confirmed_behaviour', 'Confirmed suspicious behaviour'],
-      ['evidence_missing', 'Required evidence missing'],
-      ['recording_incomplete', 'Recording incomplete or interrupted'],
-      ['conflicting', 'Conflicting evidence'],
-      ['other', 'Other'],
+      ['behaviour', 'Behaviour concern', 'Recorded behaviour breaks the proctoring policy.'],
+      ['evidence', 'Evidence concern', 'Required evidence is missing or not enough to assess the attempt.'],
     ];
     const CLEAR_REASONS = [
       ['false_positive', 'Signal was a false positive'],
@@ -75,8 +73,9 @@
       const pick = a => a[Math.floor(rand() * a.length)];
       const between = (a, b) => a + rand() * (b - a);
 
-      // Why a case exists: AI flagged it (most), or the client asked to check the evidence of an AI-cleared candidate
-      const origin = rand() < 0.15 ? 'client' : 'ai_flagged';
+      // Why a case exists comes with the case (data.html): AI flagged it, or someone asked to review an AI-cleared candidate
+      rand(); // keeps the rest of the seeded detail unchanged
+      const origin = c.origin;
       const recordingEnabled = rand() < 0.6;
       // Candidate profile details shown on the page
       const profile = {
@@ -183,7 +182,7 @@
 
       const latest = sessions[sessions.length - 1];
       const behaviour = events.length > 0;
-      const concernType = origin !== 'ai_flagged' ? null : behaviour ? 'behaviour' : 'evidence';
+      const concernType = origin !== 'ai_flagged' ? null : c.concern || (behaviour ? 'behaviour' : 'evidence');
       const aiResult = origin === 'ai_flagged' ? 'flagged' : 'clear';
       const aiAt = latest.end + Math.floor(between(3, 25) * MIN);
 
@@ -195,14 +194,13 @@
         history.push({ id: 'h-ai-prev', at: prev.end + 12 * MIN, kind: 'assessment', actor: 'AI', title: 'AI cleared the candidate', description: `Assessed through Session ${prev.n}.` });
       }
       const created = c.createdAt || aiAt + 2 * MIN;
-      // A client request names what to check: periodic snapshots, or recordings when the policy records sessions
-      const request = origin !== 'client' ? null : {
-        what: recordingEnabled && rand() < 0.5 ? 'recordings' : 'snapshots',
-        session: pick(sessions).n,
-        by: 'Anita Kumar',
-        note: pick(['Client wants to see the candidate was alone for this session.', 'Client asked for a look at this session before issuing the certificate.', 'Candidate scored unusually high here; client wants the evidence checked.']),
-      };
-      const why = request ? `Client asked to check the ${request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings'} of Session ${request.session}` : 'Opened because AI flagged the candidate';
+      // A request covers the candidate's whole workspace: what to inspect (periodic snapshots, or recordings when the
+      // policy records sessions), why, and why it's urgent. It's logged under the requester's own name.
+      const what = recordingEnabled && rand() < 0.5 ? 'recordings' : 'snapshots';
+      pick(sessions); // keeps the rest of the seeded detail unchanged
+      const note = pick(['Please confirm the candidate was alone throughout the course.', 'We need the evidence checked before issuing the certificate.', 'Scores jumped sharply in the later sessions; please check the evidence.']);
+      const request = origin !== 'requested' ? null : { what, by: c.requestedBy, note, urgency: c.urgency };
+      const why = request ? `${request.by} asked for a review of the candidate’s ${request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings'}` : `Opened because AI flagged the candidate: ${CONCERN_LABEL[concernType].toLowerCase()}`;
       history.push({ id: 'h-open', at: created, kind: 'case', actor: request ? request.by : 'TPSentinel', title: 'Review case opened', description: why });
       if (c.assignedAt && c.reviewer) history.push({ id: 'h-assign', at: c.assignedAt, kind: 'case', actor: c.reviewer === ME ? 'Divya Menon' : 'Anita Kumar', title: `Assigned to ${REVIEWER_BY_ID[c.reviewer].name}`, description: '' });
       if (c.state === 'completed') {
@@ -298,10 +296,15 @@
           if (c.state === 'assigned') return 'Assigned';
           return 'Completed';
         },
-        get originLabel() {
-          return d.origin === 'client' ? 'Requested by client' : 'AI flagged';
+        // Why the case exists, in words: the AI's concern type, or who asked for the review
+        get originLabel() { return SR.triggerLabel(c); },
+        // Why the case has its priority, so Critical or High never stands without a reason
+        get priorityReason() {
+          if (d.priorityChangedBy) return `Changed by ${d.priorityChangedBy}`;
+          if (d.request) return d.request.urgency;
+          return d.concernType === 'evidence' ? 'Set from how much required evidence is missing' : 'Set from the severity of what AI found';
         },
-        relative, exact, day, dayTime, dur, span,
+        relative, waited, exact, day, dayTime, dur, span,
 
         // ---------- queue: Previous / Next follow the list the case was opened from ----------
         get sequence() {
@@ -340,9 +343,9 @@
 
         // ---------- why this candidate needs review ----------
         get summary() {
-          if (d.origin === 'client') {
+          if (d.request) {
             const what = d.request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings';
-            return `The client asked to check the ${what} from Session ${d.request.session}. AI cleared this candidate, so review the requested evidence directly and record a decision.`;
+            return `${d.request.by} asked for a review of this candidate’s ${what} across all ${d.sessions.length} sessions. AI cleared the candidate, so check the requested evidence and record a decision for the whole workspace.`;
           }
           if (d.concernType === 'behaviour') {
             const top = this.behaviourConcerns[0];
@@ -350,14 +353,15 @@
           }
           return 'AI flagged this candidate because required evidence is missing, so the attempt can’t be fully assessed. A reviewer must decide whether the available evidence is still enough.';
         },
-        // Client request: the evidence they asked about, from the requested Session
+        // Requested review: the kind of evidence they asked about, across every Session, latest first
         get requestedEvidence() {
           if (!d.request) return [];
           const kind = d.request.what === 'snapshots' ? 'periodic' : 'recording';
-          return d.sessionMedia.filter(m => m.session === d.request.session && m.kind === kind).sort((a, b) => a.at - b.at);
+          return d.sessionMedia.filter(m => m.kind === kind).sort((a, b) => b.at - a.at);
         },
+        get requestedKindCount() { return this.requestedEvidence.length; },
         openRequestedEvidence() {
-          this.evidenceFilter = { session: String(d.request.session), anomaly: '', source: '', availability: '', q: d.request.what === 'snapshots' ? 'Periodic' : 'recording' };
+          this.evidenceFilter = { session: '', anomaly: '', source: '', availability: '', q: d.request.what === 'snapshots' ? 'Periodic' : 'recording' };
           this.tab = 'evidence';
           this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
         },
@@ -394,6 +398,11 @@
         },
         get evidenceConcerns() {
           return d.gaps.map(g => ({ ...g, icon: ic('missing_evidence', 'size-5'), timing: `Session ${g.session} · ${day(g.from)}, ${span(g.from, g.to)}` }));
+        },
+        // Missing evidence reads as one more anomaly; it leads when it's why AI flagged the candidate
+        get anomalies() {
+          const gaps = this.evidenceConcerns.map(g => ({ ...g, key: g.id, gap: true }));
+          return d.concernType === 'evidence' ? [...gaps, ...this.behaviourConcerns] : [...this.behaviourConcerns, ...gaps];
         },
         artifactLabel(a) {
           if (a.kind === 'snapshot') return a.source === 'screen' ? 'Screen snapshot' : 'Webcam snapshot';
@@ -548,6 +557,7 @@
           this.menu = null;
           if (c.priority === p) return;
           c.priority = p;
+          d.priorityChangedBy = 'Divya Menon';
           SR.saveChange(c.id, { priority: p });
           this.log({ kind: 'case', actor: 'Divya Menon', title: `Priority changed to ${PRIORITIES[p]}`, description: '' });
         },
@@ -556,13 +566,16 @@
         get reasons() { return this.decision.choice === 'flagged' ? FLAG_REASONS : CLEAR_REASONS; },
         choose(choice) {
           if (this.decision.choice === choice) return;
-          this.decision = { ...this.decision, choice, reason: '', confirming: false, error: '' };
+          // Flagged starts from the AI's concern type, if it had one; the reviewer can change it
+          const reason = choice === 'flagged' && d.concernType ? d.concernType : '';
+          this.decision = { ...this.decision, choice, reason, confirming: false, error: '' };
         },
         get reasonLabel() { return (this.reasons.find(r => r[0] === this.decision.reason) || [])[1] || ''; },
         get decisionError() {
           const x = this.decision;
           if (!x.choice) return 'Choose Clear or Flagged.';
-          if (!x.reason) return 'Choose a reason.';
+          if (!x.reason) return x.choice === 'flagged' ? 'Choose a concern type.' : 'Choose a reason.';
+          if (x.choice === 'flagged' && !x.notes.trim()) return 'Write the reason that supports this decision.';
           if (x.reason === 'other' && !x.notes.trim()) return 'Add a note explaining the reason.';
           return '';
         },
@@ -575,6 +588,7 @@
           if (this.condition === 'stale') { this.decision.confirming = false; return; }
           const x = this.decision;
           const fields = { state: 'completed', result: x.choice, reason: this.reasonLabel + (x.notes.trim() ? ` — ${x.notes.trim()}` : ''), completedAt: Date.now(), reviewer: ME, assessedThrough: d.assessedThrough };
+          if (x.choice === 'flagged') fields.concern = x.reason;
           Object.assign(c, fields);
           SR.saveChange(c.id, fields);
           this.log({ kind: 'case', actor: 'Divya Menon', title: `Marked ${x.choice === 'clear' ? 'Clear' : 'Flagged'}`, description: fields.reason });

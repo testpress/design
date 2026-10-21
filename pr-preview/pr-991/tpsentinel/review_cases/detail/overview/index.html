@@ -8,23 +8,20 @@
 
   <!-- Primary reason -->
   <div class="mt-3 p-4 rounded-lg bg-muted">
-    <div class="flex flex-wrap items-center gap-2">
-      <span class="inline-flex items-center py-0.5 px-2 rounded-md text-xs font-medium bg-surface text-surface-foreground" x-text="originLabel"></span>
-    </div>
-    <p class="mt-2 text-sm text-foreground" x-text="summary"></p>
+    <p class="text-sm text-foreground" x-text="summary"></p>
     <template x-if="d.request">
       <p class="mt-2 ps-3 border-s-2 border-line-3 text-sm text-muted-foreground-2">
-        <span x-text="`“${d.request.note}”`"></span> <span class="text-muted-foreground-1" x-text="`— logged by ${d.request.by}`"></span>
+        <span x-text="`“${d.request.note}”`"></span> <span class="text-muted-foreground-1" x-text="`— ${d.request.by}`"></span>
       </p>
     </template>
   </div>
 
-  <!-- Client request: the evidence they asked to check comes first -->
+  <!-- Requested review: the evidence they asked to check comes first. It covers every Session, latest first. -->
   <template x-if="d.request">
     <div class="mt-6">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <h3 class="text-sm font-medium text-muted-foreground-1"
-            x-text="`Requested: ${d.request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings'}, Session ${d.request.session}`"></h3>
+            x-text="`Requested evidence: ${d.request.what === 'snapshots' ? 'periodic snapshots' : 'session recordings'} · all ${d.sessions.length} sessions`"></h3>
         <button type="button" @click="openRequestedEvidence()"
                 class="inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
           Open in Evidence
@@ -58,22 +55,23 @@
   <span x-show="a.state === 'available'" class="absolute bottom-1.5 start-1.5 py-0.5 px-1.5 rounded-md bg-black/60 text-[11px] font-medium text-white" x-text="artifactLabel(a)"></span>
 </button>
 
-            <p class="mt-1 text-xs text-muted-foreground-1" x-text="dayTime(a.at)"></p>
+            <p class="mt-1 text-xs text-muted-foreground-1" x-text="`Session ${a.session} · ${day(a.at)}`"></p>
           </div>
         </template>
       </div>
       <p x-show="!requestedEvidence.length" class="mt-2 text-sm text-muted-foreground-2">
-        Nothing of this kind was collected in this session. See Evidence coverage below.
+        Nothing of this kind was collected for this candidate. See Evidence coverage below.
       </p>
     </div>
   </template>
 
-  <!-- Anomalies: behaviour and evidence gaps in one list, shown the same way -->
-  <template x-if="behaviourConcerns.length || evidenceConcerns.length">
+  <!-- Anomalies: what AI saw, and required evidence that's missing, in one list. On a requested review AI didn't flag these, so they're labelled as other findings. -->
+  <template x-if="anomalies.length">
     <div class="mt-6">
-      <h3 class="text-sm font-medium text-muted-foreground-1">Anomalies</h3>
+      <h3 class="text-sm font-medium text-muted-foreground-1" x-text="d.request ? 'Other anomalies AI recorded' : 'Anomalies'"></h3>
+      <p x-show="d.request" class="mt-0.5 text-xs text-muted-foreground-1">AI recorded these but didn’t flag the candidate.</p>
       <ul class="mt-3 flex flex-col gap-6">
-        <template x-for="k in behaviourConcerns" :key="k.key">
+        <template x-for="k in anomalies" :key="k.key">
           <li>
             <div class="flex gap-3">
               <span class="mt-0.5 text-muted-foreground-1" x-html="k.icon"></span>
@@ -83,7 +81,11 @@
                 </div>
                 <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="k.timing"></p>
 
-                <template x-if="k.artifacts.length">
+                <!-- Missing evidence: nothing to show, so say what's missing and why -->
+                <template x-if="k.gap">
+                  <p class="mt-2 text-sm text-muted-foreground-2" x-text="`${k.detail} Cause: ${k.cause}.`"></p>
+                </template>
+                <template x-if="!k.gap && k.artifacts.length">
                   <div class="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <template x-for="a in k.artifacts.slice(0, 4)" :key="a.id">
                       <div><!-- One Artifact thumbnail. Expects `a` in scope. States other than Available are plain text, not fake media. -->
@@ -113,30 +115,13 @@
                     </template>
                   </div>
                 </template>
-                <template x-if="!k.artifacts.length">
+                <template x-if="!k.gap && !k.artifacts.length">
                   <p class="mt-2 text-sm text-muted-foreground-1">No media was captured for this event. It’s recorded in Activity.</p>
                 </template>
 
-                <button type="button" @click="openEvidenceFor(k.key)"
+                <button type="button" @click="k.gap ? openGapSession(k) : openEvidenceFor(k.key)"
                         class="mt-2 inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
-                  View all evidence for this anomaly
-                  <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-                </button>
-              </div>
-            </div>
-          </li>
-        </template>
-        <template x-for="g in evidenceConcerns" :key="g.id">
-          <li>
-            <div class="flex gap-3">
-              <span class="mt-0.5 text-muted-foreground-1" x-html="g.icon"></span>
-              <div class="min-w-0 grow">
-                <p class="font-medium text-foreground" x-text="g.label"></p>
-                <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="g.timing"></p>
-                <p class="mt-2 text-sm text-muted-foreground-2" x-text="`${g.detail} Cause: ${g.cause}.`"></p>
-                <button type="button" @click="openGapSession(g)"
-                        class="mt-2 inline-flex items-center gap-x-1 text-sm text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">
-                  <span x-text="`Open Session ${g.session}`"></span>
+                  <span x-text="k.gap ? `Open Session ${k.session}` : 'View all evidence for this anomaly'"></span>
                   <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                 </button>
               </div>
@@ -148,7 +133,7 @@
   </template>
 
   <!-- Nothing qualified -->
-  <template x-if="!behaviourConcerns.length && !evidenceConcerns.length">
+  <template x-if="!anomalies.length">
     <p class="mt-5 text-sm text-muted-foreground-2">
       No qualifying anomalies were found in the available evidence.
       <span x-show="coverage.some(r => r.gap)">Some evidence is incomplete; see Evidence coverage below.</span>
@@ -258,13 +243,13 @@
         <span class="mt-0.5" :class="resultClass" x-html="resultIcon"></span>
         <div class="min-w-0">
           <p class="font-medium text-foreground">
-            <span x-text="c.result === 'clear' ? 'Clear' : 'Flagged'"></span>
+            <span x-text="c.result === 'clear' ? 'Clear' : 'Flagged'"></span><span x-show="c.result === 'flagged' && c.concern" class="font-normal text-muted-foreground-2" x-text="` · ${c.concern === 'evidence' ? 'Evidence concern' : 'Behaviour concern'}`"></span>
           </p>
           <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="c.reason"></p>
           <p class="mt-1 text-sm text-muted-foreground-1">
             <span x-text="`by ${reviewerFull(c.reviewer)}`"></span> ·
             <span x-text="exact(c.completedAt)"></span> ·
-            <span x-text="`covers Sessions 1–${c.assessedThrough || d.assessedThrough}`"></span>
+            <span x-text="`candidate workspace through Session ${c.assessedThrough || d.assessedThrough}`"></span>
           </p>
         </div>
       </div>
@@ -395,8 +380,9 @@
   <!-- The assigned Reviewer's form -->
   <template x-if="isMine">
     <div class="mt-1">
+      <!-- Scope: the decision is for the candidate, not one Session or the requested evidence -->
       <p class="text-sm text-muted-foreground-1">
-        Covers Sessions 1–<span x-text="d.assessedThrough"></span>, the latest the AI assessed. Your decision becomes the candidate’s result.
+        Applies to the candidate’s whole workspace through <span class="font-medium text-foreground">Session <span x-text="d.assessedThrough"></span></span>, the latest AI assessed. Your decision becomes the candidate’s result.
       </p>
 
       <fieldset class="mt-4" :disabled="!canDecide">
@@ -471,8 +457,27 @@
         </div>
       </fieldset>
 
-      <!-- Structured reason -->
-      <template x-if="decision.choice">
+      <!-- Flagged: the concern type, starting from the AI's -->
+      <template x-if="decision.choice === 'flagged'">
+        <fieldset class="mt-5" :disabled="!canDecide">
+          <legend class="text-sm font-medium text-foreground">Concern type</legend>
+          <div class="mt-2 flex flex-col gap-3">
+            <template x-for="[value, label, help] in reasons" :key="value">
+              <label class="flex items-start gap-x-3 text-sm cursor-pointer">
+                <input type="radio" name="cd-concern" :value="value" x-model="decision.reason"
+                       class="mt-0.5 shrink-0 size-4 bg-transparent border-line-3 rounded-full text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+                <span>
+                  <span class="block text-foreground" x-text="label"></span>
+                  <span class="block text-muted-foreground-1" x-text="help"></span>
+                </span>
+              </label>
+            </template>
+          </div>
+        </fieldset>
+      </template>
+
+      <!-- Clear: structured reason -->
+      <template x-if="decision.choice === 'clear'">
         <fieldset class="mt-5" :disabled="!canDecide">
           <legend class="text-sm font-medium text-foreground">Reason</legend>
           <div class="mt-2 flex flex-col gap-2">
@@ -487,7 +492,7 @@
         </fieldset>
       </template>
 
-      <template x-if="decision.choice">
+      <template x-if="decision.choice === 'clear'">
         <div class="mt-5">
           
 <div class="w-full">
@@ -512,6 +517,36 @@
   
   
     <p class="mt-1.5 text-xs text-muted-foreground-1">Required when the reason is Other. Notes stay in the case history.</p>
+  
+</div>
+
+        </div>
+      </template>
+      <template x-if="decision.choice === 'flagged'">
+        <div class="mt-5">
+          
+<div class="w-full">
+  
+    <label for="cd-reason-note" class="block mb-2 text-sm font-medium text-foreground">
+      Reason
+    </label>
+  
+
+  <div class="relative w-full">
+    <textarea id="cd-reason-note" 
+              name="cd-reason-note"
+              rows="3"
+              class="py-2 px-3 sm:py-3 sm:px-4 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:z-10 focus:ring-primary disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb  "
+              placeholder="What did you see, and why does it support flagging the candidate?"
+              
+              
+              x-model="decision.notes"
+              
+              :disabled="!canDecide"></textarea>
+  </div>
+  
+  
+    <p class="mt-1.5 text-xs text-muted-foreground-1">Required. It’s recorded with the decision and returned with the result.</p>
   
 </div>
 
@@ -567,7 +602,7 @@
               Submit as <span x-text="decision.choice === 'clear' ? 'Clear' : 'Flagged'"></span>?
             </p>
             <p class="mt-1 text-sm text-muted-foreground-2">
-              Reason: <span x-text="reasonLabel"></span>. This becomes the candidate’s result, is returned to the client and closes the case.
+              <span x-text="decision.choice === 'flagged' ? 'Concern type' : 'Reason'"></span>: <span x-text="reasonLabel"></span>. This becomes the candidate’s result through Session <span x-text="d.assessedThrough"></span>, is returned to the client and completes the case.
             </p>
             <div class="mt-3 flex flex-wrap gap-2">
               
@@ -642,13 +677,10 @@
 
   </div>
   <div class="flex flex-col gap-5 min-w-0">
-    <!-- Candidate details: who this is, for a complete review. Read-only; IDs can be copied. -->
+    <!-- Candidate details: contact and admin details. Name and workspace are in the page header, so they aren't repeated. Read-only; IDs can be copied. -->
 <section class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5" aria-labelledby="candidate-heading">
   <h2 id="candidate-heading" class="text-base font-semibold text-foreground">Candidate</h2>
   <dl class="mt-3 grid grid-cols-[5.5rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-    <dt class="text-muted-foreground-1">Name</dt>
-    <dd class="text-foreground truncate" x-text="c.name"></dd>
-
     <dt class="text-muted-foreground-1">Email</dt>
     <dd class="flex items-center gap-x-1.5 min-w-0">
       <span class="text-foreground truncate" :title="c.email" x-text="c.email"></span>
@@ -671,9 +703,6 @@
         <svg x-show="copied === 'id'" x-cloak class="size-3.5 text-green-600 dark:text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       </button>
     </dd>
-
-    <dt class="text-muted-foreground-1">Workspace</dt>
-    <dd class="text-foreground truncate" :title="workspace" x-text="workspace"></dd>
 
     <dt class="text-muted-foreground-1">Enrolled</dt>
     <dd class="text-foreground truncate" x-text="enrolledOn"></dd>

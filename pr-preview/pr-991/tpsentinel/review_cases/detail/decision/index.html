@@ -13,13 +13,13 @@
         <span class="mt-0.5" :class="resultClass" x-html="resultIcon"></span>
         <div class="min-w-0">
           <p class="font-medium text-foreground">
-            <span x-text="c.result === 'clear' ? 'Clear' : 'Flagged'"></span>
+            <span x-text="c.result === 'clear' ? 'Clear' : 'Flagged'"></span><span x-show="c.result === 'flagged' && c.concern" class="font-normal text-muted-foreground-2" x-text="` · ${c.concern === 'evidence' ? 'Evidence concern' : 'Behaviour concern'}`"></span>
           </p>
           <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="c.reason"></p>
           <p class="mt-1 text-sm text-muted-foreground-1">
             <span x-text="`by ${reviewerFull(c.reviewer)}`"></span> ·
             <span x-text="exact(c.completedAt)"></span> ·
-            <span x-text="`covers Sessions 1–${c.assessedThrough || d.assessedThrough}`"></span>
+            <span x-text="`candidate workspace through Session ${c.assessedThrough || d.assessedThrough}`"></span>
           </p>
         </div>
       </div>
@@ -150,8 +150,9 @@
   <!-- The assigned Reviewer's form -->
   <template x-if="isMine">
     <div class="mt-1">
+      <!-- Scope: the decision is for the candidate, not one Session or the requested evidence -->
       <p class="text-sm text-muted-foreground-1">
-        Covers Sessions 1–<span x-text="d.assessedThrough"></span>, the latest the AI assessed. Your decision becomes the candidate’s result.
+        Applies to the candidate’s whole workspace through <span class="font-medium text-foreground">Session <span x-text="d.assessedThrough"></span></span>, the latest AI assessed. Your decision becomes the candidate’s result.
       </p>
 
       <fieldset class="mt-4" :disabled="!canDecide">
@@ -226,8 +227,27 @@
         </div>
       </fieldset>
 
-      <!-- Structured reason -->
-      <template x-if="decision.choice">
+      <!-- Flagged: the concern type, starting from the AI's -->
+      <template x-if="decision.choice === 'flagged'">
+        <fieldset class="mt-5" :disabled="!canDecide">
+          <legend class="text-sm font-medium text-foreground">Concern type</legend>
+          <div class="mt-2 flex flex-col gap-3">
+            <template x-for="[value, label, help] in reasons" :key="value">
+              <label class="flex items-start gap-x-3 text-sm cursor-pointer">
+                <input type="radio" name="cd-concern" :value="value" x-model="decision.reason"
+                       class="mt-0.5 shrink-0 size-4 bg-transparent border-line-3 rounded-full text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+                <span>
+                  <span class="block text-foreground" x-text="label"></span>
+                  <span class="block text-muted-foreground-1" x-text="help"></span>
+                </span>
+              </label>
+            </template>
+          </div>
+        </fieldset>
+      </template>
+
+      <!-- Clear: structured reason -->
+      <template x-if="decision.choice === 'clear'">
         <fieldset class="mt-5" :disabled="!canDecide">
           <legend class="text-sm font-medium text-foreground">Reason</legend>
           <div class="mt-2 flex flex-col gap-2">
@@ -242,7 +262,7 @@
         </fieldset>
       </template>
 
-      <template x-if="decision.choice">
+      <template x-if="decision.choice === 'clear'">
         <div class="mt-5">
           
 <div class="w-full">
@@ -267,6 +287,36 @@
   
   
     <p class="mt-1.5 text-xs text-muted-foreground-1">Required when the reason is Other. Notes stay in the case history.</p>
+  
+</div>
+
+        </div>
+      </template>
+      <template x-if="decision.choice === 'flagged'">
+        <div class="mt-5">
+          
+<div class="w-full">
+  
+    <label for="cd-reason-note" class="block mb-2 text-sm font-medium text-foreground">
+      Reason
+    </label>
+  
+
+  <div class="relative w-full">
+    <textarea id="cd-reason-note" 
+              name="cd-reason-note"
+              rows="3"
+              class="py-2 px-3 sm:py-3 sm:px-4 block w-full bg-layer border-layer-line rounded-lg sm:text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:z-10 focus:ring-primary disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb  "
+              placeholder="What did you see, and why does it support flagging the candidate?"
+              
+              
+              x-model="decision.notes"
+              
+              :disabled="!canDecide"></textarea>
+  </div>
+  
+  
+    <p class="mt-1.5 text-xs text-muted-foreground-1">Required. It’s recorded with the decision and returned with the result.</p>
   
 </div>
 
@@ -322,7 +372,7 @@
               Submit as <span x-text="decision.choice === 'clear' ? 'Clear' : 'Flagged'"></span>?
             </p>
             <p class="mt-1 text-sm text-muted-foreground-2">
-              Reason: <span x-text="reasonLabel"></span>. This becomes the candidate’s result, is returned to the client and closes the case.
+              <span x-text="decision.choice === 'flagged' ? 'Concern type' : 'Reason'"></span>: <span x-text="reasonLabel"></span>. This becomes the candidate’s result through Session <span x-text="d.assessedThrough"></span>, is returned to the client and completes the case.
             </p>
             <div class="mt-3 flex flex-wrap gap-2">
               
