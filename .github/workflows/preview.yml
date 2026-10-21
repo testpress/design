@@ -7,25 +7,69 @@ on:
       - reopened
       - synchronize
       - closed
+    # Root Markdown files and docs/ aren't part of the site
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
 
-concurrency:
-  group: gh-pages-publisher
-  cancel-in-progress: false
+permissions:
+  contents: read
 
 jobs:
-  deploy-preview:
+  # Build without holding the gh-pages lock. A newer push to the same PR
+  # cancels this build, so only the latest commit is built.
+  build:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    concurrency:
+      group: preview-build-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 'lts/*'
-        
+
       - name: Install dependencies & build
-        if: github.event.action != 'closed' # You might want to skip the build if the PR has been closed
         run: |
           npm run setup
-          BASE_PATH=/pr-preview/pr-${{ github.event.pull_request.number }} npm run build   
+          BASE_PATH=/pr-preview/pr-${{ github.event.pull_request.number }} npm run build
+
+      # Packed as one file: the artifact upload rejects some file names
+      # in public/ (for example Windows ":Zone.Identifier" files in img/)
+      - name: Pack site
+        run: tar -cf site.tar -C public .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-site
+          path: site.tar
+          retention-days: 1
+
+  # Only the push to gh-pages is queued with the main site deploy, so the two
+  # never write to gh-pages at the same time.
+  deploy:
+    needs: build
+    if: always() && (github.event.action == 'closed' || needs.build.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: gh-pages-publisher
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        if: github.event.action != 'closed'
+        with:
+          name: preview-site
+
+      - name: Unpack site
+        if: github.event.action != 'closed'
+        run: mkdir public && tar -xf site.tar -C public && rm site.tar
 
       - name: Deploy preview
         uses: rossjrw/pr-preview-action@v1
@@ -33,4 +77,4 @@ jobs:
           source-dir: public
           token: ${{ secrets.GITHUB_TOKEN }}
           qr-code: true
-          wait-for-pages-deployment: true
+          wait-for-pages-deployment: false

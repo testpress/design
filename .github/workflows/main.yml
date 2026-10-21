@@ -3,19 +3,24 @@ name: CI
 on:
   push:
     branches: ["main"]
+    # Root Markdown files and docs/ aren't part of the site
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
 
   workflow_dispatch:
 
-concurrency:
-  group: gh-pages-publisher
-  cancel-in-progress: false
-
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+  # Build without holding the gh-pages lock. A newer push to main cancels this
+  # build: its deploy will include everything anyway.
   build:
     runs-on: ubuntu-latest
+    concurrency:
+      group: main-build
+      cancel-in-progress: true
 
     steps:
       - uses: actions/checkout@v4
@@ -29,8 +34,40 @@ jobs:
           npm run setup
           npm run build
 
+      # Packed as one file: the artifact upload rejects some file names
+      # in public/ (for example Windows ":Zone.Identifier" files in img/)
+      - name: Pack site
+        run: tar -cf site.tar -C public .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: site.tar
+          retention-days: 1
+
+  # Only the push to gh-pages is queued with PR preview deploys, so the two
+  # never write to gh-pages at the same time.
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: gh-pages-publisher
+      cancel-in-progress: false
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+
+      - name: Unpack site
+        run: mkdir public && tar -xf site.tar -C public && rm site.tar
+
       - name: Deploy
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           publish_dir: public
           publish_branch: gh-pages
