@@ -1,0 +1,198 @@
+<script>
+  function productDetail() {
+    // Product-level benefits, in the order the admin set. Each plan lists the
+    // ids it includes; a missing id means the benefit is not included.
+    const BENEFITS = [
+      { id: 1, name: "Recorded video lectures" },
+      { id: 2, name: "Question bank with explanations" },
+      { id: 3, name: "Weekly grand tests with all-India rank" },
+      { id: 4, name: "Live doubt-clearing sessions" },
+      { id: 5, name: "Printed study materials" },
+      { id: 6, name: "Personal mentor" },
+      { id: 7, name: "1:1 weekly mentor call" },
+      { id: 8, name: "Priority support on WhatsApp" },
+    ];
+
+    const PLANS = [
+      {
+        id: 0,
+        name: "Basic Access",
+        description: "For self-learners who want the essentials.",
+        courses: ["Prelims GS", "CSAT"],
+        benefits: [1, 2],
+        details: [
+          { duration: "90 days", ends_on: "10 Jan 2027", price: 2999, strike_through_price: 3999 },
+          { duration: "180 days", ends_on: "10 Apr 2027", price: 4999, strike_through_price: 5999 },
+        ],
+      },
+      {
+        id: 1,
+        name: "Standard Access",
+        description: "Foundation to advanced lectures with weekly tests.",
+        courses: ["Prelims GS", "CSAT", "Test series"],
+        benefits: [1, 2, 3],
+        details: [
+          { duration: "90 days", ends_on: "10 Jan 2027", price: 4499, strike_through_price: 5499 },
+          { duration: "180 days", ends_on: "10 Apr 2027", price: 7499, strike_through_price: 8999 },
+        ],
+      },
+      {
+        id: 2,
+        name: "Premium Elite",
+        description: "Everything in Standard, plus a personal mentor, a weekly 1:1 call, priority support on WhatsApp and a study plan reviewed every month.",
+        courses: ["Prelims GS", "CSAT", "Test series", "Mains GS", "Current affairs"],
+        benefits: [1, 2, 3, 4, 5, 6, 7, 8],
+        details: [
+          { duration: "90 days", ends_on: "10 Jan 2027", price: 9499, strike_through_price: 11499 },
+          { duration: "180 days", ends_on: "10 Apr 2027", price: 15499, strike_through_price: 17999 },
+        ],
+      },
+    ];
+
+    return {
+      showInstallments: false,
+
+      // Prototype switches (bottom-right menu).
+      hasPlans: true,
+      // How many plans to show: 3 (all) or 2 (Basic and Premium), to preview the 2-column grid.
+      planCount: 3,
+      hasBenefits: true,
+      // Faculty in this product: "many" (all courses), "one" (a single-teacher product) or "none".
+      facultyMode: "many",
+
+      // Faculty section: first 4 cards, then "Show all". The profile drawer shows one person.
+      showAllFaculty: false,
+      profile: null,
+      profileVideo: null,
+
+      // Product sold without plans: one price for the whole product.
+      product: { price: 23000, strike_through_price: 79000, validity: "Valid till 28 May 2026" },
+
+      allBenefits: BENEFITS,
+      allPlans: PLANS,
+
+      // One duration for the whole page, picked in the dropdown at the right of the plans header.
+      // Durations are set per plan, so a plan may not offer the chosen one.
+      duration: PLANS[0].details[0].duration,
+      // Plan shown in the comparison on small screens.
+      activePlan: 0,
+      // One selection across all plans. The first plan is preselected so the
+      // purchase card always has a price and a Buy button.
+      selectedPlan: PLANS[0],
+      // Plan ids whose description is cut off at 2 lines.
+      truncated: {},
+
+      init() {
+        this.$watch("hasPlans", () => (this.selectedPlan = this.plans[0]));
+        this.$watch("planCount", () => (this.selectedPlan = this.plans[0]));
+        // Icons inside x-for / x-if templates render after lucide's first pass.
+        const refreshIcons = () => this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        refreshIcons();
+        this.$watch("hasPlans", refreshIcons);
+        this.$watch("hasBenefits", refreshIcons);
+        this.$watch("facultyMode", refreshIcons);
+        this.$watch("showAllFaculty", refreshIcons);
+        this.$watch("profile", refreshIcons);
+      },
+
+      get faculty() {
+        if (this.facultyMode === "none") return [];
+        const courses = this.facultyMode === "one" ? [PRODUCT_COURSES[1]] : PRODUCT_COURSES;
+        return resolveFaculty(courses);
+      },
+
+      // Courses the faculty list was built from. "Teaches in this product" only helps when there are several.
+      get facultyCourseCount() {
+        return this.facultyMode === "one" ? 1 : PRODUCT_COURSES.length;
+      },
+
+      get visibleFaculty() {
+        return this.showAllFaculty ? this.faculty : this.faculty.slice(0, 4);
+      },
+
+      // "Taught by" line in the hero: first name, then the count of the rest.
+      get taughtBy() {
+        const [first, ...rest] = this.faculty;
+        if (!first) return "";
+        return rest.length ? `${first.name} and ${rest.length} more` : first.name;
+      },
+
+      // More than one course intro: the drawer lets students switch between them.
+      get hasManyIntros() {
+        return !!this.profile && this.profile.teaches.filter((t) => t.video).length > 1;
+      },
+
+      // profileVideo is the course link whose intro video plays in the drawer.
+      openProfile(person) {
+        this.profile = person;
+        this.profileVideo = person.teaches.find((t) => t.video) || null;
+        this.$dispatch("open-drawer-faculty-profile");
+      },
+
+      get plans() {
+        return this.planCount === 2 ? this.allPlans.filter((p) => p.name !== "Standard Access") : this.allPlans;
+      },
+
+      get benefits() {
+        return this.hasBenefits ? this.allBenefits : [];
+      },
+
+      // Every course across plans, in first-seen order, for the comparison table.
+      get allCourses() {
+        return [...new Set(this.plans.flatMap((p) => p.courses))];
+      },
+
+      // Every duration offered by any plan, in first-seen order.
+      get durations() {
+        return [...new Set(this.plans.flatMap((p) => p.details.map((d) => d.duration)))];
+      },
+
+      // The plan's price for the chosen duration, or undefined when it doesn't offer it.
+      detailFor(plan) {
+        return plan.details.find((d) => d.duration === this.duration);
+      },
+
+      setDuration(duration) {
+        this.duration = duration;
+        // Keep the selection valid: move to the first plan that offers this duration.
+        if (this.selectedPlan && !this.detailFor(this.selectedPlan)) {
+          this.selectedPlan = this.plans.find((p) => this.detailFor(p)) || null;
+        }
+      },
+
+      get selectedDetail() {
+        return this.selectedPlan ? this.detailFor(this.selectedPlan) : null;
+      },
+
+      get lowestPrice() {
+        return Math.min(...this.plans.flatMap((p) => p.details.map((d) => d.price)));
+      },
+
+      isSelected(plan) {
+        return !!this.selectedPlan && this.selectedPlan.id === plan.id;
+      },
+
+      includes(plan, benefit) {
+        return plan.benefits.includes(benefit.id);
+      },
+
+      money(amount) {
+        return "₹" + Number(amount).toLocaleString("en-IN");
+      },
+
+      measureDescription(el, plan) {
+        this.truncated[plan.id] = el.scrollHeight > el.clientHeight + 1;
+      },
+
+      percentOff(price, strike) {
+        return Math.round((1 - price / strike) * 100);
+      },
+
+      selectPlan(plan) {
+        if (!this.detailFor(plan)) return;
+        this.selectedPlan = plan;
+        this.activePlan = plan.id;
+      },
+    };
+  }
+</script>

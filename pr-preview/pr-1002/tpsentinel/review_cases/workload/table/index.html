@@ -1,0 +1,483 @@
+
+
+
+
+
+<!-- Details, plain (Preline users table): reviewers or workspaces, searchable, sortable, paginated -->
+<section id="workload-table" class="scroll-mt-20 bg-card border border-card-line shadow-2xs rounded-xl" x-show="!loadFailed" :class="stale && 'opacity-70'" aria-label="Workload details">
+  <!-- Header: tabs + search -->
+  <div class="flex flex-wrap items-center justify-between gap-3 px-4 md:px-5 pt-3 pb-1 sm:pb-0 border-b border-card-line">
+    <div class="pt-1">
+      
+
+
+
+<div  id="workload-tabs">
+  
+  
+  <div class="sm:hidden relative w-full"
+       x-data="{ 
+         open: false,
+         top: 0,
+         left: 0,
+         width: 0,
+         _scrollHandler: null,
+         init() {
+           this.$watch('open', value => {
+             if (value) {
+               this._scrollHandler = this._scrollHandler || (() => this.updatePosition());
+               setTimeout(() => this.updatePosition(), 0);
+               window.addEventListener('scroll', this._scrollHandler, true);
+               window.addEventListener('resize', this._scrollHandler, true);
+             } else {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           });
+         },
+         updatePosition() {
+           const rect = this.$refs.trigger.getBoundingClientRect();
+           this.top = rect.bottom + 4;
+           this.left = rect.left;
+           this.width = rect.width;
+         }
+       }">
+    
+    <button type="button" @click="open = !open" x-ref="trigger" class="py-2 px-3 inline-flex items-center justify-between w-full gap-x-2 text-sm font-medium rounded-lg border border-layer-line bg-layer text-layer-foreground hover:bg-layer-hover focus:outline-hidden focus:bg-layer-focus" aria-haspopup="menu" :aria-expanded="open.toString()">
+      <span x-html="
+        
+          tab === 'reviewers' ? 'Reviewers' + ' (' + (num(tabCounts.reviewers)) + ')' :
+        
+          tab === 'workspaces' ? 'Workspaces' + ' (' + (num(tabCounts.workspaces)) + ')' :
+         'Select tab'
+      "></span>
+      <svg class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+
+    <div x-show="open" 
+         @click.outside="open = false"
+         @keydown.escape.window="open = false"
+         x-cloak
+         x-transition:enter="transition ease-out duration-100"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-75"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         class="fixed z-[9999] bg-dropdown border border-dropdown-line rounded-lg shadow-xl p-1"
+         x-bind:style="{ top: top + 'px', left: left + 'px', width: width + 'px' }"
+         role="menu"
+         aria-orientation="vertical">
+      
+        
+          <button type="button"
+                  class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm font-normal text-start focus:outline-hidden hover:bg-dropdown-item-hover focus:bg-dropdown-item-focus text-dropdown-item-foreground"
+                  @click="tab = 'reviewers'; open = false"
+                  >
+            
+            <span>Reviewers</span>
+          </button>
+        
+      
+        
+          <button type="button"
+                  class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm font-normal text-start focus:outline-hidden hover:bg-dropdown-item-hover focus:bg-dropdown-item-focus text-dropdown-item-foreground"
+                  @click="tab = 'workspaces'; open = false"
+                  >
+            
+            <span>Workspaces</span>
+          </button>
+        
+      
+    </div>
+  </div>
+
+  
+  
+  <nav class="--prevent-on-load-init hidden sm:flex  gap-1 relative " aria-label="Tabs" role="tablist" aria-orientation="horizontal">
+    
+    
+      
+        <button type="button"
+                
+                  @click="tab = 'reviewers'"
+                
+                class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-muted-focus focus:text-foreground after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-muted-hover hover:text-foreground "
+                :class="tab === 'reviewers' 
+                          ? 'after:bg-foreground text-foreground' 
+                          : 'text-muted-foreground-1'"
+                :aria-selected="tab === 'reviewers'"
+                id="workload-tabs-item-reviewers"
+                aria-controls="workload-tabs-panel-reviewers"
+                role="tab"
+                >
+          
+          Reviewers
+          
+            <span class="ml-2 inline-flex items-center justify-center rounded-full min-w-[1.5rem] h-5 px-2 text-[10px] sm:text-xs font-medium leading-none transition-colors"
+                  :class="tab === 'reviewers' 
+                    ? 'bg-foreground text-foreground-inverse' 
+                    : 'bg-surface text-surface-foreground'"
+                  x-text="num(tabCounts.reviewers)">
+              
+            </span>
+          
+        </button>
+      
+    
+      
+        <button type="button"
+                
+                  @click="tab = 'workspaces'"
+                
+                class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-muted-focus focus:text-foreground after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-muted-hover hover:text-foreground "
+                :class="tab === 'workspaces' 
+                          ? 'after:bg-foreground text-foreground' 
+                          : 'text-muted-foreground-1'"
+                :aria-selected="tab === 'workspaces'"
+                id="workload-tabs-item-workspaces"
+                aria-controls="workload-tabs-panel-workspaces"
+                role="tab"
+                >
+          
+          Workspaces
+          
+            <span class="ml-2 inline-flex items-center justify-center rounded-full min-w-[1.5rem] h-5 px-2 text-[10px] sm:text-xs font-medium leading-none transition-colors"
+                  :class="tab === 'workspaces' 
+                    ? 'bg-foreground text-foreground-inverse' 
+                    : 'bg-surface text-surface-foreground'"
+                  x-text="num(tabCounts.workspaces)">
+              
+            </span>
+          
+        </button>
+      
+    
+  </nav>
+
+  
+  
+    
+  
+    
+  
+
+  
+</div>
+
+    </div>
+    <div class="relative w-full sm:w-64 pb-3 sm:pb-0">
+      <label class="relative block">
+        <span class="sr-only" x-text="tab === 'workspaces' ? 'Search workspaces' : 'Search reviewers'"></span>
+        <svg class="absolute start-3 top-1/2 -translate-y-1/2 shrink-0 size-4 text-muted-foreground-1 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" x-model="search" :placeholder="tab === 'workspaces' ? 'Search workspaces' : 'Search name or email'"
+               class="py-1.5 ps-9 pe-8 block w-full bg-layer border border-layer-line rounded-lg text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:ring-1 focus:ring-primary">
+      </label>
+      <button type="button" x-show="search" x-cloak @click="search = ''" aria-label="Clear search"
+              class="absolute end-1.5 top-[calc(50%-0.375rem)] sm:top-1/2 -translate-y-1/2 inline-flex justify-center items-center size-6 rounded-full text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div x-show="loading" x-cloak class="p-5 flex flex-col gap-5 animate-pulse">
+    <template x-for="i in 6" :key="i"><div class="flex items-center gap-4"><div class="size-8 rounded-full bg-surface"></div><div class="h-3 w-40 rounded-full bg-surface"></div><div class="ms-auto h-3 w-64 rounded-full bg-surface"></div></div></template>
+  </div>
+
+  <!-- Nothing open -->
+  <div x-show="noOpenWork && !hasFilters" x-cloak>
+    
+  
+  
+
+  
+    
+  <div class="p-5 min-h-[200px] flex flex-col justify-center items-center text-center">
+    
+    
+      <div class="mx-auto flex justify-center items-center size-12 bg-surface rounded-full">
+        <i data-lucide="circle-check" class="shrink-0 size-6 text-muted-foreground-1"></i>
+      </div>
+    
+
+    <div class="max-w-sm mx-auto">
+      <p class="mt-2 font-medium text-foreground">
+        No cases are waiting for a decision
+      </p>
+      
+      <p class="mb-5 mt-1 text-sm text-muted-foreground-1">
+        Every case has been reviewed. New cases will appear here when they need a reviewer.
+      </p>
+      
+    </div>
+
+    
+    <div class="flex items-center gap-x-2 ">
+      
+      
+      
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <a href="#" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   :href="casesHref({ view: 'closed', sort: 'newest' })">
+  
+
+    
+    
+
+    View closed cases
+
+    
+
+  
+    </a>
+  
+
+
+      
+    </div>
+    
+
+  </div>
+  
+  
+
+
+  </div>
+  <div x-show="noOpenWork && hasFilters" x-cloak>
+    
+  
+  
+
+  
+    
+  <div class="p-5 min-h-[200px] flex flex-col justify-center items-center text-center">
+    
+    
+      <div class="mx-auto flex justify-center items-center size-12 bg-surface rounded-full">
+        <i data-lucide="filter-x" class="shrink-0 size-6 text-muted-foreground-1"></i>
+      </div>
+    
+
+    <div class="max-w-sm mx-auto">
+      <p class="mt-2 font-medium text-foreground">
+        No open work matches these filters
+      </p>
+      
+      <p class="mb-5 mt-1 text-sm text-muted-foreground-1">
+        There may be open cases outside this workspace or priority.
+      </p>
+      
+    </div>
+
+    
+    <div class="flex items-center gap-x-2 ">
+      
+      
+      
+        
+
+  
+  
+  
+
+  
+  
+
+  
+
+  
+  
+  
+
+  
+    <button type="button" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-1.5 px-2.5 text-[13px] bg-primary border border-transparent text-primary-foreground hover:bg-primary-hover focus:bg-primary-focus"   @click.prevent="clearFilters()">
+  
+
+    
+    
+
+    Clear filters
+
+    
+
+  
+    </button>
+  
+
+
+      
+    </div>
+    
+
+  </div>
+  
+  
+
+
+  </div>
+
+  <template x-if="ready && !noOpenWork">
+    <div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full">
+          <thead class="border-b border-card-line">
+            <tr>
+              <th scope="col" class="py-2.5 ps-4 md:ps-5 pe-3 text-start text-xs font-medium uppercase tracking-wide text-muted-foreground-1" x-text="tab === 'workspaces' ? 'Workspace' : 'Reviewer'"></th>
+              <template x-for="col in columns[tab]" :key="tab + col[0]">
+                <th scope="col" :class="col[2]" :aria-sort="ariaSort(col[0])" class="py-2.5 px-3 text-end whitespace-nowrap">
+                  <button type="button" @click="sortBy(col[0])"
+                          :class="sort.by === col[0] ? 'text-foreground' : 'text-muted-foreground-1 hover:text-foreground'"
+                          class="group inline-flex items-center gap-x-1 text-xs font-medium uppercase tracking-wide focus:outline-hidden focus-visible:underline">
+                    <span x-text="col[1]"></span>
+                    <svg class="shrink-0 size-3.5" :class="[sort.by === col[0] ? '' : 'opacity-0 group-hover:opacity-60', sort.by === col[0] && sort.dir === 'asc' && 'rotate-180']" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                  </button>
+                </th>
+              </template>
+              <th scope="col" class="py-2.5 ps-3 pe-4 md:pe-5"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-card-line">
+            <template x-for="row in pageRows" :key="tab + row.id">
+              <tr class="hover:bg-layer-hover/50">
+                <!-- Who / which workspace -->
+                <td class="py-3 ps-4 md:ps-5 pe-3">
+                  <div class="flex items-center gap-x-3 min-w-48">
+                    <template x-if="row.kind === 'unassigned'">
+                      <span class="shrink-0 flex justify-center items-center size-8 rounded-full border border-dashed border-muted-foreground-2 text-muted-foreground-1">
+                        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21a8 8 0 0 1 13.29-6"/><circle cx="10" cy="8" r="5"/><path d="M19 16v6"/><path d="M22 19h-6"/></svg>
+                      </span>
+                    </template>
+                    <template x-if="row.kind === 'reviewer' && row.avatar">
+                      <img :src="row.avatar" alt="" class="shrink-0 size-8 rounded-full object-cover">
+                    </template>
+                    <template x-if="row.kind === 'reviewer' && !row.avatar">
+                      <span class="shrink-0 flex justify-center items-center size-8 rounded-full bg-surface text-xs font-medium text-muted-foreground-1" x-text="initials(row.name)"></span>
+                    </template>
+                    <div class="min-w-0">
+                      <p class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <a :href="rowHref(row)" class="text-sm font-medium text-foreground hover:text-primary focus:outline-hidden focus-visible:underline" x-text="row.name"></a>
+                        <span x-show="row.you" class="text-xs text-muted-foreground-1">(you)</span>
+                      </p>
+                      <p x-show="row.email" class="text-xs text-muted-foreground-1 truncate" x-text="row.email"></p>
+                      <p x-show="row.kind === 'unassigned'" class="text-xs text-muted-foreground-1">No reviewer yet</p>
+                    </div>
+                  </div>
+                </td>
+                <!-- Numbers: each opens its cases -->
+                <template x-for="col in columns[tab]" :key="tab + row.id + col[0]">
+                  <td :class="col[2]" class="py-3 px-3 text-end whitespace-nowrap">
+                    <a x-show="row[col[0]] && col[0] !== 'oldest'" :href="rowCellHref(row, col[0])"
+                       class="text-sm tabular-nums hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline"
+                       :class="col[0] === 'open' ? 'font-medium text-foreground' : 'text-foreground'" x-text="cell(row, col[0])"></a>
+                    <a x-show="col[0] === 'oldest' && row.oldest" :href="rowCellHref(row, 'oldest')"
+                       @mouseenter="showTip($event, 'Oldest waiting case', [['Opened', exact(row.oldest)]], 'Click to see the oldest first')" @mouseleave="hideTip()"
+                       class="text-sm tabular-nums text-foreground hover:text-primary hover:underline underline-offset-4 focus:outline-hidden focus-visible:underline" x-text="cell(row, 'oldest')"></a>
+                    <span x-show="!row[col[0]]" class="text-sm tabular-nums text-muted-foreground-2" x-text="row[col[0]] === null ? '—' : '0'"></span>
+                  </td>
+                </template>
+                <!-- Actions: text links, like Preline tables -->
+                <td class="py-3 ps-3 pe-4 md:pe-5 text-end whitespace-nowrap">
+                  <div class="inline-flex items-center gap-x-4 text-sm font-medium">
+                    <button type="button" x-show="row.kind === 'unassigned' && eligible.length" @click="openMove('unassigned', row.high ? 'high' : 'all')" class="text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline">Assign</button>
+                    <button type="button" x-show="row.kind === 'reviewer' && row.open && eligible.length > 1" @click="openMove(row.id)" class="text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline">Move</button>
+                    <button type="button" x-show="row.kind === 'workspace' && row.unowned && eligible.length" @click="openMove('unassigned', 'all', row.id)" class="text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline">Assign</button>
+                    <a :href="rowHref(row)" class="text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:underline">View</a>
+                  </div>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Search found nothing (pinned rows may still show above) -->
+      <div x-show="search.trim() && !rows.filter(r => r.kind === 'reviewer' || r.kind === 'workspace').length" class="py-8 px-4 text-center border-t border-card-line">
+        <p class="text-sm font-medium text-foreground">No <span x-text="tab === 'workspaces' ? 'workspace' : 'reviewer'"></span> matches “<span x-text="search.trim()"></span>”</p>
+        <p class="mt-1 text-sm text-muted-foreground-1" x-show="tab === 'reviewers'">Looking for a candidate or case? <a :href="window.SentinelReview.url(`/tpsentinel/review_cases/?${new URLSearchParams({ view: 'open', q: search.trim() })}`)" class="font-medium text-primary hover:underline underline-offset-4">Search in Review Cases</a></p>
+        <button type="button" @click="search = ''" class="mt-3 py-1.5 px-2.5 rounded-lg text-[13px] font-medium border border-layer-line bg-layer text-layer-foreground hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">Clear search</button>
+      </div>
+
+      <!-- Nobody to give work to -->
+      <div x-show="!eligible.length" class="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 border-t border-card-line">
+        <p class="grow text-sm text-muted-foreground-1">No reviewer has review access, so cases can't be assigned or moved yet.</p>
+        <a href="#" class="shrink-0 text-sm font-medium text-primary hover:text-primary-hover">Manage reviewer access</a>
+      </div>
+
+      <!-- Pagination -->
+      <!-- Only when there's more than one page, as on Review Cases -->
+      <div x-show="pageCount > 1" class="py-3 px-4 border-t border-card-line">
+        
+
+
+
+
+<!-- Stacks on narrow screens so page buttons never overflow -->
+<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+
+  <!-- Left Side: Results Count, Go To Page Input, Showing range -->
+  <div class="flex items-center gap-x-4">
+    
+
+    
+      <input type="number" placeholder="Go to" class="min-h-9 py-1.5 px-2 block w-14 bg-layer border border-layer-line rounded-lg text-sm text-center text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:opacity-50 disabled:pointer-events-none" style="-moz-appearance: textfield;"
+             min="1" :max="pageCount" aria-label="Go to page" @keydown.enter.prevent="if ($el.value) goPage(Math.min(Math.max(1, Math.round(Number($el.value))), pageCount)); $el.value = ''">
+    
+
+    
+      <p class="text-sm text-muted-foreground-1">
+        Showing <span class="font-medium text-foreground" x-text="(rangeFrom).toLocaleString()"></span>
+        to <span class="font-medium text-foreground" x-text="(rangeTo).toLocaleString()"></span>
+        of <span class="font-medium text-foreground" x-text="(rows.length).toLocaleString()"></span> results
+      </p>
+    
+  </div>
+
+  <!-- Right Side: Pagination Pages -->
+  <nav class="flex items-center -space-x-px" aria-label="Pagination">
+    <button type="button" class="min-h-9 min-w-9 py-2 px-2.5 inline-flex justify-center items-center gap-x-1.5 text-sm first:rounded-s-lg last:rounded-e-lg border border-layer-line text-foreground hover:bg-layer-hover focus:outline-hidden focus:bg-layer-focus disabled:opacity-50 disabled:pointer-events-none" aria-label="Previous"
+            @click="goPage(page - 1)" :disabled="page <= 1">
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      <span class="sr-only">Previous</span>
+    </button>
+
+    
+      
+      <template x-for="(item, i) in pageItems" :key="i + '-' + item">
+        <button type="button"
+                :disabled="item === '...' || item === '…'"
+                @click="goPage(item)"
+                :class="(item === '...' || item === '…') ? 'border-x-0 text-muted-foreground !opacity-100' : (item === page ? 'bg-layer-hover text-foreground' : 'text-foreground hover:bg-layer-hover focus:bg-layer-focus')"
+                :aria-current="item === page ? 'page' : null"
+                class="min-h-9 min-w-9 flex justify-center items-center border border-layer-line py-2 px-3 text-sm first:rounded-s-lg last:rounded-e-lg focus:outline-hidden disabled:opacity-50 disabled:pointer-events-none"
+                x-text="(item === '...' || item === '…') ? '•••' : item"></button>
+      </template>
+    
+
+    <button type="button" class="min-h-9 min-w-9 py-2 px-2.5 inline-flex justify-center items-center gap-x-1.5 text-sm first:rounded-s-lg last:rounded-e-lg border border-layer-line text-foreground hover:bg-layer-hover focus:outline-hidden focus:bg-layer-focus disabled:opacity-50 disabled:pointer-events-none" aria-label="Next"
+            @click="goPage(page + 1)" :disabled="page >= pageCount">
+      <span class="sr-only">Next</span>
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </nav>
+
+</div>
+
+      </div>
+    </div>
+  </template>
+</section>
