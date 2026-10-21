@@ -1,0 +1,155 @@
+{# TPSentinel copy of src/ui-system/components/tabs.html: same markup, Preline theme tokens for neutral and primary colours; accent colours stay Tailwind palette, as in Preline. #}
+{% macro tabs(tabs=[], active_tab="", variant="standard", full_width=false, show_border=true, x_model="", id="", content_class="mt-3") %}
+{% set default_active = active_tab if active_tab else (tabs[0].key if tabs | length else "") %}
+{% set unique_id = id if id else "tabs-" ~ range(1000, 9999) | random %}
+
+<div {% if not x_model %}x-data="{ activeTab: '{{ default_active }}' }"{% endif %} id="{{ unique_id }}">
+  
+  {# Mobile Dropdown #}
+  <div class="sm:hidden relative w-full"
+       x-data="{ 
+         open: false,
+         top: 0,
+         left: 0,
+         width: 0,
+         _scrollHandler: null,
+         init() {
+           this.$watch('open', value => {
+             if (value) {
+               this._scrollHandler = this._scrollHandler || (() => this.updatePosition());
+               setTimeout(() => this.updatePosition(), 0);
+               window.addEventListener('scroll', this._scrollHandler, true);
+               window.addEventListener('resize', this._scrollHandler, true);
+             } else {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           });
+         },
+         updatePosition() {
+           const rect = this.$refs.trigger.getBoundingClientRect();
+           this.top = rect.bottom + 4;
+           this.left = rect.left;
+           this.width = rect.width;
+         }
+       }">
+    
+    <button type="button" @click="open = !open" x-ref="trigger" class="py-2 px-3 inline-flex items-center justify-between w-full gap-x-2 text-sm font-medium rounded-lg border border-layer-line bg-layer text-layer-foreground hover:bg-layer-hover focus:outline-hidden focus:bg-layer-focus" aria-haspopup="menu" :aria-expanded="open.toString()">
+      <span x-html="
+        {% for tab in tabs %}
+          {% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}' ? '{{ tab.label | escape }}{% if tab.badge %} ({{ tab.badge }}){% endif %}' :
+        {% endfor %} 'Select tab'
+      "></span>
+      <svg class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+
+    <div x-show="open" 
+         @click.outside="open = false"
+         @keydown.escape.window="open = false"
+         x-cloak
+         x-transition:enter="transition ease-out duration-100"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         x-transition:leave="transition ease-in duration-75"
+         x-transition:leave-start="opacity-100 scale-100"
+         x-transition:leave-end="opacity-0 scale-95"
+         class="fixed z-[9999] bg-dropdown border border-dropdown-line rounded-lg shadow-xl p-1"
+         x-bind:style="{ top: top + 'px', left: left + 'px', width: width + 'px' }"
+         role="menu"
+         aria-orientation="vertical">
+      {% for tab in tabs %}
+        {% if tab.href %}
+          <a href="{{ tab.href }}"
+             class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm font-normal text-start focus:outline-hidden hover:bg-dropdown-item-hover focus:bg-dropdown-item-focus text-dropdown-item-foreground">
+            {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4 text-muted-foreground-1"></i>{% endif %}
+            <span>{{ tab.label }}{% if tab.badge %} ({{ tab.badge }}){% endif %}</span>
+          </a>
+        {% else %}
+          <button type="button"
+                  class="w-full flex items-center gap-x-3 py-2 px-3 rounded-lg text-sm font-normal text-start focus:outline-hidden hover:bg-dropdown-item-hover focus:bg-dropdown-item-focus text-dropdown-item-foreground"
+                  @click="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} = '{{ tab.key }}'; open = false"
+                  {% if tab.disabled %}disabled{% endif %}>
+            {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4 text-muted-foreground-1"></i>{% endif %}
+            <span>{{ tab.label }}{% if tab.badge %} ({{ tab.badge }}){% endif %}</span>
+          </button>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  {# Desktop Tabs #}
+  {# --prevent-on-load-init: Alpine drives these tabs, so Preline's own tabs plugin must skip them #}
+  <nav class="--prevent-on-load-init hidden sm:flex {% if full_width %}w-full{% endif %} gap-1 relative {% if show_border %}after:absolute after:bottom-0 after:inset-x-0 after:border-b after:border-layer-line{% endif %}" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
+    
+    {% for tab in tabs %}
+      {% if tab.href %}
+        {# href-based tab: active state via Nunjucks active_tab param #}
+        {% set is_active = (active_tab == tab.key) %}
+        <a href="{{ tab.href }}"
+           class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm rounded-lg after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-muted-hover hover:text-foreground focus:outline-hidden {% if full_width %}flex-1{% endif %} {{ 'after:bg-foreground text-foreground' if is_active else 'text-muted-foreground-1' }}"
+           aria-selected="{{ 'true' if is_active else 'false' }}"
+           id="{{ unique_id }}-item-{{ tab.key }}"
+           role="tab">
+          {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4"></i>{% endif %}
+          {{ tab.label }}
+          {% if tab.badge %}
+            <span class="ml-2 inline-flex items-center justify-center rounded-full min-w-[1.5rem] h-5 px-2 text-[10px] sm:text-xs font-medium leading-none transition-colors {{ 'bg-foreground text-foreground-inverse' if is_active else 'bg-surface text-surface-foreground' }}">
+              {{ tab.badge }}
+            </span>
+          {% endif %}
+        </a>
+      {% else %}
+        <button type="button"
+                {% if x_model %}
+                  @click="{{ x_model }} = '{{ tab.key }}'"
+                {% else %}
+                  @click="activeTab = '{{ tab.key }}'"
+                {% endif %}
+                class="px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-sm rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-muted-focus focus:text-foreground after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:pointer-events-none hover:bg-muted-hover hover:text-foreground {% if full_width %}flex-1{% endif %}"
+                :class="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}' 
+                          ? 'after:bg-foreground text-foreground' 
+                          : 'text-muted-foreground-1'"
+                :aria-selected="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}'"
+                id="{{ unique_id }}-item-{{ tab.key }}"
+                aria-controls="{{ unique_id }}-panel-{{ tab.key }}"
+                role="tab"
+                {% if tab.disabled %}disabled{% endif %}>
+          {% if tab.icon %}<i data-lucide="{{ tab.icon }}" class="shrink-0 size-4"></i>{% endif %}
+          {{ tab.label }}
+          {% if tab.badge %}
+            <span class="ml-2 inline-flex items-center justify-center rounded-full min-w-[1.5rem] h-5 px-2 text-[10px] sm:text-xs font-medium leading-none transition-colors"
+                  :class="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}' 
+                    ? 'bg-foreground text-foreground-inverse' 
+                    : 'bg-surface text-surface-foreground'">
+              {{ tab.badge }}
+            </span>
+          {% endif %}
+        </button>
+      {% endif %}
+    {% endfor %}
+  </nav>
+
+  {% set has_content = false %}
+  {% for tab in tabs %}
+    {% if tab.content %}
+      {% set has_content = true %}
+    {% endif %}
+  {% endfor %}
+
+  {% if has_content %}
+  <div class="{{ content_class }}">
+    {% for tab in tabs %}
+      {% if tab.content %}
+        <div id="{{ unique_id }}-panel-{{ tab.key }}" 
+             role="tabpanel" 
+             aria-labelledby="{{ unique_id }}-item-{{ tab.key }}"
+             x-show="{% if x_model %}{{ x_model }}{% else %}activeTab{% endif %} === '{{ tab.key }}'"
+             {% if default_active != tab.key and not x_model %}style="display: none;"{% endif %}>
+          {{ tab.content | safe }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endmacro %}

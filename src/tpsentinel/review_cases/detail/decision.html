@@ -1,0 +1,152 @@
+{% from "src/tpsentinel/components/button.html" import button %}
+{% from "src/tpsentinel/components/radio.html" import radio %}
+{% from "src/tpsentinel/components/textarea.html" import textarea %}
+
+<!-- Decision: only the assigned Reviewer can submit; everyone else sees why -->
+<section id="decision" class="bg-card border border-card-line shadow-2xs rounded-xl p-4 sm:p-5 scroll-mt-20" aria-labelledby="decision-heading">
+  <h2 id="decision-heading" class="text-base font-semibold text-foreground">Decision</h2>
+
+  <!-- Completed: read-only result, never an empty form -->
+  <template x-if="c.state === 'completed'">
+    <div class="mt-3">
+      <div class="flex items-start gap-3 p-4 rounded-lg bg-muted">
+        <span class="mt-0.5" :class="resultClass" x-html="resultIcon"></span>
+        <div class="min-w-0">
+          <p class="font-medium text-foreground">
+            <span x-text="c.result === 'clear' ? 'Clear' : 'Flagged'"></span><span x-show="c.result === 'flagged' && c.concern" class="font-normal text-muted-foreground-2" x-text="` · ${c.concern === 'evidence' ? 'Evidence concern' : 'Behaviour concern'}`"></span>
+          </p>
+          <p class="mt-0.5 text-sm text-muted-foreground-2" x-text="c.reason"></p>
+          <p class="mt-1 text-sm text-muted-foreground-1">
+            <span x-text="`by ${reviewerFull(c.reviewer)}`"></span> ·
+            <span x-text="exact(c.completedAt)"></span> ·
+            <span x-text="`candidate workspace through Session ${c.assessedThrough || d.assessedThrough}`"></span>
+          </p>
+        </div>
+      </div>
+      <p x-show="justSubmitted" class="mt-3 text-sm text-muted-foreground-2">Saved. This is now the candidate’s result and has been returned to the client.</p>
+
+      <template x-if="newReview">
+        <p class="mt-3 text-sm text-muted-foreground-2">
+          <span class="font-medium text-foreground" x-text="newReview.id"></span> was opened and queued. This decision stays the current result until that review is completed.
+        </p>
+      </template>
+
+      <div class="mt-4 flex flex-wrap items-center gap-2">
+        <template x-if="justSubmitted && nextAssignedHref">
+          {{ button(text="Next assigned case", extra_attrs=':href="nextAssignedHref"', href="#") }}
+        </template>
+        <template x-if="justSubmitted && !nextAssignedHref">
+          {{ button(text="Back to Review cases", extra_attrs=':href="listHref"', href="#") }}
+        </template>
+        <template x-if="!newReview">
+          {{ button(text="Request new review", variant="secondary", extra_attrs='@click="requestNewReview()"') }}
+        </template>
+      </div>
+    </div>
+  </template>
+
+  <!-- Queued: nobody owns it yet -->
+  <template x-if="c.state === 'queued'">
+    <p class="mt-2 text-sm text-muted-foreground-2">Nobody has claimed this case yet. Assign it to yourself at the top of the page to record a decision.</p>
+  </template>
+
+  <!-- Someone else's case -->
+  <template x-if="c.state === 'assigned' && !isMine">
+    <p class="mt-2 text-sm text-muted-foreground-2">
+      Assigned to <span class="font-medium text-foreground" x-text="reviewerFull(c.reviewer)"></span>. Only they can submit a decision<span x-show="isAdmin">; use Reassign at the top to move it</span>.
+    </p>
+  </template>
+
+  <!-- The assigned Reviewer's form -->
+  <template x-if="isMine">
+    <div class="mt-1">
+      <!-- Scope: the decision is for the candidate, not one Session or the requested evidence -->
+      <p class="text-sm text-muted-foreground-1">
+        Applies to the candidate’s whole workspace through <span class="font-medium text-foreground">Session <span x-text="d.assessedThrough"></span></span>, the latest AI assessed. Your decision becomes the candidate’s result.
+      </p>
+
+      <fieldset class="mt-4" :disabled="!canDecide">
+        <legend class="sr-only">Result</legend>
+        <div class="grid sm:grid-cols-2 gap-3">
+          {{ radio(name="cd-choice", id="cd-choice-clear", value="clear", label="Clear", description="The available evidence doesn’t support an integrity concern.", variant="card", extra_attrs=':checked="decision.choice === \'clear\'" @change="choose(\'clear\')"') }}
+          {{ radio(name="cd-choice", id="cd-choice-flagged", value="flagged", label="Flagged", description="The evidence supports a concern, including required evidence that’s missing or unusable.", variant="card", extra_attrs=':checked="decision.choice === \'flagged\'" @change="choose(\'flagged\')"') }}
+        </div>
+      </fieldset>
+
+      <!-- Flagged: the concern type, starting from the AI's -->
+      <template x-if="decision.choice === 'flagged'">
+        <fieldset class="mt-5" :disabled="!canDecide">
+          <legend class="text-sm font-medium text-foreground">Concern type</legend>
+          <div class="mt-2 flex flex-col gap-3">
+            <template x-for="[value, label, help] in reasons" :key="value">
+              <label class="flex items-start gap-x-3 text-sm cursor-pointer">
+                <input type="radio" name="cd-concern" :value="value" x-model="decision.reason"
+                       class="mt-0.5 shrink-0 size-4 bg-transparent border-line-3 rounded-full text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+                <span>
+                  <span class="block text-foreground" x-text="label"></span>
+                  <span class="block text-muted-foreground-1" x-text="help"></span>
+                </span>
+              </label>
+            </template>
+          </div>
+        </fieldset>
+      </template>
+
+      <!-- Clear: structured reason -->
+      <template x-if="decision.choice === 'clear'">
+        <fieldset class="mt-5" :disabled="!canDecide">
+          <legend class="text-sm font-medium text-foreground">Reason</legend>
+          <div class="mt-2 flex flex-col gap-2">
+            <template x-for="[value, label] in reasons" :key="value">
+              <label class="flex items-center gap-x-3 text-sm text-foreground cursor-pointer">
+                <input type="radio" name="cd-reason" :value="value" x-model="decision.reason"
+                       class="shrink-0 size-4 bg-transparent border-line-3 rounded-full text-primary focus:ring-0 focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-primary checked:bg-primary-checked checked:border-primary-checked">
+                <span x-text="label"></span>
+              </label>
+            </template>
+          </div>
+        </fieldset>
+      </template>
+
+      <template x-if="decision.choice === 'clear'">
+        <div class="mt-5">
+          {{ textarea(name="cd-notes", id="cd-notes", label="Notes", rows="3", placeholder="What did you see, and why does it support this result?", x_model="decision.notes", help_text="Required when the reason is Other. Notes stay in the case history.", extra_attrs=':disabled="!canDecide"') }}
+        </div>
+      </template>
+      <template x-if="decision.choice === 'flagged'">
+        <div class="mt-5">
+          {{ textarea(name="cd-reason-note", id="cd-reason-note", label="Reason", rows="3", placeholder="What did you see, and why does it support flagging the candidate?", x_model="decision.notes", help_text="Required. It’s recorded with the decision and returned with the result.", extra_attrs=':disabled="!canDecide"') }}
+        </div>
+      </template>
+
+      <!-- Errors stay next to the decision -->
+      <p x-show="decision.error" class="mt-3 text-sm text-red-600 dark:text-red-500" role="alert" x-text="decision.error"></p>
+      <p x-show="condition === 'stale'" class="mt-3 text-sm text-amber-700 dark:text-amber-500">Refresh evidence before submitting. Your choice and notes are kept.</p>
+      <p x-show="condition === 'error'" class="mt-3 text-sm text-amber-700 dark:text-amber-500">Submitting is blocked until evidence coverage loads. Your choice and notes are kept.</p>
+
+      <!-- Submit, then a deliberate confirmation -->
+      <div class="mt-5 pt-4 border-t border-card-line">
+        <template x-if="!decision.confirming">
+          <div class="flex flex-wrap items-center gap-3">
+            {{ button(text="Submit decision", extra_attrs='@click="reviewDecision()" :disabled="!canDecide"') }}
+            <span class="text-sm text-muted-foreground-1">You’ll confirm before it’s saved.</span>
+          </div>
+        </template>
+        <template x-if="decision.confirming">
+          <div class="p-4 rounded-lg bg-muted">
+            <p class="text-sm font-medium text-foreground">
+              Submit as <span x-text="decision.choice === 'clear' ? 'Clear' : 'Flagged'"></span>?
+            </p>
+            <p class="mt-1 text-sm text-muted-foreground-2">
+              <span x-text="decision.choice === 'flagged' ? 'Concern type' : 'Reason'"></span>: <span x-text="reasonLabel"></span>. This becomes the candidate’s result through Session <span x-text="d.assessedThrough"></span>, is returned to the client and completes the case.
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              {{ button(text="Confirm and submit", extra_attrs='@click="submit()"') }}
+              {{ button(text="Go back", variant="secondary", extra_attrs='@click="decision.confirming = false"') }}
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </template>
+</section>
