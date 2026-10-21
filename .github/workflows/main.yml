@@ -70,6 +70,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: read
     concurrency:
       group: gh-pages-publisher
       cancel-in-progress: false
@@ -83,6 +84,15 @@ jobs:
 
       - name: Unpack site
         run: mkdir public && tar -xf site.tar -C public && rm site.tar
+
+      # Previews whose removal job GitHub cancelled get removed here instead.
+      # Never blocks the deploy.
+      - name: Remove previews of closed PRs
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: .github/scripts/remove-closed-previews.sh
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
