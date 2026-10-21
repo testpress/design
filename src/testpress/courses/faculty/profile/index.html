@@ -17,7 +17,6 @@ date: 2026-10-20
 {% from "../../../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../../../ui-system/components/popover.html" import popover %}
 {% from "../includes/avatar.html" import avatar %}
-{% from "../includes/subject_picker.html" import subject_picker %}
 
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
 
@@ -108,14 +107,6 @@ date: 2026-10-20
                 </div>
               </div>
 
-              {# Subjects as chips in one field: pick from subjects already in use, or type to add a new one.
-                 Chips as in the ui-system multi-select; the list and "Add … as new" as in batches/list tags. #}
-              {{ field_label("Subjects taught", "subject_input") }}
-              <div class="sm:col-span-9">
-                {{ subject_picker("form.subjects", "subject_input") }}
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">What they teach in general. When you assign a course, these fill in its subjects, and you can change them for that course.</p>
-              </div>
-
               {# Repeatable rows, as in the Preline block's "Add phone". #}
               {% for list in [
                 { key: "highlights", label: "Highlights", add: "Add highlight", placeholder: "e.g. Mentored 120+ selections in CSE 2019–2025", help: "Ranks, awards, books or the number of students taught." },
@@ -159,15 +150,7 @@ date: 2026-10-20
         </form>
         </div>
 
-        {% set link_subjects_more %}
-          <span class="ps-1.5 text-gray-500 text-sm font-medium whitespace-nowrap cursor-default dark:text-neutral-400" x-text="'+' + (link.subjects.length - 2) + ' more'"></span>
-        {% endset %}
-        {% set link_subjects_rest %}
-          <ul class="py-2 px-3 space-y-1 list-disc list-inside text-sm text-gray-800 dark:text-neutral-200">
-            <template x-for="subject in link.subjects.slice(2)" :key="subject"><li x-text="subject"></li></template>
-          </ul>
-        {% endset %}
-        {# Assigned courses, with the subjects and intro video for each. #}
+        {# Assigned courses, with the subject and intro video for each. Subjects live here only (PRD). #}
         {# Stays in view while the long profile form scrolls (below the fixed admin navbar). #}
         <div x-show="!isNew" class="lg:col-span-1 lg:sticky lg:top-20">
           {% call card(padding="p-0") %}
@@ -181,13 +164,9 @@ date: 2026-10-20
                   <li class="px-5 py-4">
                     <div class="flex gap-x-3">
                       <div class="min-w-0 grow">
-                        <a href="#" class="block text-sm font-medium text-gray-800 truncate hover:text-primary-600 hover:underline dark:text-neutral-200" x-text="link.course"></a>
+                        <a :href="courseFacultyUrl(link.course)" class="block text-sm font-medium text-gray-800 truncate hover:text-primary-600 hover:underline dark:text-neutral-200" x-text="link.course" title="Open this course's faculty"></a>
                         <p class="mt-0.5 flex flex-wrap items-center text-sm text-gray-500 dark:text-neutral-400">
-                          <span x-text="link.subjects.slice(0, 2).join(', ')"></span>
-                          {# More than two: "+N more", the rest in a popover, as on the Faculty list. #}
-                          <template x-if="link.subjects.length > 2">
-                            {{ popover(trigger=link_subjects_more, content=link_subjects_rest, trigger_type="hover", placement="bottom", width="w-auto max-w-xs") }}
-                          </template>
+                          <span class="truncate max-w-56" x-text="link.subject" :title="link.subject"></span>
                           {# Intro video, in the dot style of the student card's "Intro video" tag. #}
                           <template x-if="link.video">
                             <span class="inline-flex items-center"><span class="mx-1.5 text-gray-300 dark:text-neutral-600" aria-hidden="true">·</span><i data-lucide="circle-play" class="size-3.5 me-1"></i>Intro video</span>
@@ -196,9 +175,9 @@ date: 2026-10-20
                       </div>
                       <div class="shrink-0 -me-2 -mt-1">
                         {{ dropdown(trigger="⋮", placement="bottom-end", width="large", items=[
-                          { label: "Edit subjects and video", icon: "pencil", x_on: '@click="openEdit(link); open = false"' },
+                          { label: "Edit subject and video", icon: "pencil", x_on: '@click="openEdit(link); open = false"' },
                           { divider: true },
-                          { label: "Unassign from course", icon: "x-circle", variant: "danger", x_on: '@click="askUnassign(link); open = false"' }
+                          { label: "Remove from course", icon: "x-circle", variant: "danger", x_on: '@click="askUnassign(link); open = false"' }
                         ]) }}
                       </div>
                     </div>
@@ -267,13 +246,12 @@ date: 2026-10-20
       const existing = profiles[id] || null;
       const isNew = params.has("new") && !!staff && !existing;
 
-      const blank = { photo: null, short_description: "", bio: "", years_of_experience: null, subjects: [], qualifications: [], highlights: [] };
+      const blank = { photo: null, short_description: "", bio: "", years_of_experience: null, qualifications: [], highlights: [] };
       // Lists always show at least one row to type in.
       const toForm = (p) => ({
         ...blank,
         ...p,
         years_of_experience: p.years_of_experience ?? "",
-        subjects: [...(p.subjects || [])],
         highlights: p.highlights && p.highlights.length ? [...p.highlights] : [""],
         qualifications: p.qualifications && p.qualifications.length ? [...p.qualifications] : [""],
       });
@@ -282,7 +260,6 @@ date: 2026-10-20
         short_description: f.short_description.trim(),
         bio: f.bio.trim(),
         years_of_experience: f.years_of_experience === "" || f.years_of_experience === null ? null : Number(f.years_of_experience),
-        subjects: f.subjects.map((x) => x.trim()).filter(Boolean),
         highlights: f.highlights.map((h) => h.trim()).filter(Boolean),
         qualifications: f.qualifications.map((q) => q.trim()).filter(Boolean),
       });
@@ -290,7 +267,7 @@ date: 2026-10-20
       const start = toForm(existing || blank);
 
       const data = {
-        person: staff && (existing || isNew) ? { ...staff, subjects: existing ? existing.subjects || [] : [] } : null,
+        person: staff && (existing || isNew) ? { ...staff } : null,
         isNew,
         form: JSON.parse(JSON.stringify(start)),
         saved: JSON.stringify(clean(start)),
@@ -355,7 +332,6 @@ date: 2026-10-20
             window.location = profileUrl(this.person.id);
             return;
           }
-          this.person = { ...this.person, subjects: data.subjects };
           this.saved = JSON.stringify(clean(this.form));
           this.form = toForm(data);
           this.$dispatch("toast", { title: "Profile saved", variant: "success" });

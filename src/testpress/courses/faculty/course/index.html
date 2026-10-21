@@ -1,0 +1,270 @@
+---
+title: Course faculty
+tags: testpress
+date: 2026-10-21
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% from "../../../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../../../ui-system/components/page-header.html" import page_header %}
+{% from "../../../../ui-system/components/button.html" import button %}
+{% from "../../../../ui-system/components/card.html" import card %}
+{% from "../../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../../ui-system/components/modal.html" import modal %}
+{% from "../../../../ui-system/components/input.html" import input %}
+{% from "../../../../ui-system/components/badge.html" import badge %}
+{% from "../../../../ui-system/components/toast.html" import toast_provider %}
+{% from "../includes/avatar.html" import avatar %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+{# A course's instructors, in the order students see them. Same course links as the instructor's
+   page (Courses › Faculty › Instructor): both edit the same data. Layout of the course Staffs page. #}
+<div x-data="courseFaculty()"
+     @modal-confirmed-unassign-course.window="confirmUnassign()"
+     @pick-instructor.window="pick($event.detail)"
+     class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
+
+  <div class="py-6 px-2 sm:px-6 lg:py-0 lg:px-0 lg:col-span-3">
+    {% include "partials/admin_course_sidebar.html" %}
+  </div>
+
+  <main class="lg:px-0 lg:col-span-9 px-4 space-y-5 pb-16">
+    <div class="space-y-2">
+      {# The course's name is filled in from the link (the macro escapes markup in labels). #}
+      <div x-init="const item = $el.querySelectorAll('ol li')[1]; if (item) item.querySelector('a, span').textContent = course">
+        {{ breadcrumb({ items: [ { label: "Courses", href: "#" }, { label: "Course", href: "#" }, { label: "Faculty" } ] }) }}
+      </div>
+      {% set header_actions %}
+        <span x-show="rows.length" x-cloak>{{ button(text="Assign instructor", icon="plus", extra_attrs='@click="openPicker()"') }}</span>
+      {% endset %}
+      {{ page_header(title="Faculty", description="Students see these instructors before they buy this course.", actions=header_actions) }}
+    </div>
+
+    {# Rows can be dragged to change the order students see. #}
+    <div x-show="rows.length" x-cloak>
+      {% call card(padding="p-0", extra_classes="overflow-hidden") %}
+        <ul>
+          <template x-for="(row, i) in rows" :key="row.id">
+            <li draggable="true"
+                @dragstart="dragId = row.id; $event.dataTransfer.effectAllowed = 'move'"
+                @dragover.prevent="overId = row.id"
+                @dragleave="if (overId === row.id) overId = null"
+                @drop.prevent="drop(row.id)"
+                @dragend="dragId = null; overId = null"
+                class="flex items-center gap-x-3 px-4 sm:px-5 py-3 bg-white dark:bg-neutral-800"
+                :class="[i && 'border-t border-gray-200 dark:border-neutral-700', dragId === row.id && 'opacity-50', overId === row.id && dragId !== row.id && 'ring-2 ring-inset ring-primary-500']">
+              <span class="shrink-0 cursor-grab text-gray-400 hover:text-gray-600 dark:text-neutral-500" title="Drag to reorder" aria-hidden="true">
+                <i data-lucide="grip-vertical" class="size-4"></i>
+              </span>
+              {{ avatar("row", size="size-9") }}
+              <div class="min-w-0 grow">
+                <a :href="profileUrl(row.id)" class="text-sm font-medium text-gray-800 hover:text-primary-600 hover:underline dark:text-neutral-200" x-text="row.name"></a>
+                <p class="flex flex-wrap items-center text-sm text-gray-500 dark:text-neutral-400">
+                  <span x-text="row.subject"></span>
+                  <template x-if="row.video">
+                    <span class="inline-flex items-center"><span class="mx-1.5 text-gray-300 dark:text-neutral-600" aria-hidden="true">·</span><i data-lucide="circle-play" class="size-3.5 me-1"></i>Intro video</span>
+                  </template>
+                </p>
+              </div>
+              <div class="shrink-0">
+                {{ dropdown(trigger="⋮", placement="bottom-end", width="large", items=[
+                  { label: "Edit subject and video", icon: "pencil", x_on: '@click="editRow(row); open = false"' },
+                  { label: "Edit profile", icon: "user", x_on: '@click="window.location = profileUrl(row.id)"' },
+                  { divider: true },
+                  { label: "Remove from course", icon: "x-circle", variant: "danger", x_on: '@click="removeRow(row); open = false"' }
+                ]) }}
+              </div>
+            </li>
+          </template>
+        </ul>
+      {% endcall %}
+    </div>
+
+    {# None assigned to this course yet, but instructors exist. #}
+    <div x-show="!rows.length && allInstructors.length" x-cloak>
+      {{ empty_state(
+        title="No instructors on this course yet",
+        description="Assign the instructors who teach this course. Students see them before they buy it.",
+        icon="users",
+        primary_action_text="Assign instructor",
+        primary_action_icon="plus",
+        primary_action_attrs='@click="openPicker()"'
+      ) }}
+    </div>
+
+    {# No instructors at all: they're added in Faculty first. #}
+    <div x-show="!allInstructors.length" x-cloak>
+      {{ empty_state(
+        title="No instructors yet",
+        description="Add your instructors in Faculty first, then assign them to this course.",
+        icon="users",
+        primary_action_text="Go to Faculty",
+        primary_action_href="/testpress/courses/faculty/" | url
+      ) }}
+    </div>
+  </main>
+
+  {# Pick from the Faculty profiles not on this course yet. Picking opens the drawer for subject and video. #}
+  {% call modal(id="pick-instructor", title="Assign instructor", confirm_text="", show_cancel=false) %}
+    <div class="space-y-4">
+      <div x-show="allInstructors.length">
+        {{ input(name="instructor_search", placeholder="Search instructors", icon="search", variant="solid", x_model="pickerSearch") }}
+      </div>
+      <ul x-show="allInstructors.length" class="-mx-2 max-h-80 overflow-y-auto space-y-0.5">
+        <template x-for="person in pickerResults" :key="person.id">
+          <li>
+            <button type="button" :disabled="person.onCourse" @click="$dispatch('pick-instructor', person)"
+              class="w-full flex items-center gap-x-3 px-2 py-2 rounded-lg text-start hover:bg-gray-100 focus:outline-none focus:bg-gray-100 disabled:hover:bg-transparent disabled:cursor-default dark:hover:bg-neutral-700/50">
+              {{ avatar("person", size="size-9") }}
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm font-medium truncate" :class="person.onCourse ? 'text-gray-500 dark:text-neutral-500' : 'text-gray-800 dark:text-neutral-200'" x-text="person.name"></span>
+                <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person.subjects.length ? person.subjects.join(', ') : 'Not on any course yet'"></span>
+              </span>
+              <span x-show="person.onCourse">{{ badge(text="Assigned", size="xs") }}</span>
+              <i x-show="!person.onCourse" data-lucide="chevron-right" class="shrink-0 size-4 text-gray-400"></i>
+            </button>
+          </li>
+        </template>
+        <li x-show="!pickerResults.length" class="py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+          No faculty match “<span x-text="pickerSearch"></span>”
+        </li>
+      </ul>
+      <p x-show="!allInstructors.length" class="py-6 text-center text-sm text-gray-500 dark:text-neutral-400">There are no instructors yet.</p>
+      <p class="pt-4 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
+        Only existing instructors are listed. To add a new one, go to <a :href="facultyListUrl() + '?add=1'" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline dark:text-primary-500">Faculty</a> first.
+      </p>
+    </div>
+  {% endcall %}
+
+  {% include "../includes/course_links.html" %}
+
+  {# Prototype only: switch between the sample and the two empty states. #}
+  {% set state_trigger %}
+    <button type="button" class="size-8 inline-flex justify-center items-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none transition dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400" aria-label="Prototype states" @click="setTimeout(() => updatePosition(), 150)">
+      <i data-lucide="sliders-horizontal" class="size-4"></i>
+    </button>
+  {% endset %}
+  <div class="fixed bottom-3 right-3 z-50">
+    {% call dropdown(trigger=state_trigger, placement="top-end", width="w-64") %}
+      <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Prototype state</p>
+      <button type="button" @click="setState('sample'); open = false" class="w-full py-1.5 px-2 rounded-lg text-start text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">Sample instructors</button>
+      <button type="button" @click="setState('none-assigned'); open = false" class="w-full py-1.5 px-2 rounded-lg text-start text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">None assigned to this course</button>
+      <button type="button" @click="setState('no-instructors'); open = false" class="w-full py-1.5 px-2 rounded-lg text-start text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">No instructors at all</button>
+    {% endcall %}
+  </div>
+
+  {{ toast_provider() }}
+</div>
+{% endblock content %}
+
+{% block script %}
+  {% include "../../../../ui-system/scripts/select_script.html" %}
+  {% include "../../../../ui-system/scripts/upload_script.html" %}
+  {% include "../includes/faculty_data.html" %}
+  <script>
+    function courseFaculty() {
+      const course = new URLSearchParams(window.location.search).get("course") || "Prelims GS";
+
+      const data = {
+        course,
+        profiles: facultyStore.load(),
+        person: null,
+        pickerSearch: "",
+        dragId: null,
+        overId: null,
+
+        init() {
+          this.fixedCourse = course;
+          document.title = course + " · Faculty";
+          this.refreshIcons();
+          this.$watch("allLinks", () => this.refreshIcons());
+          this.$watch("draft", () => this.refreshIcons());
+          this.$watch("pickerSearch", () => this.refreshIcons());
+        },
+
+        refreshIcons() {
+          this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        },
+
+        // This course's instructors, in the course's order.
+        get rows() {
+          return this.allLinks
+            .filter((l) => l.course === course && this.profiles[l.instructor])
+            .map((l) => ({ ...this.profiles[l.instructor], id: l.instructor, subject: l.subject, video: l.video, link: l }));
+        },
+
+        get allInstructors() {
+          return Object.entries(this.profiles).map(([id, p]) => ({ ...p, id, subjects: subjectsFor(id, this.allLinks) }));
+        },
+
+        get pickerResults() {
+          const q = this.pickerSearch.trim().toLowerCase();
+          const on = this.rows.map((r) => r.id);
+          return this.allInstructors
+            .filter((p) => !q || (p.name + " " + p.subjects.join(" ")).toLowerCase().includes(q))
+            .map((p) => ({ ...p, onCourse: on.includes(p.id) }))
+            .sort((a, b) => a.onCourse - b.onCourse || a.name.localeCompare(b.name));
+        },
+
+        openPicker() {
+          this.pickerSearch = "";
+          this.$dispatch("open-modal-pick-instructor");
+          this.refreshIcons();
+        },
+
+        // Picked (sent as an event from the popup, so `this` is the page): open the drawer for this course.
+        pick(p) {
+          this.$dispatch("close-modal-pick-instructor");
+          this.person = { id: p.id, name: p.name };
+          this.openAssign();
+        },
+
+        editRow(row) {
+          this.person = { id: row.id, name: row.name };
+          this.openEdit(row.link);
+        },
+
+        removeRow(row) {
+          this.person = { id: row.id, name: row.name };
+          this.askUnassign(row.link);
+        },
+
+        // Reorder within this course; other courses' links keep their place.
+        reorder(ids) {
+          const all = facultyStore.loadLinks();
+          const mine = ids.map((id) => all.find((l) => l.course === course && l.instructor === id));
+          let k = 0;
+          const next = all.map((l) => (l.course === course && this.profiles[l.instructor] ? mine[k++] : l));
+          facultyStore.saveLinks(next);
+          this.allLinks = next;
+        },
+
+        setState(state) {
+          facultyStore.reset();
+          if (state === "no-instructors") facultyStore.save({});
+          if (state === "none-assigned") facultyStore.saveLinks(facultyStore.loadLinks().filter((l) => l.course !== course));
+          this.profiles = facultyStore.load();
+          this.allLinks = facultyStore.loadLinks();
+          this.refreshIcons();
+        },
+
+        drop(targetId) {
+          const ids = this.rows.map((r) => r.id);
+          const from = ids.indexOf(this.dragId);
+          const to = ids.indexOf(targetId);
+          if (from < 0 || to < 0 || from === to) return;
+          ids.splice(to, 0, ids.splice(from, 1)[0]);
+          this.reorder(ids);
+          this.dragId = null;
+          this.overId = null;
+        },
+
+      };
+      return Object.defineProperties(data, Object.getOwnPropertyDescriptors(courseLinkActions()));
+    }
+  </script>
+{% endblock script %}

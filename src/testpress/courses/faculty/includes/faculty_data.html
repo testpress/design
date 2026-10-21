@@ -3,7 +3,7 @@
   // each instructor's page, next to the profile. Edits are kept in sessionStorage so the
   // list and the profile page agree while you click through.
   const FACULTY_PHOTO = (id) => `https://images.unsplash.com/photo-${id}?w=320&h=320&fit=crop&crop=faces&q=80`;
-  const FACULTY_KEY = "tp-faculty-profiles-v6";
+  const FACULTY_KEY = "tp-faculty-profiles-v7";
 
   const STAFF = [
     { id: "ananya", name: "Dr. Ananya Rao", email: "ananya.rao@ias-academy.in" },
@@ -153,18 +153,18 @@
 
   // Course links, in each course's order. Set on the course's Faculty page.
   const SAMPLE_LINKS = [
-    { course: "Prelims GS", instructor: "ananya", subject: "Polity", visible: true },
+    { course: "Prelims GS", instructor: "ananya", subject: "Polity, Constitution", visible: true },
     { course: "Prelims GS", instructor: "rahul", subject: "History, Art and Culture", visible: true },
     { course: "Prelims GS", instructor: "kavya", subject: "Economy", visible: true },
     { course: "CSAT", instructor: "arjun", subject: "Quant and Reasoning", visible: true },
     { course: "Mains GS", instructor: "meera", subject: "Ethics and Essay", visible: true },
-    { course: "Mains GS", instructor: "ananya", subject: "Governance", visible: true },
+    { course: "Mains GS", instructor: "ananya", subject: "Governance, Social Justice, Ethics", visible: true },
     { course: "Mains GS", instructor: "kavya", subject: "Economy", visible: false },
     { course: "Current affairs", instructor: "sandeep", subject: "Current Affairs", visible: true },
     { course: "Prelims GS", instructor: "farhan", subject: "Geography", visible: true },
     { course: "Mains GS", instructor: "farhan", subject: "Geography", visible: true },
     { course: "Current affairs", instructor: "farhan", subject: "Maps in the news", visible: true },
-    { course: "Essay Test Series", instructor: "meera", subject: "Essay", visible: true },
+    { course: "Essay Test Series", instructor: "meera", subject: "Essay, Answer Writing", visible: true },
     { course: "Sociology Optional", instructor: "lakshmi", subject: "Paper 1 and 2", visible: true },
     { course: "Prelims GS", instructor: "rohit", subject: "Science and Technology", visible: true },
     { course: "Prelims GS", instructor: "divya", subject: "Environment", visible: true },
@@ -177,22 +177,11 @@
     SAMPLE_PROFILES[id].staff = id;
   });
 
-  // General subjects on the profile: what they teach anywhere. Each course link keeps its own
-  // subjects, prefilled from these when the course is assigned.
-  const SAMPLE_SUBJECTS = {
-    ananya: ["Polity", "Governance", "Constitution", "Social Justice", "Ethics"], rahul: ["History", "Art and Culture"], kavya: ["Economy"],
-    arjun: ["Quantitative Aptitude", "Reasoning"], meera: ["Ethics", "Essay", "Case Studies", "Answer Writing"], sandeep: ["Current Affairs"],
-    farhan: ["Geography"], lakshmi: ["Sociology"], rohit: ["Science and Technology"],
-    divya: ["Environment", "Ecology"], suresh: ["Interview"], anjali: ["International Relations"],
-  };
-  Object.keys(SAMPLE_PROFILES).forEach((id) => (SAMPLE_PROFILES[id].subjects = SAMPLE_SUBJECTS[id] || []));
-
-  // Course links keep their subjects as a list and the intro video's file name (or null).
+  // Per the PRD, the subject is free text on the course link (never on the instructor), for display
+  // only: it can hold several subjects separated by commas. The intro video is a file name or null.
   const SAMPLE_VIDEOS = { "Prelims GS/ananya": "ananya-polity-intro.mp4", "Mains GS/ananya": "ananya-governance-intro.mp4", "Prelims GS/rahul": "rahul-history-intro.mp4", "CSAT/arjun": "arjun-csat-intro.mp4" };
   SAMPLE_LINKS.forEach((l) => {
-    l.subjects = l.subject.split(",").map((x) => x.trim()).filter(Boolean);
     l.video = SAMPLE_VIDEOS[l.course + "/" + l.instructor] || null;
-    delete l.subject;
   });
 
   // Sample clip played for intro videos in the prototype.
@@ -249,6 +238,16 @@
     return name.replace(/^Dr\.\s*/, "").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   }
 
+  // "History, Art and Culture" → ["History", "Art and Culture"].
+  function splitSubjects(text) {
+    return (text || "").split(",").map((x) => x.trim()).filter(Boolean);
+  }
+
+  // Every subject an instructor teaches, gathered from their course links (for the Faculty list).
+  function subjectsFor(id, links) {
+    return [...new Set(linksFor(id, links).flatMap((l) => splitSubjects(l.subject)))];
+  }
+
   function linksFor(id, links) {
     return (links || facultyStore.loadLinks()).filter((l) => l.instructor === id);
   }
@@ -260,6 +259,10 @@
 
   function newInstructorUrl() {
     return (window.location.pathname.match(/(\/pr-preview\/pr-\d+)?/)[0] || "") + "/testpress/courses/faculty/profile/?new=1";
+  }
+
+  function courseFacultyUrl(course) {
+    return (window.location.pathname.match(/(\/pr-preview\/pr-\d+)?/)[0] || "") + "/testpress/courses/faculty/course/?course=" + encodeURIComponent(course);
   }
 
   function facultyListUrl() {
