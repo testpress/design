@@ -84,8 +84,8 @@ date: 2026-10-21
       {% endcall %}
     </div>
 
-    {# No instructors on this course yet. #}
-    <div x-show="!rows.length" x-cloak>
+    {# None assigned to this course yet, but instructors exist. #}
+    <div x-show="!rows.length && allInstructors.length" x-cloak>
       {{ empty_state(
         title="No instructors on this course yet",
         description="Assign the instructors who teach this course. Students see them before they buy it.",
@@ -93,6 +93,17 @@ date: 2026-10-21
         primary_action_text="Assign instructor",
         primary_action_icon="plus",
         primary_action_attrs='@click="openPicker()"'
+      ) }}
+    </div>
+
+    {# No instructors at all: they're added in Faculty first. #}
+    <div x-show="!allInstructors.length" x-cloak>
+      {{ empty_state(
+        title="No instructors yet",
+        description="Add your instructors in Faculty first, then assign them to this course.",
+        icon="users",
+        primary_action_text="Go to Faculty",
+        primary_action_href="/testpress/courses/faculty/" | url
       ) }}
     </div>
   </main>
@@ -130,6 +141,22 @@ date: 2026-10-21
   {% endcall %}
 
   {% include "../includes/course_links.html" %}
+
+  {# Prototype only: switch between the sample and the two empty states. #}
+  {% set state_trigger %}
+    <button type="button" class="size-8 inline-flex justify-center items-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none transition dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400" aria-label="Prototype states" @click="setTimeout(() => updatePosition(), 150)">
+      <i data-lucide="sliders-horizontal" class="size-4"></i>
+    </button>
+  {% endset %}
+  <div class="fixed bottom-3 right-3 z-50">
+    {% call dropdown(trigger=state_trigger, placement="top-end", width="w-64") %}
+      <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Prototype state</p>
+      <button type="button" @click="setState('sample'); open = false" class="w-full py-1.5 px-2 rounded-lg text-start text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">Sample instructors</button>
+      <button type="button" @click="setState('none-assigned'); open = false" class="w-full py-1.5 px-2 rounded-lg text-start text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">None assigned to this course</button>
+      <button type="button" @click="setState('no-instructors'); open = false" class="w-full py-1.5 px-2 rounded-lg text-start text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">No instructors at all</button>
+    {% endcall %}
+  </div>
+
   {{ toast_provider() }}
 </div>
 {% endblock content %}
@@ -141,9 +168,10 @@ date: 2026-10-21
   <script>
     function courseFaculty() {
       const course = new URLSearchParams(window.location.search).get("course") || "Prelims GS";
-      const profiles = facultyStore.load();
+
       const data = {
         course,
+        profiles: facultyStore.load(),
         person: null,
         pickerSearch: "",
         dragId: null,
@@ -165,12 +193,12 @@ date: 2026-10-21
         // This course's instructors, in the course's order.
         get rows() {
           return this.allLinks
-            .filter((l) => l.course === course && profiles[l.instructor])
-            .map((l) => ({ ...profiles[l.instructor], id: l.instructor, subjects: l.subjects, video: l.video, link: l }));
+            .filter((l) => l.course === course && this.profiles[l.instructor])
+            .map((l) => ({ ...this.profiles[l.instructor], id: l.instructor, subjects: l.subjects, video: l.video, link: l }));
         },
 
         get allInstructors() {
-          return Object.entries(profiles).map(([id, p]) => ({ ...p, id, subjects: p.subjects || [] }));
+          return Object.entries(this.profiles).map(([id, p]) => ({ ...p, id, subjects: p.subjects || [] }));
         },
 
         get pickerResults() {
@@ -211,9 +239,18 @@ date: 2026-10-21
           const all = facultyStore.loadLinks();
           const mine = ids.map((id) => all.find((l) => l.course === course && l.instructor === id));
           let k = 0;
-          const next = all.map((l) => (l.course === course && profiles[l.instructor] ? mine[k++] : l));
+          const next = all.map((l) => (l.course === course && this.profiles[l.instructor] ? mine[k++] : l));
           facultyStore.saveLinks(next);
           this.allLinks = next;
+        },
+
+        setState(state) {
+          facultyStore.reset();
+          if (state === "no-instructors") facultyStore.save({});
+          if (state === "none-assigned") facultyStore.saveLinks(facultyStore.loadLinks().filter((l) => l.course !== course));
+          this.profiles = facultyStore.load();
+          this.allLinks = facultyStore.loadLinks();
+          this.refreshIcons();
         },
 
         drop(targetId) {
