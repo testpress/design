@@ -64,7 +64,7 @@ date: 2026-10-21
               <div class="min-w-0 grow">
                 <a :href="profileUrl(row.id)" class="text-sm font-medium text-gray-800 hover:text-primary-600 hover:underline dark:text-neutral-200" x-text="row.name"></a>
                 <p class="flex flex-wrap items-center text-sm text-gray-500 dark:text-neutral-400">
-                  <span x-text="row.subjects.join(', ')"></span>
+                  <span x-text="row.subject"></span>
                   <template x-if="row.video">
                     <span class="inline-flex items-center"><span class="mx-1.5 text-gray-300 dark:text-neutral-600" aria-hidden="true">·</span><i data-lucide="circle-play" class="size-3.5 me-1"></i>Intro video</span>
                   </template>
@@ -72,7 +72,7 @@ date: 2026-10-21
               </div>
               <div class="shrink-0">
                 {{ dropdown(trigger="⋮", placement="bottom-end", width="large", items=[
-                  { label: "Edit subjects and video", icon: "pencil", x_on: '@click="editRow(row); open = false"' },
+                  { label: "Edit subject and video", icon: "pencil", x_on: '@click="editRow(row); open = false"' },
                   { label: "Edit profile", icon: "user", x_on: '@click="window.location = profileUrl(row.id)"' },
                   { divider: true },
                   { label: "Remove from course", icon: "x-circle", variant: "danger", x_on: '@click="removeRow(row); open = false"' }
@@ -108,7 +108,7 @@ date: 2026-10-21
     </div>
   </main>
 
-  {# Pick from the Faculty profiles not on this course yet. Picking opens the drawer for subjects and video. #}
+  {# Pick from the Faculty profiles not on this course yet. Picking opens the drawer for subject and video. #}
   {% call modal(id="pick-instructor", title="Assign instructor", confirm_text="", show_cancel=false) %}
     <div class="space-y-4">
       <div x-show="allInstructors.length">
@@ -122,7 +122,7 @@ date: 2026-10-21
               {{ avatar("person", size="size-9") }}
               <span class="min-w-0 flex-1">
                 <span class="block text-sm font-medium truncate" :class="person.onCourse ? 'text-gray-500 dark:text-neutral-500' : 'text-gray-800 dark:text-neutral-200'" x-text="person.name"></span>
-                <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person.subjects.length ? person.subjects.join(', ') : 'No subjects yet'"></span>
+                <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person.subjects.length ? person.subjects.join(', ') : 'Not on any course yet'"></span>
               </span>
               <span x-show="person.onCourse">{{ badge(text="Assigned", size="xs") }}</span>
               <i x-show="!person.onCourse" data-lucide="chevron-right" class="shrink-0 size-4 text-gray-400"></i>
@@ -194,11 +194,11 @@ date: 2026-10-21
         get rows() {
           return this.allLinks
             .filter((l) => l.course === course && this.profiles[l.instructor])
-            .map((l) => ({ ...this.profiles[l.instructor], id: l.instructor, subjects: l.subjects, video: l.video, link: l }));
+            .map((l) => ({ ...this.profiles[l.instructor], id: l.instructor, subject: l.subject, video: l.video, link: l }));
         },
 
         get allInstructors() {
-          return Object.entries(this.profiles).map(([id, p]) => ({ ...p, id, subjects: p.subjects || [] }));
+          return Object.entries(this.profiles).map(([id, p]) => ({ ...p, id, subjects: subjectsFor(id, this.allLinks) }));
         },
 
         get pickerResults() {
@@ -216,16 +216,15 @@ date: 2026-10-21
           this.refreshIcons();
         },
 
-        // Picked (sent as an event from the popup, so `this` is the page): open the drawer
-        // for this course, subjects filled in from their profile.
+        // Picked (sent as an event from the popup, so `this` is the page): open the drawer for this course.
         pick(p) {
           this.$dispatch("close-modal-pick-instructor");
-          this.person = { id: p.id, name: p.name, subjects: p.subjects };
+          this.person = { id: p.id, name: p.name };
           this.openAssign();
         },
 
         editRow(row) {
-          this.person = { id: row.id, name: row.name, subjects: row.subjects };
+          this.person = { id: row.id, name: row.name };
           this.openEdit(row.link);
         },
 

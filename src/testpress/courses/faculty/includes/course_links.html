@@ -1,13 +1,13 @@
 {# The course list is filled in when the drawer opens (set-options), so the choice is read from the
    select's own state, not from its hidden native <select>.
-   Assign, edit and unassign an instructor's courses: the side drawer (subjects, intro video) and
+   Assign, edit and unassign an instructor's courses: the side drawer (subject, intro video) and
    the unassign confirmation. The page's Alpine data must include courseLinkActions(). #}
 {% from "../../../../ui-system/components/button.html" import button %}
 {% from "../../../../ui-system/components/drawer.html" import drawer %}
 {% from "../../../../ui-system/components/modal.html" import modal %}
 {% from "../../../../ui-system/components/select.html" import select %}
 {% from "../../../../ui-system/components/upload.html" import upload %}
-{% from "./subject_picker.html" import subject_picker %}
+{% from "../../../../ui-system/components/input.html" import input %}
 
   {% set course_options = [
     { value: "Prelims GS", label: "Prelims GS" },
@@ -40,10 +40,22 @@
       </div>
 
       <div class="p-4 bg-white rounded-xl border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700">
-        <h5 class="mb-3 font-medium text-sm text-gray-800 dark:text-neutral-200">Subjects in this course <span class="text-red-500">*</span></h5>
-        {{ subject_picker("draft.subjects", "link_subjects") }}
-        <p x-show="errors.subjects" class="mt-1.5 text-xs text-red-500" x-text="errors.subjects"></p>
-        <p x-show="!errors.subjects" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400" x-text="draft.isNew ? 'Filled in from their profile. Changes here apply only to this course.' : 'Changes here apply only to this course, not to their profile.'"></p>
+        <h5 class="mb-3 font-medium text-sm text-gray-800 dark:text-neutral-200">Subject they teach in this course <span class="text-red-500">*</span></h5>
+        {# Free text, as in the PRD: shown to students as typed. Not linked to Testpress subjects. #}
+        {{ input(name="link_subject", placeholder="e.g. Polity, Governance", x_model="draft.subject", extra_attrs='@input="errors.subject = \'\'" :class="errors.subject && \'!border-red-500 focus:!ring-red-500\'"') }}
+        <p x-show="errors.subject" class="mt-1.5 text-xs text-red-500" x-text="errors.subject"></p>
+        <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Shown to students next to their name. For more than one, separate with commas.</p>
+        {# Typing shortcut: what they teach in their other courses. Only fills the text. #}
+        <div x-show="usedBefore.length" class="mt-3 flex flex-wrap items-center gap-1.5">
+          <span class="text-xs text-gray-500 dark:text-neutral-400">Used before:</span>
+          <template x-for="subject in usedBefore" :key="subject">
+            <button type="button" @click="addSubject(subject)"
+              class="inline-flex items-center gap-x-1 rounded-md px-2 py-1 text-xs bg-gray-100 text-gray-800 hover:bg-gray-200 focus:outline-none focus:bg-gray-200 dark:bg-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-600">
+              <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+              <span x-text="subject"></span>
+            </button>
+          </template>
+        </div>
       </div>
 
       <div class="p-4 bg-white rounded-xl border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700">
@@ -96,20 +108,20 @@
     <p class="text-gray-800 dark:text-neutral-200">
       Students will no longer see <span class="font-medium" x-text="person ? person.name : 'this instructor'"></span> on <span class="font-medium" x-text="unassigning && unassigning.course"></span>.
     </p>
-    <p class="mt-2 text-gray-500 dark:text-neutral-400">Their subjects and intro video for this course are removed. Their profile and other courses stay the same.</p>
+    <p class="mt-2 text-gray-500 dark:text-neutral-400">Their subject and intro video for this course are removed. Their profile and other courses stay the same.</p>
   {% endcall %}
 
 <script>
-  // Shared by pages that manage an instructor's courses. Needs `person` on the page; new subjects start from `form.subjects` when there is a form.
+  // Shared by pages that manage an instructor's courses. Needs `person` on the page.
   function courseLinkActions() {
-      const blankDraft = () => ({ isNew: true, course: "", subjects: [], video: null, videoUrl: null, visible: true });
+      const blankDraft = () => ({ isNew: true, course: "", subject: "", video: null, videoUrl: null, visible: true });
 
       return {
         // Set on a course's Faculty page: the drawer is for that course, and picks no course.
         fixedCourse: null,
         allLinks: facultyStore.loadLinks(),
         draft: blankDraft(),
-        errors: { course: "", subjects: "" },
+        errors: { course: "", subject: "" },
         unassigning: null,
         draftPlaying: false,
 
@@ -126,11 +138,11 @@
           return COURSES.filter((c) => !this.links.some((l) => l.course === c));
         },
 
-        // New course: subjects start from the profile; the course select lists only courses they're not in.
+        // New course: the course select lists only courses they're not in.
         openAssign() {
-          this.draft = { ...blankDraft(), subjects: [...((this.form && this.form.subjects) || this.person.subjects || [])] };
+          this.draft = blankDraft();
           this.draftPlaying = false;
-          this.errors = { course: "", subjects: "" };
+          this.errors = { course: "", subject: "" };
           this.$dispatch("set-uploaded-file", { name: "link_video", files: [] });
           this.$dispatch("open-drawer-course-link");
           this.$nextTick(() => window.lucide && window.lucide.createIcons());
@@ -143,21 +155,36 @@
         },
 
         openEdit(link) {
-          this.draft = { isNew: false, course: link.course, subjects: [...link.subjects], video: link.video, videoUrl: link.videoUrl || null, visible: link.visible };
+          this.draft = { isNew: false, course: link.course, subject: link.subject || "", video: link.video, videoUrl: link.videoUrl || null, visible: link.visible };
           this.draftPlaying = false;
-          this.errors = { course: "", subjects: "" };
+          this.errors = { course: "", subject: "" };
           this.$dispatch("set-uploaded-file", { name: "link_video", files: [] });
           this.$dispatch("open-drawer-course-link");
           this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        },
+
+        // Subjects from their other courses that aren't in the field yet.
+        get usedBefore() {
+          if (!this.person) return [];
+          const current = splitSubjects(this.draft.subject).map((x) => x.toLowerCase());
+          const other = this.allLinks.filter((l) => l.instructor === this.person.id && l.course !== (this.fixedCourse || this.draft.course));
+          return [...new Set(other.flatMap((l) => splitSubjects(l.subject)))].filter((x) => !current.includes(x.toLowerCase()));
+        },
+
+        addSubject(subject) {
+          const list = splitSubjects(this.draft.subject);
+          list.push(subject);
+          this.draft.subject = list.join(", ");
+          this.errors.subject = "";
         },
 
         saveDraft() {
           this.draftPlaying = false;
           if (this.fixedCourse) this.draft.course = this.fixedCourse;
           if (this.draft.isNew && !this.draft.course) this.errors.course = "Pick a course.";
-          if (!this.draft.subjects.length) this.errors.subjects = "Add the subjects they teach in this course.";
-          if (this.errors.course || this.errors.subjects) return false;
-          const link = { course: this.draft.course, instructor: this.person.id, subjects: [...this.draft.subjects], video: this.draft.video, videoUrl: this.draft.videoUrl, visible: this.draft.visible };
+          if (!this.draft.subject.trim()) this.errors.subject = "Add the subject they teach in this course.";
+          if (this.errors.course || this.errors.subject) return false;
+          const link = { course: this.draft.course, instructor: this.person.id, subject: this.draft.subject.trim(), video: this.draft.video, videoUrl: this.draft.videoUrl, visible: this.draft.visible };
           const all = facultyStore.loadLinks();
           const i = all.findIndex((l) => l.course === link.course && l.instructor === link.instructor);
           if (i >= 0) all[i] = link; else all.push(link);
