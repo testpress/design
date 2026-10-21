@@ -31,10 +31,28 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      - name: Install dependencies & build
-        run: |
-          npm run setup
-          BASE_PATH=/pr-preview/pr-${{ github.event.pull_request.number }} npm run build
+      # Reuse installed packages until a lockfile or the Node version changes
+      - id: node
+        run: echo "version=$(node -v)" >> "$GITHUB_OUTPUT"
+
+      - id: deps
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            src/simba/node_modules
+            src/odinhire/node_modules
+            src/limeread/node_modules
+            src/testpress/node_modules
+          key: deps-${{ runner.os }}-${{ steps.node.outputs.version }}-${{ hashFiles('package-lock.json', 'src/simba/package-lock.json', 'src/odinhire/package-lock.json', 'src/limeread/package-lock.json', 'src/testpress/package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.deps.outputs.cache-hit != 'true'
+        run: npm run setup:ci
+
+      # Product CSS is committed and copied as-is, so CI doesn't rebuild it
+      - name: Build
+        run: BASE_PATH=/pr-preview/pr-${{ github.event.pull_request.number }} npm run build:ci
 
       # Packed as one file: the artifact upload rejects some file names
       # in public/ (for example Windows ":Zone.Identifier" files in img/)
