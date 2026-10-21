@@ -1,4 +1,6 @@
-{# Assign, edit and unassign an instructor's courses: the side drawer (subjects, intro video) and
+{# The course list is filled in when the drawer opens (set-options), so the choice is read from the
+   select's own state, not from its hidden native <select>.
+   Assign, edit and unassign an instructor's courses: the side drawer (subjects, intro video) and
    the unassign confirmation. The page's Alpine data must include courseLinkActions(). #}
 {% from "../../../../ui-system/components/button.html" import button %}
 {% from "../../../../ui-system/components/drawer.html" import drawer %}
@@ -29,11 +31,11 @@
       <div x-show="draft.isNew" class="p-4 bg-white rounded-xl border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700">
         <h5 class="mb-3 font-medium text-sm text-gray-800 dark:text-neutral-200">Course <span class="text-red-500">*</span></h5>
         <template x-if="availableCourses.length">
-          <div id="course-select" @change="draft.course = $event.target.value; errors.course = ''">
+          <div id="course-select" @change="if ($event.target.tagName === 'SELECT') { draft.course = $event.target.closest('[x-data]')._x_dataStack[0].selected; errors.course = ''; }">
             {{ select(label="", name="link_course", placeholder="Select course", options=course_options, search=true, multiple=false) }}
           </div>
         </template>
-        <p x-show="!availableCourses.length" class="text-sm text-gray-500 dark:text-neutral-400" x-text="noCourses ? 'There are no courses yet. Create a course first.' : person && person.name + ' is already in every course.'"></p>
+        <p x-show="!availableCourses.length" class="text-sm text-gray-500 dark:text-neutral-400" x-text="noCourses ? 'There are no courses yet. Create a course first.' : (person ? person.name : 'They') + ' are already in every course.'"></p>
         <p x-show="errors.course" class="mt-1.5 text-xs text-red-500" x-text="errors.course"></p>
       </div>
 
@@ -91,7 +93,7 @@
 
   {% call modal(id="unassign-course", title="Unassign from course?", variant="danger", confirm_text="Unassign", cancel_text="Cancel") %}
     <p class="text-gray-800 dark:text-neutral-200">
-      Students will no longer see <span class="font-medium" x-text="person && person.name"></span> on <span class="font-medium" x-text="unassigning && unassigning.course"></span>’s page.
+      Students will no longer see <span class="font-medium" x-text="person ? person.name : 'this instructor'"></span> on <span class="font-medium" x-text="unassigning && unassigning.course"></span>’s page.
     </p>
     <p class="mt-2 text-gray-500 dark:text-neutral-400">Their subjects and intro video for this course are removed. Their profile and other courses stay the same.</p>
   {% endcall %}

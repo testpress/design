@@ -30,7 +30,7 @@ date: 2026-10-20
       {% set header_actions %}
         <span x-show="instructors.length" x-cloak class="flex items-center gap-2">
           {{ button(text="How it works", variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-about-faculty\')"') }}
-          {{ button(text="Add instructor", icon="plus", extra_attrs='@click="openAdd()"') }}
+          {{ button(text="Add instructor", icon="plus", extra_attrs='@click="window.location = newInstructorUrl()"') }}
         </span>
       {% endset %}
       {{ page_header(
@@ -186,43 +186,13 @@ date: 2026-10-20
         icon="users",
         primary_action_text="Add instructor",
         primary_action_icon="plus",
-        primary_action_attrs='@click="openAdd()"',
+        primary_action_attrs='@click="window.location = newInstructorUrl()"',
         secondary_action_text="How it works",
         secondary_action_attrs='@click="$dispatch(\'open-modal-about-faculty\')"'
       ) }}
     </div>
   </main>
 
-  {# Pick a staff member. Picking one opens their new profile. #}
-  {% call modal(id="add-instructor", title="Add instructor", confirm_text="", show_cancel=false) %}
-    <div class="-m-5">
-      <div class="px-5 py-4">
-        {{ input(name="staff_search", placeholder="Search staff by name or email", icon="search", variant="solid", x_model="staffSearch", extra_attrs="autofocus") }}
-      </div>
-      <ul class="max-h-80 overflow-y-auto border-t border-gray-200 divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
-        <template x-for="person in staffResults" :key="person.id">
-          <li>
-            <button type="button" :disabled="person.added" @click="window.location = profileUrl(person.id, true)"
-              class="w-full flex items-center gap-x-3 px-5 py-3 text-start hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:hover:bg-transparent disabled:cursor-default dark:hover:bg-neutral-700/40 dark:focus:bg-neutral-700/40">
-              {{ avatar("person", size="size-9") }}
-              <span class="min-w-0 flex-1">
-                <span class="block text-sm font-medium truncate" :class="person.added ? 'text-gray-500 dark:text-neutral-500' : 'text-gray-800 dark:text-neutral-200'" x-text="person.name"></span>
-                <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="person.email"></span>
-              </span>
-              <span x-show="person.added">{{ badge(text="Added", size="xs") }}</span>
-              <i x-show="!person.added" data-lucide="chevron-right" class="shrink-0 size-4 text-gray-400"></i>
-            </button>
-          </li>
-        </template>
-        <li x-show="!staffResults.length" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
-          No staff match “<span x-text="staffSearch"></span>”
-        </li>
-      </ul>
-      <p class="px-5 py-3 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
-        Not in the list? <a href="#" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline dark:text-primary-500">Add them as staff</a> first.
-      </p>
-    </div>
-  {% endcall %}
 
   {% call modal(id="remove-instructor", title="Remove from faculty?", variant="danger", confirm_text="Remove", cancel_text="Cancel") %}
     <p class="text-gray-800 dark:text-neutral-200">
@@ -279,7 +249,6 @@ date: 2026-10-20
         pending: { subject: "", course: "", experience: "" },
         page: 1,
         perPage: 10,
-        staffSearch: "",
         removing: null,
 
         init() {
@@ -291,7 +260,6 @@ date: 2026-10-20
           if (message) this.$nextTick(() => this.$dispatch("toast", { title: message, variant: "success" }));
           this.refreshIcons();
           this.$watch("paged", () => this.refreshIcons());
-          this.$watch("staffSearch", () => this.refreshIcons());
         },
 
         refreshIcons() {
@@ -345,18 +313,7 @@ date: 2026-10-20
         },
 
 
-        get staffResults() {
-          const q = this.staffSearch.trim().toLowerCase();
-          return STAFF
-            .filter((s) => !q || (s.name + " " + s.email).toLowerCase().includes(q))
-            .map((s) => ({ ...s, photo: this.profiles[s.id] ? this.profiles[s.id].photo : null, added: !!this.profiles[s.id] }))
-            .sort((a, b) => a.added - b.added);
-        },
 
-        openAdd() {
-          this.staffSearch = "";
-          this.$dispatch("open-modal-add-instructor");
-        },
 
         askRemove(person) {
           this.removing = person;

@@ -16,6 +16,7 @@ date: 2026-10-20
 {% from "../../../../ui-system/components/toast.html" import toast_provider %}
 {% from "../../../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../../../ui-system/components/popover.html" import popover %}
+{% from "../../../../ui-system/components/select.html" import select %}
 {% from "../includes/avatar.html" import avatar %}
 {% from "../includes/subject_picker.html" import subject_picker %}
 
@@ -39,7 +40,7 @@ date: 2026-10-20
   <main class="px-4 sm:px-0 pb-28">
 
     {# Unknown id in the link. #}
-    <template x-if="!person">
+    <template x-if="!isNew && !person">
       <div class="space-y-5">
         {{ breadcrumb({ items: [ { label: "Faculty", href: "/testpress/courses/faculty/" | url } ] }) }}
         {{ empty_state(
@@ -52,8 +53,43 @@ date: 2026-10-20
       </div>
     </template>
 
+    {# Adding, step 1: choose the staff member. The profile form comes next. #}
+    <template x-if="isNew && !person">
+      <div class="max-w-lg mx-auto pt-6 space-y-5">
+        {{ breadcrumb({ items: [ { label: "Faculty", href: "/testpress/courses/faculty/" | url }, { label: "Add instructor" } ] }) }}
+        {% call card(padding="p-5 sm:p-7") %}
+          <h1 class="text-lg font-semibold text-gray-800 dark:text-neutral-200">Add instructor</h1>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Choose a staff member. You'll fill in their profile next.</p>
+          <div class="mt-5">
+            {{ input(name="staff_search", placeholder="Search staff by name or email", icon="search", variant="solid", x_model="staffSearch", extra_attrs="autofocus") }}
+          </div>
+          {# Staff who aren't instructors yet, listed in place. Choosing one opens their profile form. #}
+          <ul class="mt-3 -mx-5 sm:-mx-7 max-h-96 overflow-y-auto border-y border-gray-200 divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+            <template x-for="staff in staffResults" :key="staff.id">
+              <li>
+                <button type="button" @click="chooseStaff(staff)"
+                  class="w-full flex items-center gap-x-3 px-5 sm:px-7 py-3 text-start hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:hover:bg-neutral-700/40 dark:focus:bg-neutral-700/40">
+                  {{ avatar("staff", size="size-9") }}
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="staff.name"></span>
+                    <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="staff.email"></span>
+                  </span>
+                  <i data-lucide="chevron-right" class="shrink-0 size-4 text-gray-400"></i>
+                </button>
+              </li>
+            </template>
+            <li x-show="!staffResults.length" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-neutral-400" x-text="staffSearch ? 'No staff match “' + staffSearch + '”' : 'Every staff member is already an instructor.'"></li>
+          </ul>
+          <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <p class="text-sm text-gray-500 dark:text-neutral-400">Not in the list? <a href="#" class="font-medium text-primary-600 hover:underline dark:text-primary-500">Add them as staff</a> first.</p>
+            {{ button(text="Cancel", variant="secondary", extra_attrs='@click="cancel()"') }}
+          </div>
+        {% endcall %}
+      </div>
+    </template>
+
     <template x-if="person">
-      <div class="space-y-5">
+      <div class="space-y-5" :class="isNew && 'max-w-4xl mx-auto'">
         <div class="space-y-2">
           {{ breadcrumb({ items: [
             { label: "Faculty", href: "/testpress/courses/faculty/" | url },
@@ -63,12 +99,12 @@ date: 2026-10-20
           {% set header_title %}<span x-text="isNew ? 'Add ' + person.name : person.name"></span>{% endset %}
           <div>
             {{ page_header(title=header_title) }}
-            <p class="text-sm text-gray-500 dark:text-neutral-400">Staff account · <span x-text="person.email"></span></p>
+            <p class="text-sm text-gray-500 dark:text-neutral-400">Staff account · <span x-text="person.email"></span><template x-if="isNew"><span> · <button type="button" @click="person = null" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline dark:text-primary-500">Change</button></span></template></p>
           </div>
         </div>
 
         <div class="grid lg:grid-cols-3 gap-6 items-start">
-        <div class="lg:col-span-2">
+        <div :class="isNew ? 'lg:col-span-3' : 'lg:col-span-2'">
         <form @submit.prevent="save()" novalidate>
         {% call card(padding="p-0") %}
             <div class="p-4 sm:p-7 grid sm:grid-cols-12 gap-2 sm:gap-x-6 sm:gap-y-8">
@@ -171,11 +207,11 @@ date: 2026-10-20
         {% endset %}
         {# Assigned courses, with the subjects and intro video for each. #}
         {# Stays in view while the long profile form scrolls (below the fixed admin navbar). #}
-        <div class="lg:col-span-1 lg:sticky lg:top-20">
+        <div x-show="!isNew" class="lg:col-span-1 lg:sticky lg:top-20">
           {% call card(padding="p-0") %}
             <div class="px-5 py-4 border-b border-gray-200 dark:border-neutral-700 flex justify-between items-center">
               <h3 class="text-lg font-medium text-gray-800 dark:text-neutral-200">Assigned courses</h3>
-              <span x-show="!isNew && links.length">{{ button(text="Assign course", variant="secondary", icon="plus", size="sm", extra_attrs='@click="openAssign()"') }}</span>
+              <span x-show="links.length">{{ button(text="Assign course", variant="secondary", icon="plus", size="sm", extra_attrs='@click="openAssign()"') }}</span>
             </div>
             <template x-if="links.length">
               <ul class="divide-y divide-gray-200 dark:divide-neutral-700">
@@ -208,10 +244,7 @@ date: 2026-10-20
                 </template>
               </ul>
             </template>
-            <template x-if="isNew">
-              <p class="p-5 text-sm text-gray-500 dark:text-neutral-400">Add them to faculty first, then assign their courses here.</p>
-            </template>
-            <template x-if="!isNew && !links.length">
+            <template x-if="!links.length">
               <div class="p-5 text-center">
                 <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">Not assigned to any course yet</p>
                 <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Students see them only on the pages of courses they're assigned to.</p>
@@ -261,10 +294,11 @@ date: 2026-10-20
   <script>
     function facultyProfile() {
       const params = new URLSearchParams(window.location.search);
-      const id = params.get("id") || "ananya";
-      const staff = staffById(id);
+      // ?new=1 adds an instructor: the staff member is picked on the page. ?id=… edits one.
+      const isNew = params.has("new");
+      const id = isNew ? null : params.get("id") || "ananya";
       const profiles = facultyStore.load();
-      const isNew = !!staff && !profiles[id];
+      const staff = id && profiles[id] ? staffById(id) : null;
 
       const blank = { photo: null, short_description: "", bio: "", years_of_experience: null, subjects: [], qualifications: [], highlights: [] };
       // Lists always show at least one row to type in.
@@ -292,14 +326,22 @@ date: 2026-10-20
         isNew,
         form: JSON.parse(JSON.stringify(start)),
         saved: JSON.stringify(clean(start)),
-        errors: { short_description: "" },
+        errors: { short_description: "", staff: "" },
+        staffSearch: "",
         leaving: false,
 
 
         init() {
           if (this.person) document.title = this.person.name + " · Faculty";
+          const message = facultyStore.flash();
+          if (message) this.$nextTick(() => this.$dispatch("toast", { title: message, variant: "success" }));
+          if (this.isNew) {
+            document.title = "Add instructor · Faculty";
+          }
           this.refreshIcons();
           this.$watch("form", () => this.refreshIcons());
+          this.$watch("person", () => this.refreshIcons());
+          this.$watch("staffSearch", () => this.refreshIcons());
           this.$watch("allLinks", () => this.refreshIcons());
           this.$watch("draft", () => this.refreshIcons());
         },
@@ -338,6 +380,19 @@ date: 2026-10-20
         },
 
 
+
+        // Staff who aren't instructors yet, filtered by the search.
+        get staffResults() {
+          const q = this.staffSearch.trim().toLowerCase();
+          return STAFF.filter((s) => !profiles[s.id] && (!q || (s.name + " " + s.email).toLowerCase().includes(q))).map((s) => ({ ...s, photo: null }));
+        },
+
+        chooseStaff(staff) {
+          this.person = staffById(staff.id);
+          this.staffSearch = "";
+          window.scrollTo(0, 0);
+        },
+
         save() {
           const data = clean(this.form);
           if (!data.short_description) {
@@ -349,9 +404,10 @@ date: 2026-10-20
           all[this.person.id] = data;
           facultyStore.save(all);
           if (this.isNew) {
-            facultyStore.flash(`${this.person.name} added to faculty`);
+            // Next step is their courses, on their own page.
+            facultyStore.flash(`${this.person.name} added to faculty. Assign their courses next.`);
             this.leaving = true;
-            window.location = facultyListUrl();
+            window.location = profileUrl(this.person.id);
             return;
           }
           this.saved = JSON.stringify(data);
