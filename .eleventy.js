@@ -1,6 +1,14 @@
 const groupBy = require("./js/groupBy");
 const filter = require("./js/filter");
+const pages = require("./js/pages");
 module.exports = config => {
+    // Publish only full pages; partials and layouts get no URL of their own (see js/pages.js)
+    let layouts = new Set();
+    config.on("eleventy.before", () => { layouts = pages.findLayouts("src"); });
+    config.addPreprocessor("partials", "html", function (data, content) {
+        if (!pages.isPage(this.inputPath, content, layouts)) return false;
+    });
+
     // Ignore the build output and node_modules from the file watcher
     // to prevent unnecessary re-builds when output files change
     config.watchIgnores.add("public/**");

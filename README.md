@@ -36,6 +36,26 @@ src/testpress/my_feature/
 
 Keep each page readable. If a file grows past a few hundred lines or has a large Alpine `x-data` block, split it into partials under `includes/`.
 
+### Which files get a URL
+
+Only full pages are published (rule in [js/pages.js](js/pages.js)). A file is a page when it:
+
+- extends a layout (`{% extends "layouts/admin_base.html" %}`), or
+- is a whole HTML document (`<html>` / `<!doctype>`), or
+- starts with front matter (`---` … `---`, e.g. `title`, `tags`, `permalink`).
+
+Everything else is a partial: it works with `{% include %}` but gets no URL. Layouts (files other pages extend, named `*base*` / `*layout*` or kept in a `layout/` or `layouts/` folder) get no URL either.
+
+- Link only to pages, never to a partial's path.
+- A partial that a page loads by URL at runtime (`fetch`, `hx-get`, an `iframe`) must start with front matter so it stays published:
+
+  ```
+  ---
+  # Loaded by URL at runtime (fetch/hx-get), so it is published as its own page
+  publish: true
+  ---
+  ```
+
 ## 3. Build the page
 
 Start the file with front matter, then extend a layout:
