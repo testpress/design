@@ -95,10 +95,6 @@ module.exports = config => {
             "src/simba/node_modules/preline/dist/preline.js",
     });
     config.addPassthroughCopy({
-        "src/sentinel/node_modules/preline/dist/preline.js":
-            "src/sentinel/node_modules/preline/dist/preline.js",
-    });
-    config.addPassthroughCopy({
         "src/testpress/node_modules/preline/dist/preline.js":
             "src/testpress/node_modules/preline/dist/preline.js",
     });
