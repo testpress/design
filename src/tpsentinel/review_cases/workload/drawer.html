@@ -1,0 +1,91 @@
+{% from "src/tpsentinel/components/drawer.html" import drawer %}
+
+<!-- Assign or move cases without leaving the dashboard: pick which cases and who gets them; loads preview before you confirm -->
+{% call drawer(id="move-drawer", size="md", x_open="!!move", x_title="moveTitle", x_subtitle="moveSubtitle", close="closeMove()") %}
+<template x-if="move">
+  <div class="flex flex-col flex-1 min-h-0">
+    <div class="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-7">
+
+      <!-- Which cases -->
+      <fieldset>
+        <legend class="text-sm font-semibold text-foreground">Which cases</legend>
+        <div class="mt-3 flex flex-wrap gap-2" role="radiogroup">
+          <template x-for="o in whichOptions" :key="o.key">
+            <button type="button" role="radio" :aria-checked="move.which === o.key" @click="setWhich(o.key)"
+                    :class="move.which === o.key ? 'border-primary bg-primary-50 text-primary-800 dark:bg-primary-500/15 dark:text-primary-300' : 'border-layer-line bg-layer text-foreground hover:bg-layer-hover'"
+                    class="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-lg border text-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+              <span x-text="o.label"></span>
+              <span class="text-xs tabular-nums opacity-70" x-text="num(o.n)"></span>
+            </button>
+          </template>
+        </div>
+        <label class="mt-4 flex items-center gap-x-3 text-sm text-foreground">
+          How many
+          <input type="number" min="1" :max="movePool(move.from, move.which).length" x-model.number="move.count"
+                 class="w-20 py-1.5 px-2.5 bg-layer border border-layer-line rounded-lg text-sm text-foreground tabular-nums focus:border-primary focus:ring-1 focus:ring-primary">
+          <span class="text-muted-foreground-1" x-text="`of ${num(movePool(move.from, move.which).length)}`"></span>
+        </label>
+        <p class="mt-2 text-xs text-muted-foreground-1" x-text="move.which === 'old' ? 'Longest waiting first.' : 'Highest priority first, then longest waiting.'"></p>
+      </fieldset>
+
+      <!-- Who gets them -->
+      <fieldset>
+        <div class="flex items-center justify-between gap-x-3">
+          <legend class="text-sm font-semibold text-foreground">Give them to</legend>
+          <button type="button" x-show="moveTargets.length > 1"
+                  @click="move.to = move.to.length === moveTargets.length ? [] : moveTargets.map(t => t.id)"
+                  class="text-[13px] font-medium text-primary hover:text-primary-hover focus:outline-hidden focus-visible:underline"
+                  x-text="move.to.length === moveTargets.length ? 'Clear' : 'Select all'"></button>
+        </div>
+        <p class="mt-1 text-xs text-muted-foreground-1">With more than one person, each case goes to whoever has the fewest open cases at that point, so loads even out.</p>
+
+        <p x-show="!moveTargets.length" class="mt-4 text-sm text-muted-foreground-1">No other reviewer has review access.</p>
+        <ul class="mt-3 flex flex-col gap-1">
+          <template x-for="t in moveTargets" :key="t.id">
+            <li>
+              <label :class="move.to.includes(t.id) ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-layer-hover'"
+                     class="flex items-center gap-x-3 py-2.5 px-3 rounded-lg cursor-pointer">
+                <input type="checkbox" :checked="move.to.includes(t.id)" @change="toggleTarget(t.id)"
+                       class="shrink-0 size-4 rounded-sm border-layer-line bg-layer text-primary checked:bg-primary checked:border-primary focus:ring-primary">
+                <img x-show="t.avatar" :src="t.avatar" alt="" class="shrink-0 size-7 rounded-full object-cover">
+                <span x-show="!t.avatar" class="shrink-0 flex justify-center items-center size-7 rounded-full bg-surface text-[11px] font-medium text-muted-foreground-1" x-text="initials(t.name)"></span>
+                <span class="min-w-0 grow">
+                  <span class="flex items-center justify-between gap-x-2">
+                    <span class="truncate text-sm font-medium text-foreground"><span x-text="t.name"></span><span x-show="t.you" class="ms-1 text-xs font-normal text-muted-foreground-1">(you)</span></span>
+                    <span class="shrink-0 text-xs tabular-nums text-muted-foreground-1">
+                      <span x-text="num(t.load)"></span><template x-if="plan[t.id]?.length"><span class="font-semibold text-primary" x-text="` + ${plan[t.id].length} → ${num(t.load + plan[t.id].length)}`"></span></template> open
+                    </span>
+                  </span>
+                  <!-- Load before and after -->
+                  <span class="mt-1.5 flex h-1.5 rounded-full bg-surface overflow-hidden">
+                    <span class="h-full bg-gray-300 dark:bg-neutral-500" :style="`width: ${(t.load / planMax) * 100}%`"></span>
+                    <span class="h-full bg-primary transition-[width]" :style="`width: ${((plan[t.id]?.length || 0) / planMax) * 100}%`"></span>
+                  </span>
+                </span>
+              </label>
+            </li>
+          </template>
+        </ul>
+      </fieldset>
+
+      <a :href="move.from === 'unassigned' ? casesHref({ view: 'unassigned' }) : casesHref({ reviewer: move.from })"
+         class="self-start text-[13px] font-medium text-primary hover:text-primary-hover hover:underline underline-offset-4">
+        Pick cases one by one in Review Cases
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <div class="shrink-0 flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-t border-overlay-footer">
+      <p class="text-sm text-muted-foreground-1"
+         x-text="!move.to.length ? 'Choose who gets the cases.' : `${plural(moveCases.length, 'case')} to ${plural(Object.values(plan).filter(ids => ids.length).length, 'reviewer')}`"></p>
+      <div class="flex items-center gap-x-2">
+        <button type="button" @click="closeMove()"
+                class="py-2 px-3 rounded-lg text-sm font-medium border border-layer-line bg-layer text-layer-foreground hover:bg-layer-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">Cancel</button>
+        <button type="button" @click="applyMove()" :disabled="!canApply"
+                class="py-2 px-3 rounded-lg text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary"
+                x-text="applyLabel"></button>
+      </div>
+    </div>
+  </div>
+</template>
+{% endcall %}
