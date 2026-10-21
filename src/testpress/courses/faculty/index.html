@@ -30,7 +30,7 @@ date: 2026-10-20
       {% set header_actions %}
         <span x-show="instructors.length" x-cloak class="flex items-center gap-2">
           {{ button(text="How it works", variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-about-faculty\')"') }}
-          {{ button(text="Add instructor", icon="plus", extra_attrs='@click="window.location = newInstructorUrl()"') }}
+          {{ button(text="Add instructor", icon="plus", extra_attrs='@click="openAdd()"') }}
         </span>
       {% endset %}
       {{ page_header(
@@ -182,11 +182,11 @@ date: 2026-10-20
     <div x-show="!instructors.length" x-cloak>
       {{ empty_state(
         title="No instructors yet",
-        description="Add your instructors and assign them to courses. Students see them on the course's page before they buy.",
+        description="Pick instructors from your staff and mentors, and assign them to courses. Students see them on the course's page before they buy.",
         icon="users",
         primary_action_text="Add instructor",
         primary_action_icon="plus",
-        primary_action_attrs='@click="window.location = newInstructorUrl()"',
+        primary_action_attrs='@click="openAdd()"',
         secondary_action_text="How it works",
         secondary_action_attrs='@click="$dispatch(\'open-modal-about-faculty\')"'
       ) }}
@@ -194,11 +194,45 @@ date: 2026-10-20
   </main>
 
 
+  {# Add instructor: pick a staff member or mentor. Picking one opens their new profile. #}
+  {% call modal(id="add-instructor", title="Add instructor", confirm_text="", show_cancel=false) %}
+    <div class="-m-5">
+      <div class="px-5 py-4">
+        {{ input(name="staff_search", placeholder="Search staff and mentors", icon="search", variant="solid", x_model="staffSearch", extra_attrs="autofocus") }}
+      </div>
+      <ul class="max-h-80 overflow-y-auto border-t border-gray-200 divide-y divide-gray-200 dark:border-neutral-700 dark:divide-neutral-700">
+        <template x-for="person in staffResults" :key="person.id">
+          <li>
+            <button type="button" :disabled="person.added" @click="window.location = profileUrl(person.id, true)"
+              class="w-full flex items-center gap-x-3 px-5 py-3 text-start hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:hover:bg-transparent disabled:cursor-default dark:hover:bg-neutral-700/40 dark:focus:bg-neutral-700/40">
+              {{ avatar("person", size="size-9") }}
+              <span class="min-w-0 flex-1">
+                <span class="flex items-center gap-x-2">
+                  <span class="text-sm font-medium truncate" :class="person.added ? 'text-gray-500 dark:text-neutral-500' : 'text-gray-800 dark:text-neutral-200'" x-text="person.name"></span>
+                  <span class="shrink-0 rounded-md px-1.5 py-0.5 text-[11px] bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" x-text="person.role"></span>
+                </span>
+                <span class="block text-sm text-gray-500 truncate dark:text-neutral-400" x-text="person.email"></span>
+              </span>
+              <span x-show="person.added">{{ badge(text="Added", size="xs") }}</span>
+              <i x-show="!person.added" data-lucide="chevron-right" class="shrink-0 size-4 text-gray-400"></i>
+            </button>
+          </li>
+        </template>
+        <li x-show="!staffResults.length" class="px-5 py-8 text-center text-sm text-gray-500 dark:text-neutral-400">
+          No staff or mentors match “<span x-text="staffSearch"></span>”
+        </li>
+      </ul>
+      <p class="px-5 py-3 border-t border-gray-200 text-sm text-gray-500 dark:border-neutral-700 dark:text-neutral-400">
+        Instructors are picked from your staff and mentors. Not in the list? <a href="#" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline dark:text-primary-500">Add them in Members</a>.
+      </p>
+    </div>
+  {% endcall %}
+
   {% call modal(id="remove-instructor", title="Remove from faculty?", variant="danger", confirm_text="Remove", cancel_text="Cancel") %}
     <p class="text-gray-800 dark:text-neutral-200">
       <span class="font-medium" x-text="removing && removing.name"></span>’s profile will be deleted<template x-if="removing && removing.courses.length"><span>, and students will no longer see them in <span x-text="removing.courses.join(', ')"></span></span></template>.
     </p>
-    <p class="mt-2 text-gray-500 dark:text-neutral-400" x-text="removing && removing.email ? 'Their staff account and course access stay the same.' : 'Course access isn’t affected.'"></p>
+    <p class="mt-2 text-gray-500 dark:text-neutral-400" x-text="'Their staff account and course access stay the same.'"></p>
   {% endcall %}
 
   {# Guide, in the format of the "About benefits" modal on product_benefits. #}
@@ -212,7 +246,7 @@ date: 2026-10-20
       <section>
         <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">How to set it up</h3>
         <ol class="mt-2 space-y-1.5 list-decimal ps-5 text-gray-600 dark:text-neutral-400">
-          <li>Add an instructor and fill in their profile. If they have a staff account, you can link it; it's optional.</li>
+          <li>Add an instructor from your staff or mentors, and fill in their profile.</li>
           <li>On their page, assign the courses they teach.</li>
           <li>For each course, check the subjects they teach in it and add an intro video if you have one.</li>
         </ol>
@@ -224,8 +258,7 @@ date: 2026-10-20
           <li>A profile is written once and shown in every course they're assigned to. Edit it in one place.</li>
           <li>Subjects and intro videos can be different for each course.</li>
           <li>Faculty is for display only. It doesn't give anyone access to a course; use Add Staffs for that.</li>
-          <li>Instructors don't need a staff account. Linking one just keeps a single record for the person.</li>
-          <li>Removing an instructor takes them off every course page. A linked staff account stays.</li>
+          <li>Removing an instructor takes them off every course page. Their staff account stays.</li>
         </ul>
       </section>
     </div>
@@ -246,6 +279,7 @@ date: 2026-10-20
         profiles: {},
         links: [],
         search: "",
+        staffSearch: "",
         filters: { subject: "", course: "", experience: "" },
         pending: { subject: "", course: "", experience: "" },
         page: 1,
@@ -261,6 +295,9 @@ date: 2026-10-20
           if (message) this.$nextTick(() => this.$dispatch("toast", { title: message, variant: "success" }));
           this.refreshIcons();
           this.$watch("paged", () => this.refreshIcons());
+          this.$watch("staffSearch", () => this.refreshIcons());
+          // "Change" on a new profile comes back here to pick someone else.
+          if (new URLSearchParams(window.location.search).has("add")) this.$nextTick(() => this.openAdd());
         },
 
         refreshIcons() {
@@ -272,7 +309,7 @@ date: 2026-10-20
             subjects: [],
             ...p,
             id,
-            email: instructorEmail(p) || (p.invite ? p.invite.email : ""),
+            email: instructorEmail(p),
             courses: [...new Set(linksFor(id, this.links).map((l) => l.course))],
           })).sort((a, b) => a.name.replace(/^Dr\.\s*/, "").localeCompare(b.name.replace(/^Dr\.\s*/, "")));
         },
@@ -314,6 +351,21 @@ date: 2026-10-20
 
 
 
+
+        // Staff and mentors, with the ones already added at the end.
+        get staffResults() {
+          const q = this.staffSearch.trim().toLowerCase();
+          return STAFF
+            .filter((s) => !q || (s.name + " " + s.email + " " + s.role).toLowerCase().includes(q))
+            .map((s) => ({ ...s, photo: this.profiles[s.id] ? this.profiles[s.id].photo : null, added: !!this.profiles[s.id] }))
+            .sort((a, b) => a.added - b.added);
+        },
+
+        openAdd() {
+          this.staffSearch = "";
+          this.$dispatch("open-modal-add-instructor");
+          this.refreshIcons();
+        },
 
         askRemove(person) {
           this.removing = person;

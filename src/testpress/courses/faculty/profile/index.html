@@ -16,7 +16,6 @@ date: 2026-10-20
 {% from "../../../../ui-system/components/toast.html" import toast_provider %}
 {% from "../../../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../../../ui-system/components/popover.html" import popover %}
-{% from "../../../../ui-system/components/switch.html" import switch %}
 {% from "../includes/avatar.html" import avatar %}
 {% from "../includes/subject_picker.html" import subject_picker %}
 
@@ -40,7 +39,7 @@ date: 2026-10-20
   <main class="px-4 sm:px-0 pb-28">
 
     {# Unknown id in the link. #}
-    <template x-if="!isNew && !person">
+    <template x-if="!person">
       <div class="space-y-5">
         {{ breadcrumb({ items: [ { label: "Faculty", href: "/testpress/courses/faculty/" | url } ] }) }}
         {{ empty_state(
@@ -53,13 +52,16 @@ date: 2026-10-20
       </div>
     </template>
 
-    <template x-if="isNew || person">
+    <template x-if="person">
       <div class="space-y-5" :class="isNew && 'max-w-4xl mx-auto'">
         <div class="space-y-2">
           <div x-show="isNew">{{ breadcrumb({ items: [ { label: "Faculty", href: "/testpress/courses/faculty/" | url }, { label: "Add instructor" } ] }) }}</div>
           <div x-show="!isNew">{{ breadcrumb({ items: [ { label: "Faculty", href: "/testpress/courses/faculty/" | url }, { label: "Instructor" } ] }) }}</div>
-          {% set header_title %}<span x-text="isNew ? 'Add instructor' : person.name"></span>{% endset %}
-          {{ page_header(title=header_title) }}
+          {% set header_title %}<span x-text="isNew ? 'Add ' + person.name : person.name"></span>{% endset %}
+          <div>
+            {{ page_header(title=header_title) }}
+            <p class="text-sm text-gray-500 dark:text-neutral-400"><span x-text="person.role"></span> · <span x-text="person.email"></span><template x-if="isNew"><span> · <a :href="facultyListUrl() + '?add=1'" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline dark:text-primary-500">Change</a></span></template></p>
+          </div>
         </div>
 
         <div class="grid lg:grid-cols-3 gap-6 items-start">
@@ -67,32 +69,6 @@ date: 2026-10-20
         <form @submit.prevent="save()" novalidate>
         {% call card(padding="p-0") %}
             <div class="p-4 sm:p-7 grid sm:grid-cols-12 gap-2 sm:gap-x-6 sm:gap-y-8">
-
-              {# Name. While typing, instructors with a matching name are listed so a second profile
-                 isn't made by mistake. Menu as in includes/subject_picker.html. #}
-              {{ field_label("Name", "instructor_name", required=true) }}
-              <div class="sm:col-span-9">
-                <div class="relative" @click.outside="if ($event.target.isConnected) nameOpen = false">
-                  <input id="instructor_name" type="text" x-model="form.name" autocomplete="off"
-                    placeholder="e.g. Dr. Ananya Rao"
-                    @input="nameOpen = true; errors.name = ''" @keydown.escape="nameOpen = false"
-                    class="py-2 sm:py-2.5 px-3 block w-full bg-white border border-gray-200 rounded-lg sm:text-sm text-gray-800 placeholder:text-gray-500 focus:border-primary-700 focus:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:placeholder:text-neutral-400"
-                    :class="errors.name && '!border-red-500 focus:!ring-red-500'">
-                  <div x-show="nameOpen && instructorMatches.length" x-cloak x-transition
-                    class="absolute z-20 mt-1 w-full p-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-72 overflow-y-auto dark:bg-neutral-900 dark:border-neutral-700">
-                    <p class="px-3 pt-2 pb-1 text-xs text-gray-500 dark:text-neutral-400">Already instructors</p>
-                    <template x-for="other in instructorMatches" :key="other.id">
-                      <a :href="profileUrl(other.id)" class="w-full py-2 px-3 flex items-center gap-x-3 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:hover:bg-neutral-800">
-                        <span class="flex shrink-0 justify-center items-center size-8 bg-gray-100 text-gray-600 text-xs font-medium uppercase rounded-full dark:bg-neutral-700 dark:text-neutral-300" x-text="initialsOf(other.name)"></span>
-                        <span class="min-w-0 grow text-sm text-gray-800 truncate dark:text-neutral-200" x-text="other.name"></span>
-                        <span class="shrink-0 text-xs text-gray-500 dark:text-neutral-400">Open profile</span>
-                      </a>
-                    </template>
-                  </div>
-                </div>
-                <p x-show="errors.name" class="mt-1.5 text-xs text-red-500" x-text="errors.name"></p>
-                <p x-show="!errors.name" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Shown to students, as you type it here.</p>
-              </div>
 
               {{ field_label("Photo") }}
               <div class="sm:col-span-9">
@@ -180,77 +156,6 @@ date: 2026-10-20
         {% endcall %}
 
 
-        {# Sign-in access: optional. Only for instructors who take live classes or answer doubts.
-           Access itself stays with Staff; this just creates or links the staff account. #}
-        {% call card(padding="p-0", extra_classes="mt-5") %}
-          <div class="px-4 sm:px-7 py-4 border-b border-gray-200 dark:border-neutral-700">
-            <h2 class="text-base font-semibold text-gray-800 dark:text-neutral-200">Sign-in access</h2>
-            <p class="text-sm text-gray-500 dark:text-neutral-400">Optional. Students don't see this.</p>
-          </div>
-          <div class="p-4 sm:p-7 space-y-5">
-            {{ switch(
-              id="access_on",
-              size="sm",
-              x_model="form.accessOn",
-              label="Can sign in to Testpress",
-              description="Turn on if they take live classes or answer doubts. Leave off for instructors who only appear on course pages."
-            ) }}
-
-            <template x-if="form.accessOn">
-              <div class="space-y-4 sm:ps-14">
-                {# Chips as in live_classes/includes/filter_drawer.html. #}
-                <div class="flex flex-wrap gap-2">
-                  {% set chip = "py-2 px-2.5 relative flex justify-center items-center text-center text-[13px] bg-white border border-gray-200 ring-1 ring-transparent text-gray-800 cursor-pointer rounded-xl hover:border-emerald-600 hover:ring-emerald-600 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700 has-[:checked]:bg-emerald-100 has-[:checked]:border-emerald-200 has-[:checked]:ring-emerald-200 has-[:checked]:text-emerald-800 dark:has-[:checked]:bg-emerald-800/30 dark:has-[:checked]:border-emerald-800/50 dark:has-[:checked]:text-emerald-500" %}
-                  <label class="{{ chip }}"><input type="radio" class="hidden" value="invite" x-model="form.accessMode">Invite by email</label>
-                  <label class="{{ chip }}"><input type="radio" class="hidden" value="existing" x-model="form.accessMode">They're already staff</label>
-                </div>
-
-                <div x-show="form.accessMode === 'invite'">
-                  {{ input(name="invite_email", type="email", label="Email", placeholder="name@example.com", x_model="form.inviteEmail", extra_attrs='@input="errors.access = \'\'"') }}
-                  <p x-show="savedInvite" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400"><span class="inline-flex items-center gap-x-1 text-amber-700 dark:text-amber-500"><i data-lucide="clock" class="size-3.5"></i>Invite sent</span>, waiting for them to set a password.</p>
-                  <p x-show="!savedInvite" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">They get an email to set a password, with the Instructor role: take live classes and answer doubts in the courses you assign.</p>
-                </div>
-
-                <div x-show="form.accessMode === 'existing'">
-                  <template x-if="form.staff">
-                    <div class="flex items-center gap-x-3 p-3 border border-gray-200 rounded-lg dark:border-neutral-700">
-                      <span class="flex shrink-0 justify-center items-center size-9 bg-white border border-gray-200 text-gray-800 text-xs font-medium uppercase rounded-full dark:bg-neutral-800 dark:border-neutral-700 dark:text-white" x-text="initialsOf(linkedStaff.name)"></span>
-                      <div class="grow min-w-0">
-                        <p class="text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="linkedStaff.name"></p>
-                        <p class="text-xs text-gray-500 truncate dark:text-neutral-400" x-text="linkedStaff.email"></p>
-                      </div>
-                      {{ button(text="Change", variant="ghost", size="sm", extra_attrs='@click="form.staff = null"') }}
-                    </div>
-                  </template>
-                  <template x-if="!form.staff">
-                    <div>
-                      {{ input(name="staff_search", placeholder="Search staff by name or email", icon="search", variant="solid", x_model="staffQuery", padding_class="py-1.5") }}
-                      <ul class="mt-3 space-y-3">
-                        <template x-for="staff in staffMatches" :key="staff.id">
-                          <li class="flex items-center gap-x-3">
-                            <span class="flex shrink-0 justify-center items-center size-9 bg-white border border-gray-200 text-gray-800 text-xs font-medium uppercase rounded-full dark:bg-neutral-800 dark:border-neutral-700 dark:text-white" x-text="initialsOf(staff.name)"></span>
-                            <div class="grow min-w-0">
-                              <p class="text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="staff.name"></p>
-                              <p class="text-xs text-gray-500 truncate dark:text-neutral-400" x-text="staff.email"></p>
-                            </div>
-                            <button type="button" @click="form.staff = staff.id; staffQuery = ''; errors.access = ''"
-                              class="py-1.5 px-2 inline-flex items-center bg-white border border-gray-200 font-medium text-xs text-gray-800 rounded-lg hover:border-gray-300 focus:outline-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-white">
-                              Select
-                            </button>
-                          </li>
-                        </template>
-                        <li x-show="!staffMatches.length" class="py-3 text-sm text-gray-500 dark:text-neutral-400" x-text="staffQuery ? 'No staff match “' + staffQuery + '”' : 'No staff without an instructor profile.'"></li>
-                      </ul>
-                    </div>
-                  </template>
-                </div>
-
-                <p x-show="errors.access" class="text-xs text-red-500" x-text="errors.access"></p>
-                <p class="text-xs text-gray-500 dark:text-neutral-400">Need other permissions? <a href="#" class="font-medium text-primary-600 hover:underline dark:text-primary-500">Change them in Staff</a> after saving.</p>
-              </div>
-            </template>
-          </div>
-        {% endcall %}
         </form>
         </div>
 
@@ -286,9 +191,6 @@ date: 2026-10-20
                           {# Intro video, in the dot style of the student card's "Intro video" tag. #}
                           <template x-if="link.video">
                             <span class="inline-flex items-center"><span class="mx-1.5 text-gray-300 dark:text-neutral-600" aria-hidden="true">·</span><i data-lucide="circle-play" class="size-3.5 me-1"></i>Intro video</span>
-                          </template>
-                          <template x-if="link.liveClasses">
-                            <span class="inline-flex items-center"><span class="mx-1.5 text-gray-300 dark:text-neutral-600" aria-hidden="true">·</span><i data-lucide="video" class="size-3.5 me-1"></i>Live classes</span>
                           </template>
                         </p>
                       </div>
@@ -355,29 +257,24 @@ date: 2026-10-20
   <script>
     function facultyProfile() {
       const params = new URLSearchParams(window.location.search);
-      // ?new=1 adds an instructor; ?id=… edits one.
-      const isNew = params.has("new");
-      const id = isNew ? null : params.get("id") || "ananya";
+      // ?id=… edits an instructor; with &new=1 it adds the staff member or mentor picked on the Faculty list.
+      const id = params.get("id") || "ananya";
       const profiles = facultyStore.load();
-      const existing = id ? profiles[id] : null;
+      const staff = staffById(id);
+      const existing = profiles[id] || null;
+      const isNew = params.has("new") && !!staff && !existing;
 
-      const blank = { name: "", staff: null, invite: null, photo: null, short_description: "", bio: "", years_of_experience: null, subjects: [], qualifications: [], highlights: [] };
+      const blank = { photo: null, short_description: "", bio: "", years_of_experience: null, subjects: [], qualifications: [], highlights: [] };
       // Lists always show at least one row to type in.
       const toForm = (p) => ({
         ...blank,
         ...p,
-        accessOn: !!(p.staff || p.invite),
-        accessMode: p.staff ? "existing" : "invite",
-        inviteEmail: p.invite ? p.invite.email : "",
         years_of_experience: p.years_of_experience ?? "",
         subjects: [...(p.subjects || [])],
         highlights: p.highlights && p.highlights.length ? [...p.highlights] : [""],
         qualifications: p.qualifications && p.qualifications.length ? [...p.qualifications] : [""],
       });
       const clean = (f) => ({
-        name: f.name.trim(),
-        staff: f.accessOn && f.accessMode === "existing" ? f.staff || null : null,
-        invite: f.accessOn && f.accessMode === "invite" && f.inviteEmail.trim() ? { email: f.inviteEmail.trim() } : null,
         photo: f.photo,
         short_description: f.short_description.trim(),
         bio: f.bio.trim(),
@@ -388,20 +285,17 @@ date: 2026-10-20
       });
 
       const start = toForm(existing || blank);
-      const linkedStaffIds = Object.values(profiles).map((p) => p.staff).filter(Boolean);
 
       const data = {
-        person: existing ? { id, name: existing.name, email: instructorEmail(existing), subjects: existing.subjects || [] } : null,
+        person: staff && (existing || isNew) ? { ...staff, subjects: existing ? existing.subjects || [] : [] } : null,
         isNew,
         form: JSON.parse(JSON.stringify(start)),
         saved: JSON.stringify(clean(start)),
-        errors: { short_description: "", name: "", access: "" },
-        nameOpen: false,
-        staffQuery: "",
+        errors: { short_description: "" },
         leaving: false,
 
         init() {
-          document.title = (isNew ? "Add instructor" : this.person ? this.person.name : "Instructor") + " · Faculty";
+          document.title = (this.person ? (isNew ? "Add " : "") + this.person.name : "Instructor") + " · Faculty";
           const message = facultyStore.flash();
           if (message) this.$nextTick(() => this.$dispatch("toast", { title: message, variant: "success" }));
           this.refreshIcons();
@@ -415,45 +309,11 @@ date: 2026-10-20
         },
 
         get formPerson() {
-          return { name: this.form.name || "?", photo: this.form.photo };
+          return { name: this.person ? this.person.name : "", photo: this.form.photo };
         },
 
         get dirty() {
           return JSON.stringify(clean(this.form)) !== this.saved;
-        },
-
-        get linkedStaff() {
-          return (this.form.staff && staffById(this.form.staff)) || { name: "", email: "" };
-        },
-
-        // Staff without an instructor profile yet, for "They're already staff".
-        get staffMatches() {
-          const q = this.staffQuery.trim().toLowerCase();
-          return STAFF.filter((s) => (!linkedStaffIds.includes(s.id) || s.id === (existing && existing.staff)) && (!q || (s.name + " " + s.email).toLowerCase().includes(q))).slice(0, 5);
-        },
-
-        // An invite saved earlier for the email now in the field.
-        get savedInvite() {
-          const saved = JSON.parse(this.saved);
-          return !!saved.invite && saved.invite.email === this.form.inviteEmail.trim();
-        },
-
-        // Saved sign-in access; the course drawer uses it for "Can take live classes".
-        get canSignIn() {
-          const saved = JSON.parse(this.saved);
-          return !!(saved.staff || saved.invite);
-        },
-
-        // Other instructors with a matching name: open them instead of making a second one.
-        get instructorMatches() {
-          const q = this.form.name.trim().toLowerCase();
-          if (q.length < 2) return [];
-          return Object.entries(profiles).filter(([key, p]) => key !== id && p.name.toLowerCase().includes(q)).map(([key, p]) => ({ id: key, name: p.name })).slice(0, 4);
-        },
-
-        get exactInstructor() {
-          const q = this.form.name.trim().toLowerCase();
-          return Object.entries(profiles).some(([key, p]) => key !== id && p.name.toLowerCase() === q);
         },
 
         addRow(key) {
@@ -476,38 +336,31 @@ date: 2026-10-20
         },
 
         save() {
-          const data = clean(this.form);
-          this.errors.name = !data.name ? "Add their name." : this.exactInstructor ? "There's already an instructor with this name. Open their profile from the suggestions instead." : "";
-          this.errors.short_description = data.short_description ? "" : "Add a short description. Students see it under their name.";
-          const f = this.form;
-          this.errors.access = !f.accessOn ? ""
-            : f.accessMode === "invite" && !/^\S+@\S+\.\S+$/.test(f.inviteEmail.trim()) ? "Add the email to send their invite to."
-            : f.accessMode === "existing" && !f.staff ? "Select their staff account." : "";
-          if (this.errors.name || this.errors.short_description || this.errors.access) {
-            this.$nextTick(() => { const el = document.getElementById(this.errors.name ? "instructor_name" : this.errors.short_description ? "short_description" : "access_on"); el && el.scrollIntoView({ block: "center" }); el && el.focus(); });
+          const data = { ...clean(this.form), name: this.person.name, staff: this.person.id };
+          if (!data.short_description) {
+            this.errors.short_description = "Add a short description. Students see it under their name.";
+            this.$nextTick(() => document.getElementById("short_description").focus());
             return;
           }
-          const newInvite = !!data.invite && !JSON.parse(this.saved).invite;
           const all = facultyStore.load();
-          const key = id || "ins-" + Date.now();
-          all[key] = data;
+          all[this.person.id] = data;
           facultyStore.save(all);
           if (this.isNew) {
-            // Next step is their courses, on their own page.
-            facultyStore.flash(`${data.name} added to faculty${newInvite ? ", invite sent" : ""}. Assign their courses next.`);
+            // Next step is their courses, on this page in edit mode.
+            facultyStore.flash(`${data.name} added to faculty. Assign their courses next.`);
             this.leaving = true;
-            window.location = profileUrl(key);
+            window.location = profileUrl(this.person.id);
             return;
           }
-          this.person = { ...this.person, name: data.name, email: instructorEmail(data), subjects: data.subjects };
-          this.saved = JSON.stringify(data);
+          this.person = { ...this.person, subjects: data.subjects };
+          this.saved = JSON.stringify(clean(this.form));
           this.form = toForm(data);
-          this.$dispatch("toast", { title: newInvite ? `Profile saved. Invite sent to ${data.invite.email}.` : "Profile saved", variant: "success" });
+          this.$dispatch("toast", { title: "Profile saved", variant: "success" });
         },
 
         discard() {
           this.form = toForm(JSON.parse(this.saved));
-          this.errors = { short_description: "", name: "", access: "" };
+          this.errors = { short_description: "" };
         },
 
         cancel() {
