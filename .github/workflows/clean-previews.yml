@@ -1,0 +1,62 @@
+name: Remove previews of closed PRs
+
+# Run by hand from the Actions tab. Start with "Only list" on to see what
+# would be removed, then run again with it off.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only list the previews that would be removed
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    # Same queue as the main and preview deploys, so nothing else writes to
+    # gh-pages while this runs
+    concurrency:
+      group: gh-pages-publisher
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      REPO: ${{ github.repository }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      # Only the latest commit and folder listings are downloaded, not the
+      # file contents, so this stays fast however big gh-pages is
+      - name: Fetch gh-pages
+        run: |
+          git clone --quiet --filter=blob:none --no-checkout --depth 1 --branch gh-pages \
+            "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" site
+
+      - name: Find previews of closed PRs
+        working-directory: site
+        run: |
+          gh pr list --repo "$REPO" --state open --limit 1000 --json number --jq '.[].number' | sort -n > ../open.txt
+          git ls-tree -d --name-only HEAD pr-preview/ | while read -r dir; do
+            number="${dir#pr-preview/pr-}"
+            grep -qx "$number" ../open.txt || echo "$dir"
+          done > ../stale.txt
+          echo "Open PRs: $(wc -l < ../open.txt)"
+          echo "Preview folders: $(git ls-tree -d --name-only HEAD pr-preview/ | wc -l)"
+          echo "Previews of closed PRs: $(wc -l < ../stale.txt)"
+          cat ../stale.txt
+
+      - name: Remove them from gh-pages
+        if: env.DRY_RUN != 'true'
+        working-directory: site
+        run: |
+          if [ ! -s ../stale.txt ]; then echo "Nothing to remove"; exit 0; fi
+          git reset --quiet
+          xargs git rm -r --cached --quiet < ../stale.txt
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit --quiet -m "Remove previews of closed PRs"
+          git push --quiet origin HEAD:gh-pages
+          echo "Removed $(wc -l < ../stale.txt) previews"
