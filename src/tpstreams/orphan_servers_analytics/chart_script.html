@@ -219,29 +219,102 @@
       }
     }
 
-    const activeClass = "px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 after:absolute after:-bottom-2 after:inset-x-0 after:z-10 after:h-0.5 after:bg-gray-800 dark:text-white dark:hover:bg-neutral-800 dark:focus:bg-neutral-800 dark:after:bg-white";
-    const inactiveClass = "px-2.5 py-1.5 mb-2 relative inline-flex justify-center items-center gap-x-2 text-gray-500 hover:text-gray-800 text-sm font-medium rounded-lg hover:bg-gray-100 focus:outline-hidden focus:bg-gray-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800";
+    window.currentAnomalyTab = 'active';
 
-    const updateTabs = (clickedTab, otherTab) => {
-      if (clickedTab && otherTab) {
-        clickedTab.className = activeClass;
-        otherTab.className = inactiveClass;
+    window.switchAnomalyTab = function(tabName) {
+      window.currentAnomalyTab = tabName;
+      const allRows = document.querySelectorAll('.anomaly-row');
+      const emptyRow = document.getElementById('tab-empty-state-row');
+      const emptyMsg = document.getElementById('tab-empty-state-message');
+
+      let activeCount = 0;
+      let resolvedCount = 0;
+      let visibleCount = 0;
+
+      allRows.forEach(row => {
+        const isResolved = row.getAttribute('data-state') === 'resolved';
+        if (isResolved) {
+          resolvedCount++;
+        } else {
+          activeCount++;
+        }
+
+        if (tabName === 'resolved') {
+          if (isResolved) {
+            row.style.display = '';
+            visibleCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        } else {
+          if (!isResolved) {
+            row.style.display = '';
+            visibleCount++;
+          } else {
+            row.style.display = 'none';
+          }
+        }
+      });
+
+      const actBadge = document.getElementById('active-anomalies-count');
+      if (actBadge) actBadge.textContent = activeCount;
+      const resBadge = document.getElementById('resolved-anomalies-count');
+      if (resBadge) resBadge.textContent = resolvedCount;
+
+      if (emptyRow) {
+        if (visibleCount === 0) {
+          emptyRow.classList.remove('hidden');
+          if (emptyMsg) {
+            emptyMsg.textContent = tabName === 'resolved' 
+              ? 'No resolved anomalies found.' 
+              : 'No active anomalies found.';
+          }
+        } else {
+          emptyRow.classList.add('hidden');
+        }
+      }
+
+      // Visual button styles
+      const activeBtnClass = "py-4 px-1 relative inline-flex items-center gap-x-2 border-b-2 border-gray-800 text-sm whitespace-nowrap text-gray-800 font-semibold focus:outline-none z-10 dark:border-white dark:text-white transition-colors";
+      const inactiveBtnClass = "py-4 px-1 relative inline-flex items-center gap-x-2 border-b-2 border-transparent text-sm whitespace-nowrap text-gray-500 hover:text-gray-800 focus:outline-none z-10 dark:text-neutral-400 dark:hover:text-white transition-colors";
+
+      if (tabName === 'active') {
+        if (activeTab) {
+          activeTab.className = activeBtnClass;
+          activeTab.setAttribute('aria-selected', 'true');
+        }
+        if (resolvedTab) {
+          resolvedTab.className = inactiveBtnClass;
+          resolvedTab.setAttribute('aria-selected', 'false');
+        }
+      } else {
+        if (resolvedTab) {
+          resolvedTab.className = activeBtnClass;
+          resolvedTab.setAttribute('aria-selected', 'true');
+        }
+        if (activeTab) {
+          activeTab.className = inactiveBtnClass;
+          activeTab.setAttribute('aria-selected', 'false');
+        }
       }
     };
 
     if (activeTab) {
       activeTab.addEventListener('click', (e) => {
         e.preventDefault();
-        updateTabs(activeTab, resolvedTab);
+        window.switchAnomalyTab('active');
       });
     }
 
     if (resolvedTab) {
       resolvedTab.addEventListener('click', (e) => {
         e.preventDefault();
-        updateTabs(resolvedTab, activeTab);
+        window.switchAnomalyTab('resolved');
       });
     }
+
+    // Initial filter on active tab
+    window.switchAnomalyTab('active');
 
     if (typeof lucide !== 'undefined') {
       lucide.createIcons();
