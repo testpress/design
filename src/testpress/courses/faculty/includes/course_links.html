@@ -41,20 +41,8 @@
 
       <div class="p-4 bg-white rounded-xl border border-gray-200 dark:bg-neutral-900 dark:border-neutral-700">
         <h5 class="mb-3 font-medium text-sm text-gray-800 dark:text-neutral-200">Subject they teach in this course <span class="text-red-500">*</span></h5>
-        {# Free text, as in the PRD: shown to students as typed, not linked to Testpress subjects.
-           Clicking or typing shows what they teach in their other courses; picking one fills the
-           word being typed (after the last comma). Menu as on the Faculty Add instructor popup. #}
-        <div class="relative" @click.outside="if ($event.target.isConnected) subjectOpen = false">
-          {{ input(name="link_subject", placeholder="e.g. Polity, Governance", x_model="draft.subject", extra_attrs='autocomplete="off" @focus="subjectOpen = true" @click="subjectOpen = true" @input="subjectOpen = true; errors.subject = \'\'" @keydown.escape="subjectOpen = false" :class="errors.subject && \'!border-red-500 focus:!ring-red-500\'"') }}
-          <div x-show="subjectOpen && subjectSuggestions.length" x-cloak x-transition
-            class="absolute z-20 mt-1 w-full p-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto dark:bg-neutral-900 dark:border-neutral-700">
-            <p class="px-3 pt-2 pb-1 text-xs text-gray-500 dark:text-neutral-400">From their other courses</p>
-            <template x-for="subject in subjectSuggestions" :key="subject">
-              <button type="button" @click="pickSubject(subject)"
-                class="w-full py-2 px-3 text-start text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800" x-text="subject"></button>
-            </template>
-          </div>
-        </div>
+        {# Free text, as in the PRD: shown to students as typed, not linked to Testpress subjects. #}
+        {{ input(name="link_subject", placeholder="e.g. Polity, Governance", x_model="draft.subject", extra_attrs='autocomplete="off" @input="errors.subject = \'\'" :class="errors.subject && \'!border-red-500 focus:!ring-red-500\'"') }}
         <p x-show="errors.subject" class="mt-1.5 text-xs text-red-500" x-text="errors.subject"></p>
         <p x-show="!errors.subject" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Shown to students next to their name. For more than one, separate with commas.</p>
       </div>
@@ -125,7 +113,6 @@
         errors: { course: "", subject: "" },
         unassigning: null,
         draftPlaying: false,
-        subjectOpen: false,
 
         get links() {
           return this.person ? this.allLinks.filter((l) => l.instructor === this.person.id) : [];
@@ -165,28 +152,8 @@
           this.$nextTick(() => window.lucide && window.lucide.createIcons());
         },
 
-        // Subjects from their other courses that aren't in the field yet.
-        get usedBefore() {
-          if (!this.person) return [];
-          const current = splitSubjects(this.draft.subject.split(",").slice(0, -1).join(",")).map((x) => x.toLowerCase());
-          const other = this.allLinks.filter((l) => l.instructor === this.person.id && l.course !== (this.fixedCourse || this.draft.course));
-          return [...new Set(other.flatMap((l) => splitSubjects(l.subject)))].filter((x) => !current.includes(x.toLowerCase()));
-        },
 
-        // Matches for the word being typed (after the last comma).
-        get subjectSuggestions() {
-          const typing = (this.draft.subject.split(",").pop() || "").trim().toLowerCase();
-          return this.usedBefore.filter((x) => x.toLowerCase().includes(typing));
-        },
 
-        pickSubject(subject) {
-          const parts = this.draft.subject.split(",");
-          parts[parts.length - 1] = subject;
-          // Ends with ", " so the next subject can be typed or picked; tidied when saved.
-          this.draft.subject = splitSubjects(parts.join(",")).join(", ") + ", ";
-          this.errors.subject = "";
-          document.getElementById("link_subject").focus();
-        },
 
         saveDraft() {
           this.draftPlaying = false;
