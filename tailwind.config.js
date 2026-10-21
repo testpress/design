@@ -11,6 +11,9 @@ module.exports = {
     "!./src/tpsentinel/session_monitor/**",
     "!./src/tpsentinel/warning_widget/**",
     "!./src/tpsentinel/authentication/**",
+    // Product folders have their own node_modules; scanning them is slow and only adds unused classes
+    "!./src/*/node_modules/**",
+    "./src/*/node_modules/preline/dist/*.js",
     "node_modules/preline/dist/*.js",
     "node_modules/@themesberg/tailwind-datepicker/dist/js/*.js"
   ],
