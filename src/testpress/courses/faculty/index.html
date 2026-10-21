@@ -122,7 +122,7 @@ date: 2026-10-20
                 {{ avatar("person", size="size-8", text="text-xs") }}
                 <div class="flex flex-col">
                   <a :href="profileUrl(person.id)" class="inline-block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors" x-text="person.name"></a>
-                  <span class="mt-0.5 text-xs text-gray-500 dark:text-neutral-500" x-text="person.email"></span>
+                  <span class="mt-0.5 text-xs text-gray-500 dark:text-neutral-500" x-text="person.email || 'No staff account'"></span>
                 </div>
               </div>
             {% endcall %}
@@ -182,7 +182,7 @@ date: 2026-10-20
     <div x-show="!instructors.length" x-cloak>
       {{ empty_state(
         title="No instructors yet",
-        description="Add instructors from your staff and assign them to courses. Students see them on the course's page before they buy.",
+        description="Add your instructors and assign them to courses. Students see them on the course's page before they buy.",
         icon="users",
         primary_action_text="Add instructor",
         primary_action_icon="plus",
@@ -198,7 +198,7 @@ date: 2026-10-20
     <p class="text-gray-800 dark:text-neutral-200">
       <span class="font-medium" x-text="removing && removing.name"></span>’s profile will be deleted<template x-if="removing && removing.courses.length"><span>, and students will no longer see them in <span x-text="removing.courses.join(', ')"></span></span></template>.
     </p>
-    <p class="mt-2 text-gray-500 dark:text-neutral-400">Their staff account and course access stay the same.</p>
+    <p class="mt-2 text-gray-500 dark:text-neutral-400" x-text="removing && removing.email ? 'Their staff account and course access stay the same.' : 'Course access isn’t affected.'"></p>
   {% endcall %}
 
   {# Guide, in the format of the "About benefits" modal on product_benefits. #}
@@ -212,7 +212,7 @@ date: 2026-10-20
       <section>
         <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">How to set it up</h3>
         <ol class="mt-2 space-y-1.5 list-decimal ps-5 text-gray-600 dark:text-neutral-400">
-          <li>Add an instructor from your staff and fill in their profile.</li>
+          <li>Add an instructor and fill in their profile. If they have a staff account, you can link it; it's optional.</li>
           <li>On their page, assign the courses they teach.</li>
           <li>For each course, check the subjects they teach in it and add an intro video if you have one.</li>
         </ol>
@@ -224,7 +224,8 @@ date: 2026-10-20
           <li>A profile is written once and shown in every course they're assigned to. Edit it in one place.</li>
           <li>Subjects and intro videos can be different for each course.</li>
           <li>Faculty is for display only. It doesn't give anyone access to a course; use Add Staffs for that.</li>
-          <li>Removing an instructor takes them off every course page. Their staff account stays.</li>
+          <li>Instructors don't need a staff account. Linking one just keeps a single record for the person.</li>
+          <li>Removing an instructor takes them off every course page. A linked staff account stays.</li>
         </ul>
       </section>
     </div>
@@ -267,14 +268,13 @@ date: 2026-10-20
         },
 
         get instructors() {
-          return STAFF.filter((s) => this.profiles[s.id]).map((s) => {
-            return {
-              subjects: [],
-              ...s,
-              ...this.profiles[s.id],
-              courses: [...new Set(linksFor(s.id, this.links).map((l) => l.course))],
-            };
-          }).sort((a, b) => a.name.replace(/^Dr\.\s*/, "").localeCompare(b.name.replace(/^Dr\.\s*/, "")));
+          return Object.entries(this.profiles).map(([id, p]) => ({
+            subjects: [],
+            ...p,
+            id,
+            email: instructorEmail(p),
+            courses: [...new Set(linksFor(id, this.links).map((l) => l.course))],
+          })).sort((a, b) => a.name.replace(/^Dr\.\s*/, "").localeCompare(b.name.replace(/^Dr\.\s*/, "")));
         },
 
         get filtered() {
