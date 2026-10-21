@@ -71,10 +71,10 @@ date: 2026-10-20
                  already an instructor before a duplicate is made. Menu as in includes/subject_picker.html. #}
               {{ field_label("Name", "instructor_name", required=true) }}
               <div class="sm:col-span-9">
-                <div class="relative" @click.outside="if ($event.target.isConnected) nameOpen = false">
+                <div class="relative" @click.outside="if ($event.target.isConnected) { nameOpen = false; linkMode = false; }">
                   <input id="instructor_name" type="text" x-model="form.name" autocomplete="off" :readonly="!!form.staff"
                     placeholder="Their full name, as students should see it"
-                    @focus="if (!form.staff) nameOpen = true" @input="nameOpen = true; errors.name = ''" @keydown.escape="nameOpen = false"
+                    @focus="if (!form.staff && form.name.trim().length >= 2) nameOpen = true" @input="nameOpen = form.name.trim().length >= 2 || linkMode; errors.name = ''" @keydown.escape="nameOpen = false"
                     class="py-2 sm:py-2.5 px-3 block w-full bg-white border border-gray-200 rounded-lg sm:text-sm text-gray-800 placeholder:text-gray-500 focus:border-primary-700 focus:ring-primary-700 read-only:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:placeholder:text-neutral-400 dark:read-only:bg-neutral-900"
                     :class="errors.name && '!border-red-500 focus:!ring-red-500'">
                   <div x-show="nameOpen && !form.staff && (staffMatches.length || instructorMatches.length || (isNew && form.name.trim()))" x-cloak x-transition
@@ -103,7 +103,7 @@ date: 2026-10-20
                         <span class="shrink-0 text-xs text-gray-500 dark:text-neutral-400">Open profile</span>
                       </a>
                     </template>
-                    <template x-if="isNew && form.name.trim() && !exactInstructor">
+                    <template x-if="isNew && form.name.trim().length >= 2 && !exactInstructor">
                       <button type="button" @click="nameOpen = false"
                         class="w-full py-2 px-3 flex items-center gap-x-2 text-start text-sm text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
                         <svg class="shrink-0 size-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
@@ -348,6 +348,7 @@ date: 2026-10-20
         saved: JSON.stringify(clean(start)),
         errors: { short_description: "", name: "" },
         nameOpen: false,
+        linkMode: false,
         leaving: false,
 
         init() {
@@ -378,9 +379,11 @@ date: 2026-10-20
         },
 
         // Staff accounts not linked to any instructor yet, matching the typed name.
+        // Shown once two letters are typed, or all of them after "Link their staff account".
         get staffMatches() {
           const q = this.form.name.trim().toLowerCase();
-          return STAFF.filter((s) => !linkedStaffIds.includes(s.id) && (!q || (s.name + " " + s.email).toLowerCase().includes(q))).slice(0, 6);
+          if (q.length < 2 && !this.linkMode) return [];
+          return STAFF.filter((s) => !linkedStaffIds.includes(s.id) && (!q || (s.name + " " + s.email).toLowerCase().includes(q))).slice(0, this.linkMode && q.length < 2 ? 50 : 6);
         },
 
         // Other instructors with a matching name: open them instead of making a second one.
@@ -400,6 +403,7 @@ date: 2026-10-20
           this.form.name = staff.name;
           this.errors.name = "";
           this.nameOpen = false;
+          this.linkMode = false;
         },
 
         unlinkStaff() {
@@ -408,6 +412,7 @@ date: 2026-10-20
         },
 
         startLink() {
+          this.linkMode = true;
           this.nameOpen = true;
           this.$nextTick(() => document.getElementById("instructor_name").focus());
         },
