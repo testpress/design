@@ -1,0 +1,101 @@
+{#
+  Message box, after the Preline AI chat template's composer (bg-layer, border-line-3 = gray-300, shadow-xs = v3 shadow-sm). Used inside aiChatApp.
+  Starts as one line (+, text, send) like ChatGPT; grows into the full box once the text
+  wraps, has a line break, or has images, and shrinks back when it's empty again.
+#}
+<form @submit.prevent="send()" class="relative">
+  <div class="relative bg-white border shadow-sm dark:bg-neutral-800"
+       :class="[expanded ? 'rounded-3xl' : 'rounded-[1.75rem]', dragging ? 'border-primary-500 border-dashed' : (tooLong ? 'border-red-500' : 'border-gray-300 dark:border-neutral-600')]"
+       @dragover.prevent="if (!locked) dragging = true" @dragleave.self="dragging = false" @drop.prevent="if (!locked) onDrop($event)">
+
+    <!-- Drop overlay -->
+    <div x-show="dragging" class="absolute inset-0 z-10 flex items-center justify-center gap-x-2 rounded-[inherit] bg-primary-50/90 text-sm font-medium text-primary-700 pointer-events-none dark:bg-neutral-900/90 dark:text-primary-400">
+      <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      Drop image to add
+    </div>
+
+    <label for="ai-chat-input" class="sr-only">Ask a question</label>
+    <div class="flex flex-wrap items-center" :class="expanded ? 'pb-2 px-2' : 'p-2 gap-x-1'">
+      <!-- Attached images -->
+      <div x-show="attachments.length" class="order-first basis-full pt-3 px-1 flex flex-wrap gap-2">
+        <template x-for="a in attachments" :key="a.id">
+          <div class="relative group/att">
+            <button type="button" @click="a.status === 'done' && (lightbox = a.src)" class="block size-16 rounded-xl overflow-hidden border border-gray-200 bg-gray-100 dark:border-neutral-700 dark:bg-neutral-800" :aria-label="'Preview ' + a.name">
+              <img :src="a.src" :alt="a.name" class="size-full object-cover" :class="a.status === 'uploading' && 'opacity-50'">
+            </button>
+            <!-- Upload progress -->
+            <div x-show="a.status === 'uploading'" class="absolute inset-0 flex items-center justify-center rounded-xl bg-gray-900/40" role="progressbar" :aria-valuenow="a.progress" aria-valuemin="0" aria-valuemax="100" :aria-label="'Uploading ' + a.name">
+              <svg class="size-8 -rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15" fill="none" stroke="rgb(255 255 255 / .35)" stroke-width="3"/>
+                <circle cx="18" cy="18" r="15" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-dasharray="94.25" :stroke-dashoffset="94.25 - (94.25 * a.progress / 100)"/>
+              </svg>
+            </div>
+            <button type="button" @click="removeAttachment(a)" :aria-label="'Remove ' + a.name"
+                    class="absolute -top-1.5 -end-1.5 flex justify-center items-center size-5 rounded-full bg-gray-800 text-white border-2 border-white transition-opacity hover:bg-gray-900 focus:outline-none focus:opacity-100 focus-visible:ring-2 focus-visible:ring-primary-500 md:opacity-0 md:group-hover/att:opacity-100 dark:border-neutral-900 dark:bg-neutral-600">
+              <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </template>
+      </div>
+
+      <textarea id="ai-chat-input" x-model="draft" rows="1"
+                x-effect="draft; expanded; $nextTick(() => { $el.style.height = 'auto'; const h = $el.scrollHeight; $el.style.height = Math.min(h, 144) + 'px'; $el.style.overflowY = h > 144 ? 'auto' : 'hidden'; if (!expanded && h > 44) expandComposer = true; if (!draft && !attachments.length) expandComposer = false; })"
+                @keydown.enter="if (!$event.shiftKey && window.matchMedia('(min-width: 768px)').matches) { $event.preventDefault(); send(); }"
+                @paste="onPaste($event)"
+                :disabled="locked"
+                :aria-invalid="tooLong"
+                aria-describedby="ai-chat-input-help"
+                :placeholder="locked ? 'Sending is paused' : 'Ask anything about your studies…'"
+                class="order-2 max-h-36 block bg-transparent border-transparent resize-none overflow-hidden text-gray-800 placeholder:text-gray-500 focus:outline-none focus:border-transparent focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none dark:text-neutral-200 dark:placeholder:text-neutral-500"
+                :class="expanded ? 'basis-full mt-2 pt-2 pb-2 px-2' : 'flex-1 min-w-0 py-2 px-1'"></textarea>
+
+      <!-- Toolbar: its own row when expanded; when collapsed its buttons sit either side of the text -->
+      <div :class="expanded ? 'order-3 basis-full pt-2 flex justify-between items-center gap-x-1' : 'contents'">
+        <!-- Add image -->
+        <div class="order-1 relative flex items-center gap-x-1" @click.outside="plusOpen = false" @keydown.escape="plusOpen = false">
+          <input id="ai-chat-file" type="file" accept="image/jpeg,image/png,image/webp" multiple class="hidden" @change="addFiles([...$event.target.files]); $event.target.value = ''">
+          <input id="ai-chat-camera" type="file" accept="image/*" capture="environment" class="hidden" @change="addFiles([...$event.target.files]); $event.target.value = ''">
+          <button type="button" @click="plusOpen = !plusOpen" :disabled="locked" :aria-expanded="plusOpen" aria-haspopup="menu"
+                  class="flex justify-center items-center size-8 text-gray-800 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"
+                  :class="plusOpen && 'bg-gray-100 dark:bg-neutral-800'">
+            <svg class="shrink-0 size-[18px]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            <span class="sr-only">Add image</span>
+          </button>
+          <div x-show="plusOpen" x-transition.opacity x-cloak role="menu"
+               class="absolute start-0 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700"
+               :class="active ? 'bottom-full mb-2' : 'top-full mt-2'">
+            <div class="p-1 space-y-0.5">
+              <button type="button" role="menuitem" @click="pickImages()"
+                      class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
+                Upload an image
+              </button>
+              <button type="button" role="menuitem" @click="takePhoto()"
+                      class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+                Take a photo
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="order-3 flex items-center gap-x-2">
+          <span x-show="uploading" class="text-xs text-gray-500 dark:text-neutral-400">Uploading…</span>
+          <span x-show="showCounter" class="text-xs tabular-nums"
+                :class="tooLong ? 'font-medium text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-neutral-400'"
+                x-text="`${draft.length.toLocaleString('en-IN')} / ${limits.maxChars.toLocaleString('en-IN')}`"></span>
+          <!-- Send -->
+          <button type="submit" :disabled="!canSend"
+                  class="inline-flex shrink-0 justify-center items-center size-8 text-sm font-medium rounded-full bg-primary-600 border border-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:bg-primary-700">
+            <span class="sr-only">Send</span>
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Messages about the box -->
+  <p id="ai-chat-input-help" class="empty:hidden mt-2 px-2 text-xs" :class="(tooLong || attachError) ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-neutral-400'"
+     x-text="tooLong ? 'Shorten your message to send it.' : attachError ? attachError : ''"></p>
+</form>

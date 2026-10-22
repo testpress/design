@@ -1,0 +1,393 @@
+{#
+  AI Chat, laid out after the Preline "AI Chat Interface" template, inside the student layout:
+  a chat-history sidebar (minifies to icons on desktop, a drawer on mobile), a header with the
+  chat title, a centered start screen, and a thread with a sticky composer.
+#}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% set menu_item_cls = "w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800" %}
+{% set menu_delete_cls = "w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-red-600 hover:bg-red-50 focus:outline-none focus:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10 dark:focus:bg-red-500/10" %}
+{% set icon_rename %}<svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></svg>{% endset %}
+{% set icon_delete %}<svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>{% endset %}
+{% set icon_more %}<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>{% endset %}
+{% set icon_new %}<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>{% endset %}
+{% set icon_copy %}<svg x-show="copied !== key" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg x-show="copied === key" class="shrink-0 size-4 text-primary-600 dark:text-primary-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{% endset %}
+
+<div class="ai-chat relative h-full flex bg-white text-gray-800 dark:bg-neutral-900 dark:text-neutral-200"
+     @ai-chat-state.window="applyState($event.detail)"
+     @modal-confirmed-ai-chat-delete.window="confirmDelete()"
+     @keydown.escape.window="sidebarOpen = false; menuFor = null; lightbox = null"
+     @scroll.capture="hideTip()">
+
+  <!-- Drawer backdrop (mobile) -->
+  <div x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false"
+       class="md:hidden fixed inset-0 z-[65] bg-gray-900/50 dark:bg-neutral-900/80" aria-hidden="true"></div>
+
+  <!-- ========== CHATS SIDEBAR ========== -->
+  <aside id="ai-chat-sidebar"
+         class="fixed inset-y-0 start-0 z-[70] w-[16.25rem] flex flex-col overflow-hidden bg-white border-e border-gray-200 transition-all duration-300 md:static md:z-auto md:translate-x-0 dark:bg-neutral-900 dark:border-neutral-700"
+         :class="[sidebarOpen ? 'translate-x-0' : '-translate-x-full', collapsed ? 'md:w-[3.25rem]' : 'md:w-[16.25rem]']"
+         aria-label="Chats">
+
+    <!-- Header -->
+    <header class="py-2.5 px-4 flex items-center gap-x-2" :class="collapsed ? 'md:justify-center md:px-2' : 'justify-between'">
+      <span class="text-sm font-semibold text-gray-800 dark:text-white" :class="collapsed && 'md:hidden'">Chats</span>
+      <!-- Minify toggle (desktop) -->
+      <button type="button" @click="collapsed = !collapsed; menuFor = null; hideTip()" :aria-expanded="!collapsed" aria-controls="ai-chat-sidebar"
+              @mouseenter="showTip($el, collapsed ? 'Expand sidebar' : 'Collapse sidebar', 'right')" @mouseleave="hideTip()"
+              class="hidden md:flex justify-center items-center flex-none size-9 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+        <svg x-show="collapsed" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>
+        <svg x-show="!collapsed" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m10 15-3-3 3-3"/></svg>
+        <span class="sr-only" x-text="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"></span>
+      </button>
+      <!-- Close (mobile) -->
+      <button type="button" @click="sidebarOpen = false"
+              class="flex md:hidden justify-center items-center size-6 bg-white border border-gray-200 text-gray-600 rounded-full hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-700">
+        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        <span class="sr-only">Close</span>
+      </button>
+    </header>
+
+    <!-- New chat -->
+    <div class="mb-5 px-2">
+      <button type="button" @click="newChat(); hideTip()"
+              @mouseenter="collapsed && showTip($el, 'New chat', 'right')" @mouseleave="hideTip()"
+              class="group relative w-full flex items-center gap-1 py-1.5 px-2.5 text-sm rounded-lg before:absolute before:inset-y-0 before:-start-2 before:rounded-e-full before:w-1 before:h-full focus:outline-none"
+              :class="!active ? 'bg-gray-100 before:bg-primary-600 text-primary-700 dark:bg-neutral-800 dark:text-primary-400' : 'text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800'">
+        <span class="-ms-[5px] flex shrink-0 justify-center items-center size-6">
+          <svg class="shrink-0 size-4 group-hover:scale-110 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+        </span>
+        <span class="truncate transition-opacity duration-300" :class="collapsed && 'md:opacity-0'">New chat</span>
+      </button>
+    </div>
+
+    <!-- Recent chats -->
+    <div class="relative pb-4 px-2 flex-1 min-h-0 flex flex-col gap-y-5 overflow-y-auto transition-opacity duration-300 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600"
+         :class="collapsed && 'md:opacity-0 md:pointer-events-none'">
+      <!-- Loading -->
+      <template x-if="loading">
+        <div class="animate-pulse space-y-6 ps-2.5 pe-2" aria-label="Loading chats">
+          <template x-for="g in [3, 4]">
+            <div class="space-y-3.5">
+              <div class="h-3 w-20 rounded-full bg-gray-200 dark:bg-neutral-700"></div>
+              <template x-for="n in g">
+                <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" :style="`width: ${55 + (n * 13) % 40}%`"></div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+
+      <!-- Empty -->
+      <p x-show="!loading && !chats.length" class="ps-2.5 text-sm text-gray-500 dark:text-neutral-400">Your chats will appear here.</p>
+
+      <!-- Groups -->
+      <template x-for="g in loading ? [] : groups" :key="g.name">
+        <div class="flex flex-col">
+          <span class="block ps-2.5 mb-2 text-sm text-gray-500 dark:text-neutral-400" x-text="g.name"></span>
+          <ul class="flex flex-col gap-y-0.5">
+            <template x-for="c in g.chats" :key="c.id">
+              <li>
+                <!-- Rename -->
+                <template x-if="renamingId === c.id">
+                  <form @submit.prevent="saveRename(c)">
+                    <label :for="'ai-chat-rename-' + c.id" class="sr-only">Chat name</label>
+                    <input :id="'ai-chat-rename-' + c.id" type="text" x-model="renameDraft" maxlength="80"
+                           @keydown.escape.stop="renamingId = null" @blur="saveRename(c)"
+                           class="py-1.5 px-2.5 block w-full text-sm bg-white border border-primary-500 rounded-lg ring-1 ring-primary-500 text-gray-800 focus:outline-none focus:border-primary-500 focus:ring-primary-500 dark:bg-neutral-900 dark:text-neutral-200">
+                  </form>
+                </template>
+
+                <template x-if="renamingId !== c.id">
+                  <div class="relative group" :class="menuFor === c.id && 'z-20'" @click.outside="if (menuFor === c.id) menuFor = null">
+                    <!-- Title. Long-press on touch screens opens the menu. -->
+                    <button type="button" @click="if (!pressedOpen) openChat(c.id); pressedOpen = false"
+                            @touchstart.passive="pressStart(c)" @touchend="pressEnd()" @touchmove.passive="pressEnd()" @contextmenu="if (isTouch) $event.preventDefault()"
+                            :aria-current="c.id === activeId ? 'page' : null"
+                            class="w-full flex items-center py-2 ps-2.5 text-sm text-start rounded-lg select-none [-webkit-touch-callout:none] focus:outline-none"
+                            :class="[(c.id === activeId || menuFor === c.id) ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800',
+                                     menuFor === c.id ? 'pe-8' : 'pe-2.5 md:group-hover:pe-8 md:group-focus-within:pe-8']">
+                      <span class="truncate" x-text="c.shown !== undefined ? c.shown : c.title"></span>
+                    </button>
+                    <!-- More: on hover (desktop) -->
+                    <div class="absolute top-1/2 end-0 -translate-y-1/2 transition-opacity duration-200"
+                         :class="menuFor === c.id ? 'opacity-100' : 'opacity-0 pointer-events-none md:pointer-events-auto md:group-hover:opacity-100 md:focus-within:opacity-100'">
+                      <button type="button" @click="menuFor = menuFor === c.id ? null : c.id" :aria-expanded="menuFor === c.id" aria-haspopup="menu"
+                              class="flex justify-center items-center size-8 text-gray-800 rounded-lg hover:bg-gray-200/70 focus:outline-none focus:bg-gray-200/70 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                        {{ icon_more | safe }}
+                        <span class="sr-only" x-text="'Options for ' + c.title"></span>
+                      </button>
+                      <div x-show="menuFor === c.id" x-transition.opacity x-cloak role="menu"
+                           class="absolute top-full end-0 mt-1 z-30 w-32 bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700">
+                        <div class="p-1 space-y-0.5">
+                          <button type="button" role="menuitem" @click="startRename(c)" class="{{ menu_item_cls }}">{{ icon_rename | safe }} Rename</button>
+                          <button type="button" role="menuitem" @click="askDelete(c)" class="{{ menu_delete_cls }}">{{ icon_delete | safe }} Delete</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </li>
+            </template>
+          </ul>
+        </div>
+      </template>
+    </div>
+  </aside>
+  <!-- ========== END CHATS SIDEBAR ========== -->
+
+  <!-- ========== MAIN ========== -->
+  <main class="relative flex-1 min-w-0 flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="shrink-0 py-2.5 px-4 sm:px-5 flex items-center gap-x-1.5">
+      <button type="button" @click="sidebarOpen = true" aria-controls="ai-chat-sidebar" :aria-expanded="sidebarOpen"
+              class="md:hidden -ms-1.5 flex justify-center items-center flex-none size-9 text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+        <span class="sr-only">Show chats</span>
+      </button>
+      <h1 class="flex-1 min-w-0 truncate font-medium text-gray-800 dark:text-neutral-200" x-text="active ? (active.shown !== undefined ? active.shown : active.title) : 'AI Chat'"></h1>
+
+      <template x-if="active">
+        <div class="flex items-center gap-x-1">
+          <!-- New chat (mobile) -->
+          <button type="button" @click="newChat()"
+                  class="md:hidden flex justify-center items-center flex-none size-9 text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800">
+            {{ icon_new | safe }}
+            <span class="sr-only">New chat</span>
+          </button>
+          <!-- More -->
+          <div class="relative" @click.outside="if (menuFor === 'header') menuFor = null">
+            <button type="button" @click="menuFor = menuFor === 'header' ? null : 'header'" :aria-expanded="menuFor === 'header'" aria-haspopup="menu"
+                    class="flex justify-center items-center flex-none size-9 text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800">
+              {{ icon_more | safe }}
+              <span class="sr-only">Chat options</span>
+            </button>
+            <div x-show="menuFor === 'header'" x-transition.opacity x-cloak role="menu"
+                 class="absolute top-full end-0 mt-1 z-30 w-32 bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700">
+              <div class="p-1 space-y-0.5">
+                <button type="button" role="menuitem" @click="sidebarOpen = !window.matchMedia('(min-width: 768px)').matches; collapsed = false; startRename(active)" class="{{ menu_item_cls }}">{{ icon_rename | safe }} Rename</button>
+                <button type="button" role="menuitem" @click="askDelete(active)" class="{{ menu_delete_cls }}">{{ icon_delete | safe }} Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </header>
+
+    <!-- ===== Start screen ===== -->
+    <template x-if="!active">
+      <div class="relative flex-1 min-h-0 overflow-y-auto">
+        <!-- Extra bottom padding lifts the block slightly above the middle (optical centre), like ChatGPT -->
+        <div class="min-h-full flex flex-col justify-center max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-[15vh]">
+          <!-- Daily new-chat limit -->
+          <template x-if="block === 'day'">
+            <div class="flex flex-col justify-center items-center text-center">
+              <span class="inline-flex justify-center items-center size-11 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                <svg class="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              </span>
+              <h2 class="mt-4 text-xl text-gray-800 dark:text-neutral-200">You’ve started 10 new chats today</h2>
+              <p class="mt-2 text-gray-500 dark:text-neutral-400">Continue an earlier chat, or start a new one after midnight.</p>
+              <button type="button" @click="sidebarOpen = true; if (window.matchMedia('(min-width: 768px)').matches) openChat(chats[0].id)"
+                      class="mt-6 py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700">
+                Open my chats
+              </button>
+            </div>
+          </template>
+
+          <template x-if="block !== 'day'">
+            <div class="contents">
+              <!-- Heading -->
+              <div class="flex flex-col justify-center items-center mb-8 text-center">
+                <h2 class="text-2xl sm:text-3xl text-gray-800 dark:text-neutral-200">What can I help with?</h2>
+              </div>
+              <!-- Body -->
+              <div>
+                {% include "./composer.html" %}
+                <!-- Prompt starters (template's label buttons): a 2-column grid on phones, one centred row from sm. They fill the message box. Hidden, not removed, so the composer doesn't move. -->
+                <div class="mt-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-center transition-opacity duration-200" :class="(draft || attachments.length) && 'opacity-0 invisible'" :aria-hidden="!!(draft || attachments.length)">
+                  <template x-for="s in starters" :key="s.label">
+                    <button type="button" @click="useStarter(s)"
+                            class="py-2 sm:py-1.5 px-3 sm:px-2.5 inline-flex items-center gap-x-2 sm:gap-x-1.5 text-sm text-start text-gray-800 bg-gray-100 rounded-lg hover:text-primary-700 focus:outline-none focus:text-primary-700 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:text-primary-400 dark:focus:text-primary-400">
+                      <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="s.d"/></svg>
+                      <span x-text="s.label"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- ===== Conversation ===== -->
+    <template x-if="active">
+      <div id="ai-chat-thread" class="relative flex-1 min-h-0 overflow-y-auto flex flex-col">
+        <ol class="flex-1 flex flex-col md:max-w-3xl w-full mx-auto pt-2 pb-8 px-4 sm:px-6 lg:px-8">
+          <template x-for="(m, i) in messages" :key="i">
+            <li x-data="{ key: 'm' + i }">
+              <!-- Student -->
+              <template x-if="m.role === 'user'">
+                <div class="py-3 group flex flex-col gap-y-1 text-gray-800 dark:text-neutral-200">
+                  <span class="sr-only">You:</span>
+                  <div x-show="m.images && m.images.length" class="flex flex-wrap justify-end gap-2">
+                    <template x-for="img in (m.images || [])">
+                      <button type="button" @click="lightbox = img.src" class="block overflow-hidden rounded-2xl border border-gray-200 dark:border-neutral-700" :aria-label="'Open ' + img.name">
+                        <img :src="img.src" :alt="img.name" class="h-40 w-auto max-w-[15rem] object-cover">
+                      </button>
+                    </template>
+                  </div>
+                  <!-- Copy sits beside the bubble (on hover), so it adds no height -->
+                  <div x-show="m.text" class="flex justify-end items-center gap-x-1" style="word-break: break-word;">
+                    <button type="button" @click="copy(key, m.text); showTip($el, 'Copied')" @mouseenter="showTip($el, copied === key ? 'Copied' : 'Copy')" @mouseleave="hideTip()"
+                            class="shrink-0 hidden md:flex justify-center items-center size-8 text-sm text-gray-500 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 hover:bg-gray-100 focus:opacity-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                      {{ icon_copy | safe }}
+                      <span class="sr-only">Copy</span>
+                    </button>
+                    <div class="max-w-[85%] text-start bg-gray-100 inline-block rounded-3xl py-2.5 px-4 dark:bg-neutral-800">
+                      <p class="leading-relaxed whitespace-pre-wrap" x-text="m.text"></p>
+                    </div>
+                  </div>
+                </div>
+              </template>
+
+              <!-- AI -->
+              <template x-if="m.role === 'ai'">
+                <div class="py-3 group flex flex-col gap-y-1 text-gray-800 dark:text-neutral-200">
+                  <span class="sr-only">AI:</span>
+
+                  <template x-if="!m.state || m.state === 'done' || m.state === 'streaming'">
+                    <div>
+                      <div class="ai-prose" :class="m.state === 'streaming' && 'is-streaming'" x-html="m.html"></div>
+                      <!-- Button group -->
+                      <div x-show="m.state !== 'streaming'" class="mt-2 -ms-2 flex flex-wrap items-center">
+                        <button type="button" @click="copy(key, plainText(m.html)); showTip($el, 'Copied')" @mouseenter="showTip($el, copied === key ? 'Copied' : 'Copy')" @mouseleave="hideTip()"
+                                class="flex justify-center items-center size-8 text-sm text-gray-800/70 hover:bg-gray-100 rounded-full focus:outline-none focus:bg-gray-100 dark:text-neutral-200/70 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                          {{ icon_copy | safe }}
+                          <span class="sr-only">Copy</span>
+                        </button>
+                      </div>
+                    </div>
+                  </template>
+
+                  <!-- Non-academic -->
+                  <template x-if="m.state === 'off_topic'">
+                    <div class="ai-prose">
+                      <p>I can only help with your studies, like questions from your subjects, concepts you’re learning, or problems you’re solving. Try asking about a topic you’re preparing for.</p>
+                    </div>
+                  </template>
+
+                  <!-- Failed: quiet inline note in the reply's place, like ChatGPT / Gemini -->
+                  <template x-if="m.state === 'failed'">
+                    <div role="alert" class="flex flex-col items-start gap-y-3">
+                      <p class="inline-flex items-center gap-x-2 text-gray-500 dark:text-neutral-400">
+                        <svg class="shrink-0 size-4 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                        <span x-text="m.retried ? 'Still couldn’t get a reply. Try sending your question again.' : 'Couldn’t get a reply.'"></span>
+                      </p>
+                      <button x-show="!m.retried" type="button" @click="retry(i)" :disabled="busy"
+                              class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-sm font-medium rounded-full border border-gray-200 text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 disabled:opacity-50 disabled:pointer-events-none dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                        <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                        Retry
+                      </button>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </li>
+          </template>
+
+          <!-- Thinking -->
+          <li x-show="status === 'thinking' || block === 'other_device'" class="py-3" role="status">
+            <span class="inline-flex items-center gap-x-2 text-gray-500 dark:text-neutral-400">
+              <span x-text="block === 'other_device' ? 'Replying on your other device' : 'Thinking'"></span>
+              <span class="inline-flex gap-x-1" aria-hidden="true">
+                <span class="size-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.3s]"></span>
+                <span class="size-1.5 rounded-full bg-gray-400 animate-bounce [animation-delay:-0.15s]"></span>
+                <span class="size-1.5 rounded-full bg-gray-400 animate-bounce"></span>
+              </span>
+            </span>
+          </li>
+        </ol>
+
+        <!-- Sticky footer: limit notice or composer -->
+        <div class="sticky bottom-0 z-10 bg-white md:max-w-3xl w-full mx-auto pb-4 px-4 sm:px-6 lg:px-8 dark:bg-neutral-900">
+          <!-- Limit / availability: a one-line note above a disabled box, like ChatGPT and Claude -->
+          <div x-show="blockNote" role="status" class="mb-2 px-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center text-sm text-gray-600 dark:text-neutral-400">
+            <svg x-show="block === 'hour'" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <svg x-show="['unavailable', 'offline'].includes(block)" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+            <span x-html="blockNote"></span>
+          </div>
+          <!-- Chat limit: a bar in the box's place, with New chat at the end -->
+          <template x-if="block === 'chat'">
+            <div role="status" class="py-2 ps-5 pe-2 flex items-center justify-between gap-x-3 bg-white border border-gray-300 rounded-[1.75rem] shadow-sm dark:bg-neutral-800 dark:border-neutral-600">
+              <p class="text-sm text-gray-600 dark:text-neutral-400">This chat has reached 20 messages.</p>
+              <button type="button" @click="newChat()"
+                      class="shrink-0 py-2 px-3.5 inline-flex items-center gap-x-1.5 text-sm font-medium rounded-full bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:bg-primary-700">
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+                New chat
+              </button>
+            </div>
+          </template>
+          <template x-if="block !== 'chat'">
+            <div>{% include "./composer.html" %}</div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </main>
+  <!-- ========== END MAIN ========== -->
+
+  <!-- Tooltip: fixed to the viewport so the sidebar's overflow can't clip it -->
+  <div x-show="tip.show" x-cloak role="tooltip"
+       class="pointer-events-none fixed z-[90] whitespace-nowrap py-1 px-2 bg-gray-900 text-xs font-medium text-white rounded-md shadow-sm dark:bg-neutral-700"
+       :style="`left: ${tip.x}px; top: ${tip.y}px; transform: ${tip.place === 'right' ? 'translateY(-50%)' : 'translateX(-50%)'}`"
+       x-text="tip.text"></div>
+
+  <!-- Delete confirmation (ui-system modal) -->
+  {% call modal(id="ai-chat-delete", title="Delete chat?", size="sm", variant="danger", confirm_text="Delete") %}
+    <p>“<span class="font-medium text-gray-800 dark:text-neutral-200" x-text="deleteTarget ? deleteTarget.title : ''"></span>” will be deleted. You can’t undo this.</p>
+  {% endcall %}
+
+  <!-- Camera (ui-system modal) -->
+  {% call modal(id="ai-chat-camera", title="Take a photo", size="md", confirm_text="", cancel_text="") %}
+    <div x-init="$watch('open', (v) => { if (v) startCamera(); else stopCamera(); })" class="space-y-4">
+      <div class="relative aspect-[4/3] overflow-hidden rounded-xl bg-gray-900">
+        <video x-ref="cameraVideo" x-show="!camera.shot && !camera.error" autoplay playsinline muted class="size-full object-cover"></video>
+        <img x-show="camera.shot" :src="camera.shot" alt="Captured photo" class="size-full object-cover">
+        <div x-show="camera.error" class="absolute inset-0 flex flex-col items-center justify-center gap-y-2 p-6 text-center">
+          <svg class="size-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/><path d="m2 2 20 20"/></svg>
+          <p class="text-sm font-medium text-white">Camera isn’t available</p>
+          <p class="text-sm text-gray-400">Allow camera access in your browser, or upload an image instead.</p>
+        </div>
+      </div>
+      <div class="flex justify-end gap-x-2">
+        <template x-if="camera.error">
+          <button type="button" @click="open = false; pickImages()" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700">Upload an image</button>
+        </template>
+        <template x-if="!camera.error && !camera.shot">
+          <button type="button" @click="capturePhoto()" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:bg-primary-700">
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+            Take photo
+          </button>
+        </template>
+        <template x-if="camera.shot">
+          <div class="flex gap-x-2">
+            <button type="button" @click="camera.shot = null; startCamera()" class="py-2 px-3 inline-flex items-center text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:hover:bg-neutral-700">Retake</button>
+            <button type="button" @click="usePhoto(); open = false" class="py-2 px-3 inline-flex items-center text-sm font-medium rounded-lg bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:bg-primary-700">Use photo</button>
+          </div>
+        </template>
+      </div>
+    </div>
+  {% endcall %}
+
+  <!-- Image preview -->
+  <template x-if="lightbox">
+    <div class="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-gray-900/80" role="dialog" aria-modal="true" aria-label="Image preview" @click="lightbox = null">
+      <img :src="lightbox" alt="" class="max-h-full max-w-full rounded-xl shadow-xl bg-white" @click.stop>
+      <button type="button" @click="lightbox = null" class="absolute top-4 end-4 flex justify-center items-center size-9 rounded-full bg-white/90 text-gray-800 hover:bg-white focus:outline-none">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        <span class="sr-only">Close</span>
+      </button>
+    </div>
+  </template>
+</div>
