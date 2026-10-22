@@ -25,6 +25,8 @@ A PRD, UX doc, mock, screenshot or a description of a screen. Build the UI it de
 | Odinhire | `src/odinhire/<feature>/` | `src/odinhire/base.html` | `css/odinhire.css` (v4) |
 | Flimix | `src/flimix/<feature>/` | `src/flimix/layouts/sidebar_layout.html` | root `css/tailwind.css` (v3.4) |
 
+Only full pages get a URL: a file must extend a layout, be a whole HTML document or start with front matter. Partials (put them in the feature's `includes/` folder) and layouts are not published, so link only to pages. A partial that a page loads by URL at runtime (`fetch`, `hx-get`, `iframe`) needs front matter (`publish: true`) to stay published. Details: [README.md](README.md#which-files-get-a-url).
+
 Pages on the root `css/tailwind.css` only get Tailwind v3.4 classes; v4-only classes such as `shadow-2xs` and `outline-hidden` do nothing there.
 
 Products with their own CSS build (v4) only get classes from the files listed with `@source` in their entry CSS (for TPSentinel, `src/tpsentinel/backend.css`). Add every new page folder there, rebuild (`npm run build:css --prefix src/<product>`) and commit the rebuilt `css/<product>*.css`: the site build copies `css/` before it rebuilds, so PR previews use the committed file.
