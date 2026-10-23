@@ -590,7 +590,7 @@
           <!-- Limit / availability: a one-line note above a disabled box, like ChatGPT and Claude -->
           <div x-show="blockNote" role="status" class="mb-2 px-2 flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center text-sm text-gray-600 dark:text-neutral-400">
             <svg x-show="block === 'hour'" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            <svg x-show="['unavailable', 'offline'].includes(block)" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+            <svg x-show="['unavailable', 'offline', 'all_off', 'student_off'].includes(block)" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>
             <span x-html="blockNote"></span>
           </div>
           <!-- Chat limit: a bar in the box's place, with New chat at the end -->
@@ -1311,13 +1311,16 @@
       get tooLong() { return this.draft.length > this.limits.maxChars; },
       get showCounter() { return this.draft.length >= this.limits.counterFrom; },
       get busy() { return this.status !== 'idle'; },
-      get locked() { return ['hour', 'chat', 'unavailable', 'offline', 'other_device'].includes(this.block); },
+      get locked() { return ['hour', 'chat', 'unavailable', 'offline', 'other_device', 'all_off', 'student_off'].includes(this.block); },
       // One line shown above the (disabled) message box.
       get blockNote() {
         return {
           hour: 'You’ve sent 20 messages in the last hour. You can send again at <strong class="font-medium text-gray-800 dark:text-neutral-200">4:37 PM</strong>.',
           unavailable: 'AI Chat is temporarily unavailable. Your chats are safe; try again in a few minutes.',
           offline: 'You’re offline. You can send once you’re back online.',
+          // Turned off while the student has it open (otherwise AI Chat is simply hidden): from AI Chat settings (everyone) or Members (this student)
+          all_off: 'AI Chat has been disabled. You can still read this chat.',
+          student_off: 'AI Chat has been disabled for your account. You can still read this chat.',
         }[this.block] || '';
       },
       get expanded() { return this.expandComposer || this.attachments.length > 0 || this.draft.includes('\n'); },
@@ -1623,6 +1626,8 @@
           case 'limit_day': this.block = 'day'; break;
           case 'unavailable': openSn(); this.block = 'unavailable'; break;
           case 'offline': openSn(); this.block = 'offline'; break;
+          case 'all_off': openSn(); this.block = 'all_off'; break;
+          case 'student_off': openSn(); this.block = 'student_off'; break;
           case 'other_device': openSn([q]); this.block = 'other_device'; break;
         }
         this.scrollDown();
@@ -1671,6 +1676,8 @@
           ['limit_day', 'Daily new-chat limit'],
           ['unavailable', 'AI temporarily unavailable'],
           ['offline', 'No internet'],
+          ['all_off', 'Disabled for everyone'],
+          ['student_off', 'Disabled for this student'],
           ['other_device', 'Reply on another device'],
         ] },
       ],
