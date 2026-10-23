@@ -1,0 +1,223 @@
+<script>
+  const AI_ADMIN_STUDENTS = [
+    { id: 3, name: 'Anita Sharma', email: 'anita@gmail.com', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', offOn: '18 Oct 2026', offBy: 'Priya Narayanan' },
+    { id: 5, name: 'Sanjay Verma', email: 'sanjay@gmail.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', offOn: '9 Oct 2026', offBy: 'Rahul Menon' },
+    { id: 8, name: 'Kavya Iyer', email: 'kavya.iyer@gmail.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', offOn: '2 Oct 2026', offBy: 'Priya Narayanan' },
+  ];
+
+  const AI_ADMIN_PROVIDERS = [
+    { id: 'openai', label: 'OpenAI', models: [{ id: 'gpt-4.1-mini', label: 'GPT-4.1 mini' }, { id: 'gpt-4.1', label: 'GPT-4.1' }, { id: 'gpt-4o-mini', label: 'GPT-4o mini' }] },
+    { id: 'gemini', label: 'Google Gemini', models: [{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' }, { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' }] },
+  ];
+
+  // Limit rows. A saved value of `null` = Unlimited (or the system default, for message length).
+  const AI_ADMIN_LIMITS = [
+    { key: 'perChat', label: 'Messages per chat', short: 'messages per chat', note: 'Then they start a new chat', unit: 'messages', unlimitedLabel: 'No limit', min: 1, max: 500,
+      help: 'Then the student starts a new chat.' },
+    { key: 'perHour', label: 'Messages per hour', short: 'messages an hour', note: 'Over the last 60 minutes', unit: 'messages', unlimitedLabel: 'No limit', min: 1, max: 500,
+      help: 'Over the last 60 minutes.' },
+    { key: 'perDay', label: 'New chats per day', short: 'new chats a day', note: 'Resets at midnight IST', unit: 'chats', unlimitedLabel: 'No limit', min: 1, max: 200,
+      help: 'Resets at midnight IST.' },
+    { key: 'maxChars', label: 'Message length', short: 'characters a message', note: 'Longer ones can’t be sent', unit: 'characters', unlimitedLabel: 'Default (4,000)', min: 100, max: 4000,
+      help: 'In characters. Default is 4,000.' },
+  ];
+
+  const AI_ADMIN_SAVED = { enabled: true, images: true, limits: { perChat: 20, perHour: 20, perDay: 10, maxChars: null } };
+  const AI_ADMIN_PROVIDER = { status: 'ready', name: 'openai', model: 'gpt-4.1-mini', checkedAt: '21 Oct 2026, 10:14 AM', failedAt: '22 Oct 2026, 9:40 AM' };
+  const aiCopy = (o) => JSON.parse(JSON.stringify(o));
+  // Saved limits → input values (empty = no limit, or the default for message length)
+  const aiDraft = (limits) => Object.fromEntries(Object.entries(limits).map(([k, v]) => [k, v === null ? '' : String(v)]));
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('aiChatAdmin', () => ({
+      loading: true,
+      readOnly: false,
+      provider: aiCopy(AI_ADMIN_PROVIDER),
+      saved: aiCopy(AI_ADMIN_SAVED),  // what's in effect
+      pending: null,                  // toggle being saved: 'enabled' | 'images'
+      editing: false,                 // limits
+      draft: aiDraft(AI_ADMIN_SAVED.limits),
+      errors: {},
+      saveState: 'idle',              // idle | saving | failed (limits)
+      fail: {},                       // prototype: { toggle, limits, provider, restore }
+      restricted: aiCopy(AI_ADMIN_STUDENTS),
+      search: '',
+      restoring: null,
+      pform: { name: 'openai', model: 'gpt-4.1-mini', key: '', showKey: false, checking: false, error: null },
+      providers: AI_ADMIN_PROVIDERS,
+      limitFields: AI_ADMIN_LIMITS,
+
+      init() {
+        setTimeout(() => { this.loading = false; }, 700);
+        this.syncShared();
+        window.addEventListener('ai-admin-state', (e) => this.applyState(e.detail));
+        window.addEventListener('beforeunload', (e) => { if (this.editing && this.limitsChanged) { e.preventDefault(); e.returnValue = ''; } });
+      },
+      // Members page reads this to explain that off-for-everyone wins (prototype only).
+      syncShared() { try { localStorage.setItem('ai_chat_admin_enabled', this.saved.enabled ? '1' : '0'); } catch (e) {} },
+
+      // ----- Toggles: saved on change -----
+      toggleSetting(key) {
+        const next = !this.saved[key];
+        if (key === 'enabled' && !next) { window.dispatchEvent(new CustomEvent('open-modal-ai-turn-off')); return; }
+        this.saveToggle(key, next);
+      },
+      saveToggle(key, value) {
+        this.pending = key;
+        setTimeout(() => {
+          this.pending = null;
+          if (this.fail.toggle) { this.fail.toggle = false; this.toast(key === 'enabled' ? 'Couldn’t ' + (value ? 'enable' : 'disable') + ' AI Chat' : 'Couldn’t change image uploads', 'Please try again.', 'error'); return; }
+          this.saved[key] = value;
+          this.syncShared();
+          const msg = {
+            enabled: value ? ['AI Chat enabled', 'Students can now use it.'] : ['AI Chat disabled', 'Students can no longer use it.'],
+            images: value ? ['Image uploads enabled', 'Students can upload images with their questions.'] : ['Image uploads disabled', 'Students can only send text.'],
+          }[key];
+          this.toast(msg[0], msg[1]);
+        }, 800);
+      },
+
+      // ----- Limits: edit, then save together -----
+      startEdit() {
+        this.draft = aiDraft(this.saved.limits);
+        this.errors = {};
+        this.saveState = 'idle';
+        this.editing = true;
+        window.dispatchEvent(new CustomEvent('open-modal-ai-limits'));
+      },
+      cancelEdit() { this.editing = false; this.errors = {}; this.saveState = 'idle'; window.dispatchEvent(new CustomEvent('close-modal-ai-limits')); },
+      get hasNoLimit() { return ['perChat', 'perHour', 'perDay'].some((k) => this.saved.limits[k] === null); },
+      draftValue(key) { const v = String(this.draft[key]).trim(); return v === '' ? null : Number(v); },
+      get limitsChanged() { return this.limitFields.some((l) => this.draftValue(l.key) !== this.saved.limits[l.key]); },
+      validate() {
+        this.errors = {};
+        for (const l of this.limitFields) {
+          const n = this.draftValue(l.key);
+          if (n !== null && (!Number.isInteger(n) || n < l.min || n > l.max)) this.errors[l.key] = 'Enter ' + l.min.toLocaleString('en-IN') + ' to ' + l.max.toLocaleString('en-IN') + '.';
+        }
+        const first = this.limitFields.find((l) => this.errors[l.key]);
+        if (first) this.$nextTick(() => document.getElementById('ai-limit-' + first.key).focus());
+        return !first;
+      },
+      saveLimits() {
+        if (!this.validate()) return;
+        if (!this.limitsChanged) { this.cancelEdit(); return; }
+        this.saveState = 'saving';
+        setTimeout(() => {
+          if (this.fail.limits) { this.fail.limits = false; this.saveState = 'failed'; return; }
+          this.saved.limits = Object.fromEntries(this.limitFields.map((l) => [l.key, this.draftValue(l.key)]));
+          this.cancelEdit();
+          this.toast('Usage limits saved', '');
+        }, 1000);
+      },
+
+      // ----- Provider -----
+      get canEnable() { return this.provider.status === 'ready'; },
+      providerName(id) { return (this.providers.find((p) => p.id === id) || {}).label || ''; },
+      modelName(id) { for (const p of this.providers) { const m = p.models.find((x) => x.id === id); if (m) return m.label; } return id; },
+      get currentProvider() { return this.providers.find((p) => p.id === this.pform.name); },
+      // The saved key is only kept when it works and the provider isn't changing.
+      get keyKept() { return this.provider.status === 'ready' && this.pform.name === this.provider.name; },
+      openProvider(pick) {
+        const has = this.provider.status !== 'missing';
+        this.pform = { name: pick || (has ? this.provider.name : 'openai'), model: has && !pick ? this.provider.model : (pick === 'gemini' ? 'gemini-2.5-flash' : 'gpt-4.1-mini'), key: '', showKey: false, checking: false, error: null };
+        window.dispatchEvent(new CustomEvent('open-modal-ai-provider'));
+      },
+      saveProvider() {
+        if (!this.keyKept && !this.pform.key.trim()) { this.pform.error = 'key'; document.getElementById('ai-key').focus(); return; }
+        this.pform.error = null;
+        this.pform.checking = true;
+        setTimeout(() => {
+          this.pform.checking = false;
+          const fail = this.fail.provider || (this.pform.key.trim().toLowerCase().startsWith('bad') ? 'invalid' : null);
+          this.fail.provider = null;
+          if (fail) { this.pform.error = fail; return; }
+          const firstTime = this.provider.status === 'missing';
+          this.provider = { ...this.provider, status: 'ready', name: this.pform.name, model: this.pform.model, checkedAt: 'just now' };
+          window.dispatchEvent(new CustomEvent('close-modal-ai-provider'));
+          this.toast(this.providerName(this.pform.name) + ' connected', firstTime ? 'Check the limits, then enable AI Chat.' : 'New replies use ' + this.modelName(this.pform.model) + '.');
+        }, 1400);
+      },
+
+      // ----- Students turned off -----
+      openStudents() { this.search = ''; window.dispatchEvent(new CustomEvent('open-drawer-ai-students')); },
+      get filteredRestricted() {
+        const q = this.search.trim().toLowerCase();
+        return q ? this.restricted.filter((s) => (s.name + ' ' + s.email).toLowerCase().includes(q)) : this.restricted;
+      },
+      restore(s) {
+        this.restoring = s.id;
+        setTimeout(() => {
+          this.restoring = null;
+          if (this.fail.restore) { this.fail.restore = false; this.toast('Couldn’t enable AI Chat for ' + s.name, 'Please try again.', 'error'); return; }
+          this.restricted = this.restricted.filter((x) => x.id !== s.id);
+          this.toast('AI Chat enabled for ' + s.name,
+            this.saved.enabled ? 'They can use AI Chat again.' : 'They can use it once you enable AI Chat.');
+        }, 900);
+      },
+
+      // Status card: what students get right now
+      get live() { return this.saved.enabled && this.provider.status === 'ready'; },
+      get statusTone() {
+        if (this.saved.enabled && this.provider.status !== 'ready') return { title: 'AI Chat needs attention', text: 'Students can’t get answers right now', dot: 'bg-amber-500' };
+        if (this.saved.enabled) return { title: 'AI Chat is enabled', text: 'Students can use it', dot: 'bg-green-500' };
+        return { title: 'AI Chat is disabled', text: 'Students can’t use it', dot: 'bg-gray-300' };
+      },
+
+      toast(title, description, variant = 'success') {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { variant, title, description, position: 'bottom-right' } }));
+      },
+
+      // Prototype only
+      applyState(id) {
+        Object.assign(this, {
+          loading: false, readOnly: false, provider: aiCopy(AI_ADMIN_PROVIDER), saved: aiCopy(AI_ADMIN_SAVED),
+          pending: null, editing: false, saveState: 'idle', fail: {}, restricted: aiCopy(AI_ADMIN_STUDENTS), search: '', restoring: null,
+        });
+        ['ai-provider', 'ai-turn-off', 'ai-limits'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
+        ['ai-students'].forEach((d) => window.dispatchEvent(new CustomEvent('close-drawer-' + d)));
+        const unlimited = { perChat: null, perHour: null, perDay: null, maxChars: null };
+        switch (id) {
+          case 'loading': this.loading = true; break;
+          case 'first_time': this.provider.status = 'missing'; this.restricted = []; this.saved = { enabled: false, images: false, limits: unlimited }; break;
+          case 'provider_setup': this.provider.status = 'missing'; this.restricted = []; this.saved = { enabled: false, images: false, limits: unlimited }; this.$nextTick(() => this.openProvider('openai')); break;
+          case 'just_connected': this.saved = { enabled: false, images: false, limits: unlimited }; this.restricted = []; break;
+          case 'off': this.saved.enabled = false; break;
+          case 'key_invalid': this.provider.status = 'invalid'; break;
+          case 'provider_invalid_key': this.$nextTick(() => { this.openProvider(); this.pform.key = 'sk-proj-8f2k…'; this.pform.error = 'invalid'; }); break;
+          case 'provider_unavailable': this.$nextTick(() => { this.openProvider(); this.pform.error = 'unavailable'; }); break;
+          case 'turn_off_confirm': this.$nextTick(() => window.dispatchEvent(new CustomEvent('open-modal-ai-turn-off'))); break;
+          case 'toggle_fails': this.fail.toggle = true; break;
+          case 'editing': this.startEdit(); this.draft.perHour = '30'; this.draft.perDay = ''; break;
+          case 'invalid': this.startEdit(); this.draft.perChat = '2.5'; this.draft.perDay = '0'; this.$nextTick(() => this.validate()); break;
+          case 'saving': this.startEdit(); this.draft.perHour = '30'; this.saveState = 'saving'; break;
+          case 'save_failed': this.startEdit(); this.draft.perHour = '30'; this.saveState = 'failed'; break;
+          case 'fail_next_save': this.fail.limits = true; this.startEdit(); this.draft.perHour = '30'; break;
+          case 'students': this.$nextTick(() => this.openStudents()); break;
+          case 'students_off': this.saved.enabled = false; this.$nextTick(() => this.openStudents()); break;
+          case 'students_none': this.restricted = []; break;
+          case 'restore_fails': this.fail.restore = true; this.$nextTick(() => this.openStudents()); break;
+          case 'read_only': this.readOnly = true; break;
+        }
+        this.syncShared();
+      },
+    }));
+
+    Alpine.data('aiAdminPrototype', () => ({
+      open: false,
+      state: 'normal',
+      groups: [
+        { name: 'Page', states: [['normal', 'On, provider ready'], ['loading', 'Loading'], ['read_only', 'View only (no permission)']] },
+        { name: 'Setup and on/off', states: [['first_time', 'First time: not set up'], ['provider_setup', 'Connecting provider'], ['just_connected', 'Connected, still disabled'], ['off', 'Disabled'], ['turn_off_confirm', 'Disabling: confirm'], ['toggle_fails', 'Next switch fails']] },
+        { name: 'AI provider', states: [['key_invalid', 'Saved key stopped working'], ['provider_invalid_key', 'Key rejected on save'], ['provider_unavailable', 'Service unreachable']] },
+        { name: 'Usage limits', states: [['editing', 'Editing'], ['invalid', 'Field errors'], ['saving', 'Saving'], ['save_failed', 'Save failed'], ['fail_next_save', 'Next save fails']] },
+        { name: 'Students without access', states: [['students', 'Manage list'], ['students_off', 'List while disabled for all'], ['students_none', 'Everyone has access'], ['restore_fails', 'Enabling fails']] },
+      ],
+      pick(id) {
+        this.state = id;
+        this.open = false;
+        window.dispatchEvent(new CustomEvent('ai-admin-state', { detail: id }));
+      },
+    }));
+  });
+</script>

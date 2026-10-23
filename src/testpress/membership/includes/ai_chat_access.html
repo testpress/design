@@ -1,0 +1,97 @@
+{#
+  Remove (or give back) one student's AI Chat access, from the row ⋮ menu.
+  They can't use AI Chat; their chat history, account and courses stay as they are.
+  AI Chat being disabled for everyone (AI Chat settings) always wins over this.
+#}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/alert.html" import alert %}
+
+{% call modal(id="ai-chat-access", title="AI Chat access", size="sm", confirm_text="", cancel_text="") %}
+  <template x-if="$store.aiChatAccess.target">
+    <div>
+      <!-- Who this is for -->
+      <div class="flex items-center gap-x-3">
+        <img :src="$store.aiChatAccess.target.avatar" alt="" class="shrink-0 size-10 rounded-full object-cover">
+        <div class="min-w-0">
+          <p class="font-medium text-gray-800 truncate dark:text-neutral-200" x-text="$store.aiChatAccess.target.name"></p>
+          <p class="text-xs text-gray-500 truncate dark:text-neutral-400" x-text="$store.aiChatAccess.target.email"></p>
+        </div>
+      </div>
+
+
+      <!-- Removing access -->
+      <template x-if="!$store.aiChatAccess.wasOff">
+        <p class="mt-4">
+          <span x-text="$store.aiChatAccess.target.name"></span> won’t be able to use AI Chat.
+        </p>
+      </template>
+
+      <!-- Giving access back -->
+      <template x-if="$store.aiChatAccess.wasOff">
+        <div class="mt-4 space-y-3">
+          <p x-show="$store.aiChatAccess.instituteOn"><span x-text="$store.aiChatAccess.target.name"></span> will be able to use AI Chat again.</p>
+          <div x-show="!$store.aiChatAccess.instituteOn">
+            {{ alert(variant="warning", style="soft", size="sm", description="AI Chat is disabled for all students, so this student can use it only after you enable it in AI Chat settings.") }}
+          </div>
+        </div>
+      </template>
+
+      <!-- Save failed -->
+      <div x-show="$store.aiChatAccess.failed" class="mt-4">
+        {{ alert(variant="danger", style="soft", size="sm", description="Couldn’t save. Please try again.") }}
+      </div>
+
+      <div class="mt-6 flex justify-end gap-x-2">
+        <button type="button" @click="open = false" :disabled="$store.aiChatAccess.saving"
+                class="py-2 px-3 inline-flex items-center text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">Cancel</button>
+        <button type="button" @click="$store.aiChatAccess.confirm()" :disabled="$store.aiChatAccess.saving"
+                class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent text-white focus:outline-none disabled:opacity-70 disabled:pointer-events-none"
+                :class="$store.aiChatAccess.wasOff ? 'bg-primary-600 hover:bg-primary-700 focus:bg-primary-700' : 'bg-red-600 hover:bg-red-700 focus:bg-red-700'">
+          <span x-show="$store.aiChatAccess.saving" class="animate-spin inline-block size-3.5 border-2 border-current border-t-transparent rounded-full" aria-hidden="true"></span>
+          <span x-text="$store.aiChatAccess.saving ? 'Saving…' : $store.aiChatAccess.failed ? 'Try again' : $store.aiChatAccess.wasOff ? 'Enable AI Chat' : 'Disable AI Chat'"></span>
+        </button>
+      </div>
+    </div>
+  </template>
+{% endcall %}
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    let instituteOn = true;
+    try { instituteOn = localStorage.getItem('ai_chat_admin_enabled') !== '0'; } catch (e) {}
+
+    Alpine.store('aiChatAccess', {
+      off: { 3: true, 5: true },  // same students as the list on the AI Chat settings page
+      instituteOn,
+      target: null,
+      wasOff: false,
+      saving: false,
+      failed: false,
+      failNext: false,             // prototype
+      isOff(id) { return !!this.off[id]; },
+      ask(student) {
+        this.target = student;
+        this.wasOff = this.isOff(student.id);
+        this.saving = this.failed = false;
+        window.dispatchEvent(new CustomEvent('open-modal-ai-chat-access'));
+      },
+      confirm() {
+        this.saving = true;
+        this.failed = false;
+        setTimeout(() => {
+          this.saving = false;
+          if (this.failNext) { this.failNext = false; this.failed = true; return; }
+          const { id, name } = this.target;
+          if (this.wasOff) delete this.off[id]; else this.off[id] = true;
+          this.off = { ...this.off };
+          window.dispatchEvent(new CustomEvent('close-modal-ai-chat-access'));
+          window.dispatchEvent(new CustomEvent('toast', { detail: {
+            variant: 'success',
+            title: this.wasOff ? 'AI Chat enabled for ' + name : 'AI Chat disabled for ' + name,
+            description: this.wasOff && !this.instituteOn ? 'They can use it once AI Chat is enabled.' : '',
+          } }));
+        }, 900);
+      },
+    });
+  });
+</script>

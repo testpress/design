@@ -1,0 +1,134 @@
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "./logos.html" import openai_logo, gemini_logo %}
+{% from "../../../ui-system/components/alert.html" import alert %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% set btn_secondary = "py-2 px-3 inline-flex items-center justify-center text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700" %}
+
+<!-- Disabling AI Chat for everyone is confirmed first -->
+{% call modal(id="ai-turn-off", title="Disable AI Chat?", size="sm", confirm_text="", cancel_text="") %}
+  <p>Students won’t be able to use AI Chat until you enable it again.</p>
+  <div class="mt-6 flex justify-end gap-x-2">
+    <button type="button" class="{{ btn_secondary }}" @click="open = false">Cancel</button>
+    <button type="button" @click="open = false; saveToggle('enabled', false)" class="py-2 px-3 inline-flex items-center text-sm font-medium rounded-lg bg-red-600 border border-transparent text-white hover:bg-red-700 focus:outline-none focus:bg-red-700">Disable</button>
+  </div>
+{% endcall %}
+
+<!-- AI provider: the key goes to LearnLens and is never shown again -->
+{% call modal(id="ai-provider", title="Connect AI provider", size="md", confirm_text="", cancel_text="") %}
+  <form @submit.prevent="saveProvider()" class="flex flex-col gap-y-5" novalidate>
+    <!-- Couldn't reach LearnLens (ui-system alert) -->
+    <div x-show="pform.error === 'unavailable'">
+      {{ alert(variant="neutral", style="soft", size="sm", icon="triangle-alert", title="Couldn’t reach the AI service", description="Please try again in a few minutes.") }}
+    </div>
+
+    <!-- Provider -->
+    <fieldset>
+      <legend class="mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Provider</legend>
+      <div class="grid grid-cols-2 gap-2">
+        <template x-for="p in providers" :key="p.id">
+          <label class="relative flex items-center gap-x-3 py-3 px-3.5 rounded-xl border cursor-pointer text-sm transition"
+                 :class="pform.name === p.id ? 'border-primary-600 ring-1 ring-primary-600 bg-primary-50/40' : 'border-gray-200 hover:border-gray-300'">
+            <input type="radio" name="ai-provider" class="sr-only" :value="p.id" x-model="pform.name" @change="pform.model = p.models[0].id; pform.error = null" :disabled="pform.checking">
+            <span class="shrink-0 inline-flex justify-center items-center size-8 rounded-lg bg-white shadow-sm ring-1 ring-gray-100">
+              <span x-show="p.id === 'openai'" class="contents text-gray-900">{{ openai_logo("size-5") }}</span>
+              <span x-show="p.id === 'gemini'" class="contents text-gray-900">{{ gemini_logo("size-5") }}</span>
+            </span>
+            <span class="font-medium text-gray-800" x-text="p.label"></span>
+            <svg x-show="pform.name === p.id" class="ms-auto size-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </label>
+        </template>
+      </div>
+    </fieldset>
+
+    <!-- Model -->
+    <div>
+      <label for="ai-model" @click.prevent="document.getElementById('ai-model').focus()" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Model</label>
+      <!-- Dropdown (ui-system dropdown styling), not the browser's select -->
+      <div class="relative" x-data="{ menu: false }" @click.outside="menu = false" @keydown.escape.stop="menu = false">
+        <button type="button" id="ai-model" @click="menu = !menu" :disabled="pform.checking" aria-haspopup="listbox" :aria-expanded="menu"
+                class="py-2 ps-3 pe-9 relative w-full flex items-center bg-white border border-gray-200 rounded-lg text-sm text-start text-gray-800 focus:outline-none focus:border-primary-700 focus:ring-1 focus:ring-primary-700 disabled:opacity-50 disabled:pointer-events-none">
+          <span x-text="modelName(pform.model)"></span>
+          <svg class="absolute end-3 size-4 text-gray-500 transition-transform" :class="menu && 'rotate-180'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div x-show="menu" x-transition.opacity x-cloak role="listbox" aria-labelledby="ai-model"
+             class="absolute z-20 mt-1 w-full p-1 bg-white border border-gray-200 rounded-xl shadow-lg space-y-0.5">
+          <template x-for="m in currentProvider.models" :key="m.id">
+            <button type="button" role="option" :aria-selected="m.id === pform.model" @click="pform.model = m.id; menu = false"
+                    class="w-full py-2 px-3 flex items-center justify-between gap-x-3 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100">
+              <span x-text="m.label"></span>
+              <svg x-show="m.id === pform.model" class="size-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+          </template>
+        </div>
+      </div>
+      <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Choose a model that supports images if image uploads are enabled.</p>
+    </div>
+
+    <!-- API key -->
+    <div>
+      <label for="ai-key" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">API key</label>
+      <div class="relative">
+        <input id="ai-key" :type="pform.showKey ? 'text' : 'password'" x-model="pform.key" @input="if (pform.error === 'key' || pform.error === 'invalid') pform.error = null" :disabled="pform.checking"
+               autocomplete="off" spellcheck="false" :placeholder="keyKept ? 'Saved key is kept' : 'Paste the key'"
+               :aria-invalid="['key', 'invalid'].includes(pform.error)" aria-describedby="ai-key-msg"
+               class="py-2 ps-3 pe-10 block w-full bg-white border rounded-lg sm:text-sm font-mono text-gray-800 placeholder:font-sans placeholder:text-gray-400 disabled:opacity-50 dark:bg-neutral-800 dark:text-white"
+               :class="['key', 'invalid'].includes(pform.error) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-primary-700 focus:ring-primary-700 dark:border-neutral-700'">
+        <button type="button" @click="pform.showKey = !pform.showKey" :aria-label="pform.showKey ? 'Hide key' : 'Show key'"
+                class="absolute inset-y-0 end-0 flex items-center px-3 text-gray-400 hover:text-gray-600 focus:outline-none focus:text-primary-600 dark:text-neutral-500">
+          <svg x-show="!pform.showKey" class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg x-show="pform.showKey" class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/></svg>
+        </button>
+      </div>
+      <p id="ai-key-msg" class="mt-1.5 text-xs" :class="['key', 'invalid'].includes(pform.error) ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-neutral-400'"
+         x-text="pform.error === 'key' ? 'Paste your ' + currentProvider.label + ' API key.'
+               : pform.error === 'invalid' ? currentProvider.label + ' didn’t accept this key.'
+               : keyKept ? 'The saved key isn’t shown. Paste a new one only to replace it.'
+               : 'Stored securely. It won’t be shown again after you save.'"></p>
+    </div>
+
+    <div class="pt-1 flex justify-end gap-x-2">
+      <button type="button" class="{{ btn_secondary }}" @click="open = false" :disabled="pform.checking">Cancel</button>
+      <button type="submit" :disabled="pform.checking"
+              class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:outline-none focus:bg-primary-700 disabled:opacity-70 disabled:pointer-events-none">
+        <span x-show="pform.checking" class="animate-spin inline-block size-3.5 border-2 border-current border-t-transparent rounded-full" aria-hidden="true"></span>
+        <span x-text="pform.checking ? 'Checking key…' : 'Check and save'"></span>
+      </button>
+    </div>
+  </form>
+{% endcall %}
+
+<!-- Edit usage limits: students keep the saved limits until Save -->
+{% call modal(id="ai-limits", title="Usage limits", size="md", confirm_text="", cancel_text="") %}
+  <div>
+    <!-- ui-system inputs; errors from validate() show in place of the help text -->
+    {% set limit_rows = [
+      { key: "perChat", label: "Messages per chat", help: "Then the student starts a new chat. Leave empty for no limit.", placeholder: "No limit", max: 500 },
+      { key: "perHour", label: "Messages per hour", help: "Counted over the last 60 minutes. Leave empty for no limit.", placeholder: "No limit", max: 500 },
+      { key: "perDay", label: "New chats per day", help: "Resets at midnight IST. Leave empty for no limit.", placeholder: "No limit", max: 200 },
+      { key: "maxChars", label: "Message length", help: "In characters. Default is 4,000.", placeholder: "4,000", max: 4000 }
+    ] %}
+    <div class="space-y-5">
+      {% for r in limit_rows %}
+        {{ input(
+          name="ai-limit-" ~ r.key, id="ai-limit-" ~ r.key, label=r.label, type="number",
+          placeholder=r.placeholder, help_text=r.help,
+          x_model="draft." ~ r.key, x_error="errors." ~ r.key,
+          extra_attrs='inputmode="numeric" step="1" min="1" max="' ~ r.max ~ '" :disabled="saveState === \'saving\'" @input="delete errors.' ~ r.key ~ '"'
+        ) }}
+      {% endfor %}
+    </div>
+  </div>
+  <div class="mt-6 flex flex-col gap-y-3">
+    <div x-show="saveState === 'failed'">
+      {{ alert(variant="danger", style="soft", size="sm", description="Couldn’t save the limits. Try again.") }}
+    </div>
+    <div class="flex justify-end gap-x-2">
+      <button type="button" @click="cancelEdit()" :disabled="saveState === 'saving'" class="{{ btn_secondary }}">Cancel</button>
+      <button type="button" @click="saveLimits()" :disabled="saveState === 'saving'"
+              class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg bg-primary-600 border border-transparent text-white hover:bg-primary-700 focus:outline-none focus:bg-primary-700 disabled:opacity-70 disabled:pointer-events-none">
+        <span x-show="saveState === 'saving'" class="animate-spin size-3.5 border-2 border-current border-t-transparent rounded-full" aria-hidden="true"></span>
+        <span x-text="saveState === 'saving' ? 'Saving…' : 'Save limits'"></span>
+      </button>
+    </div>
+  </div>
+{% endcall %}
