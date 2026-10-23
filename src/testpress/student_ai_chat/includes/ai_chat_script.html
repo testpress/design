@@ -195,9 +195,14 @@
       expandComposer: false,   // set once the text wraps; cleared when the box is empty
       status: 'idle',          // idle | thinking | streaming
       block: null,             // null | hour | chat | day | unavailable | offline | other_device
-      loading: false,
+      loading: true,           // chat list; also shown before the page's scripts load
       sidebarOpen: false,      // mobile drawer
-      collapsed: false,        // desktop: sidebar minified to icons
+      collapsed: document.documentElement.dataset.aiSidebar === 'collapsed', // desktop: minified to icons (saved)
+      sidebarWidth: 260,       // desktop: dragged by the sidebar's edge
+      sidebarDefault: 260,
+      sidebarMin: 220,
+      sidebarMax: 420,
+      resizing: false,
       menuFor: null,           // chat id whose "more" menu is open
       plusOpen: false,
       renamingId: null,
@@ -217,6 +222,13 @@
         // The app header (which normally applies the saved theme) isn't on this page, so apply it here.
         const theme = localStorage.getItem('hs_theme') || 'default';
         document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'default' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+        try { const w = parseInt(localStorage.getItem('ai_chat_sidebar_w'), 10); if (w) this.setSidebarWidth(w); } catch (e) {}
+        // The collapsed look is plain CSS on <html data-ai-sidebar>, so it's right before Alpine loads; keep it in step.
+        this.$watch('collapsed', (v) => {
+          document.documentElement.dataset.aiSidebar = v ? 'collapsed' : '';
+          try { localStorage.setItem('ai_chat_sidebar_collapsed', v ? '1' : ''); } catch (e) {}
+        });
+        this.loading = false;
         // Ready to type on load (desktop only: on phones this would pop the keyboard unasked).
         if (!this.isTouch) this.focusInput();
       },
@@ -256,6 +268,35 @@
           : { show: true, text, place, x: r.left + r.width / 2, y: r.bottom + 6 };
       },
       hideTip() { this.tip.show = false; },
+
+      // ----- Sidebar width (desktop) -----
+      setSidebarWidth(w) {
+        this.sidebarWidth = Math.round(Math.min(this.sidebarMax, Math.max(this.sidebarMin, w)));
+        document.documentElement.style.setProperty('--ai-sidebar-w', this.sidebarWidth + 'px');
+        try { localStorage.setItem('ai_chat_sidebar_w', this.sidebarWidth); } catch (e) {}
+      },
+      startResize(e) {
+        const startX = e.clientX, startW = this.sidebarWidth;
+        this.resizing = true;
+        this.hideTip();
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        // Dragged well past the narrowest width, the sidebar collapses (like ChatGPT); drag back out to reopen it.
+        const move = (ev) => {
+          const w = startW + ev.clientX - startX;
+          this.collapsed = w < this.sidebarMin - 60;
+          this.setSidebarWidth(this.collapsed ? startW : w);
+        };
+        const up = () => {
+          this.resizing = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      },
 
       // ----- Chats -----
       openChat(id) {

@@ -22,32 +22,31 @@
 
 
   <!-- Drawer backdrop (mobile) -->
-  <div x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false"
+  <div x-show="sidebarOpen" x-cloak x-transition.opacity @click="sidebarOpen = false"
        class="md:hidden fixed inset-0 z-[65] bg-gray-900/50 dark:bg-neutral-900/80" aria-hidden="true"></div>
 
   <!-- ========== CHATS SIDEBAR ========== -->
   <aside id="ai-chat-sidebar"
-         class="fixed inset-y-0 start-0 z-[70] w-[16.25rem] flex flex-col overflow-hidden bg-white border-e border-gray-200 transition-all duration-300 md:static md:z-auto md:translate-x-0 dark:bg-neutral-900 dark:border-neutral-700"
-         :class="[sidebarOpen ? 'translate-x-0' : '-translate-x-full', collapsed ? 'md:w-[3.25rem]' : 'md:w-[16.25rem]']"
+         class="ai-sb fixed inset-y-0 start-0 z-[70] w-[16.25rem] -translate-x-full flex flex-col overflow-hidden bg-white border-e border-gray-200 md:static md:z-auto md:translate-x-0 md:w-[var(--ai-sidebar-w,16.25rem)] dark:bg-neutral-900 dark:border-neutral-700"
+         :class="[sidebarOpen && '!translate-x-0', (!resizing || collapsed) && 'transition-all duration-300']"
          aria-label="Chats">
 
     <!-- Header -->
     <!-- Same 56px height as the chat header, so "Chats"/"AI Chat" and the chat title line up -->
-    <header class="shrink-0 h-14 px-4 flex items-center gap-x-1" :class="collapsed && 'md:h-auto md:py-2.5 md:flex-col md:gap-y-1 md:px-2'">
+    <header class="ai-sb-header shrink-0 h-14 px-4 flex items-center gap-x-1">
       <!-- Back to the app (full-screen layout) -->
       <a {{ back_attrs | safe }}
          @mouseenter="showTip($el, 'Back', 'right')" @mouseleave="hideTip()" aria-label="Back"
-         class="-ms-2 md:-ms-1.5 flex justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"
-         :class="collapsed && 'md:ms-0'">
+         class="ai-sb-back hidden md:flex md:-ms-1.5 justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
         {{ icon_back | safe }}
       </a>
-      <span class="flex-1 min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-white" :class="collapsed && 'md:hidden'">AI Chat</span>
+      <span class="ai-sb-label flex-1 min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-white">AI Chat</span>
       <!-- Minify toggle (desktop) -->
       <button type="button" @click="collapsed = !collapsed; menuFor = null; hideTip()" :aria-expanded="!collapsed" aria-controls="ai-chat-sidebar"
               @mouseenter="showTip($el, collapsed ? 'Expand sidebar' : 'Collapse sidebar', 'right')" @mouseleave="hideTip()"
               class="hidden md:flex justify-center items-center flex-none size-9 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-        <svg x-show="collapsed" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>
-        <svg x-show="!collapsed" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m10 15-3-3 3-3"/></svg>
+        <svg class="ai-sb-if-collapsed shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>
+        <svg class="ai-sb-if-expanded shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m10 15-3-3 3-3"/></svg>
         <span class="sr-only" x-text="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"></span>
       </button>
       <!-- Close (mobile) -->
@@ -65,31 +64,28 @@
               class="group relative w-full flex items-center gap-1 py-1.5 px-2.5 text-sm rounded-lg before:absolute before:inset-y-0 before:-start-2 before:rounded-e-full before:w-1 before:h-full focus:outline-none"
               :class="!active ? 'bg-gray-100 before:bg-primary-600 text-primary-700 dark:bg-neutral-800 dark:text-primary-400' : 'text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800'">
         <span class="-ms-[5px] flex shrink-0 justify-center items-center size-6">
-          <svg class="shrink-0 size-4 group-hover:scale-110 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          {{ icon_new | safe }}
         </span>
-        <span class="truncate transition-opacity duration-300" :class="collapsed && 'md:opacity-0'">New chat</span>
+        <span class="ai-sb-fade truncate transition-opacity duration-300">New chat</span>
       </button>
     </div>
 
     <!-- Recent chats -->
-    <div class="relative pb-4 px-2 flex-1 min-h-0 flex flex-col gap-y-5 overflow-y-auto transition-opacity duration-300 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600"
-         :class="collapsed && 'md:opacity-0 md:pointer-events-none'">
-      <!-- Loading -->
-      <template x-if="loading">
-        <div class="animate-pulse space-y-6 ps-2.5 pe-2" aria-label="Loading chats">
-          <template x-for="g in [3, 4]">
-            <div class="space-y-3.5">
-              <div class="h-3 w-20 rounded-full bg-gray-200 dark:bg-neutral-700"></div>
-              <template x-for="n in g">
-                <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" :style="`width: ${55 + (n * 13) % 40}%`"></div>
-              </template>
-            </div>
-          </template>
-        </div>
-      </template>
+    <div class="ai-sb-fade relative pb-4 px-2 flex-1 min-h-0 flex flex-col gap-y-5 overflow-y-auto transition-opacity duration-300 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600">
+      <!-- Loading. Plain markup (not x-if), so it also shows while the page's scripts are still loading. -->
+      <div x-show="loading" class="animate-pulse space-y-6 ps-2.5 pe-2" aria-label="Loading chats">
+        {% for g in [3, 4] %}
+          <div class="space-y-3.5">
+            <div class="h-3 w-20 rounded-full bg-gray-200 dark:bg-neutral-700"></div>
+            {% for n in range(1, g + 1) %}
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: {{ 55 + (n * 13) % 40 }}%"></div>
+            {% endfor %}
+          </div>
+        {% endfor %}
+      </div>
 
       <!-- Empty -->
-      <p x-show="!loading && !chats.length" class="ps-2.5 text-sm text-gray-500 dark:text-neutral-400">Your chats will appear here.</p>
+      <p x-show="!loading && !chats.length" x-cloak class="ps-2.5 text-sm text-gray-500 dark:text-neutral-400">Your chats will appear here.</p>
 
       <!-- Groups -->
       <template x-for="g in loading ? [] : groups" :key="g.name">
@@ -114,16 +110,16 @@
                     <button type="button" @click="if (!pressedOpen) openChat(c.id); pressedOpen = false"
                             @touchstart.passive="pressStart(c)" @touchend="pressEnd()" @touchmove.passive="pressEnd()" @contextmenu="if (isTouch) $event.preventDefault()"
                             :aria-current="c.id === activeId ? 'page' : null"
-                            class="w-full flex items-center py-2 ps-2.5 text-sm text-start rounded-lg select-none [-webkit-touch-callout:none] focus:outline-none"
-                            :class="[(c.id === activeId || menuFor === c.id) ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800',
-                                     menuFor === c.id ? 'pe-8' : 'pe-2.5 md:group-hover:pe-8 md:group-focus-within:pe-8']">
+                            class="w-full flex items-center py-2 ps-2.5 text-sm text-start rounded-lg select-none transition-colors duration-150 [-webkit-touch-callout:none] focus:outline-none"
+                            :class="[(c.id === activeId || menuFor === c.id) ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-800 md:group-hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 md:dark:group-hover:bg-neutral-800 dark:focus:bg-neutral-800',
+                                     menuFor === c.id ? 'pe-2.5 md:pe-8' : 'pe-2.5 md:group-hover:pe-8 md:group-focus-within:pe-8']">
                       <span class="truncate" x-text="c.shown !== undefined ? c.shown : c.title"></span>
                     </button>
                     <!-- More: on hover (desktop) -->
                     <div class="absolute top-1/2 end-0 -translate-y-1/2 transition-opacity duration-200"
                          :class="menuFor === c.id ? 'opacity-100' : 'opacity-0 pointer-events-none md:pointer-events-auto md:group-hover:opacity-100 md:focus-within:opacity-100'">
                       <button type="button" @click="menuFor = menuFor === c.id ? null : c.id" :aria-expanded="menuFor === c.id" aria-haspopup="menu"
-                              class="flex justify-center items-center size-8 text-gray-800 rounded-lg hover:bg-gray-200/70 focus:outline-none focus:bg-gray-200/70 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                              class="invisible md:visible flex justify-center items-center size-8 text-gray-800 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-neutral-200">
                         {{ icon_more | safe }}
                         <span class="sr-only" x-text="'Options for ' + c.title"></span>
                       </button>
@@ -144,6 +140,17 @@
       </template>
     </div>
   </aside>
+  <!-- Resize handle (desktop): drag the sidebar's edge; drag it far left to collapse, double-click to reset -->
+  <div class="ai-sb-resize hidden md:block relative z-20 w-0">
+    <div role="separator" aria-orientation="vertical" aria-controls="ai-chat-sidebar" aria-label="Resize sidebar" tabindex="0"
+         :aria-valuenow="sidebarWidth" :aria-valuemin="sidebarMin" :aria-valuemax="sidebarMax"
+         @pointerdown.prevent="startResize($event)" @dblclick="setSidebarWidth(sidebarDefault)"
+         @keydown.left.prevent="setSidebarWidth(sidebarWidth - 16)" @keydown.right.prevent="setSidebarWidth(sidebarWidth + 16)"
+         class="group/resize absolute inset-y-0 -start-1.5 w-3 flex justify-center cursor-col-resize touch-none focus:outline-none">
+      <span class="w-0.5 h-full transition-colors duration-150 group-hover/resize:bg-gray-300 group-focus-visible/resize:bg-gray-300 dark:group-hover/resize:bg-neutral-600 dark:group-focus-visible/resize:bg-neutral-600"
+            :class="resizing && '!bg-gray-300 dark:!bg-neutral-600'"></span>
+    </div>
+  </div>
   <!-- ========== END CHATS SIDEBAR ========== -->
 
   <!-- ========== MAIN ========== -->
@@ -151,19 +158,15 @@
 
     <!-- Header -->
     <header class="shrink-0 h-14 px-4 sm:px-5 flex items-center gap-x-1.5">
-      <!-- Back to the app (mobile) -->
-      <a {{ back_attrs | safe }} aria-label="Back"
-         class="md:hidden -ms-2 flex justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
-        {{ icon_back | safe }}
-      </a>
+      <!-- Chats (mobile). No Back here: phones have their own. -->
       <button type="button" @click="sidebarOpen = true" aria-controls="ai-chat-sidebar" :aria-expanded="sidebarOpen"
-              class="md:hidden flex justify-center items-center flex-none size-9 text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800">
-        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+              class="md:hidden -ms-2 flex justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+        <svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
         <span class="sr-only">Show chats</span>
       </button>
-      <!-- Chat title. On a new chat it's blank on desktop (the sidebar already says "AI Chat") and "AI Chat" on phones, where the sidebar is hidden. -->
+      <!-- Chat title: phones only, where the sidebar is hidden. On desktop the sidebar already shows it (kept for screen readers). -->
       <h1 class="flex-1 min-w-0 truncate font-medium text-gray-800 dark:text-neutral-200">
-        <span x-show="active" x-text="active ? (active.shown !== undefined ? active.shown : active.title) : ''"></span>
+        <span x-show="active" class="md:sr-only" x-text="active ? (active.shown !== undefined ? active.shown : active.title) : ''"></span>
         <span x-show="!active" class="md:sr-only">AI Chat</span>
       </h1>
 
