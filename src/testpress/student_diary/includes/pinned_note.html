@@ -11,18 +11,25 @@
   </div>
 
   {% for entry in student_diary.history %}
-  <div x-show="pinnedId === {{ entry.id }}" x-cloak class="flex gap-x-2.5">
+  <div x-show="pinnedId === {{ entry.id }}" x-cloak class="flex gap-x-2.5"
+       x-data="{ expanded: false, long: false, measure() { setTimeout(() => { this.long = this.$refs.body.scrollHeight > 64 }, 0) } }"
+       x-init="measure(); $watch('pinnedId', () => { expanded = false; measure() })">
     <svg class="shrink-0 size-4 mt-[3px] text-gray-400 dark:text-neutral-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
     <div class="flex-1 min-w-0">
       <p class="text-[13px] text-gray-500 dark:text-neutral-500">
         <span class="font-medium text-gray-800 dark:text-neutral-200">{{ entry.created_by.name }}</span> added a
         <span class="font-medium text-gray-800 dark:text-neutral-200">{{ category_names[entry.category] or (entry.category | replace("_", " ") | title) }}</span> on {{ entry.created_at }}
       </p>
-      <!-- Full note; scrolls inside if long, so the sticky card still fits the screen -->
-      <div class="mt-2 prose prose-sm max-w-none text-gray-800 overflow-y-auto pe-1 dark:text-neutral-200" style="max-height: calc(100vh - 30rem)">{{ entry.content | safe }}</div>
-      <!-- Quiet text action under the note, at the right end: clearly clickable (icon + hover underline) without outweighing the note -->
-      <div class="mt-3 flex justify-end">
-      <button type="button" @click="unpin()" class="inline-flex items-center gap-x-1 text-[13px] font-medium text-gray-500 hover:text-gray-800 hover:underline focus:outline-none focus-visible:underline dark:text-neutral-400 dark:hover:text-neutral-200">
+      <!-- Quieter than the feed (13px grey) and cut to 3 lines, so it doesn't pull the eye while reading the feed. Expanded, it scrolls inside so the sticky card still fits. -->
+      <div x-ref="body" class="mt-2 prose prose-sm max-w-none text-[13px] leading-5 text-gray-600 pe-1 dark:text-neutral-400"
+           :class="expanded ? 'overflow-y-auto' : 'overflow-hidden max-h-[60px]'" :style="expanded && 'max-height: calc(100vh - 30rem)'">{{ entry.content | safe }}</div>
+      <!-- Show more on the left (same as the feed); Unpin, a quiet text action, at the right end -->
+      <div class="mt-3 flex items-center gap-x-3">
+      <button type="button" x-show="long" @click="expanded = !expanded" class="inline-flex items-center gap-x-1 text-[13px] text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200 hover:underline focus:outline-none focus-visible:underline">
+        <span x-text="expanded ? 'Show less' : 'Show more'"></span>
+        <svg class="size-3.5 transition-transform" :class="expanded && 'rotate-180'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <button type="button" @click="unpin()" class="ms-auto inline-flex items-center gap-x-1 text-[13px] font-medium text-gray-500 hover:text-gray-800 hover:underline focus:outline-none focus-visible:underline dark:text-neutral-400 dark:hover:text-neutral-200">
         <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M15 9.34V6h1a2 2 0 0 0 0-4H7.89"/><path d="m2 2 20 20"/><path d="M9 9v1.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h11"/></svg>
         Unpin
       </button>
