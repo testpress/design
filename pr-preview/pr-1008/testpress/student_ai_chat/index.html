@@ -75,6 +75,14 @@
     }
   </script>
   
+<script>
+  // Saved sidebar width and collapsed state, applied before the page paints so it doesn't jump when Alpine loads.
+  try {
+    const w = parseInt(localStorage.getItem('ai_chat_sidebar_w'), 10);
+    if (w) document.documentElement.style.setProperty('--ai-sidebar-w', Math.min(420, Math.max(220, w)) + 'px');
+    if (localStorage.getItem('ai_chat_sidebar_collapsed') === '1') document.documentElement.dataset.aiSidebar = 'collapsed';
+  } catch (e) {}
+</script>
 <!-- Same Inter build as the Preline template (with optical sizing), which sets slightly tighter than "Inter var". -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap">
 <style>
@@ -100,6 +108,19 @@
   .dark .ai-prose th { background: rgb(38 38 38); }
   .dark .ai-prose th, .dark .ai-prose td { border-color: rgb(64 64 64); }
   .dark .ai-prose th:first-child, .dark .ai-prose td:first-child { color: rgb(163 163 163); }
+
+  /* Collapsed sidebar (desktop), from <html data-ai-sidebar="collapsed">. */
+  .ai-sb-if-collapsed { display: none; }
+  [data-ai-sidebar="collapsed"] .ai-sb-if-collapsed { display: block; }
+  [data-ai-sidebar="collapsed"] .ai-sb-if-expanded { display: none; }
+  @media (min-width: 768px) {
+    [data-ai-sidebar="collapsed"] .ai-sb { width: 3.25rem; }
+    [data-ai-sidebar="collapsed"] .ai-sb-header { height: auto; padding: .625rem .5rem; flex-direction: column; row-gap: .25rem; }
+    [data-ai-sidebar="collapsed"] .ai-sb-back { margin-inline-start: 0; }
+    [data-ai-sidebar="collapsed"] .ai-sb-label,
+    [data-ai-sidebar="collapsed"] .ai-sb-resize { display: none; }
+    [data-ai-sidebar="collapsed"] .ai-sb-fade { opacity: 0; pointer-events: none; }
+  }
 </style>
 
   
@@ -140,32 +161,31 @@
 
 
   <!-- Drawer backdrop (mobile) -->
-  <div x-show="sidebarOpen" x-transition.opacity @click="sidebarOpen = false"
+  <div x-show="sidebarOpen" x-cloak x-transition.opacity @click="sidebarOpen = false"
        class="md:hidden fixed inset-0 z-[65] bg-gray-900/50 dark:bg-neutral-900/80" aria-hidden="true"></div>
 
   <!-- ========== CHATS SIDEBAR ========== -->
   <aside id="ai-chat-sidebar"
-         class="fixed inset-y-0 start-0 z-[70] w-[16.25rem] flex flex-col overflow-hidden bg-white border-e border-gray-200 transition-all duration-300 md:static md:z-auto md:translate-x-0 dark:bg-neutral-900 dark:border-neutral-700"
-         :class="[sidebarOpen ? 'translate-x-0' : '-translate-x-full', collapsed ? 'md:w-[3.25rem]' : 'md:w-[16.25rem]']"
+         class="ai-sb fixed inset-y-0 start-0 z-[70] w-[16.25rem] -translate-x-full flex flex-col overflow-hidden bg-white border-e border-gray-200 md:static md:z-auto md:translate-x-0 md:w-[var(--ai-sidebar-w,16.25rem)] dark:bg-neutral-900 dark:border-neutral-700"
+         :class="[sidebarOpen && '!translate-x-0', (!resizing || collapsed) && 'transition-all duration-300']"
          aria-label="Chats">
 
     <!-- Header -->
     <!-- Same 56px height as the chat header, so "Chats"/"AI Chat" and the chat title line up -->
-    <header class="shrink-0 h-14 px-4 flex items-center gap-x-1" :class="collapsed && 'md:h-auto md:py-2.5 md:flex-col md:gap-y-1 md:px-2'">
+    <header class="ai-sb-header shrink-0 h-14 px-4 flex items-center gap-x-1">
       <!-- Back to the app (full-screen layout) -->
       <a href="/testpress/my_courses/" @click.prevent="if (history.length > 1) history.back(); else location.href = $el.href"
          @mouseenter="showTip($el, 'Back', 'right')" @mouseleave="hideTip()" aria-label="Back"
-         class="-ms-2 md:-ms-1.5 flex justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800"
-         :class="collapsed && 'md:ms-0'">
+         class="ai-sb-back hidden md:flex md:-ms-1.5 justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
       </a>
-      <span class="flex-1 min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-white" :class="collapsed && 'md:hidden'">AI Chat</span>
+      <span class="ai-sb-label flex-1 min-w-0 truncate text-sm font-semibold text-gray-800 dark:text-white">AI Chat</span>
       <!-- Minify toggle (desktop) -->
       <button type="button" @click="collapsed = !collapsed; menuFor = null; hideTip()" :aria-expanded="!collapsed" aria-controls="ai-chat-sidebar"
               @mouseenter="showTip($el, collapsed ? 'Expand sidebar' : 'Collapse sidebar', 'right')" @mouseleave="hideTip()"
               class="hidden md:flex justify-center items-center flex-none size-9 text-sm text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
-        <svg x-show="collapsed" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>
-        <svg x-show="!collapsed" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m10 15-3-3 3-3"/></svg>
+        <svg class="ai-sb-if-collapsed shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>
+        <svg class="ai-sb-if-expanded shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m10 15-3-3 3-3"/></svg>
         <span class="sr-only" x-text="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"></span>
       </button>
       <!-- Close (mobile) -->
@@ -183,31 +203,45 @@
               class="group relative w-full flex items-center gap-1 py-1.5 px-2.5 text-sm rounded-lg before:absolute before:inset-y-0 before:-start-2 before:rounded-e-full before:w-1 before:h-full focus:outline-none"
               :class="!active ? 'bg-gray-100 before:bg-primary-600 text-primary-700 dark:bg-neutral-800 dark:text-primary-400' : 'text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800'">
         <span class="-ms-[5px] flex shrink-0 justify-center items-center size-6">
-          <svg class="shrink-0 size-4 group-hover:scale-110 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>
         </span>
-        <span class="truncate transition-opacity duration-300" :class="collapsed && 'md:opacity-0'">New chat</span>
+        <span class="ai-sb-fade truncate transition-opacity duration-300">New chat</span>
       </button>
     </div>
 
     <!-- Recent chats -->
-    <div class="relative pb-4 px-2 flex-1 min-h-0 flex flex-col gap-y-5 overflow-y-auto transition-opacity duration-300 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600"
-         :class="collapsed && 'md:opacity-0 md:pointer-events-none'">
-      <!-- Loading -->
-      <template x-if="loading">
-        <div class="animate-pulse space-y-6 ps-2.5 pe-2" aria-label="Loading chats">
-          <template x-for="g in [3, 4]">
-            <div class="space-y-3.5">
-              <div class="h-3 w-20 rounded-full bg-gray-200 dark:bg-neutral-700"></div>
-              <template x-for="n in g">
-                <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" :style="`width: ${55 + (n * 13) % 40}%`"></div>
-              </template>
-            </div>
-          </template>
-        </div>
-      </template>
+    <div class="ai-sb-fade relative pb-4 px-2 flex-1 min-h-0 flex flex-col gap-y-5 overflow-y-auto transition-opacity duration-300 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-600">
+      <!-- Loading. Plain markup (not x-if), so it also shows while the page's scripts are still loading. -->
+      <div x-show="loading" class="animate-pulse space-y-6 ps-2.5 pe-2" aria-label="Loading chats">
+        
+          <div class="space-y-3.5">
+            <div class="h-3 w-20 rounded-full bg-gray-200 dark:bg-neutral-700"></div>
+            
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: 68%"></div>
+            
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: 81%"></div>
+            
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: 94%"></div>
+            
+          </div>
+        
+          <div class="space-y-3.5">
+            <div class="h-3 w-20 rounded-full bg-gray-200 dark:bg-neutral-700"></div>
+            
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: 68%"></div>
+            
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: 81%"></div>
+            
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: 94%"></div>
+            
+              <div class="h-3.5 rounded-full bg-gray-200 dark:bg-neutral-700" style="width: 67%"></div>
+            
+          </div>
+        
+      </div>
 
       <!-- Empty -->
-      <p x-show="!loading && !chats.length" class="ps-2.5 text-sm text-gray-500 dark:text-neutral-400">Your chats will appear here.</p>
+      <p x-show="!loading && !chats.length" x-cloak class="ps-2.5 text-sm text-gray-500 dark:text-neutral-400">Your chats will appear here.</p>
 
       <!-- Groups -->
       <template x-for="g in loading ? [] : groups" :key="g.name">
@@ -232,16 +266,16 @@
                     <button type="button" @click="if (!pressedOpen) openChat(c.id); pressedOpen = false"
                             @touchstart.passive="pressStart(c)" @touchend="pressEnd()" @touchmove.passive="pressEnd()" @contextmenu="if (isTouch) $event.preventDefault()"
                             :aria-current="c.id === activeId ? 'page' : null"
-                            class="w-full flex items-center py-2 ps-2.5 text-sm text-start rounded-lg select-none [-webkit-touch-callout:none] focus:outline-none"
-                            :class="[(c.id === activeId || menuFor === c.id) ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-800 hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800',
-                                     menuFor === c.id ? 'pe-8' : 'pe-2.5 md:group-hover:pe-8 md:group-focus-within:pe-8']">
+                            class="w-full flex items-center py-2 ps-2.5 text-sm text-start rounded-lg select-none transition-colors duration-150 [-webkit-touch-callout:none] focus:outline-none"
+                            :class="[(c.id === activeId || menuFor === c.id) ? 'bg-gray-100 text-gray-800 dark:bg-neutral-800 dark:text-white' : 'text-gray-800 md:group-hover:bg-gray-100 focus:bg-gray-100 dark:text-neutral-200 md:dark:group-hover:bg-neutral-800 dark:focus:bg-neutral-800',
+                                     menuFor === c.id ? 'pe-2.5 md:pe-8' : 'pe-2.5 md:group-hover:pe-8 md:group-focus-within:pe-8']">
                       <span class="truncate" x-text="c.shown !== undefined ? c.shown : c.title"></span>
                     </button>
                     <!-- More: on hover (desktop) -->
                     <div class="absolute top-1/2 end-0 -translate-y-1/2 transition-opacity duration-200"
                          :class="menuFor === c.id ? 'opacity-100' : 'opacity-0 pointer-events-none md:pointer-events-auto md:group-hover:opacity-100 md:focus-within:opacity-100'">
                       <button type="button" @click="menuFor = menuFor === c.id ? null : c.id" :aria-expanded="menuFor === c.id" aria-haspopup="menu"
-                              class="flex justify-center items-center size-8 text-gray-800 rounded-lg hover:bg-gray-200/70 focus:outline-none focus:bg-gray-200/70 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                              class="invisible md:visible flex justify-center items-center size-8 text-gray-800 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-neutral-200">
                         <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                         <span class="sr-only" x-text="'Options for ' + c.title"></span>
                       </button>
@@ -262,6 +296,17 @@
       </template>
     </div>
   </aside>
+  <!-- Resize handle (desktop): drag the sidebar's edge; drag it far left to collapse, double-click to reset -->
+  <div class="ai-sb-resize hidden md:block relative z-20 w-0">
+    <div role="separator" aria-orientation="vertical" aria-controls="ai-chat-sidebar" aria-label="Resize sidebar" tabindex="0"
+         :aria-valuenow="sidebarWidth" :aria-valuemin="sidebarMin" :aria-valuemax="sidebarMax"
+         @pointerdown.prevent="startResize($event)" @dblclick="setSidebarWidth(sidebarDefault)"
+         @keydown.left.prevent="setSidebarWidth(sidebarWidth - 16)" @keydown.right.prevent="setSidebarWidth(sidebarWidth + 16)"
+         class="group/resize absolute inset-y-0 -start-1.5 w-3 flex justify-center cursor-col-resize touch-none focus:outline-none">
+      <span class="w-0.5 h-full transition-colors duration-150 group-hover/resize:bg-gray-300 group-focus-visible/resize:bg-gray-300 dark:group-hover/resize:bg-neutral-600 dark:group-focus-visible/resize:bg-neutral-600"
+            :class="resizing && '!bg-gray-300 dark:!bg-neutral-600'"></span>
+    </div>
+  </div>
   <!-- ========== END CHATS SIDEBAR ========== -->
 
   <!-- ========== MAIN ========== -->
@@ -269,19 +314,15 @@
 
     <!-- Header -->
     <header class="shrink-0 h-14 px-4 sm:px-5 flex items-center gap-x-1.5">
-      <!-- Back to the app (mobile) -->
-      <a href="/testpress/my_courses/" @click.prevent="if (history.length > 1) history.back(); else location.href = $el.href" aria-label="Back"
-         class="md:hidden -ms-2 flex justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
-        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
-      </a>
+      <!-- Chats (mobile). No Back here: phones have their own. -->
       <button type="button" @click="sidebarOpen = true" aria-controls="ai-chat-sidebar" :aria-expanded="sidebarOpen"
-              class="md:hidden flex justify-center items-center flex-none size-9 text-gray-500 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-800">
-        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
+              class="md:hidden -ms-2 flex justify-center items-center flex-none size-9 text-gray-800 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+        <svg class="shrink-0 size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
         <span class="sr-only">Show chats</span>
       </button>
-      <!-- Chat title. On a new chat it's blank on desktop (the sidebar already says "AI Chat") and "AI Chat" on phones, where the sidebar is hidden. -->
+      <!-- Chat title: phones only, where the sidebar is hidden. On desktop the sidebar already shows it (kept for screen readers). -->
       <h1 class="flex-1 min-w-0 truncate font-medium text-gray-800 dark:text-neutral-200">
-        <span x-show="active" x-text="active ? (active.shown !== undefined ? active.shown : active.title) : ''"></span>
+        <span x-show="active" class="md:sr-only" x-text="active ? (active.shown !== undefined ? active.shown : active.title) : ''"></span>
         <span x-show="!active" class="md:sr-only">AI Chat</span>
       </h1>
 
@@ -400,16 +441,16 @@
             <span class="sr-only">Add image</span>
           </button>
           <div x-show="plusOpen" x-transition.opacity x-cloak role="menu"
-               class="absolute start-0 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700"
+               class="absolute start-0 z-20 w-max bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700"
                :class="active ? 'bottom-full mb-2' : 'top-full mt-2'">
             <div class="p-1 space-y-0.5">
               <button type="button" role="menuitem" @click="pickImages()"
-                      class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                      class="w-full flex items-center gap-x-3 py-1.5 ps-2 pe-3 whitespace-nowrap rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                 <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
                 Upload an image
               </button>
               <button type="button" role="menuitem" @click="takePhoto()"
-                      class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                      class="w-full flex items-center gap-x-3 py-1.5 ps-2 pe-3 whitespace-nowrap rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                 <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
                 Take a photo
               </button>
@@ -624,16 +665,16 @@
             <span class="sr-only">Add image</span>
           </button>
           <div x-show="plusOpen" x-transition.opacity x-cloak role="menu"
-               class="absolute start-0 z-20 w-56 bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700"
+               class="absolute start-0 z-20 w-max bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700"
                :class="active ? 'bottom-full mb-2' : 'top-full mt-2'">
             <div class="p-1 space-y-0.5">
               <button type="button" role="menuitem" @click="pickImages()"
-                      class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                      class="w-full flex items-center gap-x-3 py-1.5 ps-2 pe-3 whitespace-nowrap rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                 <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6-8.414 8.586a2 2 0 0 0 2.829 2.829l8.414-8.586a4 4 0 1 0-5.657-5.657l-8.379 8.551a6 6 0 1 0 8.485 8.485l8.379-8.551"/></svg>
                 Upload an image
               </button>
               <button type="button" role="menuitem" @click="takePhoto()"
-                      class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+                      class="w-full flex items-center gap-x-3 py-1.5 ps-2 pe-3 whitespace-nowrap rounded-lg text-sm text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
                 <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
                 Take a photo
               </button>
@@ -1222,9 +1263,14 @@
       expandComposer: false,   // set once the text wraps; cleared when the box is empty
       status: 'idle',          // idle | thinking | streaming
       block: null,             // null | hour | chat | day | unavailable | offline | other_device
-      loading: false,
+      loading: true,           // chat list; also shown before the page's scripts load
       sidebarOpen: false,      // mobile drawer
-      collapsed: false,        // desktop: sidebar minified to icons
+      collapsed: document.documentElement.dataset.aiSidebar === 'collapsed', // desktop: minified to icons (saved)
+      sidebarWidth: 260,       // desktop: dragged by the sidebar's edge
+      sidebarDefault: 260,
+      sidebarMin: 220,
+      sidebarMax: 420,
+      resizing: false,
       menuFor: null,           // chat id whose "more" menu is open
       plusOpen: false,
       renamingId: null,
@@ -1244,6 +1290,13 @@
         // The app header (which normally applies the saved theme) isn't on this page, so apply it here.
         const theme = localStorage.getItem('hs_theme') || 'default';
         document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'default' && window.matchMedia('(prefers-color-scheme: dark)').matches));
+        try { const w = parseInt(localStorage.getItem('ai_chat_sidebar_w'), 10); if (w) this.setSidebarWidth(w); } catch (e) {}
+        // The collapsed look is plain CSS on <html data-ai-sidebar>, so it's right before Alpine loads; keep it in step.
+        this.$watch('collapsed', (v) => {
+          document.documentElement.dataset.aiSidebar = v ? 'collapsed' : '';
+          try { localStorage.setItem('ai_chat_sidebar_collapsed', v ? '1' : ''); } catch (e) {}
+        });
+        this.loading = false;
         // Ready to type on load (desktop only: on phones this would pop the keyboard unasked).
         if (!this.isTouch) this.focusInput();
       },
@@ -1283,6 +1336,35 @@
           : { show: true, text, place, x: r.left + r.width / 2, y: r.bottom + 6 };
       },
       hideTip() { this.tip.show = false; },
+
+      // ----- Sidebar width (desktop) -----
+      setSidebarWidth(w) {
+        this.sidebarWidth = Math.round(Math.min(this.sidebarMax, Math.max(this.sidebarMin, w)));
+        document.documentElement.style.setProperty('--ai-sidebar-w', this.sidebarWidth + 'px');
+        try { localStorage.setItem('ai_chat_sidebar_w', this.sidebarWidth); } catch (e) {}
+      },
+      startResize(e) {
+        const startX = e.clientX, startW = this.sidebarWidth;
+        this.resizing = true;
+        this.hideTip();
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        // Dragged well past the narrowest width, the sidebar collapses (like ChatGPT); drag back out to reopen it.
+        const move = (ev) => {
+          const w = startW + ev.clientX - startX;
+          this.collapsed = w < this.sidebarMin - 60;
+          this.setSidebarWidth(this.collapsed ? startW : w);
+        };
+        const up = () => {
+          this.resizing = false;
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      },
 
       // ----- Chats -----
       openChat(id) {
