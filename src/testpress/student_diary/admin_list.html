@@ -5,6 +5,7 @@ date: 2000-10-01
 ---
 
 {% extends "layouts/admin_base.html" %}
+{% from "../../ui-system/components/toast.html" import toast_provider %}
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
 
 {% block extra_head %}
@@ -48,7 +49,20 @@ date: 2000-10-01
   </ol>
 
   <!-- Left-Right Panel Grid -->
-  <div class="grid grid-cols-1 lg:grid-cols-6 gap-5" x-data="{ selectedFilter: 'all', sortOrder: 'recent', categories: [{% for entry in student_diary.history %}'{{ entry.category }}',{% endfor %}] }">
+  <div class="grid grid-cols-1 lg:grid-cols-6 gap-5" x-data="{
+         selectedFilter: 'all', sortOrder: 'recent', categories: [{% for entry in student_diary.history %}'{{ entry.category }}',{% endfor %}],
+         // One pinned note per student (prototype: entry 2 starts pinned)
+         pinnedId: 2, pinnedBy: 'Rahul Menon',
+         pin(id) {
+           const replaced = this.pinnedId !== null;
+           this.pinnedId = id; this.pinnedBy = 'You';
+           this.$dispatch('toast', { variant: 'success', title: 'Note pinned', description: replaced ? 'It replaced the previous pinned note.' : 'It shows under the student’s profile.' });
+         },
+         unpin() {
+           this.pinnedId = null;
+           this.$dispatch('toast', { variant: 'success', title: 'Note unpinned' });
+         }
+       }">
     
     <!-- Left side: Student info (sticky) -->
     <div class="lg:col-span-2 lg:sticky lg:top-0 lg:self-start z-10">
@@ -65,6 +79,7 @@ date: 2000-10-01
 </div>
 
 {% include "./includes/create_entry.html" %}
+{{ toast_provider() }}
 
 {% for entry in student_diary.history %}
 {% include "./includes/edit_entry.html" %}
