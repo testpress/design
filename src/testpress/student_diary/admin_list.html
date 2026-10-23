@@ -47,7 +47,7 @@ date: 2000-10-01
     </li>
   </ol>
 
-  {% set page_has_pinned = ('"is_pinned": true' in (student_diary.history | dump)) %}
+  {% set page_has_pinned = ((student_diary.history | selectattr('is_pinned') | length) > 0) or ('"is_pinned":true' in (student_diary.history | dump)) or ('"is_pinned": true' in (student_diary.history | dump)) %}
   <!-- Left-Right Panel Grid -->
   <div class="grid grid-cols-1 lg:grid-cols-6 gap-5" x-data="{ selectedFilter: 'all', sortOrder: 'recent', categories: [{% for entry in student_diary.history %}'{{ entry.category }}',{% endfor %}], hasPinned: {{ 'true' if page_has_pinned else 'false' }} }">
     
@@ -109,6 +109,11 @@ function unpinCard(card, feedContainer) {
       grid._x_dataStack[0].hasPinned = false;
     }
   }
+  const unpinWrapper = card.querySelector('[data-quick-unpin-wrapper]');
+  if (unpinWrapper) {
+    unpinWrapper.style.display = 'none';
+  }
+
   document.querySelectorAll('[data-quick-pin-btn]').forEach(el => {
     const tooltip = el.closest('.hs-tooltip');
     if (tooltip) tooltip.style.display = '';
@@ -116,24 +121,6 @@ function unpinCard(card, feedContainer) {
   });
   if (window.HSStaticMethods && window.HSStaticMethods.autoInit) {
     window.HSStaticMethods.autoInit();
-  }
-
-  const originalIndex = parseInt(card.getAttribute('data-original-index'), 10);
-  const siblings = Array.from(feedContainer.querySelectorAll('[data-entry-card]'));
-  let placed = false;
-  for (const sibling of siblings) {
-    if (sibling === card) continue;
-    const sibPinned = sibling.getAttribute('data-pinned') === 'true';
-    if (sibPinned) continue;
-    const sibIndex = parseInt(sibling.getAttribute('data-original-index'), 10);
-    if (sibIndex > originalIndex) {
-      feedContainer.insertBefore(card, sibling);
-      placed = true;
-      break;
-    }
-  }
-  if (!placed) {
-    feedContainer.appendChild(card);
   }
 }
 
@@ -165,8 +152,6 @@ function pinCard(card, feedContainer) {
     metaList.appendChild(pinnedLi);
   }
 
-  feedContainer.prepend(card);
-
   const grid = document.querySelector('[x-data]');
   if (grid) {
     if (window.Alpine && window.Alpine.$data) {
@@ -180,6 +165,13 @@ function pinCard(card, feedContainer) {
     if (tooltip) tooltip.style.display = 'none';
     else el.style.display = 'none';
   });
+  document.querySelectorAll('[data-quick-unpin-wrapper]').forEach(el => {
+    el.style.display = 'none';
+  });
+  const unpinWrapper = card.querySelector('[data-quick-unpin-wrapper]');
+  if (unpinWrapper) {
+    unpinWrapper.style.display = '';
+  }
 
   let sidebarContainer = document.getElementById('sidebar-pinned-container');
   let slot = document.getElementById('sidebar-pinned-card-slot');
@@ -210,6 +202,10 @@ function pinCard(card, feedContainer) {
       const cloneTooltip = cloneQuickPin.closest('.hs-tooltip');
       if (cloneTooltip) cloneTooltip.remove();
       else cloneQuickPin.remove();
+    }
+    const cloneQuickUnpin = clone.querySelector('[data-quick-unpin-wrapper]');
+    if (cloneQuickUnpin) {
+      cloneQuickUnpin.style.display = '';
     }
 
     const cloneIndicator = clone.querySelector('.pinned-indicator, .pinned-subtext');
@@ -272,5 +268,33 @@ function togglePin(card) {
     pinCard(card, feedContainer);
   }
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  const pinnedCard = document.querySelector('[data-entry-card][data-pinned="true"]');
+  if (pinnedCard) {
+    const grid = document.querySelector('[x-data]');
+    if (grid) {
+      if (window.Alpine && window.Alpine.$data) {
+        window.Alpine.$data(grid).hasPinned = true;
+      } else if (grid._x_dataStack) {
+        grid._x_dataStack[0].hasPinned = true;
+      }
+    }
+    document.querySelectorAll('[data-quick-pin-btn]').forEach(el => {
+      const tooltip = el.closest('.hs-tooltip');
+      if (tooltip) tooltip.style.display = 'none';
+      else el.style.display = 'none';
+    });
+    document.querySelectorAll('[data-quick-unpin-wrapper]').forEach(el => {
+      const isSidebar = el.closest('[data-sidebar-pinned-card]') || el.closest('#sidebar-pinned-container');
+      const isPinnedCard = el.closest('[data-entry-card][data-pinned="true"]');
+      if (isSidebar || isPinnedCard) {
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+  }
+});
 </script>
 {% endblock %}
