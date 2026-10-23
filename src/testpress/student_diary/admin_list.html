@@ -76,4 +76,84 @@ date: 2000-10-01
 <script src="https://preline.co/assets/vendor/clipboard/dist/clipboard.min.js"></script>
 <script src="https://preline.co/assets/js/hs-copy-clipboard-helper.js"></script>
 {% include "./includes/text_editor_script.html" %}
+<script>
+function unpinCard(card, feedContainer) {
+  if (!card) return;
+  card.setAttribute('data-pinned', 'false');
+  const pinBtn = card.querySelector('[data-pin-btn]');
+  if (pinBtn) {
+    pinBtn.innerHTML = `
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+      Pin
+    `;
+  }
+
+  const indicator = card.querySelector('.pinned-indicator, .pinned-subtext');
+  if (indicator) {
+    indicator.remove();
+  }
+
+  const originalIndex = parseInt(card.getAttribute('data-original-index'), 10);
+  const siblings = Array.from(feedContainer.querySelectorAll('[data-entry-card]'));
+  let placed = false;
+  for (const sibling of siblings) {
+    if (sibling === card) continue;
+    const sibPinned = sibling.getAttribute('data-pinned') === 'true';
+    if (sibPinned) continue;
+    const sibIndex = parseInt(sibling.getAttribute('data-original-index'), 10);
+    if (sibIndex > originalIndex) {
+      feedContainer.insertBefore(card, sibling);
+      placed = true;
+      break;
+    }
+  }
+  if (!placed) {
+    feedContainer.appendChild(card);
+  }
+}
+
+function pinCard(card, feedContainer) {
+  if (!card) return;
+
+  const existingPinned = feedContainer.querySelector('[data-entry-card][data-pinned="true"]');
+  if (existingPinned && existingPinned !== card) {
+    unpinCard(existingPinned, feedContainer);
+  }
+
+  card.setAttribute('data-pinned', 'true');
+  const pinBtn = card.querySelector('[data-pin-btn]');
+  if (pinBtn) {
+    pinBtn.innerHTML = `
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V17h14"/><path d="M15 9.34V6h1a2 2 0 0 0 0-4H7.89"/></svg>
+      Unpin
+    `;
+  }
+
+  const metaList = card.querySelector('[data-profile-details] ul');
+  if (metaList && !metaList.querySelector('.pinned-indicator')) {
+    const pinnedLi = document.createElement('li');
+    pinnedLi.className = 'pinned-indicator pinned-subtext inline-flex items-center gap-x-1 relative text-xs text-gray-500 pe-2 last:pe-0 last:after:hidden after:absolute after:top-1/2 after:end-0 after:inline-block after:size-[3px] after:bg-gray-400 after:rounded-full after:-translate-y-1/2 dark:text-neutral-500 dark:after:bg-neutral-600';
+    pinnedLi.innerHTML = `
+      <svg class="shrink-0 size-3 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/></svg>
+      <span>Pinned</span>
+    `;
+    metaList.appendChild(pinnedLi);
+  }
+
+  feedContainer.prepend(card);
+}
+
+function togglePin(card) {
+  if (!card) return;
+  const feedContainer = card.parentElement;
+  if (!feedContainer) return;
+
+  const isCurrentlyPinned = card.getAttribute('data-pinned') === 'true';
+  if (isCurrentlyPinned) {
+    unpinCard(card, feedContainer);
+  } else {
+    pinCard(card, feedContainer);
+  }
+}
+</script>
 {% endblock %}
