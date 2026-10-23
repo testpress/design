@@ -47,8 +47,9 @@ date: 2000-10-01
     </li>
   </ol>
 
+  {% set page_has_pinned = ('"is_pinned": true' in (student_diary.history | dump)) %}
   <!-- Left-Right Panel Grid -->
-  <div class="grid grid-cols-1 lg:grid-cols-6 gap-5" x-data="{ selectedFilter: 'all', sortOrder: 'recent', categories: [{% for entry in student_diary.history %}'{{ entry.category }}',{% endfor %}] }">
+  <div class="grid grid-cols-1 lg:grid-cols-6 gap-5" x-data="{ selectedFilter: 'all', sortOrder: 'recent', categories: [{% for entry in student_diary.history %}'{{ entry.category }}',{% endfor %}], hasPinned: {{ 'true' if page_has_pinned else 'false' }} }">
     
     <!-- Left side: Student info (sticky) -->
     <div class="lg:col-span-2 lg:sticky lg:top-0 lg:self-start z-10">
@@ -91,6 +92,30 @@ function unpinCard(card, feedContainer) {
   const indicator = card.querySelector('.pinned-indicator, .pinned-subtext');
   if (indicator) {
     indicator.remove();
+  }
+
+  const sidebarContainer = document.getElementById('sidebar-pinned-container');
+  if (sidebarContainer) {
+    sidebarContainer.style.display = 'none';
+    const slot = document.getElementById('sidebar-pinned-card-slot');
+    if (slot) slot.innerHTML = '';
+  }
+
+  const grid = document.querySelector('[x-data]');
+  if (grid) {
+    if (window.Alpine && window.Alpine.$data) {
+      window.Alpine.$data(grid).hasPinned = false;
+    } else if (grid._x_dataStack) {
+      grid._x_dataStack[0].hasPinned = false;
+    }
+  }
+  document.querySelectorAll('[data-quick-pin-btn]').forEach(el => {
+    const tooltip = el.closest('.hs-tooltip');
+    if (tooltip) tooltip.style.display = '';
+    else el.style.display = '';
+  });
+  if (window.HSStaticMethods && window.HSStaticMethods.autoInit) {
+    window.HSStaticMethods.autoInit();
   }
 
   const originalIndex = parseInt(card.getAttribute('data-original-index'), 10);
@@ -141,12 +166,104 @@ function pinCard(card, feedContainer) {
   }
 
   feedContainer.prepend(card);
+
+  const grid = document.querySelector('[x-data]');
+  if (grid) {
+    if (window.Alpine && window.Alpine.$data) {
+      window.Alpine.$data(grid).hasPinned = true;
+    } else if (grid._x_dataStack) {
+      grid._x_dataStack[0].hasPinned = true;
+    }
+  }
+  document.querySelectorAll('[data-quick-pin-btn]').forEach(el => {
+    const tooltip = el.closest('.hs-tooltip');
+    if (tooltip) tooltip.style.display = 'none';
+    else el.style.display = 'none';
+  });
+
+  let sidebarContainer = document.getElementById('sidebar-pinned-container');
+  let slot = document.getElementById('sidebar-pinned-card-slot');
+  if (!sidebarContainer) {
+    const profileContainer = document.querySelector('.lg\\:sticky.lg\\:top-0.z-20');
+    if (profileContainer) {
+      sidebarContainer = document.createElement('div');
+      sidebarContainer.id = 'sidebar-pinned-container';
+      sidebarContainer.className = 'mt-4';
+      sidebarContainer.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-gray-500 dark:text-neutral-500 uppercase tracking-wider">Pinned</span>
+        </div>
+        <div id="sidebar-pinned-card-slot"></div>
+      `;
+      profileContainer.appendChild(sidebarContainer);
+      slot = sidebarContainer.querySelector('#sidebar-pinned-card-slot');
+    }
+  }
+  if (sidebarContainer && slot) {
+    const clone = card.cloneNode(true);
+    clone.removeAttribute('data-entry-card');
+    clone.setAttribute('data-sidebar-pinned-card', '');
+    clone.style.display = '';
+
+    const cloneQuickPin = clone.querySelector('[data-quick-pin-btn]');
+    if (cloneQuickPin) {
+      const cloneTooltip = cloneQuickPin.closest('.hs-tooltip');
+      if (cloneTooltip) cloneTooltip.remove();
+      else cloneQuickPin.remove();
+    }
+
+    const cloneIndicator = clone.querySelector('.pinned-indicator, .pinned-subtext');
+    if (cloneIndicator) {
+      cloneIndicator.remove();
+    }
+
+    const toggleBtn = clone.querySelector('.hs-dropdown-toggle');
+    const menu = clone.querySelector('.hs-dropdown-menu');
+    const entryId = clone.getAttribute('data-entry-id');
+    if (toggleBtn) {
+      toggleBtn.id = `hs-dropdown-sidebar-${entryId}`;
+    }
+    if (menu) {
+      menu.setAttribute('aria-labelledby', `hs-dropdown-sidebar-${entryId}`);
+      menu.classList.add('hidden');
+      menu.classList.remove('hs-dropdown-open', 'opacity-100');
+      menu.classList.add('opacity-0');
+    }
+    const cloneDropdown = clone.querySelector('.hs-dropdown');
+    if (cloneDropdown) {
+      cloneDropdown.classList.remove('active');
+    }
+
+    slot.innerHTML = '';
+    slot.appendChild(clone);
+    sidebarContainer.style.display = '';
+    if (window.HSStaticMethods && window.HSStaticMethods.autoInit) {
+      window.HSStaticMethods.autoInit();
+    }
+    if (window.Alpine && window.Alpine.initTree) {
+      window.Alpine.initTree(clone);
+    }
+  }
+}
+
+function unpinFromSidebar() {
+  const feedContainer = document.querySelector('[x-ref="feedContainer"]');
+  if (!feedContainer) return;
+  const pinnedCard = feedContainer.querySelector('[data-entry-card][data-pinned="true"]');
+  if (pinnedCard) {
+    unpinCard(pinnedCard, feedContainer);
+  }
 }
 
 function togglePin(card) {
   if (!card) return;
-  const feedContainer = card.parentElement;
+  const feedContainer = document.querySelector('[x-ref="feedContainer"]');
   if (!feedContainer) return;
+
+  if (card.hasAttribute('data-sidebar-pinned-card')) {
+    unpinFromSidebar();
+    return;
+  }
 
   const isCurrentlyPinned = card.getAttribute('data-pinned') === 'true';
   if (isCurrentlyPinned) {
