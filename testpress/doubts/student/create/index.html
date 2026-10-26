@@ -132,6 +132,177 @@
     background-color: #737373;
   }
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+<style>
+  /* Crop box: white frame, darker surround, corner brackets instead of Cropper's small squares */
+  .doubt-cropper .cropper-modal {
+    background-color: #000;
+    opacity: 0.6;
+  }
+
+  .doubt-cropper .cropper-view-box {
+    outline: 2px solid rgba(255, 255, 255, 0.95);
+    outline-offset: 0;
+  }
+
+  .doubt-cropper .cropper-face {
+    background-color: transparent;
+  }
+
+  /* Rule-of-thirds lines only while dragging */
+  .doubt-cropper .cropper-dashed {
+    border-color: rgba(255, 255, 255, 0.55);
+    border-style: solid;
+    opacity: 0;
+    transition: opacity 150ms;
+  }
+
+  .doubt-cropper.is-interacting .cropper-dashed {
+    opacity: 1;
+  }
+
+  .doubt-cropper .cropper-line {
+    background-color: transparent;
+  }
+
+  /* 44px touch targets centred on each handle, with the visible mark drawn by ::before */
+  .doubt-cropper .cropper-point {
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    background-color: transparent;
+    opacity: 1;
+  }
+
+  .doubt-cropper .cropper-point::before {
+    content: "";
+    position: absolute;
+    border-color: #fff;
+    border-style: solid;
+    border-width: 0;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  }
+
+  .doubt-cropper .cropper-point.point-nw { top: -22px; left: -22px; }
+  .doubt-cropper .cropper-point.point-ne { top: -22px; right: -22px; left: auto; }
+  .doubt-cropper .cropper-point.point-sw { bottom: -22px; left: -22px; top: auto; }
+  .doubt-cropper .cropper-point.point-se { bottom: -22px; right: -22px; left: auto; top: auto; }
+
+  .doubt-cropper .cropper-point.point-nw::before,
+  .doubt-cropper .cropper-point.point-ne::before,
+  .doubt-cropper .cropper-point.point-sw::before,
+  .doubt-cropper .cropper-point.point-se::before {
+    width: 22px;
+    height: 22px;
+  }
+
+  .doubt-cropper .cropper-point.point-nw::before { top: 18px; left: 18px; border-top-width: 4px; border-left-width: 4px; border-top-left-radius: 3px; }
+  .doubt-cropper .cropper-point.point-ne::before { top: 18px; right: 18px; border-top-width: 4px; border-right-width: 4px; border-top-right-radius: 3px; }
+  .doubt-cropper .cropper-point.point-sw::before { bottom: 18px; left: 18px; border-bottom-width: 4px; border-left-width: 4px; border-bottom-left-radius: 3px; }
+  .doubt-cropper .cropper-point.point-se::before { bottom: 18px; right: 18px; border-bottom-width: 4px; border-right-width: 4px; border-bottom-right-radius: 3px; }
+
+  .doubt-cropper .cropper-point.point-n { top: -22px; left: 50%; margin-left: -22px; }
+  .doubt-cropper .cropper-point.point-s { bottom: -22px; left: 50%; margin-left: -22px; top: auto; }
+  .doubt-cropper .cropper-point.point-e { right: -22px; top: 50%; margin-top: -22px; left: auto; }
+  .doubt-cropper .cropper-point.point-w { left: -22px; top: 50%; margin-top: -22px; }
+
+  .doubt-cropper .cropper-point.point-n::before,
+  .doubt-cropper .cropper-point.point-s::before {
+    left: 10px;
+    width: 24px;
+    height: 0;
+    border-top-width: 4px;
+    border-radius: 2px;
+  }
+
+  .doubt-cropper .cropper-point.point-n::before { top: 18px; }
+  .doubt-cropper .cropper-point.point-s::before { bottom: 18px; }
+
+  .doubt-cropper .cropper-point.point-e::before,
+  .doubt-cropper .cropper-point.point-w::before {
+    top: 10px;
+    width: 0;
+    height: 24px;
+    border-left-width: 4px;
+    border-radius: 2px;
+  }
+
+  .doubt-cropper .cropper-point.point-e::before { right: 18px; }
+  .doubt-cropper .cropper-point.point-w::before { left: 18px; }
+
+  /* Cropper's own extra handle on the bottom-right corner */
+  .doubt-cropper .cropper-point.point-se::after {
+    display: none;
+  }
+
+  /* Tool buttons: stacked icon + label on the dark mobile sheet, inline on the desktop dialog */
+  .doubt-crop-tool {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-width: 4rem;
+    min-height: 3rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .doubt-crop-tool:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .doubt-crop-tool:disabled {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+
+  .doubt-crop-tool:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 1px;
+  }
+
+  @media (min-width: 640px) {
+    .doubt-crop-tool {
+      flex-direction: row;
+      gap: 0.375rem;
+      min-width: 2.25rem;
+      min-height: 2.25rem;
+      padding: 0.375rem 0.625rem;
+      font-size: 0.875rem;
+      color: #4b5563;
+    }
+
+    .doubt-crop-tool:hover {
+      background-color: #f3f4f6;
+      color: #111827;
+    }
+
+    .doubt-crop-tool:focus-visible {
+      outline-color: #337ab7;
+    }
+
+    .dark .doubt-crop-tool {
+      color: #d4d4d4;
+    }
+
+    .dark .doubt-crop-tool:hover {
+      background-color: #404040;
+      color: #fff;
+    }
+  }
+
+  /* Camera button added to the Trix toolbar */
+  trix-toolbar .trix-button--icon-camera::before {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E");
+    background-size: 18px;
+  }
+</style>
+
 
 
   <script defer src="https://unpkg.com/alpinejs@3.4.2/dist/cdn.min.js"></script>
@@ -874,10 +1045,543 @@
         </div>
     </main>
 </div>
+<div x-data="imageCropper()" x-init="setup()"
+  @keydown.escape.window="open && discard()"
+  @keydown.enter.window="open && (mode === 'camera' ? cameraReady && capture() : ready && !processing && crop())">
+  <div x-cloak x-show="open" role="dialog" aria-modal="true" aria-labelledby="crop-title"
+    class="fixed inset-0 z-[80] flex sm:items-center sm:justify-center sm:p-6">
+    <div class="hidden sm:block absolute inset-0 bg-gray-900/70 dark:bg-black/80"></div>
+
+    <div
+      class="relative flex flex-col w-full h-full bg-black sm:h-[min(88vh,52rem)] sm:max-w-4xl sm:rounded-xl sm:overflow-hidden sm:bg-white sm:shadow-2xl sm:dark:bg-neutral-800">
+
+      <!-- Header -->
+      <div
+        class="shrink-0 flex items-center gap-2 h-14 px-2 pt-[env(safe-area-inset-top)] box-content sm:box-border sm:pt-0 sm:px-5 sm:h-16 sm:border-b sm:border-gray-200 sm:dark:border-neutral-700">
+        <button type="button" @click="discard()" :aria-label="mode === 'camera' ? 'Close camera' : 'Discard image'"
+          class="order-first sm:order-last inline-flex items-center justify-center size-11 sm:size-9 rounded-full text-white hover:bg-white/10 sm:text-gray-500 sm:hover:bg-gray-100 sm:hover:text-gray-700 sm:dark:text-neutral-400 sm:dark:hover:bg-neutral-700 sm:dark:hover:text-neutral-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-white sm:focus-visible:ring-[#337ab7]">
+          <i data-lucide="x" class="size-6 sm:size-5"></i>
+        </button>
+        <div class="flex-1 min-w-0 text-center sm:text-left">
+          <h2 id="crop-title" x-text="mode === 'camera' ? 'Take a photo' : 'Crop image'"
+            class="text-base font-semibold text-white sm:text-lg sm:text-gray-900 sm:dark:text-neutral-100">
+            Crop image
+          </h2>
+          <p x-show="mode === 'crop' && total > 1" x-text="`Image ${index} of ${total}`"
+            class="text-xs text-white/60 sm:text-sm sm:text-gray-500 sm:dark:text-neutral-400"></p>
+        </div>
+        <span class="size-11 sm:hidden" aria-hidden="true"></span>
+      </div>
+
+      <!-- Camera (desktop webcams; phones use their own camera app) -->
+      <div x-cloak x-show="mode === 'camera'" class="relative flex-1 min-h-0 bg-black">
+        <video x-ref="video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-contain"
+          :class="cameraReady ? 'opacity-100' : 'opacity-0'"></video>
+
+        <div x-show="!cameraReady && !cameraError" class="absolute inset-0 flex flex-col items-center justify-center">
+          <span class="size-8 rounded-full border-[3px] border-white/20 border-t-white animate-spin" role="status"
+            aria-label="Starting camera"></span>
+          <p class="mt-4 text-sm text-white/60">Allow camera access if your browser asks</p>
+        </div>
+
+        <div x-cloak x-show="cameraError" class="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+          <span class="inline-flex items-center justify-center size-12 rounded-full bg-white/10 text-white/80">
+            <i data-lucide="camera-off" class="size-6"></i>
+          </span>
+          <p class="mt-4 text-base font-medium text-white"
+            x-text="cameraError === 'blocked' ? 'Camera access is blocked' : 'No camera found'"></p>
+          <p class="mt-1 max-w-xs text-sm text-white/60"
+            x-text="cameraError === 'blocked' ? 'Allow camera access from the icon in the address bar, then try again.' : 'Connect a camera, or upload a photo instead.'"></p>
+          <div class="mt-5 flex items-center gap-3">
+            <button type="button" x-show="cameraError === 'blocked'" @click="startWebcam()"
+              class="inline-flex items-center rounded-lg bg-white/10 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/15">
+              Try again
+            </button>
+            <button type="button" @click="uploadInstead()"
+              class="inline-flex items-center rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-100">
+              Upload a photo
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div x-cloak x-show="mode === 'camera' && !cameraError"
+        class="shrink-0 grid grid-cols-3 items-center px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5 sm:py-4 sm:border-t sm:border-gray-200 sm:dark:border-neutral-700">
+        <div>
+          <button type="button" @click="uploadInstead()" class="doubt-crop-tool">
+            <i data-lucide="images" class="size-5 sm:size-4"></i>
+            <span>Upload</span>
+          </button>
+        </div>
+        <div class="flex justify-center">
+          <button type="button" @click="capture()" :disabled="!cameraReady" aria-label="Take photo"
+            class="inline-flex items-center justify-center size-16 rounded-full bg-white ring-4 ring-white/30 hover:bg-gray-100 sm:size-14 sm:bg-[#337ab7] sm:text-white sm:ring-[#337ab7]/20 sm:hover:bg-[#296292] sm:dark:bg-emerald-600 sm:dark:ring-emerald-600/20 sm:dark:hover:bg-emerald-700 disabled:opacity-40 disabled:pointer-events-none focus:outline-none focus-visible:ring-offset-2 focus-visible:ring-[#337ab7]">
+            <i data-lucide="camera" class="size-6 hidden sm:block"></i>
+          </button>
+        </div>
+        <div class="flex justify-end">
+          <button type="button" x-show="cameras.length > 1" @click="switchCamera()" class="doubt-crop-tool">
+            <i data-lucide="switch-camera" class="size-5 sm:size-4"></i>
+            <span>Switch</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stage -->
+      <div x-show="mode === 'crop'" class="relative flex-1 min-h-0 flex flex-col bg-black">
+        <div class="shrink-0 flex justify-center px-4 pt-3 pb-2 sm:pt-4 [@media(max-height:560px)]:hidden">
+          <p
+            class="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-sm text-white transition-opacity duration-150"
+            :class="interacting ? 'opacity-0' : 'opacity-100'">
+            <i data-lucide="crop" class="size-4 text-white/70"></i>
+            Drag the corners to crop
+          </p>
+        </div>
+
+        <div class="relative flex-1 min-h-0 mx-3 mb-3 sm:mx-6 sm:mb-5">
+          <div x-ref="stage" class="absolute inset-0 doubt-cropper" :class="interacting && 'is-interacting'">
+            <img x-ref="image" alt="Image to crop" class="block max-w-full opacity-0">
+          </div>
+
+          <div x-show="!ready && !failed" class="absolute inset-0 flex items-center justify-center">
+            <span class="size-8 rounded-full border-[3px] border-white/20 border-t-white animate-spin" role="status"
+              aria-label="Loading image"></span>
+          </div>
+
+          <div x-cloak x-show="failed" class="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+            <span class="inline-flex items-center justify-center size-12 rounded-full bg-white/10 text-white/80">
+              <i data-lucide="image-off" class="size-6"></i>
+            </span>
+            <p class="mt-4 text-base font-medium text-white">This image couldn't be opened</p>
+            <p class="mt-1 text-sm text-white/60">Try a JPG or PNG photo.</p>
+            <button type="button" @click="retake()"
+              class="mt-5 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-medium text-gray-900 hover:bg-gray-100">
+              <span x-text="source === 'camera' ? 'Take another photo' : 'Choose another image'"></span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div x-show="mode === 'crop'"
+        class="shrink-0 flex flex-col gap-3 px-4 pt-2 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5 sm:py-4 sm:border-t sm:border-gray-200 sm:dark:border-neutral-700">
+
+        <div class="flex items-center justify-around sm:justify-start sm:gap-1" :class="failed && 'invisible'">
+          <button type="button" @click="retake()" class="doubt-crop-tool">
+            <i x-show="source === 'camera'" data-lucide="camera" class="size-5 sm:size-4"></i>
+            <i x-show="source !== 'camera'" data-lucide="images" class="size-5 sm:size-4"></i>
+            <span x-text="source === 'camera' ? 'Retake' : 'Change'"></span>
+          </button>
+          <span class="hidden sm:block w-px h-5 mx-2 bg-gray-200 dark:bg-neutral-700" aria-hidden="true"></span>
+          <button type="button" @click="rotate()" :disabled="!ready" class="doubt-crop-tool">
+            <i data-lucide="rotate-cw" class="size-5 sm:size-4"></i>
+            <span>Rotate</span>
+          </button>
+          <button type="button" @click="zoom(-0.15)" :disabled="!ready" aria-label="Zoom out" title="Zoom out"
+            class="doubt-crop-tool !hidden sm:!inline-flex">
+            <i data-lucide="zoom-out" class="size-4"></i>
+          </button>
+          <button type="button" @click="zoom(0.15)" :disabled="!ready" aria-label="Zoom in" title="Zoom in"
+            class="doubt-crop-tool !hidden sm:!inline-flex">
+            <i data-lucide="zoom-in" class="size-4"></i>
+          </button>
+          <button type="button" @click="reset()" :disabled="!changed" class="doubt-crop-tool">
+            <i data-lucide="undo-2" class="size-5 sm:size-4"></i>
+            <span>Reset</span>
+          </button>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button type="button" @click="useFullImage()" :disabled="!ready || processing"
+            class="flex-1 sm:flex-none inline-flex items-center justify-center h-12 sm:h-10 px-4 rounded-lg text-sm font-medium whitespace-nowrap bg-white/10 text-white hover:bg-white/15 sm:bg-white sm:text-gray-800 sm:border sm:border-gray-300 sm:shadow-sm sm:hover:bg-gray-50 sm:dark:bg-neutral-800 sm:dark:border-neutral-600 sm:dark:text-neutral-200 sm:dark:hover:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#337ab7]">
+            Use full image
+          </button>
+          <button type="button" @click="crop()" :disabled="!ready || processing"
+            class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 h-12 sm:h-10 px-5 rounded-lg text-sm font-semibold text-white bg-[#337ab7] hover:bg-[#296292] shadow-sm dark:bg-emerald-600 dark:hover:bg-emerald-700 disabled:opacity-60 disabled:pointer-events-none focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#337ab7] focus-visible:ring-offset-black sm:focus-visible:ring-offset-white">
+            <span x-show="processing" class="size-4 rounded-full border-2 border-white/40 border-t-white animate-spin"
+              aria-hidden="true"></span>
+            <i x-show="!processing" data-lucide="crop" class="size-4"></i>
+            <span class="whitespace-nowrap" x-text="processing ? 'Attaching…' : 'Crop & attach'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <input x-ref="cameraInput" type="file" accept="image/*" capture="environment" class="hidden"
+    @change="pick($event, 'camera')">
+  <input x-ref="fileInput" type="file" accept="image/*" multiple class="hidden" @change="pick($event, 'files')">
+</div>
+
 
     </div>
 
     
+<script>
+  // Images that already went through the cropper, so Trix lets them in on the second pass.
+  const croppedFiles = new WeakSet();
+
+  function imageCropper() {
+    return {
+      open: false,
+      mode: 'crop',
+      ready: false,
+      failed: false,
+      processing: false,
+      interacting: false,
+      changed: false,
+      source: 'files',
+      queue: [],
+      file: null,
+      index: 0,
+      total: 0,
+      cropper: null,
+      stageObserver: null,
+      objectUrl: null,
+      stream: null,
+      cameraReady: false,
+      cameraError: null,
+      cameras: [],
+      cameraIndex: 0,
+
+      setup() {
+        this.bindEditor();
+        this.openDemoImage();
+      },
+
+      bindEditor() {
+        let pending = [];
+
+        const addCameraButton = (editor) => {
+          const fileTools = editor.toolbarElement && editor.toolbarElement.querySelector('[data-trix-button-group="file-tools"]');
+          if (!fileTools || fileTools.querySelector('.trix-button--icon-camera')) return;
+          const camera = document.createElement('button');
+          camera.type = 'button';
+          camera.className = 'trix-button trix-button--icon trix-button--icon-camera';
+          camera.title = 'Take a photo';
+          camera.textContent = 'Take a photo';
+          camera.addEventListener('click', () => this.openCamera());
+          fileTools.prepend(camera);
+        };
+        document.querySelectorAll('trix-editor').forEach(addCameraButton);
+        document.addEventListener('trix-initialize', (event) => addCameraButton(event.target));
+
+        // Attach button, drag & drop and paste all land here. Hold images back for cropping.
+        document.addEventListener('trix-file-accept', (event) => {
+          const file = event.file;
+          if (!file.type.startsWith('image/') || croppedFiles.has(file)) return;
+          event.preventDefault();
+          pending.push(file);
+          queueMicrotask(() => {
+            if (!pending.length) return;
+            this.start({ files: pending, source: 'files' });
+            pending = [];
+          });
+        });
+
+        // Stand-in for the real upload, so the editor shows its progress bar.
+        document.addEventListener('trix-attachment-add', (event) => {
+          const attachment = event.attachment;
+          if (!attachment.file) return;
+          let progress = 0;
+          const timer = setInterval(() => {
+            progress = Math.min(progress + 20, 100);
+            attachment.setUploadProgress(progress);
+            if (progress === 100) {
+              clearInterval(timer);
+              const url = URL.createObjectURL(attachment.file);
+              attachment.setAttributes({ url: url, href: url });
+            }
+          }, 150);
+        });
+      },
+
+      // Prototype shortcut: ?demo opens the cropper with a sample textbook photo.
+      async openDemoImage() {
+        if (!new URLSearchParams(location.search).has('demo')) return;
+        const response = await fetch("/img/doubts/sample_question_page.jpg");
+        const blob = await response.blob();
+        const file = new File([blob], 'IMG_20261026_1142.jpg', { type: 'image/jpeg' });
+        this.start({ files: [file], source: 'camera' });
+      },
+
+      // Phones hand off to their own camera app through the file input. Desktop browsers ignore
+      // `capture` and would show a file picker, so they get an in-page webcam view instead.
+      // Prototype: add ?webcam to try the in-page camera in DevTools' phone emulation.
+      openCamera() {
+        const phone = matchMedia('(pointer: coarse)').matches && !new URLSearchParams(location.search).has('webcam');
+        if (phone) {
+          this.$refs.cameraInput.click();
+        } else {
+          this.openWebcam();
+        }
+      },
+
+      openWebcam() {
+        this.teardown();
+        this.file = null;
+        this.mode = 'camera';
+        this.open = true;
+        document.documentElement.classList.add('overflow-hidden');
+        this.startWebcam();
+      },
+
+      async startWebcam(deviceId) {
+        this.stopCamera();
+        this.cameraError = null;
+        // No camera API on insecure (non-https, non-localhost) pages or very old browsers.
+        if (!navigator.mediaDevices) {
+          this.cameraError = 'missing';
+          return;
+        }
+        const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        try {
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: deviceId ? { deviceId: { exact: deviceId }, ...size } : { facingMode: { ideal: 'environment' }, ...size },
+          });
+          if (this.mode !== 'camera') return this.stopCamera();
+          const video = this.$refs.video;
+          video.srcObject = this.stream;
+          await video.play();
+          this.cameraReady = true;
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          this.cameras = devices.filter((device) => device.kind === 'videoinput');
+        } catch (error) {
+          this.cameraError = ['NotAllowedError', 'SecurityError'].includes(error.name) ? 'blocked' : 'missing';
+        }
+      },
+
+      switchCamera() {
+        this.cameraIndex = (this.cameraIndex + 1) % this.cameras.length;
+        this.startWebcam(this.cameras[this.cameraIndex].deviceId);
+      },
+
+      capture() {
+        const video = this.$refs.video;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        this.stopCamera();
+        const stamp = new Date().toISOString().slice(0, 19).replace(/\D/g, '');
+        canvas.toBlob((blob) => {
+          this.start({ files: [new File([blob], `Photo_${stamp}.jpg`, { type: 'image/jpeg' })], source: 'camera' });
+        }, 'image/jpeg', 0.92);
+      },
+
+      stopCamera() {
+        if (this.stream) this.stream.getTracks().forEach((track) => track.stop());
+        this.stream = null;
+        if (this.$refs.video) this.$refs.video.srcObject = null;
+        this.cameraReady = false;
+      },
+
+      uploadInstead() {
+        this.$refs.fileInput.click();
+        this.next();
+      },
+
+      pick(event, source) {
+        const files = Array.from(event.target.files || []);
+        event.target.value = '';
+        if (!files.length) return;
+        const images = files.filter((file) => file.type.startsWith('image/'));
+        files.filter((file) => !file.type.startsWith('image/')).forEach((file) => this.attach(file));
+        if (images.length) this.start({ files: images, source: source });
+      },
+
+      start({ files, source }) {
+        this.source = source;
+        this.queue.push(...files);
+        this.total += files.length;
+        if (!this.file) this.next();
+      },
+
+      next() {
+        this.stopCamera();
+        this.mode = 'crop';
+        this.teardown();
+        const file = this.queue.shift();
+        if (!file) {
+          this.close();
+          return;
+        }
+        this.file = file;
+        this.index += 1;
+        this.open = true;
+        document.documentElement.classList.add('overflow-hidden');
+        this.$nextTick(() => this.load(file));
+      },
+
+      load(file) {
+        const image = this.$refs.image;
+        this.objectUrl = URL.createObjectURL(file);
+        image.onerror = () => { this.failed = true; };
+        image.onload = () => {
+          // Wait for the dialog's layout to settle before Cropper measures the stage.
+          requestAnimationFrame(() => requestAnimationFrame(() => this.build()));
+          this.watchStage();
+        };
+        image.src = this.objectUrl;
+      },
+
+      // `rotation` keeps the student's turn when rebuilding after a resize.
+      build(rotation) {
+        if (this.cropper) this.cropper.destroy();
+        this.cropper = new Cropper(this.$refs.image, {
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 1,
+          background: false,
+          center: false,
+          highlight: false,
+          restore: false,
+          responsive: false,
+          toggleDragModeOnDblclick: false,
+          minCropBoxWidth: 48,
+          minCropBoxHeight: 48,
+          ready: () => {
+            if (rotation) {
+              this.cropper.rotateTo(rotation);
+              this.fitCanvas();
+              this.frameDefault();
+            }
+            this.ready = true;
+          },
+          cropstart: () => { this.interacting = true; this.changed = true; },
+          cropend: () => { this.interacting = false; },
+          zoom: () => { this.changed = true; },
+        });
+      },
+
+      // The stage can change size after opening: the keyboard closing in a WebView, the address
+      // bar hiding, rotating the phone. Rebuild so the image always fills the space it has.
+      watchStage() {
+        let timer;
+        this.stageObserver = new ResizeObserver(() => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            if (!this.cropper || !this.ready) return;
+            const stage = this.$refs.stage;
+            const measured = this.cropper.getContainerData();
+            if (Math.abs(stage.offsetWidth - measured.width) < 2 && Math.abs(stage.offsetHeight - measured.height) < 2) return;
+            this.build(this.cropper.getImageData().rotate);
+          }, 100);
+        });
+        this.stageObserver.observe(this.$refs.stage);
+      },
+
+      // Select the whole image, so nothing looks cropped until the student drags a handle.
+      frameDefault() {
+        this.cropper.setCropBoxData(this.cropper.getCanvasData());
+      },
+
+      // Fit the (possibly turned) image inside the stage, centred. The crop box is cleared first,
+      // because Cropper won't shrink the image below the box it holds.
+      fitCanvas() {
+        const cropper = this.cropper;
+        cropper.clear();
+        const container = cropper.getContainerData();
+        const image = cropper.getImageData();
+        const sideways = Math.abs(image.rotate % 180) === 90;
+        const width = sideways ? image.naturalHeight : image.naturalWidth;
+        const height = sideways ? image.naturalWidth : image.naturalHeight;
+        cropper.zoomTo(Math.min(container.width / width, container.height / height));
+        const canvas = cropper.getCanvasData();
+        cropper.setCanvasData({
+          left: (container.width - canvas.width) / 2,
+          top: (container.height - canvas.height) / 2,
+        });
+        cropper.crop();
+      },
+
+      rotate() {
+        this.cropper.rotate(90);
+        this.fitCanvas();
+        this.frameDefault();
+        this.changed = true;
+      },
+
+      zoom(ratio) {
+        this.cropper.zoom(ratio);
+      },
+
+      reset() {
+        this.cropper.reset();
+        this.changed = false;
+      },
+
+      crop() {
+        this.processing = true;
+        const canvas = this.cropper.getCroppedCanvas({
+          maxWidth: 2400,
+          maxHeight: 2400,
+          fillColor: '#fff',
+          imageSmoothingQuality: 'high',
+        });
+        const name = this.file.name.replace(/\.[^.]+$/, '') + '-cropped.jpg';
+        canvas.toBlob((blob) => {
+          this.attach(new File([blob], name, { type: 'image/jpeg' }));
+          this.processing = false;
+          this.next();
+        }, 'image/jpeg', 0.9);
+      },
+
+      useFullImage() {
+        this.attach(this.file);
+        this.next();
+      },
+
+      discard() {
+        if (this.processing) return;
+        this.next();
+      },
+
+      retake() {
+        this.total -= 1;
+        this.index -= 1;
+        if (this.source === 'camera') {
+          this.openCamera();
+          if (this.mode === 'camera') return;
+        } else {
+          this.$refs.fileInput.click();
+        }
+        this.next();
+      },
+
+      attach(file) {
+        croppedFiles.add(file);
+        document.querySelector('trix-editor').editor.insertFile(file);
+      },
+
+      teardown() {
+        if (this.cropper) this.cropper.destroy();
+        if (this.stageObserver) this.stageObserver.disconnect();
+        if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+        this.cropper = null;
+        this.stageObserver = null;
+        this.objectUrl = null;
+        this.$refs.image.removeAttribute('src');
+        this.ready = false;
+        this.failed = false;
+        this.changed = false;
+        this.interacting = false;
+      },
+
+      close() {
+        this.stopCamera();
+        this.mode = 'crop';
+        this.open = false;
+        this.file = null;
+        this.index = 0;
+        this.total = 0;
+        document.documentElement.classList.remove('overflow-hidden');
+      },
+    };
+  }
+</script>
+
 <script>
     function app() {
         return {
