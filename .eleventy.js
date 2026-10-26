@@ -27,6 +27,7 @@ module.exports = config => {
     config.addPassthroughCopy("css/videojs-controls.css");
     config.addPassthroughCopy("css/videojs-tps.css");
     config.addPassthroughCopy("css/chapter-plugin.min.css");
+    config.addPassthroughCopy("css/flatpickr.min.css");
     config.addPassthroughCopy("js/settings.js");
     config.addPassthroughCopy("js/notes-editor.js");
     config.addPassthroughCopy("js/video.js");
@@ -34,6 +35,7 @@ module.exports = config => {
     config.addPassthroughCopy("js/videojs-sprite-thumbnails.js");
     config.addPassthroughCopy("js/prism.js");
     config.addPassthroughCopy("js/chapter-plugin.min.js");
+    config.addPassthroughCopy("js/flatpickr.min.js");
     config.addPassthroughCopy("node_modules/preline/dist/preline.js");
     config.addPassthroughCopy("node_modules/clipboard/dist/clipboard.min.js");
     config.addPassthroughCopy("node_modules/preline/dist/helper-clipboard.js");
