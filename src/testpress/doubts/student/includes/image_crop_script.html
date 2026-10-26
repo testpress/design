@@ -1,0 +1,364 @@
+<script>
+  // Images that already went through the cropper, so Trix lets them in on the second pass.
+  const croppedFiles = new WeakSet();
+
+  function imageCropper() {
+    return {
+      open: false,
+      mode: 'crop',
+      ready: false,
+      failed: false,
+      processing: false,
+      interacting: false,
+      changed: false,
+      source: 'files',
+      queue: [],
+      file: null,
+      index: 0,
+      total: 0,
+      cropper: null,
+      stageObserver: null,
+      objectUrl: null,
+      stream: null,
+      cameraReady: false,
+      cameraError: null,
+      cameras: [],
+      cameraIndex: 0,
+
+      setup() {
+        this.bindEditor();
+        this.openDemoImage();
+      },
+
+      bindEditor() {
+        let pending = [];
+
+        const addCameraButton = (editor) => {
+          const fileTools = editor.toolbarElement && editor.toolbarElement.querySelector('[data-trix-button-group="file-tools"]');
+          if (!fileTools || fileTools.querySelector('.trix-button--icon-camera')) return;
+          const camera = document.createElement('button');
+          camera.type = 'button';
+          camera.className = 'trix-button trix-button--icon trix-button--icon-camera';
+          camera.title = 'Take a photo';
+          camera.textContent = 'Take a photo';
+          camera.addEventListener('click', () => this.openCamera());
+          fileTools.prepend(camera);
+        };
+        document.querySelectorAll('trix-editor').forEach(addCameraButton);
+        document.addEventListener('trix-initialize', (event) => addCameraButton(event.target));
+
+        // Attach button, drag & drop and paste all land here. Hold images back for cropping.
+        document.addEventListener('trix-file-accept', (event) => {
+          const file = event.file;
+          if (!file.type.startsWith('image/') || croppedFiles.has(file)) return;
+          event.preventDefault();
+          pending.push(file);
+          queueMicrotask(() => {
+            if (!pending.length) return;
+            this.start({ files: pending, source: 'files' });
+            pending = [];
+          });
+        });
+
+        // Stand-in for the real upload, so the editor shows its progress bar.
+        document.addEventListener('trix-attachment-add', (event) => {
+          const attachment = event.attachment;
+          if (!attachment.file) return;
+          let progress = 0;
+          const timer = setInterval(() => {
+            progress = Math.min(progress + 20, 100);
+            attachment.setUploadProgress(progress);
+            if (progress === 100) {
+              clearInterval(timer);
+              const url = URL.createObjectURL(attachment.file);
+              attachment.setAttributes({ url: url, href: url });
+            }
+          }, 150);
+        });
+      },
+
+      // Prototype shortcut: ?demo opens the cropper with a sample textbook photo.
+      async openDemoImage() {
+        if (!new URLSearchParams(location.search).has('demo')) return;
+        const response = await fetch("{{ '/img/doubts/sample_question_page.jpg' | url }}");
+        const blob = await response.blob();
+        const file = new File([blob], 'IMG_20261026_1142.jpg', { type: 'image/jpeg' });
+        this.start({ files: [file], source: 'camera' });
+      },
+
+      // Phones hand off to their own camera app through the file input. Desktop browsers ignore
+      // `capture` and would show a file picker, so they get an in-page webcam view instead.
+      // Prototype: add ?webcam to try the in-page camera in DevTools' phone emulation.
+      openCamera() {
+        const phone = matchMedia('(pointer: coarse)').matches && !new URLSearchParams(location.search).has('webcam');
+        if (phone) {
+          this.$refs.cameraInput.click();
+        } else {
+          this.openWebcam();
+        }
+      },
+
+      openWebcam() {
+        this.teardown();
+        this.file = null;
+        this.mode = 'camera';
+        this.open = true;
+        document.documentElement.classList.add('overflow-hidden');
+        this.startWebcam();
+      },
+
+      async startWebcam(deviceId) {
+        this.stopCamera();
+        this.cameraError = null;
+        // No camera API on insecure (non-https, non-localhost) pages or very old browsers.
+        if (!navigator.mediaDevices) {
+          this.cameraError = 'missing';
+          return;
+        }
+        const size = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        try {
+          this.stream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: deviceId ? { deviceId: { exact: deviceId }, ...size } : { facingMode: { ideal: 'environment' }, ...size },
+          });
+          if (this.mode !== 'camera') return this.stopCamera();
+          const video = this.$refs.video;
+          video.srcObject = this.stream;
+          await video.play();
+          this.cameraReady = true;
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          this.cameras = devices.filter((device) => device.kind === 'videoinput');
+        } catch (error) {
+          this.cameraError = ['NotAllowedError', 'SecurityError'].includes(error.name) ? 'blocked' : 'missing';
+        }
+      },
+
+      switchCamera() {
+        this.cameraIndex = (this.cameraIndex + 1) % this.cameras.length;
+        this.startWebcam(this.cameras[this.cameraIndex].deviceId);
+      },
+
+      capture() {
+        const video = this.$refs.video;
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        this.stopCamera();
+        const stamp = new Date().toISOString().slice(0, 19).replace(/\D/g, '');
+        canvas.toBlob((blob) => {
+          this.start({ files: [new File([blob], `Photo_${stamp}.jpg`, { type: 'image/jpeg' })], source: 'camera' });
+        }, 'image/jpeg', 0.92);
+      },
+
+      stopCamera() {
+        if (this.stream) this.stream.getTracks().forEach((track) => track.stop());
+        this.stream = null;
+        if (this.$refs.video) this.$refs.video.srcObject = null;
+        this.cameraReady = false;
+      },
+
+      uploadInstead() {
+        this.$refs.fileInput.click();
+        this.next();
+      },
+
+      pick(event, source) {
+        const files = Array.from(event.target.files || []);
+        event.target.value = '';
+        if (!files.length) return;
+        const images = files.filter((file) => file.type.startsWith('image/'));
+        files.filter((file) => !file.type.startsWith('image/')).forEach((file) => this.attach(file));
+        if (images.length) this.start({ files: images, source: source });
+      },
+
+      start({ files, source }) {
+        this.source = source;
+        this.queue.push(...files);
+        this.total += files.length;
+        if (!this.file) this.next();
+      },
+
+      next() {
+        this.stopCamera();
+        this.mode = 'crop';
+        this.teardown();
+        const file = this.queue.shift();
+        if (!file) {
+          this.close();
+          return;
+        }
+        this.file = file;
+        this.index += 1;
+        this.open = true;
+        document.documentElement.classList.add('overflow-hidden');
+        this.$nextTick(() => this.load(file));
+      },
+
+      load(file) {
+        const image = this.$refs.image;
+        this.objectUrl = URL.createObjectURL(file);
+        image.onerror = () => { this.failed = true; };
+        image.onload = () => {
+          // Wait for the dialog's layout to settle before Cropper measures the stage.
+          requestAnimationFrame(() => requestAnimationFrame(() => this.build()));
+          this.watchStage();
+        };
+        image.src = this.objectUrl;
+      },
+
+      // `rotation` keeps the student's turn when rebuilding after a resize.
+      build(rotation) {
+        if (this.cropper) this.cropper.destroy();
+        this.cropper = new Cropper(this.$refs.image, {
+          viewMode: 1,
+          dragMode: 'move',
+          autoCropArea: 1,
+          background: false,
+          center: false,
+          highlight: false,
+          restore: false,
+          responsive: false,
+          toggleDragModeOnDblclick: false,
+          minCropBoxWidth: 48,
+          minCropBoxHeight: 48,
+          ready: () => {
+            if (rotation) {
+              this.cropper.rotateTo(rotation);
+              this.fitCanvas();
+              this.frameDefault();
+            }
+            this.ready = true;
+          },
+          cropstart: () => { this.interacting = true; this.changed = true; },
+          cropend: () => { this.interacting = false; },
+          zoom: () => { this.changed = true; },
+        });
+      },
+
+      // The stage can change size after opening: the keyboard closing in a WebView, the address
+      // bar hiding, rotating the phone. Rebuild so the image always fills the space it has.
+      watchStage() {
+        let timer;
+        this.stageObserver = new ResizeObserver(() => {
+          clearTimeout(timer);
+          timer = setTimeout(() => {
+            if (!this.cropper || !this.ready) return;
+            const stage = this.$refs.stage;
+            const measured = this.cropper.getContainerData();
+            if (Math.abs(stage.offsetWidth - measured.width) < 2 && Math.abs(stage.offsetHeight - measured.height) < 2) return;
+            this.build(this.cropper.getImageData().rotate);
+          }, 100);
+        });
+        this.stageObserver.observe(this.$refs.stage);
+      },
+
+      // Select the whole image, so nothing looks cropped until the student drags a handle.
+      frameDefault() {
+        this.cropper.setCropBoxData(this.cropper.getCanvasData());
+      },
+
+      // Fit the (possibly turned) image inside the stage, centred. The crop box is cleared first,
+      // because Cropper won't shrink the image below the box it holds.
+      fitCanvas() {
+        const cropper = this.cropper;
+        cropper.clear();
+        const container = cropper.getContainerData();
+        const image = cropper.getImageData();
+        const sideways = Math.abs(image.rotate % 180) === 90;
+        const width = sideways ? image.naturalHeight : image.naturalWidth;
+        const height = sideways ? image.naturalWidth : image.naturalHeight;
+        cropper.zoomTo(Math.min(container.width / width, container.height / height));
+        const canvas = cropper.getCanvasData();
+        cropper.setCanvasData({
+          left: (container.width - canvas.width) / 2,
+          top: (container.height - canvas.height) / 2,
+        });
+        cropper.crop();
+      },
+
+      rotate() {
+        this.cropper.rotate(90);
+        this.fitCanvas();
+        this.frameDefault();
+        this.changed = true;
+      },
+
+      zoom(ratio) {
+        this.cropper.zoom(ratio);
+      },
+
+      reset() {
+        this.cropper.reset();
+        this.changed = false;
+      },
+
+      crop() {
+        this.processing = true;
+        const canvas = this.cropper.getCroppedCanvas({
+          maxWidth: 2400,
+          maxHeight: 2400,
+          fillColor: '#fff',
+          imageSmoothingQuality: 'high',
+        });
+        const name = this.file.name.replace(/\.[^.]+$/, '') + '-cropped.jpg';
+        canvas.toBlob((blob) => {
+          this.attach(new File([blob], name, { type: 'image/jpeg' }));
+          this.processing = false;
+          this.next();
+        }, 'image/jpeg', 0.9);
+      },
+
+      useFullImage() {
+        this.attach(this.file);
+        this.next();
+      },
+
+      discard() {
+        if (this.processing) return;
+        this.next();
+      },
+
+      retake() {
+        this.total -= 1;
+        this.index -= 1;
+        if (this.source === 'camera') {
+          this.openCamera();
+          if (this.mode === 'camera') return;
+        } else {
+          this.$refs.fileInput.click();
+        }
+        this.next();
+      },
+
+      attach(file) {
+        croppedFiles.add(file);
+        document.querySelector('trix-editor').editor.insertFile(file);
+      },
+
+      teardown() {
+        if (this.cropper) this.cropper.destroy();
+        if (this.stageObserver) this.stageObserver.disconnect();
+        if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
+        this.cropper = null;
+        this.stageObserver = null;
+        this.objectUrl = null;
+        this.$refs.image.removeAttribute('src');
+        this.ready = false;
+        this.failed = false;
+        this.changed = false;
+        this.interacting = false;
+      },
+
+      close() {
+        this.stopCamera();
+        this.mode = 'crop';
+        this.open = false;
+        this.file = null;
+        this.index = 0;
+        this.total = 0;
+        document.documentElement.classList.remove('overflow-hidden');
+      },
+    };
+  }
+</script>
