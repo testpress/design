@@ -37,104 +37,206 @@
         { id: 'e-mock12', kind: 'exam', name: 'NEET Mock Test 12', when: 'Opens 1 Nov' }] }] },
   ];
   const PUSH_KINDS = { video: 'Video', notes: 'Notes', test: 'Test', exam: 'Exam', live: 'Live class' };
-  // Chapters of a course as one list, sub-chapters indented with "— "
-  const pushChapterList = (course) => {
-    const out = [];
-    const walk = (list, depth) => (list || []).forEach(ch => { out.push({ value: ch.id, label: '— '.repeat(depth) + ch.name, ch }); walk(ch.chapters, depth + 1); });
-    walk(course.chapters, 0);
-    return out;
+
+  // Everything a tap can open, flat for search; `anc` lists the course and chapters above each item.
+  const PUSH_INDEX = [], PUSH_NODES = {};
+  const pushShort = (l) => l.split(' · ')[0];
+  const pushCount = (n) => (n.items || []).length + (n.chapters || []).reduce((t, c) => t + pushCount(c), 0);
+  const pushItems = (n) => { const c = pushCount(n); return c + (c === 1 ? ' item' : ' items'); };
+  const pushPrice = (p) => p.price === 0 ? 'Free' : (p.plans > 1 ? 'From ' : '') + pushInr(p.price);
+  Object.entries(PUSH_PRODUCTS).forEach(([id, p]) => PUSH_INDEX.push({ id: 'p-' + id, value: id, type: 'product', label: p.name, hint: pushPrice(p), meta: 'Product', image: p.image, path: ['Products', p.name] }));
+  const pushWalk = (node, course, anc, path) => {
+    (node.chapters || []).forEach(ch => {
+      PUSH_NODES[ch.id] = { ...ch, kind: 'chapter', course };
+      PUSH_INDEX.push({ id: 'ch-' + ch.id, type: 'chapter', label: ch.name, hint: pushItems(ch), node: ch.id, course, anc, path: [...path, ch.name].map(pushShort) });
+      pushWalk(ch, course, [...anc, ch.id], [...path, ch.name]);
+    });
+    (node.items || []).forEach(it => PUSH_INDEX.push({ ...it, type: 'content', label: it.name, hint: it.when || PUSH_KINDS[it.kind], course, anc, path: [...path.map(pushShort), it.name] }));
   };
+  PUSH_COURSES.forEach(c => {
+    PUSH_NODES[c.id] = { ...c, kind: 'course', course: c.id };
+    PUSH_INDEX.push({ id: 'c-' + c.id, type: 'course', label: c.name, hint: pushItems(c), node: c.id, course: c.id, anc: [], image: c.image, path: [c.name] });
+    pushWalk(c, c.id, [c.id], [c.name]);
+  });
+  // A pasted link: YouTube opens the YouTube app, other links the browser. Title and picture are fetched (prototype only).
+  const pushSite = (u) => (u || '').trim().replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+  const pushIsYT = (u) => /(^|\.|\/)(youtube\.com|youtu\.be)\//i.test((u || '').trim() + '/');
+  const pushIsUrl = (u) => /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i.test((u || '').trim());
+  const pushLink = (u, m) => {
+    u = (u || '').trim(); m = m || {};
+    const yt = pushIsYT(u), site = pushSite(u), title = m.title || (yt ? 'YouTube video' : site);
+    return { id: 'link:' + u, type: 'link', yt, url: u, label: title, title, image: m.image || null, loading: m.status === 'loading',
+             hint: m.status === 'loading' ? 'Getting details…' : yt ? 'YouTube' : 'Website', path: yt ? ['YouTube', title] : [site] };
+  };
+  const pushFetchMeta = async (u) => {
+    const url = /^https?:\/\//i.test(u) ? u : 'https://' + u;
+    if (pushIsYT(url)) {
+      const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url));
+      if (!r.ok) throw new Error('not found');
+      const j = await r.json(); return { title: j.title, image: j.thumbnail_url };
+    }
+    const r = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url));
+    const j = await r.json(); if (j.status !== 'success') throw new Error('no preview');
+    return { title: j.data.title, image: j.data.image && j.data.image.url };
+  };
+  const pushClip = (t, n) => { t = (t || '').trim(); if (t.length <= n) return t; const c = t.slice(0, n - 1); return c.slice(0, Math.max(c.lastIndexOf(' '), n * 0.6)).trim() + '…'; };
+  const PUSH_HOME = { type: 'home', label: 'App home', path: [] };
+  const pushPicker = () => ({ open: false, q: '', level: 'root', stack: [], index: 0 });
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('pushContent', (init = {}) => ({
       title: init.title || '',
       summary: init.summary || '',
-      tap: init.tap || 'home',
-      product: init.product || '',
-      course: '', path: [],   // course, then the chosen chapter / sub-chapter / content at each level
-      // true = holds words or a picture filled from the product (safe to refill)
+      opens: init.opens ? JSON.parse(JSON.stringify(PUSH_INDEX.find(x => x.id === init.opens))) : { ...PUSH_HOME },
+      pk: pushPicker(),       // the "When tapped, open" field
+      linkMeta: {},           // fetched details of pasted links
+      // true = holds words or a picture filled from what it opens (safe to refill); the admin's own are never replaced
       auto: { title: false, summary: false, image: false },
       hasImage: !!init.image,
       init() {
         if (init.image) this.$nextTick(() => this.showImage({ name: 'neet-offer-banner.png', size: '184 KB', url: init.image }));
+        this.$watch('pk.q', (q) => {
+          this.pk.index = 0; this.icons();
+          clearTimeout(this._lt);
+          if (pushIsUrl(q)) this._lt = setTimeout(() => this.fetchLink(q.trim()), 400);
+        });
       },
+      icons() { setTimeout(() => window.lucide && lucide.createIcons(), 0); },
       showImage(f) {
         window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: f ? [{ progress: 100, status: 'success', extension: 'png', ...f }] : [] } }));
       },
+      imageChanged(f) { if (f && /^From /.test(f.name)) return; this.hasImage = !!f; this.auto.image = false; },
+
+      // ----- Fill Title, Summary and Image from what it opens -----
       get filled() { return this.auto.title || this.auto.summary || this.auto.image; },
-      get fillSource() { if (this.tap === 'product') return 'the product'; const p = this.picked; return p.item ? 'the ' + PUSH_KINDS[p.item.kind].toLowerCase() : p.chapter ? 'the chapter' : 'the course'; },
-      // Fill only fields that are empty or were filled by us before
+      get fillSource() {
+        const o = this.opens;
+        return ({ product: 'the product', store: 'the store', course: 'the course', chapter: 'the chapter', link: o.yt ? 'the video' : 'the page' })[o.type]
+          || (o.type === 'content' ? 'the ' + PUSH_KINDS[o.kind].toLowerCase() : '');
+      },
       fill(title, summary, image) {
-        if (!this.title.trim() || this.auto.title) { this.title = title.slice(0, 65); this.auto.title = true; }
-        if (!this.summary.trim() || this.auto.summary) { this.summary = summary; this.auto.summary = true; }
+        if (!this.title.trim() || this.auto.title) { this.title = pushClip(title, 65); this.auto.title = !!title; }
+        if (!this.summary.trim() || this.auto.summary) { this.summary = summary; this.auto.summary = !!summary; }
         if (!this.hasImage || this.auto.image) {
-          if (image) { this.showImage({ name: 'From ' + this.fillSource, size: '', url: image }); this.hasImage = true; this.auto.image = true; }
+          if (image) { this.showImage({ name: 'From ' + (this.opens.yt ? 'the YouTube video' : this.fillSource), size: '', url: image }); this.hasImage = true; this.auto.image = true; }
           else if (this.auto.image) { this.showImage(null); this.hasImage = false; this.auto.image = false; }
         }
       },
-      // ----- Course content, like the Flimix folder picker: course, then ↳ chapter, then ↳ sub-chapter or content… -----
-      get courseObj() { return PUSH_COURSES.find(c => c.id === this.course); },
-      // One dropdown per level: the course, then each chosen chapter. A chosen content item ends the chain.
-      get levels() {
-        const out = []; let node = this.courseObj, i = 0;
-        while (node) {
-          out.push({ node, top: i === 0 });
-          const next = (node.chapters || []).find(c => c.id === this.path[i]);
-          node = next; i++;
+      fillFrom(o) {
+        if (o.type === 'home') return this.fill('', '', null);
+        if (o.type === 'store') return this.fill('New in the store', 'Courses and test series for your exam. Tap to see them.', null);
+        if (o.type === 'link') return o.loading ? null : this.fill(o.title, o.yt ? 'New video on YouTube. Tap to watch.' : 'Tap to read more.', o.image);
+        if (o.type === 'product') {
+          const p = PUSH_PRODUCTS[o.value];
+          const price = p.price === 0 ? 'Free' : p.was ? 'Now ' + pushInr(p.price) + ' (was ' + pushInr(p.was) + ')' : pushPrice(p);
+          const inside = [p.chapters && p.chapters + ' chapters', p.tests && p.tests + ' mock tests', p.hours].filter(Boolean).join(', ');
+          return this.fill(p.name, [price, inside].filter(Boolean).join(' · ') + '. Tap to see what’s included.', p.image);
         }
-        return out;
+        const c = PUSH_NODES[o.course];
+        if (o.type === 'course') return this.fill('New in ' + c.name, 'Fresh lessons are up. Tap to continue where you left off.', c.image);
+        if (o.type === 'chapter') return this.fill(o.label.split(' · ').pop(), 'A new chapter is up in ' + c.name + '. Tap to start it.', c.image);
+        const w = {
+          video: ['New video: ' + o.label, 'Watch it before your next class.'],
+          notes: ['New notes: ' + o.label, 'Quick revision for the chapter.'],
+          test: [o.label + ' is open', 'Take it today and see where you stand.'],
+          exam: [o.label, (o.when || '') + '. Revise and be ready on time.'],
+          live: ['Live class: ' + o.label, (o.when || '') + '. Tap to join on time.'],
+        }[o.kind];
+        this.fill(w[0], w[1], o.kind === 'video' ? (o.image || c.image) : null);
       },
-      levelOptions(lv) {
-        const icon = (d) => '<svg class="size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
-        const ICONS = {
-          chapter: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
-          video: '<circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4Z"/>', notes: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
-          test: '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
-          exam: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="m9 15 2 2 4-4"/>', live: '<circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/>',
-        };
-        return [
-          { value: '', label: lv.top ? 'Whole course' : 'Whole chapter' },
-          ...(lv.node.chapters || []).map(c => ({ value: c.id, label: c.name, icon: icon(ICONS.chapter) })),
-          ...(lv.node.items || []).map(it => ({ value: it.id, label: it.name, description: PUSH_KINDS[it.kind] + (it.when ? ' · ' + it.when : ''), icon: icon(ICONS[it.kind]) })),
+
+      // ----- Pasted links -----
+      link(u) { u = (u || '').trim(); return pushLink(u, this.linkMeta[u]); },
+      async fetchLink(u) {
+        if (this.linkMeta[u] && this.linkMeta[u].status !== 'error') return;
+        this.linkMeta[u] = { status: 'loading' };
+        try { this.linkMeta[u] = { status: 'done', ...(await pushFetchMeta(u)) }; } catch (e) { this.linkMeta[u] = { status: 'error' }; }
+        if (this.opens.type === 'link' && this.opens.url === u) { this.opens = this.link(u); this.fillFrom(this.opens); }
+        this.icons();
+      },
+
+      // ----- The field: click to browse (Products › / Courses › course › chapter › …), type to search, or A link -----
+      goLevel(level) { this.pk.level = level; this.pk.q = ''; this.pk.index = 0; this.$nextTick(() => this.$refs.pkin && this.$refs.pkin.focus()); this.icons(); },
+      goNode(id) { this.pk.stack.push(id); this.goLevel('node'); },
+      up() {
+        const l = this.pk.level;
+        if (l === 'node') { this.pk.stack.pop(); this.goLevel(this.pk.stack.length ? 'node' : 'courses'); }
+        else if (l !== 'root') this.goLevel('root');
+      },
+      get pkNode() { return PUSH_NODES[this.pk.stack[this.pk.stack.length - 1]] || { chapters: [], items: [] }; },
+      get crumbs() {
+        const l = this.pk.level;
+        if (l === 'products') return ['Products'];
+        if (l === 'courses') return ['Courses'];
+        if (l === 'link') return ['A link'];
+        if (l === 'node') return this.pk.stack.map(id => pushShort(PUSH_NODES[id].name));
+        return [];
+      },
+      get pkHeading() {
+        const l = this.pk.level, q = this.pk.q.trim();
+        if (l === 'root') return q ? 'Results' : 'What should it open?';
+        if (l === 'link') return 'A YouTube video or any website';
+        if (l === 'node') return q ? 'In ' + this.pkNode.name : this.pkNode.name;
+        return l === 'products' ? 'Products' : 'Courses';
+      },
+      // Rows: { head } group heading, { item } to pick, { go } to step into, { hint } a note
+      get pkRows() {
+        const q = this.pk.q.trim().toLowerCase(), l = this.pk.level, rows = [];
+        const match = (x) => !q || (x.label + ' ' + (x.hint || '')).toLowerCase().includes(q);
+        if (l === 'link') return pushIsUrl(this.pk.q) ? [{ item: this.link(this.pk.q) }] : [{ hint: q ? 'That isn’t a full link yet. Copy it from the browser’s address bar.' : 'Paste the link, like https://youtube.com/watch?v=…' }];
+        if (l === 'root' && q && pushIsUrl(this.pk.q)) return [{ item: this.link(this.pk.q) }];
+        if (l === 'root' && !q) return [
+          { go: 'products', label: 'Products', side: 'Store or one product', icon: 'shopping-bag' },
+          { go: 'courses', label: 'Courses', side: 'Chapters, videos, tests, live classes', icon: 'book-open' },
+          { go: 'link', label: 'A link', side: 'YouTube or any website', icon: 'link' },
         ];
-      },
-      // What's chosen at the deepest level
-      get picked() {
-        const ls = this.levels, last = ls[ls.length - 1];
-        const chapter = ls.length > 1 ? last.node : null;
-        const item = last && (last.node.items || []).find(i => i.id === this.path[ls.length - 1]);
-        return { chapter, item };
-      },
-      setCourse(v) { this.course = v; this.path = []; this.fillContent(); },
-      setLevel(i, v) { this.path = this.path.slice(0, i); if (v) this.path.push(v); this.fillContent(); },
-      fillContent() {
-        const c = this.courseObj; if (!c) return;
-        const ch = this.picked.chapter, it = this.picked.item || {};
-        if (it.id) {
-          const words = {
-            video: ['New video: ' + it.name, 'Watch it before your next class.'],
-            notes: ['New notes: ' + it.name, 'Quick revision for the chapter.'],
-            test: [it.name + ' is open', 'Take it today and see where you stand.'],
-            exam: [it.name, (it.when || '') + '. Revise and be ready on time.'],
-            live: ['Live class: ' + it.name, (it.when || '') + '. Tap to join on time.'],
-          }[it.kind];
-          return this.fill(words[0], words[1], it.kind === 'video' ? (it.image || c.image) : null);
+        if (l === 'root') {
+          [['product', 'Products'], ['course', 'Courses'], ['chapter', 'Chapters'], ['content', 'Content']].forEach(([t, h]) => {
+            const found = PUSH_INDEX.filter(x => x.type === t && match(x)).slice(0, 5);
+            if (found.length) rows.push({ head: h }, ...found.map(x => ({ item: x, sub: t === 'product' || t === 'course' ? x.hint : x.path.slice(0, -1).join(' › ') })));
+          });
+          if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '”. For a website or YouTube video, choose A link.' });
+          return rows;
         }
-        if (ch) return this.fill(ch.name.split(' · ').pop(), 'A new chapter is up in ' + c.name + '. Tap to start it.', c.image);
-        this.fill('New in ' + c.name, 'Fresh lessons are up. Tap to continue where you left off.', c.image);
+        if (l === 'products') {
+          if (!q || 'all products store'.includes(q)) rows.push({ item: { id: 'store', type: 'store', label: 'All products (store)', hint: 'Store', path: ['All products'] } });
+          PUSH_INDEX.filter(x => x.type === 'product' && match(x)).forEach(x => rows.push({ item: x }));
+        }
+        if (l === 'courses') PUSH_COURSES.filter(c => !q || c.name.toLowerCase().includes(q)).forEach(c => rows.push({ go: 'node', id: c.id, label: c.name, side: pushItems(c), icon: 'book-open' }));
+        if (l === 'node') {
+          const n = this.pkNode;
+          if (!q) {
+            rows.push({ item: PUSH_INDEX.find(x => x.id === (n.kind === 'course' ? 'c-' : 'ch-') + n.id), whole: n.kind === 'course' ? 'Use the whole course' : 'Use the whole chapter' });
+            if ((n.chapters || []).length) rows.push({ head: n.kind === 'course' ? 'Chapters' : 'Sub-chapters' }, ...n.chapters.map(ch => ({ go: 'node', id: ch.id, label: ch.name, side: pushItems(ch), icon: 'folder' })));
+            const items = PUSH_INDEX.filter(x => x.type === 'content' && x.anc[x.anc.length - 1] === n.id);
+            if (items.length) rows.push({ head: 'In this ' + (n.kind === 'course' ? 'course' : 'chapter') }, ...items.map(x => ({ item: x })));
+          } else PUSH_INDEX.filter(x => (x.anc || []).includes(n.id) && match(x)).forEach(x => rows.push({ item: x, sub: x.path.slice(this.pk.stack.length, -1).join(' › ') || x.hint }));
+        }
+        if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '” here' });
+        return rows;
       },
-      setProduct(value) {
-        this.product = value;
-        const p = PUSH_PRODUCTS[value]; if (!p) return;
-        const price = p.price === 0 ? 'Free' : p.was ? 'Now ' + pushInr(p.price) + ' (was ' + pushInr(p.was) + ')' : (p.plans > 1 ? 'From ' : '') + pushInr(p.price);
-        const inside = [p.chapters && p.chapters + ' chapters', p.tests && p.tests + ' mock tests', p.hours].filter(Boolean).join(', ');
-        this.fill(p.name, [price, inside].filter(Boolean).join(' · ') + '. Tap to see what’s included.', p.image);
+      get pkChoices() { return this.pkRows.filter(r => r.item || r.go); },
+      rowKey(r) { return !r ? '' : r.go ? 'go:' + r.go + (r.id || '') : r.item ? 'item:' + r.item.id : (r.head || r.hint || ''); },
+      isActive(r) { const c = this.pkChoices[this.pk.index]; return !!c && this.rowKey(c) === this.rowKey(r); },
+      isPicked(o) { return !!o && this.opens.type !== 'home' && this.opens.id === o.id; },
+      choose(r) { if (r.go === 'node') return this.goNode(r.id); if (r.go) return this.goLevel(r.go); this.pick(r.item); },
+      pick(o) { this.opens = JSON.parse(JSON.stringify(o)); this.pk = pushPicker(); this.fillFrom(this.opens); this.icons(); },
+      clearOpens() { this.opens = { ...PUSH_HOME }; this.pk = pushPicker(); this.fillFrom(this.opens); },
+      pkKeydown(ev) {
+        const list = this.pkChoices;
+        if (ev.key === 'ArrowDown' && list.length) { ev.preventDefault(); this.pk.open = true; this.pk.index = (this.pk.index + 1) % list.length; }
+        else if (ev.key === 'ArrowUp' && list.length) { ev.preventDefault(); this.pk.index = (this.pk.index - 1 + list.length) % list.length; }
+        else if (ev.key === 'Enter') { ev.preventDefault(); if (list[this.pk.index]) this.choose(list[this.pk.index]); }
+        else if (ev.key === 'Backspace' && !this.pk.q) { if (this.pk.level !== 'root') this.up(); else if (this.opens.type !== 'home') this.clearOpens(); }
+        else if (ev.key === 'Escape') this.pk.open = false;
       },
-      // The admin uploaded or removed a picture themselves
-      imageChanged(f) {
-        if (f && /^From /.test(f.name)) return;
-        this.hasImage = !!f; this.auto.image = false;
+      opensIcon(o) {
+        if (!o) return 'circle';
+        if (o.type === 'content') return { video: 'circle-play', notes: 'file-text', test: 'clipboard-check', exam: 'file-check', live: 'radio' }[o.kind];
+        return ({ product: 'shopping-bag', store: 'store', course: 'book-open', chapter: 'folder-open', link: o.yt ? 'circle-play' : 'globe', home: 'house' })[o.type];
       },
+      opensWhere(o) { return o.type === 'link' ? (o.yt ? 'Opens in the YouTube app' : 'Opens in the browser') : o.type === 'home' ? 'Opens the app’s home screen' : o.type === 'store' ? 'Opens your course store' : 'Opens in the app'; },
+      get accessCourse() { return ['course', 'chapter', 'content'].includes(this.opens.type) ? PUSH_NODES[this.opens.course].name : ''; },
     }));
   });
 </script>
