@@ -1,0 +1,71 @@
+{% macro image_upload(
+  name="image",
+  id="",
+  label="",
+  required=false,
+  max_size="2MB",
+  accepted_formats="png,jpg,jpeg",
+  help_text="",
+  dropzone_title="Drop your image here or",
+  preview_class="max-h-44 max-w-full"
+) %}
+{# One image, Flimix style: a dropzone; once chosen, the image sits centred in the same box with Replace and Remove links.
+   Uses the `fileUpload` script (scripts/upload_script.html). Set it from outside with the `set-uploaded-file` window event
+   ({ name, files: [{ name, url, status: 'success' }] }); listens for changes with `file-upload-changed`.
+   preview_class: size limits of the shown image. #}
+{% set unique_id = id if id else name ~ '-' ~ (range(1000, 9999) | random) %}
+
+<div class="w-full"
+     x-data="fileUpload({ maxSize: '{{ max_size }}', acceptedFormats: '{{ accepted_formats }}'.split(',') })"
+     @set-uploaded-file.window="if ($event.detail.name === '{{ name }}') { files = $event.detail.files || []; }">
+  {% if label %}
+    <label for="{{ unique_id }}" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+      {{ label }}{% if required %} <span class="text-red-500">*</span>{% endif %}
+    </label>
+  {% endif %}
+
+  <input type="file" id="{{ unique_id }}" name="{{ name }}" x-ref="fileInput" class="sr-only" accept="{% for f in accepted_formats.split(',') %}.{{ f | trim }}{% if not loop.last %},{% endif %}{% endfor %}" @change="handleFileSelect" {% if required %}required{% endif %}>
+
+  <!-- Dropzone -->
+  <div @dragover.prevent="isDragging = true"
+       @dragleave.prevent="isDragging = false"
+       @drop.prevent="isDragging = false; handleDrop($event)"
+       @click="if (files.length === 0) $refs.fileInput.click()"
+       :class="(files.length === 0 ? 'cursor-pointer ' : '') + (isDragging ? 'border-primary-500 bg-primary-50/50 dark:bg-primary-950/20' : 'border-gray-300 bg-white hover:border-gray-400 dark:bg-neutral-800 dark:border-neutral-600 dark:hover:border-neutral-500')"
+       class="p-12 flex justify-center border border-dashed rounded-xl transition-all duration-200">
+    <div x-show="files.length === 0" class="text-center">
+      <svg class="w-16 text-gray-400 mx-auto dark:text-neutral-400" width="70" height="46" viewBox="0 0 70 46" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M6.05172 9.36853L17.2131 7.5083V41.3608L12.3018 42.3947C9.01306 43.0871 5.79705 40.9434 5.17081 37.6414L1.14319 16.4049C0.515988 13.0978 2.73148 9.92191 6.05172 9.36853Z" fill="currentColor" stroke="currentColor" stroke-width="2" class="fill-white stroke-gray-400 dark:fill-neutral-800 dark:stroke-neutral-500"/>
+        <path d="M63.9483 9.36853L52.7869 7.5083V41.3608L57.6982 42.3947C60.9869 43.0871 64.203 40.9434 64.8292 37.6414L68.8568 16.4049C69.484 13.0978 67.2685 9.92191 63.9483 9.36853Z" fill="currentColor" stroke="currentColor" stroke-width="2" class="fill-white stroke-gray-400 dark:fill-neutral-800 dark:stroke-neutral-500"/>
+        <rect x="17.0656" y="1.62305" width="35.8689" height="42.7541" rx="5" fill="currentColor" stroke="currentColor" stroke-width="2" class="fill-white stroke-gray-400 dark:fill-neutral-800 dark:stroke-neutral-500"/>
+        <path d="M47.9344 44.3772H22.0655C19.3041 44.3772 17.0656 42.1386 17.0656 39.3772L17.0656 35.9161L29.4724 22.7682L38.9825 33.7121C39.7832 34.6335 41.2154 34.629 42.0102 33.7025L47.2456 27.5996L52.9344 33.7209V39.3772C52.9344 42.1386 50.6958 44.3772 47.9344 44.3772Z" stroke="currentColor" stroke-width="2" class="stroke-gray-400 dark:stroke-neutral-500"/>
+        <circle cx="39.5902" cy="14.9672" r="4.16393" stroke="currentColor" stroke-width="2" class="stroke-gray-400 dark:stroke-neutral-500"/>
+      </svg>
+      <div class="mt-4 flex flex-wrap justify-center text-sm leading-6 text-gray-600 dark:text-neutral-400">
+        <span class="pe-1 font-medium text-gray-800 dark:text-neutral-200">{{ dropzone_title }}</span>
+        <span class="font-semibold text-primary-600 hover:text-primary-700 hover:underline decoration-2 dark:text-primary-500">browse</span>
+      </div>
+      <p class="mt-1 text-xs text-gray-400 dark:text-neutral-400">
+        {% if help_text %}{{ help_text }}{% else %}{{ accepted_formats | upper | replace(",", ", ") }} up to {{ max_size }}{% endif %}
+      </p>
+    </div>
+
+    <!-- Chosen image, centred in the same box -->
+    <div x-show="files.length > 0" x-cloak class="text-center">
+      <div class="relative inline-block">
+        <img :src="files[0]?.url" alt="" class="mx-auto {{ preview_class }} object-contain rounded-lg">
+        <div x-show="files[0]?.status === 'uploading'" class="absolute inset-x-3 bottom-3 h-1.5 bg-white/70 rounded-full overflow-hidden" role="progressbar" :aria-valuenow="files[0]?.progress" aria-valuemin="0" aria-valuemax="100">
+          <div class="h-full bg-primary-600 rounded-full transition-all duration-200" :style="`width: ${files[0]?.progress}%`"></div>
+        </div>
+      </div>
+      <div class="mt-4 flex justify-center items-center gap-x-3 text-sm">
+        <button type="button" @click.stop="replaceIndex = 0; $refs.fileInput.click()" class="font-semibold text-primary-600 hover:text-primary-700 hover:underline decoration-2 focus:outline-none focus:underline dark:text-primary-500">Replace</button>
+        <span class="text-gray-300 dark:text-neutral-600" aria-hidden="true">|</span>
+        <button type="button" @click.stop="removeFile(0)" class="font-semibold text-red-600 hover:text-red-700 hover:underline decoration-2 focus:outline-none focus:underline dark:text-red-500">Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <p class="mt-1.5 text-xs text-red-500" x-text="errorMessage" x-show="errorMessage" x-cloak></p>
+</div>
+{% endmacro %}
