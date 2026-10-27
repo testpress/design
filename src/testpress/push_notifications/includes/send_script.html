@@ -36,17 +36,37 @@
   });
   const pnFind = (id) => pnCopy(PN_INDEX.find(x => x.id === id));
   const pnIsUrl = (u) => /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i.test((u || '').trim());
-  const pnLink = (u) => {
-    u = (u || '').trim();
-    if (/youtu\.?be/i.test(u)) return { type: 'link', site: 'youtube', label: PN.links.youtube.title, hint: 'YouTube', meta: 'YouTube · opens in the YouTube app', image: PN.links.youtube.image, url: u, path: ['YouTube', PN.links.youtube.title] };
-    const site = u.replace(/^https?:\/\//, '').split('/')[0];
-    return { type: 'link', site, label: site, hint: 'Website', meta: 'Website · opens in the browser', image: PN.links.web.image, title: PN.links.web.title, url: u, path: [site] };
+  // A pasted link, as a pickable item. `meta` is what we fetched about it (title, picture); until then, just the site.
+  const pnSite = (u) => (u || '').trim().replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+  const pnIsYouTube = (u) => /(^|\.|\/)(youtube\.com|youtu\.be)\//i.test((u || '').trim() + '/');
+  const pnLink = (u, meta) => {
+    u = (u || '').trim(); meta = meta || {};
+    const yt = pnIsYouTube(u), site = pnSite(u);
+    const title = meta.title || (yt ? 'YouTube video' : site);
+    return { type: 'link', site: yt ? 'youtube' : site, url: u, label: title, title, image: meta.image || null, loading: meta.status === 'loading',
+             hint: meta.status === 'loading' ? 'Getting details…' : yt ? 'YouTube' : 'Website',
+             meta: yt ? 'YouTube' + (meta.author ? ' · ' + meta.author : '') + ' · opens in the YouTube app' : site + ' · opens in the browser',
+             path: yt ? ['YouTube', title] : [site] };
+  };
+  // Fetch a link's real title and picture: YouTube's own oEmbed for videos, Microlink for any other page (prototype only)
+  const pnFetchMeta = async (u) => {
+    const url = /^https?:\/\//i.test(u) ? u : 'https://' + u;
+    if (pnIsYouTube(url)) {
+      const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url));
+      if (!r.ok) throw new Error('not found');
+      const j = await r.json();
+      return { title: j.title, author: j.author_name, image: j.thumbnail_url };
+    }
+    const r = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url));
+    const j = await r.json();
+    if (j.status !== 'success') throw new Error('no preview');
+    return { title: j.data.title, author: j.data.publisher, image: j.data.image && j.data.image.url };
   };
   // Words to start from for what it opens: [title, message]
   const pnWords = (o) => {
     if (!o || o.type === 'home') return null;
     const l = o.label, when = o.when || '';
-    if (o.type === 'link') return o.site === 'youtube' ? [l, 'New video on our YouTube channel. Tap to watch.'] : [o.title || l, 'Tap to read more.'];
+    if (o.type === 'link') return o.loading ? null : o.site === 'youtube' ? [l, 'New video on YouTube. Tap to watch.'] : [o.title || l, 'Tap to read more.'];
     if (o.type === 'store') return ['New in the store', 'Courses and test series for your exam. Tap to see them.'];
     // Products: only facts the product has — price (or offer, or "from" for plans), what's inside. No made-up urgency.
     if (o.type === 'product') {
@@ -66,6 +86,8 @@
       live: ['Live class: ' + l, when + '. Tap to join on time.'],
     })[o.kind];
   };
+  // Shorten at a word, with "…", so a long fetched title never stops mid-word
+  const pnClip = (t, n) => { t = (t || '').trim(); if (t.length <= n) return t; const cut = t.slice(0, n - 1); return cut.slice(0, Math.max(cut.lastIndexOf(' '), n * 0.6)).trim() + '…'; };
   const pnEmptyRow = () => ({ id: Date.now() + Math.random(), type: 'batch', values: [], field: '' });
   const pnEstimate = (a, noMatch) => {
     if (!a || !a.mode) return null;
@@ -89,6 +111,7 @@
       panel: '',
       tried: false,
       pk: pnPicker(),   // the "Opens when tapped" field
+      linkMeta: {},     // fetched details of pasted links, by address
       device: 'android',
       sending: false,
       sendError: false,
@@ -112,10 +135,14 @@
         const panels = { 'edit-audience': 'audience', 'no-match': 'audience' };
         if (panels[s]) setTimeout(() => this.open(panels[s]), 400);
         if (['confirm', 'no-app', 'send-failed'].includes(s)) setTimeout(() => this.openConfirm(), 400);
-        this.$watch('pk.q', () => { this.pk.index = 0; pnIcons(); });
+        this.$watch('pk.q', (q) => {
+          this.pk.index = 0; pnIcons();
+          clearTimeout(this._linkTimer);
+          if (pnIsUrl(q)) this._linkTimer = setTimeout(() => this.fetchLink(q.trim()), 400);
+        });
       },
       loadYoutube() {
-        const o = pnLink(PN_YT);
+        const o = this.link(PN_YT);
         this.msg = { opens: o, title: o.label, message: 'New video on our YouTube channel. Watch it before Saturday’s test.', image: { name: 'From the YouTube video', url: o.image, from: 'the video' }, auto: { title: true, message: false, image: true } };
         this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['phy-11'] }] };
       },
@@ -123,6 +150,18 @@
         const o = pnFind('p-neet-crash'), w = pnWords(o);
         this.msg = { opens: o, title: w[0], message: w[1], image: { name: 'From the product', url: o.image, from: 'the product' }, auto: { title: true, message: true, image: true } };
         this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'batch', values: ['neet-a', 'neet-b'] }] };
+      },
+
+      // ----- Pasted links -----
+      link(u) { u = (u || '').trim(); return pnLink(u, this.linkMeta[u] || (u === PN_YT ? { title: PN.links.youtube.title, author: PN.links.youtube.channel, image: PN.links.youtube.image } : null)); },
+      async fetchLink(u) {
+        if (u === PN_YT || (this.linkMeta[u] && this.linkMeta[u].status !== 'error')) return;
+        this.linkMeta[u] = { status: 'loading' };
+        try { this.linkMeta[u] = { status: 'done', ...(await pnFetchMeta(u)) }; }
+        catch (e) { this.linkMeta[u] = { status: 'error' }; }
+        // Picked before the details arrived: update it, and fill the words and picture now
+        if (this.d.opens && this.d.opens.type === 'link' && this.d.opens.url === u) { this.d.opens = this.link(u); this.prefill(); }
+        pnIcons();
       },
 
       // ----- Side panels -----
@@ -187,9 +226,9 @@
       get pkRows() {
         const q = this.pk.q.trim().toLowerCase(), l = this.pk.level, rows = [];
         const match = (x) => !q || (x.label + ' ' + (x.meta || '')).toLowerCase().includes(q);
-        if (l === 'link') return pnIsUrl(this.pk.q) ? [{ item: pnLink(this.pk.q) }] : [{ hint: q ? 'That isn’t a full link yet. Copy it from the browser’s address bar.' : 'Paste the link, like https://youtube.com/watch?v=…' }];
+        if (l === 'link') return pnIsUrl(this.pk.q) ? [{ item: this.link(this.pk.q) }] : [{ hint: q ? 'That isn’t a full link yet. Copy it from the browser’s address bar.' : 'Paste the link, like https://youtube.com/watch?v=…' }];
         // A link pasted into search still works
-        if (l === 'root' && q && pnIsUrl(this.pk.q)) return [{ item: pnLink(this.pk.q) }];
+        if (l === 'root' && q && pnIsUrl(this.pk.q)) return [{ item: this.link(this.pk.q) }];
         if (l === 'root' && !q) return [
           { go: 'products', label: 'Products', side: 'Store or one product', icon: 'shopping-bag' },
           { go: 'link', label: 'A link', side: 'YouTube or any website', icon: 'link' },
@@ -248,7 +287,7 @@
       prefill() {
         const o = this.d.opens, w = pnWords(o), a = this.d.auto || (this.d.auto = {});
         ['title', 'message'].forEach((k, i) => {
-          if (!this.d[k].trim() || a[k]) { this.d[k] = w ? w[i].slice(0, k === 'title' ? 65 : 240) : ''; a[k] = !!w; }
+          if (!this.d[k].trim() || a[k]) { this.d[k] = w ? pnClip(w[i], k === 'title' ? 65 : 240) : ''; a[k] = !!w; }
         });
         if (!this.d.image || a.image) {
           const url = o.image || (['content', 'chapter'].includes(o.type) && o.kind !== 'test' && o.kind !== 'exam' ? (PN_TREE.find(c => c.id === o.course) || {}).image : null);
