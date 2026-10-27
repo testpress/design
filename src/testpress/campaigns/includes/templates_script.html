@@ -1,0 +1,77 @@
+<script>
+  window.CMP_PROTO = [
+    { name: 'Templates', states: [['list', 'With templates'], ['empty', 'No templates yet']] },
+    { name: 'Drawer', states: [['new', 'New template'], ['edit', 'Edit a template'], ['invalid', 'Save with nothing filled'], ['save-failed', 'Save failed']] },
+  ];
+  window.CMP_PROTO_DEFAULT = 'list';
+  const cmpBlankTemplate = () => ({ id: null, name: '', pushOn: true, emailOn: false, push: { title: '', message: '', image: false }, email: { subject: '', body: '' } });
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('campaignTemplates', () => ({
+      templates: cmpCopy(CMP_TEMPLATES),
+      search: '',
+      form: cmpBlankTemplate(),
+      tried: false,
+      saving: false,
+      fail: {},
+      toDelete: null,
+
+      init() {
+        const s = cmpState();
+        if (s === 'empty') this.templates = [];
+        if (s === 'new' || s === 'invalid') setTimeout(() => { this.openNew(); if (s === 'invalid') this.save(); }, 300);
+        if (s === 'edit') setTimeout(() => this.openEdit(this.templates[0]), 300);
+        if (s === 'save-failed') { this.fail.save = true; setTimeout(() => this.openEdit(this.templates[1]), 300); }
+        this.$watch('filtered', () => cmpIcons());
+      },
+      get filtered() { const q = this.search.trim().toLowerCase(); return this.templates.filter(t => !q || t.name.toLowerCase().includes(q)); },
+
+      openNew() { this.form = cmpBlankTemplate(); this.tried = false; this.openDrawer(''); },
+      openEdit(t) {
+        this.form = { id: t.id, name: t.name, pushOn: !!t.push, emailOn: !!t.email,
+          push: t.push ? cmpCopy(t.push) : { title: '', message: '', image: false }, email: t.email ? cmpCopy(t.email) : { subject: '', body: '' } };
+        this.tried = false; this.openDrawer(this.form.email.body);
+      },
+      openDrawer(body) {
+        window.dispatchEvent(new CustomEvent('open-drawer-template'));
+        this.$nextTick(() => { window.dispatchEvent(new CustomEvent('rte-set-tpl-email-body', { detail: body })); cmpIcons(); });
+      },
+
+      get errors() {
+        const e = {}, f = this.form;
+        if (!f.name.trim()) e.name = 'Give it a name';
+        if (!f.pushOn && !f.emailOn) e.channels = 'Turn on push, email or both';
+        if (f.pushOn && !f.push.title.trim()) e.pushTitle = 'Add a title';
+        if (f.pushOn && !f.push.message.trim()) e.pushMessage = 'Add a message';
+        if (f.emailOn && !f.email.subject.trim()) e.subject = 'Add a subject';
+        if (f.emailOn && !f.email.body.replace(/<[^>]*>/g, '').trim()) e.body = 'Write the email';
+        return e;
+      },
+      err(k) { return this.tried ? (this.errors[k] || '') : ''; },
+      save() {
+        this.tried = true;
+        if (Object.keys(this.errors).length) return;
+        this.saving = true;
+        setTimeout(() => {
+          this.saving = false;
+          if (this.fail.save) { this.fail.save = false; cmpToast('Couldn’t save the template', 'Your changes are still here. Try again.', 'error'); return; }
+          const f = this.form;
+          const t = { id: f.id || Date.now(), name: f.name.trim(), updated: 'Today', push: f.pushOn ? cmpCopy(f.push) : null, email: f.emailOn ? cmpCopy(f.email) : null };
+          const i = this.templates.findIndex(x => x.id === t.id);
+          if (i >= 0) this.templates.splice(i, 1, t); else this.templates.unshift(t);
+          window.dispatchEvent(new CustomEvent('close-drawer-template'));
+          cmpToast(i >= 0 ? 'Template updated' : 'Template saved', i >= 0 ? 'Campaigns that used it don’t change.' : '');
+        }, 700);
+      },
+
+      askDelete(t) { this.toDelete = t; this.$dispatch('open-modal-delete-template'); },
+      confirmDelete() {
+        this.templates = this.templates.filter(t => t.id !== this.toDelete.id);
+        cmpToast('Template deleted', '“' + this.toDelete.name + '” was removed.');
+        this.toDelete = null;
+      },
+      use(t) { window.location.href = '{{ "/testpress/campaigns/new/" | url }}?template=' + t.id; },
+      channels(t) { return t.push && t.email ? 'Push and email' : t.push ? 'Push' : 'Email'; },
+    }));
+  });
+</script>

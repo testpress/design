@@ -1,0 +1,116 @@
+---
+tags: testpress
+title: Testpress Boost report
+permalink: testpress/campaigns/boost/
+---
+
+{# Testpress Boost: sales helped by Campaigns and by Signals (staff follow-up). A purchase helped by both shows under
+   both, and counts once in the total. #}
+{% extends "layouts/admin_base.html" %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/select.html" import select %}
+{% from "../../ui-system/components/card.html" import card %}
+{% from "../../ui-system/components/table.html" import table, table_th %}
+{% from "../../ui-system/components/empty-state.html" import empty_state %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="boostReport">
+  {% set period %}
+    <div class="w-44" @change="period = Alpine.$data($event.target.closest('[x-data]')).selected">
+      {{ select(name="period", selected_value="30", options=[{value: "30", label: "Last 30 days"}, {value: "90", label: "Last 90 days"}, {value: "year", label: "This year"}], padding_class="py-1.5 px-3 pe-9") }}
+    </div>
+  {% endset %}
+  {{ page_header(title="Testpress Boost", actions=period) }}
+
+  <div x-show="total.revenue === 0" x-cloak class="mt-6">
+    {{ empty_state(title="No sales helped yet", description="When a student buys a product within 7 days of clicking a campaign, or after a staff follow-up from Signals, it shows here.", icon="chart-no-axes-column", primary_action_text="Go to campaigns", primary_action_href=("/testpress/campaigns/" | url), extra_classes="border-0 shadow-sm") }}
+  </div>
+
+  <div x-show="total.revenue > 0" class="mt-6 space-y-6">
+    {# Total, and how it splits #}
+    {% call card(bordered=false, shadow=true, padding="p-5 sm:p-6") %}
+      <p class="text-sm text-gray-500 dark:text-neutral-400">Sales helped by Boost</p>
+      <p class="mt-1 flex flex-wrap items-baseline gap-x-3">
+        <span class="text-3xl font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpMoney(total.revenue)"></span>
+        <span class="text-sm text-gray-500 dark:text-neutral-400" x-text="cmpNum(total.purchases) + ' purchases'"></span>
+      </p>
+
+      <div class="mt-6 flex h-3 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-neutral-700" role="img" :aria-label="'Campaigns only ' + cmpMoney(campaignsOnly) + ', both ' + cmpMoney(d.both.revenue) + ', Signals only ' + cmpMoney(signalsOnly)">
+        <div class="h-full bg-primary-600" :style="'width:' + share(campaignsOnly) + '%'"></div>
+        <div class="h-full bg-teal-400 border-x-2 border-white dark:border-neutral-800" x-show="d.both.revenue" :style="'width:' + share(d.both.revenue) + '%'"></div>
+        <div class="h-full bg-sky-500" :style="'width:' + share(signalsOnly) + '%'"></div>
+      </div>
+      <dl class="mt-4 grid sm:grid-cols-3 gap-4">
+        {% for k in [["Campaigns only", "bg-primary-600", "campaignsOnly"], ["Both", "bg-teal-400", "d.both.revenue"], ["Signals only", "bg-sky-500", "signalsOnly"]] %}
+        <div class="flex items-start gap-x-2">
+          <span class="mt-1.5 size-2.5 shrink-0 rounded-full {{ k[1] }}"></span>
+          <div>
+            <dt class="text-sm text-gray-500 dark:text-neutral-400">{{ k[0] }}</dt>
+            <dd class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="cmpMoney({{ k[2] }})"></dd>
+          </div>
+        </div>
+        {% endfor %}
+      </dl>
+      <p class="mt-4 text-xs text-gray-500 dark:text-neutral-400">A purchase helped by both counts once in the total.</p>
+    {% endcall %}
+
+    {# Each feature on its own, including purchases both helped with #}
+    <div class="grid sm:grid-cols-2 gap-4">
+      {% for f in [["Campaigns", "megaphone", "campaigns", "Clicked a campaign, then bought that product within 7 days"], ["Signals", "radar", "signals", "Bought after a staff follow-up"]] %}
+      {% call card(bordered=false, shadow=true, padding="p-5") %}
+        <div class="flex items-center gap-x-2 text-sm font-medium text-gray-800 dark:text-neutral-200"><i data-lucide="{{ f[1] }}" class="size-4 text-gray-500"></i>{{ f[0] }}</div>
+        <p class="mt-3 text-xl font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpMoney(d.{{ f[2] }}.revenue)"></p>
+        <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400" x-text="cmpNum(d.{{ f[2] }}.purchases) + ' purchases' + (d.both.purchases ? ', ' + cmpNum(d.both.purchases) + ' also helped by {{ "Signals" if f[2] == "campaigns" else "Campaigns" }}' : '')"></p>
+        <p class="mt-3 text-xs text-gray-500 dark:text-neutral-400">{{ f[3] }}</p>
+      {% endcall %}
+      {% endfor %}
+    </div>
+
+    {# Which campaigns brought sales #}
+    <section x-show="d.campaigns.revenue">
+      <h2 class="mb-3 text-base font-semibold text-gray-800 dark:text-neutral-100">Campaigns that led to sales</h2>
+      {% set header %}{{ table_th("Campaign") }}{{ table_th("Product") }}{{ table_th("Purchases", class="text-end") }}{{ table_th("Sales", class="text-end") }}{% endset %}
+      {% call table(table_header=header, hoverable=true) %}
+        <template x-for="r in rows" :key="r.id">
+          <tr class="cursor-pointer" @click="window.location.href = '{{ "/testpress/campaigns/report/" | url }}?id=' + r.id">
+            <td class="px-5 py-3 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="r.name"></td>
+            <td class="px-5 py-3 text-sm text-gray-600 dark:text-neutral-400" x-text="r.product"></td>
+            <td class="px-5 py-3 text-sm text-end text-gray-800 dark:text-neutral-200" x-text="r.purchases"></td>
+            <td class="px-5 py-3 text-sm text-end font-medium text-gray-800 dark:text-neutral-200" x-text="cmpMoney(r.revenue)"></td>
+          </tr>
+        </template>
+      {% endcall %}
+    </section>
+  </div>
+</div>
+{% include "./includes/prototype.html" %}
+{% endblock content %}
+
+{% block script %}
+  {% include "./includes/data.html" %}
+  {% include "../../ui-system/scripts/select_script.html" %}
+  <script>
+    window.CMP_PROTO = [{ name: 'Boost report', states: [['both', 'Campaigns and Signals'], ['campaigns-only', 'Only Campaigns so far'], ['none', 'No sales yet']] }];
+    window.CMP_PROTO_DEFAULT = 'both';
+    const BOOST = {
+      both: { campaigns: { revenue: 319936, purchases: 64 }, signals: { revenue: 286300, purchases: 61 }, both: { revenue: 64990, purchases: 13 } },
+      'campaigns-only': { campaigns: { revenue: 319936, purchases: 64 }, signals: { revenue: 0, purchases: 0 }, both: { revenue: 0, purchases: 0 } },
+      none: { campaigns: { revenue: 0, purchases: 0 }, signals: { revenue: 0, purchases: 0 }, both: { revenue: 0, purchases: 0 } },
+    };
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('boostReport', () => ({
+        period: '30',
+        d: BOOST[cmpState()] || BOOST.both,
+        rows: [
+          { id: 1, name: 'NEET 2027 Crash Course launch', product: 'NEET 2027 Crash Course', purchases: 64, revenue: 319936 },
+          { id: 4, name: 'JEE weekend batch – seats open', product: 'JEE Main Revision Batch', purchases: 0, revenue: 0 },
+        ],
+        get total() { return { revenue: this.d.campaigns.revenue + this.d.signals.revenue - this.d.both.revenue, purchases: this.d.campaigns.purchases + this.d.signals.purchases - this.d.both.purchases }; },
+        get campaignsOnly() { return this.d.campaigns.revenue - this.d.both.revenue; },
+        get signalsOnly() { return this.d.signals.revenue - this.d.both.revenue; },
+        share(v) { return this.total.revenue ? (v / this.total.revenue) * 100 : 0; },
+      }));
+    });
+  </script>
+{% endblock script %}

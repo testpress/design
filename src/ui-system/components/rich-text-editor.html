@@ -1,0 +1,52 @@
+{# Rich text field, ported from Preline's Text Editor (TipTap) to a dependency-free contenteditable.
+   x_model: Alpine property that receives the HTML on every change.
+   To replace the content from outside (e.g. a template), dispatch `rte-set-<id>` with the HTML as detail.
+   caller(): extra toolbar actions, shown after the formatting buttons. Inside it, `rteLink(href)` turns the
+   selected text into a link (or inserts `href` text when nothing is selected). #}
+{% macro rich_text_editor(id, label="", placeholder="", value="", x_model="", min_height="min-h-40", error_message="", x_error="", help_text="") %}
+{% set btn = "size-8 inline-flex justify-center items-center rounded-full text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700" %}
+<div class="w-full"
+     x-data="{
+       rteExec(cmd) { document.execCommand(cmd, false, null); this.rteSync(); },
+       rteLink(href, text) {
+         const sel = window.getSelection();
+         if (!sel.rangeCount || !this.$refs.field.contains(sel.anchorNode)) { this.$refs.field.focus(); }
+         if (sel.isCollapsed) { document.execCommand('insertHTML', false, '<a href=&quot;' + href + '&quot;>' + (text || href) + '</a>&nbsp;'); }
+         else { document.execCommand('createLink', false, href); }
+         this.rteSync();
+       },
+       rteSync() { {% if x_model %}{{ x_model }} = this.$refs.field.innerHTML.replace(/^<br>$/, ''); {% endif %} }
+     }"
+     x-init="$refs.field.innerHTML = {% if x_model %}{{ x_model }} || {% endif %}{{ value | dump }}"
+     @rte-set-{{ id }}.window="$refs.field.innerHTML = $event.detail || ''; rteSync()">
+  {% if label %}
+    <label for="{{ id }}" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">{{ label }}</label>
+  {% endif %}
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700 dark:focus-within:border-primary-600 dark:focus-within:ring-primary-600 {% if error_message %}border-red-500 dark:border-red-500{% endif %}"
+       {% if x_error %}:class="({{ x_error }}) && '!border-red-500'"{% endif %}>
+    <div class="flex flex-wrap items-center gap-x-0.5 border-b border-gray-200 p-2 dark:border-neutral-700">
+      <button type="button" class="{{ btn }}" @mousedown.prevent @click="rteExec('bold')" aria-label="Bold"><i data-lucide="bold" class="shrink-0 size-4"></i></button>
+      <button type="button" class="{{ btn }}" @mousedown.prevent @click="rteExec('italic')" aria-label="Italic"><i data-lucide="italic" class="shrink-0 size-4"></i></button>
+      <button type="button" class="{{ btn }}" @mousedown.prevent @click="rteExec('underline')" aria-label="Underline"><i data-lucide="underline" class="shrink-0 size-4"></i></button>
+      <button type="button" class="{{ btn }}" @mousedown.prevent @click="rteExec('insertUnorderedList')" aria-label="Bulleted list"><i data-lucide="list" class="shrink-0 size-4"></i></button>
+      <button type="button" class="{{ btn }}" @mousedown.prevent @click="rteExec('insertOrderedList')" aria-label="Numbered list"><i data-lucide="list-ordered" class="shrink-0 size-4"></i></button>
+      {% if caller %}
+        <span class="mx-1 h-5 w-px bg-gray-200 dark:bg-neutral-700"></span>
+        {{ caller() }}
+      {% endif %}
+    </div>
+    <div id="{{ id }}" x-ref="field" contenteditable="true" role="textbox" aria-multiline="true"
+         data-placeholder="{{ placeholder }}"
+         @input="rteSync()"
+         class="{{ min_height }} p-3 text-sm text-gray-800 outline-none dark:text-neutral-200 empty:before:content-[attr(data-placeholder)] empty:before:text-gray-400 dark:empty:before:text-neutral-500 [&_a]:font-medium [&_a]:text-primary-600 [&_a]:underline [&_a]:underline-offset-2 dark:[&_a]:text-primary-500 [&_ul]:list-disc [&_ul]:ps-5 [&_ol]:list-decimal [&_ol]:ps-5 [&_p+p]:mt-2"></div>
+  </div>
+  {% if x_error %}
+    <p class="mt-1.5 text-xs text-red-500" x-show="{{ x_error }}" x-text="{{ x_error }}" x-cloak></p>
+  {% endif %}
+  {% if error_message %}
+    <p class="mt-1.5 text-xs text-red-500">{{ error_message }}</p>
+  {% elif help_text %}
+    <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">{{ help_text }}</p>
+  {% endif %}
+</div>
+{% endmacro %}

@@ -1,0 +1,126 @@
+{# Step 2: Message. Push and email each have their own words and can be turned off (what was written is kept).
+   Both open the same place, chosen at the end of this step. #}
+{% from "../../../ui-system/components/card.html" import card %}
+{% from "../../../ui-system/components/switch.html" import switch %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+{% from "../../../ui-system/components/select.html" import select %}
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+{% from "../../../ui-system/components/rich-text-editor.html" import rich_text_editor %}
+{% set pick = "Alpine.$data($event.target.closest('[x-data]')).selected" %}
+{% set label_cls = "text-sm font-medium text-gray-800 dark:text-neutral-200" %}
+
+<div id="cmp-message" class="scroll-mt-6">
+{% call card(bordered=false, shadow=true, padding="p-5 sm:p-6") %}
+  {% set step_no = 2 %}{% set step_title = "Message" %}{% set step_key = "message" %}
+  {% set step_action = button(text="Use a template", variant="ghost", size="sm", icon="layout-template", extra_attrs='@click="openTemplates()"') %}
+  {% include "./step_heading.html" %}
+
+  <div class="mt-5 sm:ps-10">
+
+    {# ---------- Push ---------- #}
+    <div class="flex items-center justify-between gap-x-3">
+      <p class="inline-flex items-center gap-x-2 {{ label_cls }}"><i data-lucide="smartphone" class="size-4 text-gray-500"></i>Push notification</p>
+      {{ switch(id="push-on", x_model="push.on", size="sm") }}
+    </div>
+    <p x-show="!push.on && (push.title || push.message)" x-cloak class="mt-2 text-xs text-gray-500 dark:text-neutral-400">Off. What you wrote is kept in the draft.</p>
+
+    <div x-show="push.on" class="mt-4 space-y-4">
+      <div>
+        <div class="mb-2 flex justify-between items-baseline">
+          <label for="push-title" class="{{ label_cls }}">Title</label>
+          <span class="text-xs" :class="countClass(push.title.length, limits.title)" x-text="push.title.length + ' / ' + limits.title"></span>
+        </div>
+        {{ input(name="push_title", id="push-title", placeholder="e.g. Live class today at 6 PM", x_model="push.title", extra_attrs='maxlength="65"') }}
+      </div>
+      <div>
+        <div class="mb-2 flex justify-between items-baseline">
+          <label for="push-message" class="{{ label_cls }}">Message</label>
+          <span class="text-xs" :class="countClass(push.message.length, limits.message)" x-text="push.message.length + ' / ' + limits.message"></span>
+        </div>
+        {{ textarea(name="push_message", id="push-message", rows="3", placeholder="e.g. Physics with Arun sir. Tap to set a reminder.", x_model="push.message", extra_attrs='maxlength="240"') }}
+      </div>
+
+      {# Image: optional, with upload states #}
+      <div>
+        <p class="mb-2 {{ label_cls }}">Image <span class="font-normal text-gray-500 dark:text-neutral-400">(optional)</span></p>
+        <div x-show="push.imageState === 'none' || push.imageState === 'error'" class="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {{ button(text="Add an image", variant="secondary", size="sm", icon="image-plus", extra_attrs='@click="addImage()"') }}
+          <span class="text-xs text-gray-500 dark:text-neutral-400">PNG or JPG up to 1 MB. Shown 2:1, below the text.</span>
+        </div>
+        <p x-show="push.imageState === 'error'" x-cloak class="mt-2 text-xs text-red-600 dark:text-red-400">“banner.gif” isn’t a PNG or JPG. Choose another image.</p>
+
+        <div x-show="push.imageState === 'uploading' || push.imageState === 'done'" x-cloak class="flex items-center gap-x-3">
+          <div class="relative w-28 aspect-[2/1] shrink-0 overflow-hidden rounded-lg bg-gray-100 dark:bg-neutral-700">
+            <img x-show="push.imageState === 'done'" src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=400&h=200&q=70" alt="" class="size-full object-cover">
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="truncate text-sm text-gray-800 dark:text-neutral-200" x-text="push.image"></p>
+            <div x-show="push.imageState === 'uploading'" class="mt-1.5 flex items-center gap-x-2">
+              <div class="h-1.5 w-32 overflow-hidden rounded-full bg-gray-200 dark:bg-neutral-700"><div class="h-full w-2/3 rounded-full bg-primary-600 animate-pulse"></div></div>
+              <span class="text-xs text-gray-500">Uploading…</span>
+            </div>
+            <div x-show="push.imageState === 'done'" class="mt-0.5 flex items-center gap-x-3">
+              <button type="button" @click="addImage()" class="text-xs font-medium text-primary-600 hover:underline dark:text-primary-500">Replace</button>
+              <button type="button" @click="removeImage()" class="text-xs font-medium text-gray-500 hover:text-red-600 dark:text-neutral-400">Remove</button>
+            </div>
+          </div>
+          <button x-show="push.imageState === 'uploading'" type="button" @click="removeImage()" class="text-xs font-medium text-gray-500 hover:text-gray-800 dark:text-neutral-400">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    {# ---------- Email ---------- #}
+    <div class="mt-8 flex items-center justify-between gap-x-3">
+      <p class="inline-flex items-center gap-x-2 {{ label_cls }}"><i data-lucide="mail" class="size-4 text-gray-500"></i>Email</p>
+      {{ switch(id="email-on", x_model="email.on", size="sm") }}
+    </div>
+    <p x-show="!email.on && (email.subject || email.body)" x-cloak class="mt-2 text-xs text-gray-500 dark:text-neutral-400">Off. What you wrote is kept in the draft.</p>
+
+    <div x-show="email.on" class="mt-4 space-y-4">
+      <div>
+        <label for="email-subject" class="block mb-2 {{ label_cls }}">Subject</label>
+        {{ input(name="email_subject", id="email-subject", placeholder="e.g. Your live class starts at 6 PM today", x_model="email.subject", extra_attrs='maxlength="120"') }}
+      </div>
+      <div>
+        <p class="mb-2 {{ label_cls }}">Message</p>
+        {% call rich_text_editor(id="email-body", placeholder="Write your email…", x_model="email.body", help_text="Text you link opens the page chosen below, and each click is counted.") %}
+          <button type="button" @mousedown.prevent @click="rteLink('#campaign-link', 'Open ' + (destLabel || 'the page'))"
+                  class="py-1.5 px-2.5 inline-flex items-center gap-x-1.5 text-[13px] font-medium rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-500 dark:hover:bg-neutral-700">
+            <i data-lucide="link" class="shrink-0 size-3.5"></i>Link
+          </button>
+        {% endcall %}
+      </div>
+    </div>
+
+    {# ---------- Where it opens ---------- #}
+    <div id="cmp-dest" class="mt-8 pt-6 border-t border-gray-100 dark:border-neutral-700 scroll-mt-6">
+      <p class="mb-3 {{ label_cls }}">When they tap or click, open</p>
+      <div class="grid grid-cols-2 gap-2">
+        {% for d in campaigns.destinations %}
+          {{ radio(name="dest_type", value=d.key, label='<span class="inline-flex items-center gap-x-2"><i data-lucide="' ~ d.icon ~ '" class="size-4 text-gray-500"></i>' ~ d.label ~ '</span>', variant="card", x_model="dest.type") }}
+        {% endfor %}
+      </div>
+
+      <div x-show="dest.type === 'product'" x-cloak class="mt-4 space-y-3">
+        <div @change="dest.product = {{ pick }}"
+             x-init="$nextTick(() => dest.product && $el.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: dest.product })))">
+          {{ select(name="dest_product", options=campaigns.products, search=true, placeholder="Choose a product") }}
+        </div>
+        {{ checkbox(name="skip_buyers", id="skip-buyers", label="Leave out students who already bought it", x_model="dest.skipBuyers") }}
+        <p class="flex gap-x-2 text-xs text-gray-500 dark:text-neutral-400">
+          <i data-lucide="chart-no-axes-column" class="size-3.5 shrink-0 mt-px"></i>
+          Purchases of this product within 7 days of a click count as sales from this campaign.
+        </p>
+      </div>
+
+      <div x-show="dest.type === 'link'" x-cloak class="mt-4">
+        {{ input(name="dest_url", id="dest-url", placeholder="https://", x_model="dest.url", icon="globe", x_error="urlError", extra_attrs='@blur="touchedUrl = true"', help_text="Opens in the browser. Clicks are counted; sales aren’t.") }}
+      </div>
+      <p x-show="dest.type === 'home' || dest.type === 'store'" x-cloak class="mt-3 text-xs text-gray-500 dark:text-neutral-400">Clicks are counted. Sales are counted only when it opens a product.</p>
+    </div>
+  </div>
+{% endcall %}
+</div>

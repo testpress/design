@@ -1,0 +1,77 @@
+{# Create or edit a template. Push and email can each be on or off; at least one is needed. #}
+{% from "../../../ui-system/components/drawer.html" import drawer %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/textarea.html" import textarea %}
+{% from "../../../ui-system/components/switch.html" import switch %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/rich-text-editor.html" import rich_text_editor %}
+{% set label_cls = "text-sm font-medium text-gray-800 dark:text-neutral-200" %}
+{% set err_cls = "mt-1.5 text-xs text-red-500" %}
+
+{% call drawer(id="template", size="lg", title="Template") %}
+  <div class="flex-1 overflow-y-auto p-6 space-y-8">
+    {{ input(name="tpl_name", id="tpl-name", label="Name", placeholder="e.g. Live class reminder", x_model="form.name", x_error="err('name')") }}
+
+    <p x-show="err('channels')" class="{{ err_cls }}" x-text="err('channels')"></p>
+
+    {# Push #}
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+        <p class="inline-flex items-center gap-x-2 {{ label_cls }}"><i data-lucide="smartphone" class="size-4 text-gray-500"></i>Push notification</p>
+        {{ switch(id="tpl-push-on", x_model="form.pushOn", size="sm") }}
+      </div>
+      <div x-show="form.pushOn" class="space-y-4">
+        <div>
+          <div class="mb-2 flex justify-between items-baseline">
+            <label for="tpl-push-title" class="{{ label_cls }}">Title</label>
+            <span class="text-xs text-gray-500" x-text="form.push.title.length + ' / 65'"></span>
+          </div>
+          {{ input(name="tpl_push_title", id="tpl-push-title", x_model="form.push.title", x_error="err('pushTitle')", extra_attrs='maxlength="65"') }}
+        </div>
+        <div>
+          <div class="mb-2 flex justify-between items-baseline">
+            <label for="tpl-push-message" class="{{ label_cls }}">Message</label>
+            <span class="text-xs text-gray-500" x-text="form.push.message.length + ' / 240'"></span>
+          </div>
+          {{ textarea(name="tpl_push_message", id="tpl-push-message", rows="3", x_model="form.push.message", extra_attrs='maxlength="240"') }}
+          <p x-show="err('pushMessage')" class="{{ err_cls }}" x-text="err('pushMessage')"></p>
+        </div>
+        <div class="flex items-center gap-x-3">
+          <template x-if="form.push.image">
+            <div class="flex items-center gap-x-3">
+              <img src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=400&h=200&q=70" alt="" class="w-24 aspect-[2/1] object-cover rounded-lg">
+              <button type="button" @click="form.push.image = false" class="text-xs font-medium text-gray-500 hover:text-red-600">Remove image</button>
+            </div>
+          </template>
+          <div x-show="!form.push.image">{{ button(text="Add an image", variant="secondary", size="sm", icon="image-plus", extra_attrs='@click="form.push.image = true"') }}</div>
+        </div>
+      </div>
+    </div>
+
+    {# Email #}
+    <div class="space-y-4">
+      <div class="flex items-center justify-between">
+        <p class="inline-flex items-center gap-x-2 {{ label_cls }}"><i data-lucide="mail" class="size-4 text-gray-500"></i>Email</p>
+        {{ switch(id="tpl-email-on", x_model="form.emailOn", size="sm") }}
+      </div>
+      <div x-show="form.emailOn" class="space-y-4">
+        {{ input(name="tpl_subject", id="tpl-subject", label="Subject", x_model="form.email.subject", x_error="err('subject')") }}
+        <div>
+          <p class="mb-2 {{ label_cls }}">Message</p>
+          {% call rich_text_editor(id="tpl-email-body", placeholder="Write your email…", x_model="form.email.body", x_error="err('body')") %}
+            <button type="button" @mousedown.prevent @click="rteLink('#campaign-link', 'Open')" class="py-1.5 px-2.5 inline-flex items-center gap-x-1.5 text-[13px] font-medium rounded-lg text-primary-600 hover:bg-primary-50 dark:text-primary-500 dark:hover:bg-neutral-700">
+              <i data-lucide="link" class="shrink-0 size-3.5"></i>Link
+            </button>
+          {% endcall %}
+          <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Linked text opens whatever page the campaign chooses.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="p-4 border-t border-gray-200 dark:border-neutral-700 flex justify-end gap-2">
+    {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}
+    {% set save_label %}<svg x-show="saving" x-cloak class="size-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span x-text="saving ? 'Saving…' : 'Save template'"></span>{% endset %}
+    {{ button(text=save_label, extra_attrs='@click="save()" :disabled="saving"') }}
+  </div>
+{% endcall %}
