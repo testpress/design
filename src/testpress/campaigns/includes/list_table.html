@@ -1,6 +1,8 @@
 {# Campaigns table. Every row opens the campaign's page: a draft is reviewed and sent there, a sent one shows results.
-   "—" means the number doesn't apply (sales are only tracked for product campaigns);
-   20 rows a page. #}
+   Campaign: name with a badge only when it isn't simply sent (Draft, Sending, Couldn't send), then a dot line:
+   channels · who sent it. Clicked: who clicked of who got it, with a bar. Revenue: product promotions only; hover for
+   the product and purchases. "—" means it doesn't apply. 20 rows a page. #}
+{% from "../../../ui-system/components/progress.html" import progress %}
 {% from "../../../ui-system/components/table.html" import table, table_th %}
 {% from "../../../ui-system/components/select.html" import select %}
 {% from "../../../ui-system/components/badge.html" import badge %}
@@ -11,7 +13,7 @@
 
 {% set filters %}
   <div data-filter class="w-40" @change="status = $event.target.value === 'all' ? '' : $event.target.value">
-    {{ select(name="status", selected_value="all", options=[{value: "all", label: "Any status"}, {value: "draft", label: "Drafts"}, {value: "sent", label: "Sent"}, {value: "failed", label: "Couldn’t send"}], padding_class="py-1.5 px-3 pe-9") }}
+    {{ select(name="status", selected_value="all", options=[{value: "all", label: "Any status"}, {value: "draft", label: "Drafts"}, {value: "sending", label: "Sending"}, {value: "sent", label: "Sent"}, {value: "failed", label: "Couldn’t send"}], padding_class="py-1.5 px-3 pe-9") }}
   </div>
   <div data-filter class="w-52" @change="purposeFilter = $event.target.value === 'all' ? '' : $event.target.value">
     {{ select(name="purpose", selected_value="all", options=[{value: "all", label: "All purposes"}, {value: "product", label: "Product promotions"}, {value: "announce", label: "Announcements and content"}], padding_class="py-1.5 px-3 pe-9") }}
@@ -23,10 +25,8 @@
 
 {% set header %}
   {{ table_th("Campaign") }}
-  {{ table_th("Status") }}
   {{ table_th("Date") }}
-  {{ table_th("Students", class="text-end") }}
-  {{ table_th("Clicked", class="text-end") }}
+  {{ table_th("Clicked") }}
   {{ table_th("Revenue", class="text-end") }}
   {{ table_th("", class="w-12") }}
 {% endset %}
@@ -41,30 +41,19 @@
 {% call table(pagination=pager, pagination_x_show="pageCount > 1", search_enabled=true, search_placeholder="Search campaigns", search_x_model="search", filters=filters, table_header=header, hoverable=true) %}
   <template x-for="c in pageRows" :key="c.id">
     <tr class="cursor-pointer" @click="if (!$event.target.closest('a,button,[role=menu]')) window.location.href = href(c)">
-      {# Campaign: name, then channels and where it opens #}
+      {# Campaign: name (+ badge when not just sent), then channels · who sent it #}
       <td class="px-5 py-3 min-w-[18rem] max-w-md">
-        <a :href="href(c)" class="block truncate text-sm font-medium text-gray-800 hover:text-primary-600 dark:text-neutral-200 dark:hover:text-primary-400" x-text="c.name"></a>
-        <div class="mt-1 flex items-center gap-x-1.5 text-xs text-gray-500 dark:text-neutral-400">
-          <i x-show="c.channels.includes('push')" data-lucide="smartphone" class="size-3.5 shrink-0" aria-label="Push"></i>
-          <i x-show="c.channels.includes('email')" data-lucide="mail" class="size-3.5 shrink-0" aria-label="Email"></i>
-          <span class="text-gray-300 dark:text-neutral-600">·</span>
-          <span class="truncate" x-text="purpose(c)"></span>
+        <div class="flex items-center gap-x-2 min-w-0">
+          <a :href="href(c)" class="truncate text-sm font-medium text-gray-800 hover:text-primary-600 dark:text-neutral-200 dark:hover:text-primary-400" x-text="c.name"></a>
+          <template x-if="c.status === 'draft'"><span class="shrink-0">{{ badge(text="Draft", size="xs") }}</span></template>
+          <template x-if="c.status === 'sending'"><span class="shrink-0">{{ badge(text="Sending", variant="info", size="xs", icon="loader-circle", extra_classes="[&_svg]:animate-spin") }}</span></template>
+          <template x-if="c.status === 'failed'"><span class="shrink-0">{{ badge(text="Couldn’t send", variant="danger", size="xs") }}</span></template>
         </div>
-      </td>
-
-      {# Status #}
-      <td class="px-5 py-3 whitespace-nowrap">
-        <div class="flex flex-col items-start gap-1">
-          <template x-if="c.status === 'draft'"><span>{{ badge(text="Draft", size="xs") }}</span></template>
-          <template x-if="c.status === 'sending'"><span>{{ badge(text="Sending", variant="info", size="xs", icon="loader-circle", extra_classes="[&_svg]:animate-spin") }}</span></template>
-          <template x-if="c.status === 'sent'"><span>{{ badge(text="Sent", variant="success", size="xs") }}</span></template>
-          <template x-if="c.status === 'failed'"><span>{{ badge(text="Couldn’t send", variant="danger", size="xs") }}</span></template>
-          <span x-show="c.status === 'draft' && c.missing && c.missing.length" class="text-xs text-orange-600 dark:text-orange-400"
-                x-text="c.missing && (c.missing.length + (c.missing.length === 1 ? ' thing' : ' things') + ' left')"></span>
-          <span x-show="c.warning" class="inline-flex items-center gap-x-1 text-xs text-orange-600 dark:text-orange-400">
-            <i data-lucide="triangle-alert" class="size-3 shrink-0"></i><span x-text="c.warning"></span>
-          </span>
-        </div>
+        <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
+          <template x-for="(part, i) in subline(c)" :key="i">
+            <span><span x-show="i" class="mx-1 text-gray-300 dark:text-neutral-600">·</span><span :class="part[1]" x-text="part[0]"></span></span>
+          </template>
+        </p>
       </td>
 
       {# Date: sent date, or when the draft was last edited #}
@@ -73,34 +62,32 @@
         <span x-show="c.status === 'draft'" class="text-gray-500 dark:text-neutral-400" x-text="'Edited ' + (c.edited || '').toLowerCase()"></span>
       </td>
 
-      {# Students: who it went to, or the current estimate for drafts #}
-      <td class="px-5 py-3 whitespace-nowrap text-sm text-end">
-        <span x-show="c.status === 'draft'" class="text-gray-500 dark:text-neutral-400" x-text="c.estimate ? '≈ ' + cmpNum(c.estimate) : '—'"></span>
-        <span x-show="c.status !== 'draft'" class="text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.targeted)"></span>
-      </td>
-
-      {# Clicked: unique students, with the share of students who got it #}
-      <td class="px-5 py-3 whitespace-nowrap text-sm text-end">
-        <template x-if="c.status !== 'draft' && c.status !== 'failed'">
-          <div>
-            <span class="text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.unique)"></span>
-            <span class="ms-1 text-xs text-gray-500 dark:text-neutral-400" x-text="ctr(c)"></span>
+      {# Clicked: of who got it, with a bar. Drafts show who it would go to. #}
+      <td class="px-5 py-3 whitespace-nowrap min-w-[12rem]">
+        <template x-if="c.status === 'sent' || c.status === 'sending'">
+          <div class="w-44">
+            <div class="flex items-baseline justify-between gap-x-2 text-sm">
+              <p><span class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.unique)"></span> <span class="text-gray-500 dark:text-neutral-400" x-text="'of ' + cmpNum(c.received)"></span></p>
+              <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="cmpPct(c.unique, c.received)"></span>
+            </div>
+            <div class="mt-1.5">{{ progress(value_expr="c.received ? Math.round(c.unique / c.received * 100) : 0", color="teal", size="xs", label="Students who clicked") }}</div>
           </div>
         </template>
-        <span x-show="c.status === 'draft' || c.status === 'failed'" class="text-gray-400 dark:text-neutral-500">—</span>
+        <span x-show="c.status === 'draft'" class="text-sm text-gray-500 dark:text-neutral-400" x-text="c.estimate ? '≈ ' + cmpNum(c.estimate) + ' students' : '—'"></span>
+        <span x-show="c.status === 'failed'" class="text-sm text-gray-400 dark:text-neutral-500">Not sent</span>
       </td>
 
-      {# Revenue: product promotions only #}
+      {# Revenue: product promotions only; hover for what was bought #}
       <td class="px-5 py-3 whitespace-nowrap text-sm text-end">
-        <template x-if="c.status !== 'draft' && c.revenue !== null">
-          <div>
-            <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpMoney(c.revenue)"></span>
-            <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="c.purchases + (c.purchases === 1 ? ' purchase' : ' purchases')"></p>
+        <template x-if="c.status !== 'draft' && c.revenue !== null && c.revenue !== undefined">
+          <div class="inline-flex justify-end">
+            {% set rev_trigger %}<span class="font-medium text-gray-800 underline decoration-dotted decoration-gray-300 underline-offset-4 cursor-default dark:text-neutral-200 dark:decoration-neutral-600" x-text="cmpMoney(c.revenue)"></span>{% endset %}
+            {% set rev_tip %}<span class="block text-start font-medium" x-text="c.dest.label"></span><span class="block text-start" x-text="cmpNum(c.purchases) + (c.purchases === 1 ? ' purchase' : ' purchases') + ' within 7 days of a click'"></span>{% endset %}
+            {{ tooltip(trigger=rev_trigger, content=rev_tip, placement="left", width="w-64") }}
           </div>
         </template>
-        <span x-show="c.status === 'draft' || c.revenue === null" class="text-gray-400 dark:text-neutral-500">—</span>
+        <span x-show="c.status === 'draft' || c.revenue === null || c.revenue === undefined" class="text-gray-400 dark:text-neutral-500">—</span>
       </td>
-
       <td class="px-3 py-3 whitespace-nowrap text-end">
         {{ dropdown(trigger="ellipsis-vertical", width="medium", items=[
           { label: "Review and send", icon: "send", attrs: 'x-show="c.status === \'draft\'" @click="window.location.href = href(c)"' },
@@ -115,7 +102,7 @@
 
   {# No matches for the search or filters #}
   <tr x-show="filtered.length === 0" x-cloak>
-    <td colspan="7" class="hover:bg-transparent">
+    <td colspan="5" class="hover:bg-transparent">
       {{ empty_state(title="No campaigns match", description="Try a different name, or clear the filters.", icon="search-x", compact=true, wrap_card=false, secondary_action_text="Clear filters", secondary_action_attrs='@click="clearFilters()"') }}
     </td>
   </tr>
