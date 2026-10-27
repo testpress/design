@@ -1,10 +1,10 @@
 <script>
   window.PN_PROTO = [
-    { name: 'Start', states: [['blank', 'New notification'], ['youtube', 'YouTube video (ready)'], ['product', 'Product (ready)'], ['template', 'From a template']] },
+    { name: 'Start', states: [['blank', 'Add template'], ['template', 'Edit a template'], ['youtube', 'YouTube video (ready)'], ['product', 'Product (ready)']] },
     { name: '“Opens when tapped” field', states: [['pick-root', 'Clicked the field'], ['pick-products', 'Products'], ['pick-search', 'Typed a search'], ['pick-link-empty', 'A link (empty)'], ['pick-link', 'A link: pasted YouTube'], ['pick-bad', 'Typed something not found']] },
     { name: 'Other', states: [['edit-audience', 'Who gets it'], ['no-match', 'No students match']] },
     { name: 'Sending', states: [['confirm', 'Confirm send'], ['no-app', 'Nobody has the app'], ['send-failed', 'Sending failed']] },
-    { name: 'Templates', states: [['save-template', 'Save as template'], ['tpl-new', 'New template'], ['tpl-edit', 'Edit a template']] },
+    { name: 'Saving', states: [['save-template', 'Name the template']] },
   ];
   window.PN_PROTO_DEFAULT = 'blank';
 
@@ -118,10 +118,12 @@
       sendError: false,
       tplPick: null,
       // Template mode: this page creates or edits a template (everything but sending)
-      tplMode: pnParam('mode') === 'template' || ['tpl-new', 'tpl-edit'].includes(pnState()),
+      tplMode: true,
       tplId: null,
       tplName: '',
       tplTried: false,
+      nameDraft: '',
+      afterName: null,
       fail: {},
       limits: PN_LIMITS,
       kinds: PN.kinds,
@@ -131,9 +133,9 @@
         const s = pnState() || 'blank';
         if (['youtube', 'confirm', 'no-app', 'send-failed', 'edit-audience'].includes(s) || pnParam('again')) this.loadYoutube();
         if (s === 'product') this.loadProduct();
-        const tplArg = Number(pnParam('template')) || (s === 'template' || s === 'tpl-edit' ? 2 : 0);
-        if (tplArg) { const t = this.templates.find(x => x.id === tplArg); this.applyTemplate(t, false); if (this.tplMode) { this.tplId = t.id; this.tplName = t.name; } }
-        if (s === 'save-template') { this.loadYoutube(); setTimeout(() => this.openSaveTemplate(), 400); }
+        const tplArg = Number(pnParam('template')) || (s === 'template' ? 2 : 0);
+        if (tplArg) { const t = this.templates.find(x => x.id === tplArg); this.applyTemplate(t, false); this.tplId = t.id; this.tplName = t.name; }
+        if (s === 'save-template') { this.loadYoutube(); setTimeout(() => this.openSaveTemplate('save'), 400); }
         if (s === 'no-match') this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }, { id: 2, type: 'product', values: ['neet-crash'] }] };
         if (s === 'no-app') this.fail.noApp = true;
         if (s === 'send-failed') this.fail.send = true;
@@ -359,7 +361,6 @@
 
       // ----- Templates -----
       get hasContent() { return !!(this.msg.title || this.msg.message); },
-      openTemplates() { this.tplPick = null; this.$dispatch('open-modal-use-template'); },
       // A template holds everything: what it opens, words, picture and who gets it. All of it stays editable.
       templateOpens(t) {
         if (t.opens && t.opens.type === 'product') return pnFind('p-' + t.opens.value);
@@ -376,14 +377,23 @@
         if (notify) pnToast('“' + t.name + '” added', 'Change anything before sending. The template stays as it is.');
       },
       templateAudience(t) { return pnAudienceText(t.audience); },
-      openSaveTemplate() { this.tplTried = false; if (!this.tplName) this.tplName = ''; this.$dispatch('open-modal-save-template'); },
-      saveTemplate() {
+      // A template needs a name; asked for the first time it's saved (or from the pencil)
+      openSaveTemplate(then) { this.tplTried = false; this.afterName = then === undefined ? 'save' : then; this.nameDraft = this.tplName; this.$dispatch('open-modal-save-template'); },
+      confirmName() {
         this.tplTried = true;
-        if (!this.tplName.trim()) return false;
-        pnToast(this.tplId ? 'Template updated' : 'Template saved', this.tplId ? 'Notifications already sent don’t change.' : 'Find it in Use a template.');
-        if (this.tplMode) setTimeout(() => { window.location.href = '{{ "/testpress/push_notifications/templates/" | url }}?state=saved'; }, 900);
+        if (!this.nameDraft.trim()) return false;
+        this.tplName = this.nameDraft.trim();
+        const next = this.afterName; this.afterName = null;
+        if (next === 'save') this.saveTemplate();
+        if (next === 'send') this.$nextTick(() => this.openConfirm());
         return true;
       },
+      saveTemplate() {
+        if (!this.tplName) return this.openSaveTemplate('save');
+        pnToast(this.tplId ? 'Template updated' : 'Template saved');
+        setTimeout(() => { window.location.href = '{{ "/testpress/push_notifications/" | url }}?state=saved'; }, 900);
+      },
+      saveAndSend() { if (!this.tplName) return this.openSaveTemplate('send'); this.openConfirm(); },
 
       // ----- Send -----
       openConfirm() { this.sendError = false; this.$dispatch('open-modal-confirm-send'); },
@@ -392,7 +402,7 @@
         this.sending = true; this.sendError = false;
         setTimeout(() => {
           if (this.fail.send) { this.fail.send = false; this.sending = false; this.sendError = true; return; }
-          window.location.href = '{{ "/testpress/push_notifications/" | url }}?state=just-sent';
+          window.location.href = '{{ "/testpress/push_notifications/" | url }}?state=sent';
         }, 1200);
       },
     }));
