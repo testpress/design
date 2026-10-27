@@ -1,0 +1,44 @@
+<script>
+  // Notification Content: what a tap opens, and filling Title, Summary and Image from a chosen product.
+  // Only fields the admin hasn't written (or uploaded) themselves are filled; their own words are never replaced.
+  const PUSH_PRODUCTS = {
+    'neet-crash': { name: 'NEET 2027 Crash Course', price: 3999, was: 4999, plans: 1, chapters: 42, hours: '300+ hours', image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=600&h=300&q=70' },
+    'jee-revision': { name: 'JEE Main Revision Batch', price: 999, plans: 3, chapters: 18, hours: '120+ hours', image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=600&h=300&q=70' },
+    'mock-series': { name: 'All India Mock Test Series', price: 999, plans: 1, tests: 30, image: 'https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&w=600&h=300&q=70' },
+    'bio-notes': { name: 'Biology Handwritten Notes', price: 0, plans: 1, chapters: 38, image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&h=300&q=70' },
+  };
+  const pushInr = (n) => '₹' + Number(n).toLocaleString('en-IN');
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('pushContent', (init = {}) => ({
+      title: init.title || '',
+      summary: init.summary || '',
+      tap: init.tap || 'home',
+      product: init.product || '',
+      // true = holds words or a picture filled from the product (safe to refill)
+      auto: { title: false, summary: false, image: false },
+      hasImage: !!init.image,
+      init() {
+        if (init.image) this.$nextTick(() => this.showImage({ name: 'neet-offer-banner.png', size: '184 KB', url: init.image }));
+      },
+      showImage(f) {
+        window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: f ? [{ progress: 100, status: 'success', extension: 'png', ...f }] : [] } }));
+      },
+      get filled() { return this.auto.title || this.auto.summary || this.auto.image; },
+      setProduct(value) {
+        this.product = value;
+        const p = PUSH_PRODUCTS[value]; if (!p) return;
+        const price = p.price === 0 ? 'Free' : p.was ? 'Now ' + pushInr(p.price) + ' (was ' + pushInr(p.was) + ')' : (p.plans > 1 ? 'From ' : '') + pushInr(p.price);
+        const inside = [p.chapters && p.chapters + ' chapters', p.tests && p.tests + ' mock tests', p.hours].filter(Boolean).join(', ');
+        if (!this.title.trim() || this.auto.title) { this.title = p.name; this.auto.title = true; }
+        if (!this.summary.trim() || this.auto.summary) { this.summary = [price, inside].filter(Boolean).join(' · ') + '. Tap to see what’s included.'; this.auto.summary = true; }
+        if (!this.hasImage || this.auto.image) { this.showImage({ name: 'From the product', size: '', url: p.image }); this.hasImage = true; this.auto.image = true; }
+      },
+      // The admin uploaded or removed a picture themselves
+      imageChanged(f) {
+        if (f && f.name === 'From the product') return;
+        this.hasImage = !!f; this.auto.image = false;
+      },
+    }));
+  });
+</script>
