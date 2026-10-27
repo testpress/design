@@ -1,0 +1,77 @@
+{# "Opens when tapped": one field, like the Review Cases search in TPSentinel.
+   Click → Products › (whole store or a product) and Courses › course › chapter › content, step by step; each level can
+   be used whole. Type → search everything, grouped, with where each item lives. Paste a link → YouTube or a website.
+   Leave empty → app home. Backspace in an empty field steps back up, then clears the choice. #}
+<div class="relative" @click.outside="pk.open = false">
+  <label for="pk-input" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Opens when tapped</label>
+
+  <div @click="$refs.pkin.focus(); pk.open = true"
+       class="relative flex flex-wrap items-center gap-1.5 min-h-[42px] ps-9 pe-9 py-1.5 bg-white border border-gray-200 rounded-lg cursor-text focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700">
+    <svg class="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+
+    {# What's chosen #}
+    <template x-if="d.opens.type !== 'home' && pk.level === 'root' && !pk.q">
+      <span class="inline-flex items-center gap-x-1.5 max-w-full py-1 ps-2 pe-1 rounded-md bg-primary-50 text-sm text-primary-800 dark:bg-primary-500/10 dark:text-primary-300">
+        <i :data-lucide="opensIcon(d.opens)" class="size-3.5 shrink-0"></i>
+        <span class="truncate" x-text="d.opens.path.join(' › ')"></span>
+        <button type="button" @click.stop="clearOpens()" aria-label="Clear" class="shrink-0 size-5 inline-flex justify-center items-center rounded hover:bg-primary-100 dark:hover:bg-primary-500/20">
+          <svg class="size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </span>
+    </template>
+
+    {# Where you are while browsing #}
+    <template x-for="(c, i) in crumbs" :key="i">
+      <span class="inline-flex items-center gap-x-1 text-sm text-gray-500 dark:text-neutral-400">
+        <span class="py-0.5 px-1.5 rounded bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200" x-text="c"></span>
+        <span>›</span>
+      </span>
+    </template>
+
+    <input x-ref="pkin" id="pk-input" type="search" autocomplete="off" spellcheck="false"
+           x-model="pk.q" @focus="pk.open = true" @keydown="pkKeydown($event)"
+           :placeholder="pk.level !== 'root' ? 'Search in ' + crumbs[crumbs.length - 1] : (d.opens.type === 'home' ? 'Search a product, course or content, or paste a link' : '')"
+           :class="d.opens.type !== 'home' && pk.level === 'root' && !pk.q ? 'min-w-[2rem]' : 'min-w-[10rem]'"
+           class="[&::-webkit-search-cancel-button]:appearance-none flex-1 p-0 py-1 bg-transparent border-0 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 dark:text-neutral-200">
+  </div>
+  <p x-show="d.opens.type === 'home'" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Leave empty to open the app’s home screen.</p>
+  <p x-show="d.opens.type !== 'home'" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400" x-text="opensWhere(d.opens) + '.'"></p>
+
+  {# Dropdown #}
+  <div x-show="pk.open" x-cloak x-transition.opacity.duration.100ms
+       class="absolute z-[90] top-[4.6rem] inset-x-0 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden dark:bg-neutral-900 dark:border-neutral-700">
+    <div x-show="pk.level !== 'root'" class="px-2 pt-2">
+      <button type="button" @mousedown.prevent="up()" class="inline-flex items-center gap-x-1 py-1 px-1.5 rounded-md text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-neutral-400 dark:hover:bg-neutral-800">
+        <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>Back
+      </button>
+    </div>
+    <ul class="p-1 max-h-80 overflow-y-auto" role="listbox">
+      <template x-for="(r, i) in pkRows" :key="pk.level + i + rowKey(r)">
+        <li>
+          <p x-show="r.head" class="px-2.5 pt-2.5 pb-1 text-xs font-medium text-gray-500 dark:text-neutral-400" x-text="r.head"></p>
+          <p x-show="r.hint" class="px-2.5 py-2 text-xs text-gray-500 dark:text-neutral-400" x-text="r.hint"></p>
+          <template x-if="r.item || r.go">
+            <button type="button" tabindex="-1" role="option" @mousedown.prevent="choose(r)" @mouseenter="pk.index = pkChoices.findIndex(c => rowKey(c) === rowKey(r))"
+                    :class="isActive(r) ? 'bg-gray-100 dark:bg-neutral-800' : ''"
+                    class="w-full flex items-center gap-x-3 py-2 px-2.5 rounded-lg text-start">
+              <template x-if="r.item && r.item.image">
+                <img :src="r.item.image" alt="" class="shrink-0 w-12 aspect-[2/1] object-cover rounded-md">
+              </template>
+              <template x-if="!(r.item && r.item.image)">
+                <span class="shrink-0 w-12 h-6 inline-flex justify-center items-center rounded-md bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-300">
+                  <i :data-lucide="r.go ? r.icon : opensIcon(r.item)" class="size-3.5"></i>
+                </span>
+              </template>
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="r.whole || (r.item ? r.item.label : r.label)"></span>
+                <span class="block truncate text-xs text-gray-500 dark:text-neutral-400" x-text="r.item ? r.item.meta : r.meta"></span>
+              </span>
+              <svg x-show="r.go" class="ms-auto shrink-0 size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              <svg x-show="r.item && isPicked(r.item)" class="ms-auto shrink-0 size-4 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+          </template>
+        </li>
+      </template>
+    </ul>
+  </div>
+</div>

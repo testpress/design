@@ -1,34 +1,38 @@
-{# Side panel: Message. Title and message with limits, optional picture (ui-system upload with thumbnail). #}
+{# Side panel: Message. What it opens comes first, because choosing it fills the title, message and picture
+   (marked "Filled from …"). Fields the admin has edited are never replaced. #}
 {% from "../../../ui-system/components/drawer.html" import drawer %}
 {% from "../../../ui-system/components/input.html" import input %}
 {% from "../../../ui-system/components/textarea.html" import textarea %}
 {% from "../../../ui-system/components/upload.html" import upload %}
 {% from "../../../ui-system/components/button.html" import button %}
 {% set label_cls = "text-sm font-medium text-gray-800 dark:text-neutral-200" %}
+{% set auto_cls = "ms-2 text-xs font-normal text-primary-700 dark:text-primary-400" %}
 
 {% call drawer(id="pn-msg", size="lg", title="Message") %}
   <template x-if="panel === 'msg'">
-    <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-      <div>
-        <div class="mb-2 flex justify-between items-baseline">
-          <label for="pn-title" class="{{ label_cls }}">Title</label>
-          <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="d.title.length + ' / ' + limits.title"></span>
-        </div>
-        {{ input(name="pn_title", id="pn-title", placeholder="e.g. New video: Thermodynamics in 20 minutes", x_model="d.title", extra_attrs='maxlength="65" autofocus') }}
+  <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+    {% include "./opens_picker.html" %}
+
+    <div>
+      <div class="mb-2 flex justify-between items-baseline">
+        <label for="pn-title" class="{{ label_cls }}">Title<span class="{{ auto_cls }}" x-text="autoNote('title')"></span></label>
+        <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="(d.title || '').length + ' / ' + limits.title"></span>
       </div>
-      <div>
-        <div class="mb-2 flex justify-between items-baseline">
-          <label for="pn-message" class="{{ label_cls }}">Message</label>
-          <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="d.message.length + ' / ' + limits.message"></span>
-        </div>
-        {{ textarea(name="pn_message", id="pn-message", rows="4", placeholder="e.g. Watch it before Saturday’s test.", x_model="d.message", extra_attrs='maxlength="240"') }}
-        <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">iPhones show about 2 lines; tap to read the rest.</p>
-      </div>
-      <div @file-upload-changed="const f = $event.detail.files[0]; d.image = f ? { name: f.name, url: f.url, from: (d.image && d.image.url === f.url) ? d.image.from : null } : null">
-        {{ upload(name="push_image", label="Picture (optional)", max_size="1MB", accepted_formats="png,jpg,jpeg", help_text="PNG or JPG up to 1 MB. Shown 2:1 on Android, small on iPhone.", icon="image-plus", preview_class="h-12 aspect-[2/1] object-cover rounded-lg") }}
-      </div>
-      <p x-show="panelError('msg')" class="text-sm text-red-600 dark:text-red-400" x-text="panelError('msg')"></p>
+      {{ input(name="pn_title", id="pn-title", placeholder="e.g. New video: Thermodynamics in 20 minutes", x_model="d.title", extra_attrs='maxlength="65" @input="edited(\'title\')"') }}
     </div>
+    <div>
+      <div class="mb-2 flex justify-between items-baseline">
+        <label for="pn-message" class="{{ label_cls }}">Message<span class="{{ auto_cls }}" x-text="autoNote('message')"></span></label>
+        <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="(d.message || '').length + ' / ' + limits.message"></span>
+      </div>
+      {{ textarea(name="pn_message", id="pn-message", rows="3", placeholder="e.g. Watch it before Saturday’s test.", x_model="d.message", extra_attrs='maxlength="240" @input="edited(\'message\')"') }}
+      <p class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">iPhones show about 2 lines; tap to read the rest.</p>
+    </div>
+    <div @file-upload-changed="const f = $event.detail.files[0]; if (f && /^From /.test(f.size)) return; d.image = f ? { name: f.name, url: f.url } : null; edited('image')">
+      {{ upload(name="push_image", label="Picture (optional)", max_size="1MB", accepted_formats="png,jpg,jpeg", help_text="PNG or JPG up to 1 MB. Shown 2:1 on Android, small on iPhone.", icon="image-plus", preview_class="h-12 aspect-[2/1] object-cover rounded-lg") }}
+    </div>
+    <p x-show="panelError('msg')" class="text-sm text-red-600 dark:text-red-400" x-text="panelError('msg')"></p>
+  </div>
   </template>
 
   <div class="p-4 border-t border-gray-200 dark:border-neutral-700 flex justify-end gap-2">

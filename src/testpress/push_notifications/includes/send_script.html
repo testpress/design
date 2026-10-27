@@ -1,27 +1,50 @@
 <script>
   window.PN_PROTO = [
-    { name: 'Start', states: [['blank', 'New notification'], ['youtube', 'Promote a YouTube video (ready)'], ['template', 'From a template']] },
-    { name: 'When they tap (side panel)', states: [['edit-youtube', 'Pasted a YouTube link'], ['edit-testpress', 'Pasted a Testpress link'], ['edit-web', 'Pasted another website'], ['edit-bad', 'Link not valid'], ['edit-product', 'A product']] },
-    { name: 'Other side panels', states: [['edit-message', 'Message'], ['edit-audience', 'Who gets it'], ['no-match', 'No students match']] },
+    { name: 'Start', states: [['blank', 'New notification'], ['youtube', 'YouTube video (ready)'], ['content', 'Live class (ready)'], ['template', 'From a template']] },
+    { name: '“Opens when tapped” field', states: [['pick-root', 'Clicked the field'], ['pick-products', 'Products'], ['pick-course', 'Inside a course'], ['pick-chapter', 'Inside a chapter'], ['pick-search', 'Typed a search'], ['pick-link', 'Pasted a YouTube link'], ['pick-bad', 'Typed something not found']] },
+    { name: 'Other', states: [['edit-audience', 'Who gets it'], ['no-access', 'Some students can’t open it'], ['no-match', 'No students match']] },
     { name: 'Sending', states: [['confirm', 'Confirm send'], ['no-app', 'Nobody has the app'], ['send-failed', 'Sending failed']] },
   ];
   window.PN_PROTO_DEFAULT = 'blank';
 
   const PN_LIMITS = { title: 65, message: 240 };
-  const PN_SAMPLE = {
-    youtube: 'https://www.youtube.com/watch?v=k3Xq2-thermo',
-    testpress: 'https://brilliantpala.testpress.in/courses/physics-11/chapter-4/thermodynamics-lecture-3/',
-    web: 'https://nta.ac.in/neet-2027-notice',
-    bad: 'youtube thermodynamics video',
+  const PN_YT = 'https://www.youtube.com/watch?v=k3Xq2-thermo';
+  const PN_TREE = PN.courseTree;
+  const PN_ACCESS = Object.fromEntries(PN_TREE.map(c => [c.id, c.access]));
+  // Everything that can be opened, flat, each with the path shown under it
+  const PN_INDEX = [];
+  PN.products.forEach(p => PN_INDEX.push({ id: 'p-' + p.value, type: 'product', label: p.label, meta: 'Product · ' + p.meta, image: p.image, path: ['Products', p.label] }));
+  PN_TREE.forEach(c => {
+    PN_INDEX.push({ id: 'c-' + c.id, type: 'course', label: c.label, meta: 'Course · ' + c.access.toLocaleString('en-IN') + ' students have access', image: c.image, course: c.id, path: [c.label] });
+    c.chapters.forEach(ch => {
+      PN_INDEX.push({ id: 'ch-' + ch.id, type: 'chapter', label: ch.label, meta: 'Chapter · ' + c.label, image: c.image, course: c.id, chapter: ch.id, path: [c.label, ch.label] });
+      ch.items.forEach(it => PN_INDEX.push({ ...it, type: 'content', meta: PN.kinds[it.kind].label + ' · ' + (it.when || c.label + ' › ' + ch.label.split(' · ')[0]), image: it.image || null, course: c.id, chapter: ch.id, path: [c.label, ch.label.split(' · ')[0], it.label] }));
+    });
+  });
+  const pnFind = (id) => pnCopy(PN_INDEX.find(x => x.id === id));
+  const pnIsUrl = (u) => /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i.test((u || '').trim());
+  const pnLink = (u) => {
+    u = (u || '').trim();
+    if (/youtu\.?be/i.test(u)) return { type: 'link', site: 'youtube', label: PN.links.youtube.title, meta: 'YouTube · opens in the YouTube app', image: PN.links.youtube.image, url: u, path: ['YouTube', PN.links.youtube.title] };
+    const site = u.replace(/^https?:\/\//, '').split('/')[0];
+    return { type: 'link', site, label: site, meta: 'Website · opens in the browser', image: PN.links.web.image, title: PN.links.web.title, url: u, path: [site] };
   };
-  // What a pasted link is, and what a tap will do (prototype: recognised by what's in the address)
-  const pnDetect = (url) => {
-    const u = (url || '').trim();
-    if (!u) return null;
-    if (!/^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i.test(u)) return { kind: 'bad' };
-    if (/youtu\.?be/i.test(u)) return { ...PN.links.youtube, kind: 'youtube' };
-    if (/testpress|brilliantpala/i.test(u)) return { ...PN.links.testpress, kind: 'testpress' };
-    return { ...PN.links.web, kind: 'web', site: u.replace(/^https?:\/\//, '').split('/')[0] };
+  // Words to start from for what it opens: [title, message]
+  const pnWords = (o) => {
+    if (!o || o.type === 'home') return null;
+    const l = o.label, when = o.when || '';
+    if (o.type === 'link') return o.site === 'youtube' ? [l, 'New video on our YouTube channel. Tap to watch.'] : [o.title || l, 'Tap to read more.'];
+    if (o.type === 'store') return ['New in the store', 'Courses and test series for your exam. Tap to see them.'];
+    if (o.type === 'product') return [l + ' is open', 'Seats are limited. Tap to see what’s inside and join today.'];
+    if (o.type === 'course') return ['New in ' + l, 'Fresh lessons are up. Tap to continue where you left off.'];
+    if (o.type === 'chapter') return [l.split(' · ')[1] || l, 'A new chapter is up. Tap to start it.'];
+    return ({
+      video: ['New video: ' + l, 'Watch it before your next class.'],
+      test: [l + ' is open', 'Take it today and see where you stand.'],
+      exam: [l, when + '. Revise and be ready on time.'],
+      notes: ['New notes: ' + l, 'Quick revision for the chapter.'],
+      live: ['Live class: ' + l, when + '. Tap to join on time.'],
+    })[o.kind];
   };
   const pnEmptyRow = () => ({ id: Date.now() + Math.random(), type: 'batch', values: [], field: '' });
   const pnEstimate = (a, noMatch) => {
@@ -30,47 +53,56 @@
     const rows = (a.rows || []).filter(r => r.values.length);
     if (!rows.length) return null;
     if (noMatch && a.match === 'all') return 0;
-    const base = rows.reduce((t, r) => t + r.values.length * ({ product: 820, course: 1640, batch: 1180, field: 2300, students: 1 })[r.type], 0);
+    const base = rows.reduce((t, r) => t + r.values.reduce((s, v) => s + (r.type === 'course' && PN_ACCESS[v] ? PN_ACCESS[v] : ({ product: 820, course: 1640, batch: 1180, field: 2300, students: 1 })[r.type]), 0), 0);
     return a.match === 'all' && rows.length > 1 ? Math.round(base / 3.4) : base;
   };
+  const PN_HOME = { type: 'home', label: 'App home', meta: 'Opens the app’s home screen', path: [] };
+  const pnPicker = () => ({ open: false, q: '', level: 'root', course: null, chapter: null, index: 0 });
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('pushSend', () => ({
       // The notification as it is now. Side panels edit a copy (`d`), so Cancel changes nothing.
-      opens: { type: 'home', url: '', product: '', useLink: true },
-      msg: { title: '', message: '', image: null },
+      // `auto` marks fields still holding words filled from what it opens; an admin's own edits are never replaced.
+      msg: { opens: pnCopy(PN_HOME), title: '', message: '', image: null, auto: { title: false, message: false, image: false } },
       audience: { mode: '', match: 'any', rows: [] },
-      d: { useLink: true },
+      d: { opens: pnCopy(PN_HOME), auto: {}, title: '', message: '' },
       panel: '',
       tried: false,
+      pk: pnPicker(),   // the "Opens when tapped" field
       device: 'android',
       sending: false,
       sendError: false,
       tplPick: null,
       fail: {},
       limits: PN_LIMITS,
+      kinds: PN.kinds,
       templates: PN.templates,
-      products: PN.products,
 
       init() {
         const s = pnState() || 'blank';
-        if (['youtube', 'confirm', 'no-app', 'send-failed', 'edit-message', 'edit-audience'].includes(s)) this.loadYoutube();
+        if (['youtube', 'confirm', 'no-app', 'send-failed', 'edit-audience'].includes(s) || pnParam('again')) this.loadYoutube();
+        if (['content', 'no-access'].includes(s)) this.loadLive();
         if (s === 'template' || pnParam('template')) this.applyTemplate(this.templates.find(t => t.id === Number(pnParam('template') || 2)), false);
-        if (pnParam('again')) this.loadYoutube();
+        if (s === 'no-access') this.audience = { mode: 'all', match: 'any', rows: [] };
         if (s === 'no-match') this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }, { id: 2, type: 'product', values: ['neet-crash'] }] };
         if (s === 'no-app') this.fail.noApp = true;
         if (s === 'send-failed') this.fail.send = true;
-        const link = { 'edit-youtube': 'youtube', 'edit-testpress': 'testpress', 'edit-web': 'web', 'edit-bad': 'bad' }[s];
-        if (link) setTimeout(() => { this.open('opens'); this.d.type = 'link'; this.d.url = PN_SAMPLE[link]; this.tried = link === 'bad'; }, 400);
-        if (s === 'edit-product') setTimeout(() => { this.open('opens'); this.d.type = 'product'; }, 400);
-        const panels = { 'edit-message': 'msg', 'edit-audience': 'audience', 'no-match': 'audience' };
+        const picker = { 'pick-root': () => {}, 'pick-products': () => this.goLevel('products'), 'pick-course': () => this.goCourse('phy-11'), 'pick-chapter': () => { this.goCourse('phy-11'); this.goChapter('phy-4'); },
+          'pick-search': () => { this.pk.q = 'thermo'; }, 'pick-link': () => { this.pk.q = PN_YT; }, 'pick-bad': () => { this.pk.q = 'organic chemistry crash'; } }[s];
+        if (picker) setTimeout(() => { this.open('msg'); setTimeout(() => { this.pk.open = true; picker(); pnIcons(); }, 350); }, 300);
+        const panels = { 'edit-audience': 'audience', 'no-match': 'audience' };
         if (panels[s]) setTimeout(() => this.open(panels[s]), 400);
         if (['confirm', 'no-app', 'send-failed'].includes(s)) setTimeout(() => this.openConfirm(), 400);
+        this.$watch('pk.q', () => { this.pk.index = 0; pnIcons(); });
       },
       loadYoutube() {
-        const y = PN.links.youtube;
-        this.opens = { type: 'link', url: PN_SAMPLE.youtube, product: '', useLink: true };
-        this.msg = { title: y.title, message: 'New video on our YouTube channel. Watch it before Saturday’s test.', image: { name: 'YouTube thumbnail', url: y.image, from: 'youtube' } };
+        const o = pnLink(PN_YT);
+        this.msg = { opens: o, title: o.label, message: 'New video on our YouTube channel. Watch it before Saturday’s test.', image: { name: 'YouTube thumbnail', url: o.image, from: 'the video' }, auto: { title: true, message: false, image: true } };
+        this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['phy-11'] }] };
+      },
+      loadLive() {
+        const o = pnFind('l-doubt'), w = pnWords(o);
+        this.msg = { opens: o, title: w[0], message: w[1], image: null, auto: { title: true, message: true, image: false } };
         this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['phy-11'] }] };
       },
 
@@ -79,23 +111,21 @@
         this.tried = false;
         this.d = pnCopy(this[key]);
         if (key === 'audience') {
-          if (!this.d.mode) this.d.mode = 'some';
+          if (!this.d.mode) { const sg = this.audienceSuggestion; this.d = sg ? pnCopy(sg.audience) : { mode: 'some', match: 'any', rows: [] }; }
           if (this.d.mode === 'some' && !this.d.rows.length) this.d.rows.push(pnEmptyRow());
         }
+        if (key === 'msg') this.pk = pnPicker();
         this.panel = key;
         window.dispatchEvent(new CustomEvent('open-drawer-pn-' + key));
-        this.$nextTick(() => {
-          if (key === 'msg') window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: this.d.image ? [{ name: this.d.image.name, size: this.d.image.from === 'youtube' ? 'From the YouTube video' : this.d.image.from === 'web' ? 'From the web page' : '184 KB', progress: 100, status: 'success', extension: 'png', url: this.d.image.url }] : [] } }));
-          pnIcons();
-        });
+        this.$nextTick(() => { if (key === 'msg') this.showImage(); pnIcons(); });
+      },
+      showImage() {
+        const i = this.d.image;
+        window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: i ? [{ name: i.name, size: i.from ? 'From ' + i.from : '184 KB', progress: 100, status: 'success', extension: 'png', url: i.url }] : [] } }));
       },
       close() { window.dispatchEvent(new CustomEvent('close-drawer-pn-' + this.panel)); },
       panelError(key) {
         const d = this.d; if (!this.tried || this.panel !== key) return '';
-        if (key === 'opens') {
-          if (d.type === 'link' && (!d.url || !this.link || this.link.kind === 'bad')) return 'Paste a full link, like https://youtube.com/watch?v=…';
-          if (d.type === 'product' && !d.product) return 'Choose a product.';
-        }
         if (key === 'msg') { if (!d.title.trim()) return 'Add a title.'; if (!d.message.trim()) return 'Add a message.'; }
         if (key === 'audience' && d.mode === 'some' && !d.rows.some(r => r.values.length)) return 'Choose at least one batch, course, product, field or student.';
         return '';
@@ -103,36 +133,128 @@
       apply() {
         this.tried = true;
         if (this.panelError(this.panel)) return;
-        const k = this.panel;
-        this[k] = pnCopy(this.d);
-        // A link's title and picture can fill the message
-        if (k === 'opens' && this.d.type === 'link' && this.d.useLink && this.link && this.link.image !== undefined) {
-          const l = this.link;
-          if (!this.msg.title.trim()) this.msg.title = l.title.slice(0, 65);
-          if (l.image && (!this.msg.image || this.msg.image.from)) this.msg.image = { name: l.kind === 'youtube' ? 'YouTube thumbnail' : l.site + ' – page image', url: l.image, from: l.kind };
-          pnToast('Title and image added', 'Taken from the ' + (l.kind === 'youtube' ? 'video' : 'page') + '. Change them in Message.');
-        }
-        if (k === 'opens' && this.d.type === 'link' && this.link && this.link.kind === 'testpress' && this.d.useLink && !this.msg.title.trim()) this.msg.title = 'New: ' + this.link.title;
+        this[this.panel] = pnCopy(this.d);
         this.close();
       },
 
-      // ----- When they tap -----
-      // The link being typed in the panel (or the saved one)
-      get link() { return pnDetect(this.panel === 'opens' ? this.d.url : this.opens.url); },
-      get savedLink() { return this.opens.type === 'link' ? pnDetect(this.opens.url) : null; },
-      productLabel(v) { const p = this.products.find(p => p.value === v); return p ? p.label : ''; },
-      get opensTitle() {
-        const o = this.opens, l = this.savedLink;
-        if (o.type === 'link' && l) return ({ youtube: 'YouTube video · ' + l.title, testpress: l.kind && l.title, web: l.site })[l.kind] || o.url;
-        return ({ home: 'App home', store: 'Store', product: this.productLabel(o.product) })[o.type] || '';
+      // ----- "Opens when tapped": click to browse (Products › … / Courses › course › chapter › content), type to search, paste a link -----
+      goLevel(level) { this.pk.level = level; this.pk.q = ''; this.pk.index = 0; pnIcons(); },
+      goCourse(id) { this.pk.course = id; this.pk.chapter = null; this.goLevel('course'); },
+      goChapter(id) { this.pk.chapter = id; this.goLevel('chapter'); },
+      up() {
+        const l = this.pk.level;
+        if (l === 'chapter') this.goLevel('course');
+        else if (l === 'course') this.goLevel('courses');
+        else if (l !== 'root') this.goLevel('root');
       },
-      get opensMeta() {
-        const o = this.opens, l = this.savedLink;
-        if (o.type === 'link' && l) return ({ youtube: 'Opens in the YouTube app', testpress: l.kind && ('Opens in the app · ' + PN.links.testpress.kind + ' · ' + PN.links.testpress.where), web: 'Opens in the browser' })[l.kind] || '';
-        return ({ home: 'Opens the app’s home screen', store: 'Opens your course store', product: 'Opens the product page in the app' })[o.type] || '';
+      get pkCourse() { return PN_TREE.find(c => c.id === this.pk.course) || { chapters: [] }; },
+      get pkChapter() { return this.pkCourse.chapters.find(c => c.id === this.pk.chapter) || { items: [], label: '' }; },
+      // Where you are while browsing, shown in the field
+      get crumbs() {
+        const l = this.pk.level;
+        if (l === 'products') return ['Products'];
+        if (l === 'courses') return ['Courses'];
+        if (l === 'course') return [this.pkCourse.label];
+        if (l === 'chapter') return [this.pkCourse.label, this.pkChapter.label.split(' · ')[0]];
+        return [];
       },
+      // Dropdown rows: { head } group heading, { item } to pick, { go } to step into, { hint } a note
+      get pkRows() {
+        const q = this.pk.q.trim().toLowerCase(), l = this.pk.level, rows = [];
+        const match = (x) => !q || (x.label + ' ' + (x.meta || '')).toLowerCase().includes(q);
+        if (l === 'root' && q && pnIsUrl(this.pk.q)) return [{ head: 'Link' }, { item: pnLink(this.pk.q) }];
+        if (l === 'root' && !q) return [
+          { go: 'products', label: 'Products', meta: 'The whole store, or one product', icon: 'shopping-bag' },
+          { go: 'courses', label: 'Courses', meta: 'A course, chapter, video, test, exam, notes or live class', icon: 'book-open' },
+          { hint: 'Or paste a link — a YouTube video or any website' },
+        ];
+        if (l === 'root') {
+          [['product', 'Products'], ['course', 'Courses'], ['chapter', 'Chapters'], ['content', 'Content']].forEach(([t, h]) => {
+            const found = PN_INDEX.filter(x => x.type === t && match(x)).slice(0, 5);
+            if (found.length) rows.push({ head: h }, ...found.map(x => ({ item: x })));
+          });
+          if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '”. To open a website, paste its full address.' });
+          return rows;
+        }
+        if (l === 'products') {
+          if (!q || 'all products store'.includes(q)) rows.push({ item: { id: 'store', type: 'store', label: 'All products (store)', meta: 'Opens your course store', image: null, path: ['All products'] } });
+          PN_INDEX.filter(x => x.type === 'product' && match(x)).forEach(x => rows.push({ item: x }));
+        }
+        if (l === 'courses') PN_TREE.filter(c => match(c)).forEach(c => rows.push({ go: 'course', id: c.id, label: c.label, meta: c.access.toLocaleString('en-IN') + ' students have access', icon: 'book-open' }));
+        if (l === 'course') {
+          const c = this.pkCourse;
+          if (!q) {
+            rows.push({ item: pnFind('c-' + c.id), whole: 'Use the whole course' });
+            const up = PN_INDEX.filter(x => x.course === c.id && x.upcoming);
+            if (up.length) rows.push({ head: 'Upcoming' }, ...up.map(x => ({ item: x })));
+            rows.push({ head: 'Chapters' }, ...c.chapters.map(ch => ({ go: 'chapter', id: ch.id, label: ch.label, meta: ch.items.length + (ch.items.length === 1 ? ' item' : ' items'), icon: 'folder' })));
+          } else PN_INDEX.filter(x => x.course === c.id && x.type !== 'course' && match(x)).forEach(x => rows.push({ item: x }));
+        }
+        if (l === 'chapter') {
+          if (!q) rows.push({ item: pnFind('ch-' + this.pk.chapter), whole: 'Use the whole chapter' });
+          PN_INDEX.filter(x => x.chapter === this.pk.chapter && x.type === 'content' && match(x)).forEach(x => rows.push({ item: x }));
+        }
+        if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '” here' });
+        return rows;
+      },
+      get pkChoices() { return this.pkRows.filter(r => r.item || r.go); },
+      rowKey(r) { return !r ? '' : r.go ? 'go:' + r.go + (r.id || '') : r.item ? 'item:' + (r.item.id || r.item.url) : (r.head || r.hint || ''); },
+      isActive(r) { const c = this.pkChoices[this.pk.index]; return !!c && this.rowKey(c) === this.rowKey(r); },
+      isPicked(o) { const p = this.d.opens; return !!o && !!p && p.type !== 'home' && (p.id ? p.id === o.id : p.url === o.url); },
+      choose(r) {
+        if (r.go === 'course') return this.goCourse(r.id);
+        if (r.go === 'chapter') return this.goChapter(r.id);
+        if (r.go) return this.goLevel(r.go);
+        this.pick(r.item);
+      },
+      pick(o) { this.d.opens = pnCopy(o); this.pk = pnPicker(); this.prefill(); pnIcons(); },
+      clearOpens() { this.d.opens = pnCopy(PN_HOME); this.pk = pnPicker(); this.prefill(); },
+      pkKeydown(ev) {
+        const list = this.pkChoices;
+        if (ev.key === 'ArrowDown' && list.length) { ev.preventDefault(); this.pk.open = true; this.pk.index = (this.pk.index + 1) % list.length; }
+        else if (ev.key === 'ArrowUp' && list.length) { ev.preventDefault(); this.pk.index = (this.pk.index - 1 + list.length) % list.length; }
+        else if (ev.key === 'Enter') { ev.preventDefault(); if (list[this.pk.index]) this.choose(list[this.pk.index]); }
+        else if (ev.key === 'Backspace' && !this.pk.q) { if (this.pk.level !== 'root') this.up(); else if (this.d.opens.type !== 'home') this.clearOpens(); }
+        else if (ev.key === 'Escape') this.pk.open = false;
+      },
+      // Fill title, message and picture from what it opens — only fields the admin hasn't written themselves
+      prefill() {
+        const o = this.d.opens, w = pnWords(o), a = this.d.auto || (this.d.auto = {});
+        ['title', 'message'].forEach((k, i) => {
+          if (!this.d[k].trim() || a[k]) { this.d[k] = w ? w[i].slice(0, k === 'title' ? 65 : 240) : ''; a[k] = !!w; }
+        });
+        if (!this.d.image || a.image) {
+          const url = o.image || (['content', 'chapter'].includes(o.type) && o.kind !== 'test' && o.kind !== 'exam' ? (PN_TREE.find(c => c.id === o.course) || {}).image : null);
+          this.d.image = url ? { name: o.label + ' – picture', url, from: this.sourceName(o) } : null;
+          a.image = !!url;
+          this.$nextTick(() => this.showImage());
+        }
+      },
+      sourceName(o) {
+        if (o.type === 'content') return 'the ' + PN.kinds[o.kind].label.toLowerCase();
+        return ({ product: 'the product', store: 'the store', course: 'the course', chapter: 'the chapter', link: o.site === 'youtube' ? 'the video' : 'the page' })[o.type] || '';
+      },
+      edited(k) { if (this.d.auto) this.d.auto[k] = false; },
+      autoNote(k) { return this.d.auto && this.d.auto[k] ? 'Filled from ' + this.sourceName(this.d.opens) : ''; },
+      opensIcon(o) { if (!o) return 'circle'; return o.type === 'content' ? PN.kinds[o.kind].icon : ({ product: 'shopping-bag', store: 'store', course: 'book-open', chapter: 'folder-open', link: o.site === 'youtube' ? 'circle-play' : 'globe', home: 'house' })[o.type]; },
+      opensWhere(o) { return o.type === 'link' ? (o.site === 'youtube' ? 'Opens in the YouTube app' : 'Opens in the browser') : o.type === 'home' ? 'Opens the app’s home screen' : o.type === 'store' ? 'Opens your course store' : 'Opens in the app'; },
+      get opensMeta() { return this.opensWhere(this.msg.opens); },
+      get opensTitle() { const o = this.msg.opens; return o.type === 'home' ? 'App home' : o.path.join(' › '); },
 
       // ----- Who gets it -----
+      get accessCourse() { const o = this.msg.opens; return ['course', 'chapter', 'content'].includes(o.type) ? o.course : null; },
+      get audienceSuggestion() {
+        if (!this.accessCourse) return null;
+        return { title: 'Students with access to ' + pnOptLabel('course', this.accessCourse), count: PN_ACCESS[this.accessCourse],
+                 audience: { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: [this.accessCourse] }] } };
+      },
+      get cantOpen() {
+        const c = this.accessCourse, a = this.audience;
+        if (!c || !a.mode || !this.estimate) return 0;
+        const only = a.mode === 'some' && a.rows.length && a.rows.every(r => r.type === 'course' && r.values.length === 1 && r.values[0] === c);
+        return only ? 0 : Math.max(0, this.estimate - PN_ACCESS[c]);
+      },
+      useSuggestion() { this.audience = pnCopy(this.audienceSuggestion.audience); pnToast('Who gets it updated', 'Only students who can open it will get it.'); },
       dEstimate() { return this.panel === 'audience' ? pnEstimate(this.d, pnState() === 'no-match') : null; },
       get estimate() { return pnEstimate(this.audience, pnState() === 'no-match'); },
       withApp(n) { return this.fail.noApp ? 0 : Math.round((n || 0) * PN.appShare); },
@@ -148,18 +270,17 @@
       removeRow(row) { this.d.rows = this.d.rows.filter(r => r.id !== row.id); },
       setType(row, type) { row.type = type; row.values = []; row.field = ''; },
 
-      // ----- Status of each row -----
+      // ----- Status of each row: done | todo | problem | warn (a warning doesn't block sending) -----
       get rows() {
         const r = {};
-        r.opens = ['done', ''];
-        r.msg = this.msg.title && this.msg.message ? ['done', ''] : ['todo', 'Add a title and message'];
+        r.msg = this.msg.title && this.msg.message ? ['done', ''] : ['todo', 'What it opens, title, message and picture'];
         if (!this.audience.mode) r.audience = ['todo', 'Choose who should get it'];
         else if (this.estimate === 0) r.audience = ['problem', 'No student matches these conditions'];
         else if (this.estimate === null) r.audience = ['todo', 'Choose at least one condition'];
-        else r.audience = ['done', ''];
+        else r.audience = [this.cantOpen ? 'warn' : 'done', ''];
         return r;
       },
-      get leftItems() { const n = { opens: 'When they tap', msg: 'Message', audience: 'Who gets it' }; return Object.entries(this.rows).filter(([k, v]) => v[0] !== 'done').map(([k]) => n[k]); },
+      get leftItems() { const n = { msg: 'Message', audience: 'Who gets it' }; return Object.entries(this.rows).filter(([k, v]) => v[0] === 'todo' || v[0] === 'problem').map(([k]) => n[k]); },
       get ready() { return this.leftItems.length === 0; },
 
       // ----- Templates -----
@@ -167,7 +288,8 @@
       openTemplates() { this.tplPick = null; this.$dispatch('open-modal-use-template'); },
       applyTemplate(t, notify = true) {
         if (!t) return;
-        this.msg = { title: t.title, message: t.message, image: t.image ? { name: 'template-image.png', url: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=600&h=300&q=70' } : this.msg.image };
+        this.msg = { ...this.msg, title: t.title, message: t.message, auto: { title: false, message: false, image: false },
+                     image: t.image ? { name: 'template-image.png', url: PN.products[0].image } : this.msg.image };
         if (notify) pnToast('“' + t.name + '” added', 'Change anything you like. The template stays as it is.');
       },
 
