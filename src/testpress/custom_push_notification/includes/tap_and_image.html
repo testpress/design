@@ -1,0 +1,92 @@
+{# Added to the existing Notification Content section: what a tap opens, and an optional image.
+   "When tapped, open" is one select-like field: click for Products › (store or one product) or A link; typing filters
+   products; leave empty for app home.
+   State lives in the section's `pushContent` (includes/tap_script.html); a choice fills only the Image. #}
+{% from "../../../ui-system/components/image_upload.html" import image_upload %}
+{% set label_cls = "block text-sm font-medium leading-6 text-gray-900" %}
+
+<div class="col-span-full sm:ml-4">
+<div class="relative" @click.outside="pk.open = false">
+  <label for="pk-input" class="block mb-2 text-sm font-medium leading-6 text-gray-900">When tapped, open</label>
+
+  <div @click="$refs.pkin.focus(); pk.open = true"
+       :class="pk.level === 'link' ? 'ps-9' : 'ps-3'"
+       class="relative flex flex-wrap items-center gap-1.5 min-h-[42px] pe-16 py-1.5 bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700">
+    <svg x-show="pk.level === 'link'" class="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+
+    {# What's chosen, shown like a select's value (Preline advanced select): icon, name, where it lives #}
+    <template x-if="opens.type !== 'home' && pk.level === 'root' && !pk.q">
+      <span class="flex items-center gap-x-2 min-w-0 max-w-full">
+        <span class="shrink-0 inline-flex"><i :data-lucide="opensIcon(opens)" class="size-4 text-gray-500"></i></span>
+        <span class="truncate text-sm text-gray-800 dark:text-neutral-200" x-text="opens.label"></span>
+        <span x-show="opens.path.length > 1" class="truncate text-sm text-gray-400" x-text="opens.path.slice(0, -1).join(' › ')"></span>
+      </span>
+    </template>
+
+    {# Where you are while browsing #}
+    <template x-for="(c, i) in crumbs" :key="i + c">
+      <span class="inline-flex items-center gap-x-1 text-sm text-gray-400">
+        <span class="py-0.5 px-1.5 rounded bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200" x-text="c"></span>›
+      </span>
+    </template>
+
+    <div class="absolute end-2.5 top-1/2 -translate-y-1/2 flex items-center gap-x-1">
+      <button type="button" x-show="opens.type !== 'home'" @click.stop="clearOpens()" aria-label="Clear"
+              class="size-6 inline-flex justify-center items-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-neutral-700">
+        <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+    </div>
+    <input x-ref="pkin" id="pk-input" type="search" autocomplete="off" spellcheck="false"
+           x-model="pk.q" @focus="pk.open = true" @keydown="pkKeydown($event)"
+           :placeholder="pk.level === 'link' ? 'https://' : pk.level !== 'root' ? 'Type to filter' : (opens.type === 'home' ? 'Choose a product or link' : '')"
+           :class="opens.type !== 'home' && pk.level === 'root' && !pk.q ? 'min-w-[2rem]' : 'min-w-[8rem]'"
+           class="[&::-webkit-search-cancel-button]:appearance-none flex-1 p-0 py-1 bg-transparent border-0 text-sm text-gray-800 placeholder:text-gray-400 focus:ring-0 dark:text-neutral-200">
+  </div>
+  <p x-show="opens.type === 'home'" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Leave empty to open the app’s home screen.</p>
+  <p x-show="opens.type !== 'home'" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400" x-text="opensWhere(opens) + '.'"></p>
+  <p x-show="opens.type !== 'home' && (auto.image || auto.title)" x-cloak class="mt-1 text-xs text-primary-700" x-text="(auto.title && auto.image ? 'Title and image' : auto.title ? 'Title' : 'Image') + ' filled from ' + fillSource + '. Change anything.'"></p>
+
+  {# Dropdown: heading, then one-line rows (icon, name, hint) #}
+  <div x-show="pk.open" x-cloak x-transition.opacity.duration.100ms
+       class="absolute z-[90] top-[4.9rem] start-0 w-full sm:w-96 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden dark:bg-neutral-900 dark:border-neutral-700">
+    <div class="flex items-center gap-x-1 px-2 pt-2 pb-1">
+      <button type="button" x-show="pk.level !== 'root'" @mousedown.prevent="up()" aria-label="Back"
+              class="shrink-0 size-6 inline-flex justify-center items-center rounded-md text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-neutral-400 dark:hover:bg-neutral-800">
+        <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </button>
+      <p class="px-1 truncate text-xs text-gray-500 dark:text-neutral-400" x-text="pkHeading"></p>
+    </div>
+    <ul class="p-1 max-h-72 overflow-y-auto" role="listbox">
+      <template x-for="(r, i) in pkRows" :key="pk.level + i + rowKey(r)">
+        <li>
+          <p x-show="r.head" class="px-2.5 pt-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-gray-400" x-text="r.head"></p>
+          <p x-show="r.hint" class="px-2.5 py-2 text-xs text-gray-500 dark:text-neutral-400" x-text="r.hint"></p>
+          <template x-if="r.item || r.go">
+            <button type="button" tabindex="-1" role="option" @mousedown.prevent="choose(r)" @mouseenter="pk.index = pkChoices.findIndex(c => rowKey(c) === rowKey(r))"
+                    :class="isActive(r) ? 'bg-gray-100 dark:bg-neutral-800' : ''"
+                    class="w-full flex items-center gap-x-2.5 py-2 px-2.5 rounded-lg text-sm text-start text-gray-800 dark:text-neutral-200">
+              <template x-if="r.item && r.item.type === 'link' && r.item.image">
+                <img :src="r.item.image" alt="" class="shrink-0 w-10 aspect-video object-cover rounded">
+              </template>
+              <template x-if="!(r.item && r.item.type === 'link' && r.item.image)">
+                <span class="shrink-0 inline-flex"><i :data-lucide="r.go ? r.icon : opensIcon(r.item)" class="size-4 text-gray-400"></i></span>
+              </template>
+              <span class="truncate" :class="r.whole && 'font-medium'" x-text="r.whole || (r.item ? r.item.label : r.label)"></span>
+              <span class="ms-auto shrink-0 max-w-[45%] truncate text-xs text-gray-400" x-text="r.sub || (r.item ? r.item.hint || r.item.meta : r.side)"></span>
+              <svg x-show="r.go" class="shrink-0 size-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+              <svg x-show="r.item && isPicked(r.item)" class="shrink-0 size-3.5 text-primary-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </button>
+          </template>
+        </li>
+      </template>
+    </ul>
+  </div>
+</div>
+</div>
+
+<div class="col-span-full sm:ml-4">
+  <div @file-upload-changed.stop="imageChanged($event.detail.files[0])">
+    {{ image_upload(name="push_image", label="Image (optional)", max_size="1MB", accepted_formats="png,jpg,jpeg", help_text="PNG or JPG up to 1 MB. Shown 2:1 below the text on Android, small on iPhone.") }}
+  </div>
+</div>

@@ -1,0 +1,164 @@
+<script>
+  // Notification Content: what a tap opens, and filling Title, Summary and Image from a chosen product.
+  // Only fields the admin hasn't written (or uploaded) themselves are filled; their own words are never replaced.
+  const PUSH_PRODUCTS = {
+    'neet-crash': { name: 'NEET 2027 Crash Course', price: 3999, was: 4999, plans: 1, chapters: 42, hours: '300+ hours', image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=600&h=300&q=70' },
+    'jee-revision': { name: 'JEE Main Revision Batch', price: 999, plans: 3, chapters: 18, hours: '120+ hours', image: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?auto=format&fit=crop&w=600&h=300&q=70' },
+    'mock-series': { name: 'All India Mock Test Series', price: 999, plans: 1, tests: 30, image: 'https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?auto=format&fit=crop&w=600&h=300&q=70' },
+    'bio-notes': { name: 'Biology Handwritten Notes', price: 0, plans: 1, chapters: 38, image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&h=300&q=70' },
+  };
+  const pushInr = (n) => '₹' + Number(n).toLocaleString('en-IN');
+
+  // Products a tap can open
+  const PUSH_INDEX = [];
+  const pushPrice = (p) => p.price === 0 ? 'Free' : (p.plans > 1 ? 'From ' : '') + pushInr(p.price);
+  Object.entries(PUSH_PRODUCTS).forEach(([id, p]) => PUSH_INDEX.push({ id: 'p-' + id, value: id, type: 'product', label: p.name, hint: pushPrice(p), meta: 'Product', image: p.image, path: ['Products', p.name] }));
+  // A pasted link: YouTube opens the YouTube app, other links the browser. Title and picture are fetched (prototype only).
+  const pushSite = (u) => (u || '').trim().replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+  const pushIsYT = (u) => /(^|\.|\/)(youtube\.com|youtu\.be)\//i.test((u || '').trim() + '/');
+  const pushIsUrl = (u) => /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i.test((u || '').trim());
+  const pushLink = (u, m) => {
+    u = (u || '').trim(); m = m || {};
+    const yt = pushIsYT(u), site = pushSite(u), title = m.title || (yt ? 'YouTube video' : site);
+    return { id: 'link:' + u, type: 'link', yt, url: u, label: title, title, image: m.image || null, loading: m.status === 'loading',
+             hint: m.status === 'loading' ? 'Getting details…' : yt ? 'YouTube' : 'Website', path: yt ? ['YouTube', title] : [site] };
+  };
+  const pushFetchMeta = async (u) => {
+    const url = /^https?:\/\//i.test(u) ? u : 'https://' + u;
+    if (pushIsYT(url)) {
+      const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url));
+      if (!r.ok) throw new Error('not found');
+      const j = await r.json(); return { title: j.title, image: j.thumbnail_url };
+    }
+    const r = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url));
+    const j = await r.json(); if (j.status !== 'success') throw new Error('no preview');
+    return { title: j.data.title, image: j.data.image && j.data.image.url };
+  };
+  const pushClip = (t, n) => { t = (t || '').trim(); if (t.length <= n) return t; const c = t.slice(0, n - 1); return c.slice(0, Math.max(c.lastIndexOf(' '), n * 0.6)).trim() + '…'; };
+  const PUSH_HOME = { type: 'home', label: 'App home', path: [] };
+  const pushPicker = () => ({ open: false, q: '', level: 'root', index: 0 });
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('pushContent', (init = {}) => ({
+      title: init.title || '',
+      summary: init.summary || '',
+      opens: init.opens ? JSON.parse(JSON.stringify(PUSH_INDEX.find(x => x.id === init.opens))) : { ...PUSH_HOME },
+      pk: pushPicker(),       // the "When tapped, open" field
+      linkMeta: {},           // fetched details of pasted links
+      // true = holds words or a picture filled from what it opens (safe to refill); the admin's own are never replaced
+      auto: { title: false, summary: false, image: false },
+      hasImage: !!init.image,
+      init() {
+        if (init.image) this.$nextTick(() => this.showImage({ name: 'neet-offer-banner.png', size: '184 KB', url: init.image }));
+        this.$watch('pk.q', (q) => {
+          this.pk.index = 0; this.icons();
+          clearTimeout(this._lt);
+          if (pushIsUrl(q)) this._lt = setTimeout(() => this.fetchLink(q.trim()), 400);
+        });
+      },
+      icons() { setTimeout(() => window.lucide && lucide.createIcons(), 0); },
+      showImage(f) {
+        window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: f ? [{ progress: 100, status: 'success', extension: 'png', ...f }] : [] } }));
+      },
+      imageChanged(f) { if (f && /^From /.test(f.name)) return; this.hasImage = !!f; this.auto.image = false; },
+
+      // ----- Fill Title, Summary and Image from what it opens -----
+      get filled() { return this.auto.title || this.auto.summary || this.auto.image; },
+      get fillSource() {
+        const o = this.opens;
+        return ({ product: 'the product', store: 'the store', link: o.yt ? 'the video' : 'the page' })[o.type] || '';
+      },
+      // Fills the Title with the chosen item's name and the picture; the Summary is the admin's to write
+      fill(title, summary, image) {
+        const name = this.opens.type === 'link' ? this.opens.title : this.opens.type === 'product' ? this.opens.label : '';
+        if (!this.title.trim() || this.auto.title) { this.title = pushClip(name || '', 65); this.auto.title = !!name; }
+        if (!this.hasImage || this.auto.image) {
+          if (image) { this.showImage({ name: 'From ' + (this.opens.yt ? 'the YouTube video' : this.fillSource), size: '', url: image }); this.hasImage = true; this.auto.image = true; }
+          else if (this.auto.image) { this.showImage(null); this.hasImage = false; this.auto.image = false; }
+        }
+      },
+      fillFrom(o) {
+        if (o.type === 'home') return this.fill('', '', null);
+        if (o.type === 'store') return this.fill('New in the store', 'Courses and test series for your exam. Tap to see them.', null);
+        if (o.type === 'link') return o.loading ? null : this.fill(o.title, o.yt ? 'New video on YouTube. Tap to watch.' : 'Tap to read more.', o.image);
+        if (o.type === 'product') {
+          const p = PUSH_PRODUCTS[o.value];
+          const price = p.price === 0 ? 'Free' : p.was ? 'Now ' + pushInr(p.price) + ' (was ' + pushInr(p.was) + ')' : pushPrice(p);
+          const inside = [p.chapters && p.chapters + ' chapters', p.tests && p.tests + ' mock tests', p.hours].filter(Boolean).join(', ');
+          return this.fill(p.name, [price, inside].filter(Boolean).join(' · ') + '. Tap to see what’s included.', p.image);
+        }
+      },
+
+      // ----- Pasted links -----
+      link(u) { u = (u || '').trim(); return pushLink(u, this.linkMeta[u]); },
+      async fetchLink(u) {
+        if (this.linkMeta[u] && this.linkMeta[u].status !== 'error') return;
+        this.linkMeta[u] = { status: 'loading' };
+        try { this.linkMeta[u] = { status: 'done', ...(await pushFetchMeta(u)) }; } catch (e) { this.linkMeta[u] = { status: 'error' }; }
+        if (this.opens.type === 'link' && this.opens.url === u) { this.opens = this.link(u); this.fillFrom(this.opens); }
+        this.icons();
+      },
+
+      // ----- The field: click to browse (Products › / Courses › course › chapter › …), type to search, or A link -----
+      goLevel(level) { this.pk.level = level; this.pk.q = ''; this.pk.index = 0; this.$nextTick(() => this.$refs.pkin && this.$refs.pkin.focus()); this.icons(); },
+      up() {
+        const l = this.pk.level;
+        if (l !== 'root') this.goLevel('root');
+      },
+      get crumbs() {
+        const l = this.pk.level;
+        if (l === 'products') return ['Products'];
+        if (l === 'link') return ['A link'];
+        return [];
+      },
+      get pkHeading() {
+        const l = this.pk.level, q = this.pk.q.trim();
+        if (l === 'root') return q ? 'Matches' : 'What should it open?';
+        if (l === 'link') return 'A YouTube video or any website';
+        return 'Products';
+      },
+      // Rows: { head } group heading, { item } to pick, { go } to step into, { hint } a note
+      get pkRows() {
+        const q = this.pk.q.trim().toLowerCase(), l = this.pk.level, rows = [];
+        const match = (x) => !q || (x.label + ' ' + (x.hint || '')).toLowerCase().includes(q);
+        if (l === 'link') return pushIsUrl(this.pk.q) ? [{ item: this.link(this.pk.q) }] : [{ hint: q ? 'That isn’t a full link yet. Copy it from the browser’s address bar.' : 'Paste the link, like https://youtube.com/watch?v=…' }];
+        if (l === 'root' && q && pushIsUrl(this.pk.q)) return [{ item: this.link(this.pk.q) }];
+        if (l === 'root' && !q) return [
+          { go: 'products', label: 'Products', side: 'Store or one product', icon: 'shopping-bag' },
+          { go: 'link', label: 'A link', side: 'YouTube or any website', icon: 'link' },
+        ];
+        if (l === 'root') {
+          PUSH_INDEX.filter(match).forEach(x => rows.push({ item: x }));
+          if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '”. For a website or YouTube video, choose A link.' });
+          return rows;
+        }
+        if (l === 'products') {
+          if (!q || 'all products store'.includes(q)) rows.push({ item: { id: 'store', type: 'store', label: 'All products (store)', hint: 'Store', path: ['All products'] } });
+          PUSH_INDEX.filter(x => x.type === 'product' && match(x)).forEach(x => rows.push({ item: x }));
+        }
+        if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '” here' });
+        return rows;
+      },
+      get pkChoices() { return this.pkRows.filter(r => r.item || r.go); },
+      rowKey(r) { return !r ? '' : r.go ? 'go:' + r.go + (r.id || '') : r.item ? 'item:' + r.item.id : (r.head || r.hint || ''); },
+      isActive(r) { const c = this.pkChoices[this.pk.index]; return !!c && this.rowKey(c) === this.rowKey(r); },
+      isPicked(o) { return !!o && this.opens.type !== 'home' && this.opens.id === o.id; },
+      choose(r) { if (r.go) return this.goLevel(r.go); this.pick(r.item); },
+      pick(o) { this.opens = JSON.parse(JSON.stringify(o)); this.pk = pushPicker(); this.fillFrom(this.opens); this.icons(); },
+      clearOpens() { this.opens = { ...PUSH_HOME }; this.pk = pushPicker(); this.fillFrom(this.opens); },
+      pkKeydown(ev) {
+        const list = this.pkChoices;
+        if (ev.key === 'ArrowDown' && list.length) { ev.preventDefault(); this.pk.open = true; this.pk.index = (this.pk.index + 1) % list.length; }
+        else if (ev.key === 'ArrowUp' && list.length) { ev.preventDefault(); this.pk.index = (this.pk.index - 1 + list.length) % list.length; }
+        else if (ev.key === 'Enter') { ev.preventDefault(); if (list[this.pk.index]) this.choose(list[this.pk.index]); }
+        else if (ev.key === 'Backspace' && !this.pk.q) { if (this.pk.level !== 'root') this.up(); else if (this.opens.type !== 'home') this.clearOpens(); }
+        else if (ev.key === 'Escape') this.pk.open = false;
+      },
+      opensIcon(o) {
+        if (!o) return 'circle';
+        return ({ product: 'shopping-bag', store: 'store', link: o.yt ? 'circle-play' : 'globe', home: 'house' })[o.type];
+      },
+      opensWhere(o) { return o.type === 'link' ? (o.yt ? 'Opens in the YouTube app' : 'Opens in the browser') : o.type === 'home' ? 'Opens the app’s home screen' : o.type === 'store' ? 'Opens your course store' : 'Opens in the app'; },
+    }));
+  });
+</script>
