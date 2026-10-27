@@ -1,38 +1,86 @@
-{# Side panel: Where it opens. One place for both push and email. Sales are only counted for a product. #}
+{# Side panel: What it's about. One search across products, courses, chapters, videos, tests, notes and live classes,
+   plus three choices that aren't an item: an announcement (app home), the store, a web page.
+   A tap on the push or a click on the email's button opens what's chosen here. #}
 {% from "../../../ui-system/components/drawer.html" import drawer %}
-{% from "../../../ui-system/components/radio.html" import radio %}
-{% from "../../../ui-system/components/select.html" import select %}
-{% from "../../../ui-system/components/checkbox.html" import checkbox %}
 {% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
 {% from "../../../ui-system/components/button.html" import button %}
-{% set pick = "Alpine.$data($event.target.closest('[x-data]')).selected" %}
-{% set descriptions = { home: "The app’s home screen", store: "Your course store", product: "A course or test series. Sales are counted.", link: "Any web page, in the browser" } %}
+{% set opt = "w-full flex items-center gap-x-3 p-2.5 rounded-xl text-start transition-colors" %}
+{% set opt_on = "bg-primary-50 ring-1 ring-primary-600 dark:bg-primary-500/10 dark:ring-primary-500" %}
+{% set opt_off = "hover:bg-gray-50 dark:hover:bg-neutral-700/50" %}
+{% set ico = "shrink-0 size-9 inline-flex justify-center items-center rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" %}
+{% set check %}<svg class="ms-auto shrink-0 size-4 text-primary-600 dark:text-primary-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{% endset %}
 
-{% call drawer(id="cmp-dest", size="md", title="Where it opens") %}
+{% call drawer(id="cmp-dest", size="lg", title="What’s it about?") %}
+  <div class="px-6 pt-5 pb-3 border-b border-gray-100 dark:border-neutral-700">
+    {{ input(name="about_search", id="about-search", placeholder="Search a product, course, chapter, video, test or live class", icon="search", x_model="q", extra_attrs='autocomplete="off" autofocus') }}
+  </div>
+
   <template x-if="panel === 'dest'">
-    <div class="flex-1 overflow-y-auto p-6 space-y-5">
-      <p class="text-sm text-gray-500 dark:text-neutral-400">When a student taps the push or clicks a link in the email.</p>
-      <div class="space-y-2">
-        {% for dd in campaigns.destinations %}
-          {{ radio(name="dest_type", value=dd.key, label='<span class="inline-flex items-center gap-x-2"><i data-lucide="' ~ dd.icon ~ '" class="size-4 text-gray-500"></i>' ~ dd.label ~ '</span>', description=descriptions[dd.key], variant="card", x_model="d.type") }}
+    <div class="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+      {# Not an item #}
+      <div x-show="!q.trim()" class="space-y-1">
+        {% for f in [
+          { key: "home", label: "Just an announcement", meta: "Opens the app’s home screen", icon: "megaphone" },
+          { key: "store", label: "Promote the store", meta: "Opens your course store", icon: "store" },
+          { key: "link", label: "A web page", meta: "Opens in the browser", icon: "globe" }
+        ] %}
+        <button type="button" @click="pickFixed('{{ f.key }}')" class="{{ opt }}" :class="d.type === '{{ f.key }}' ? '{{ opt_on }}' : '{{ opt_off }}'">
+          <span class="{{ ico }}"><i data-lucide="{{ f.icon }}" class="size-4"></i></span>
+          <span class="min-w-0">
+            <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">{{ f.label }}</span>
+            <span class="block text-xs text-gray-500 dark:text-neutral-400">{{ f.meta }}</span>
+          </span>
+          <span x-show="d.type === '{{ f.key }}'">{{ check | safe }}</span>
+        </button>
         {% endfor %}
-      </div>
-
-      <div x-show="d.type === 'product'" class="space-y-3">
-        <div @change="d.product = {{ pick }}" x-init="$nextTick(() => d.product && $el.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: d.product })))">
-          {{ select(name="dest_product", label="Product", options=campaigns.products, search=true, placeholder="Choose a product") }}
+        <div x-show="d.type === 'link'" class="px-2.5 pt-2">
+          {{ input(name="dest_url", id="dest-url", placeholder="https://", x_model="d.url", icon="link") }}
         </div>
-        {{ checkbox(name="skip_buyers", id="skip-buyers", label="Leave out students who already bought it", x_model="d.skipBuyers") }}
-        <p class="text-xs text-gray-500 dark:text-neutral-400">A purchase of this product within 7 days of a student’s click counts as a sale from this campaign.</p>
       </div>
 
-      <div x-show="d.type === 'link'">
-        {{ input(name="dest_url", id="dest-url", label="Web address", placeholder="https://", x_model="d.url", icon="globe") }}
-      </div>
-
-      <p x-show="panelError('dest')" class="text-sm text-red-600 dark:text-red-400" x-text="panelError('dest')"></p>
+      {# Items, grouped by type #}
+      <template x-for="g in results" :key="g.kind">
+        <div>
+          <p class="px-2.5 pb-1 text-xs font-medium text-gray-500 dark:text-neutral-400" x-text="g.name"></p>
+          <div class="space-y-1">
+            <template x-for="it in g.items" :key="it.id">
+              <button type="button" @click="pickItem(it)" class="{{ opt }}"
+                      :class="d.type === 'item' && d.item && d.item.id === it.id ? '{{ opt_on }}' : '{{ opt_off }}'">
+                <span class="{{ ico }}"><i :data-lucide="kinds[it.kind].icon" class="size-4"></i></span>
+                <span class="min-w-0">
+                  <span class="block truncate text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="it.label"></span>
+                  <span class="block truncate text-xs text-gray-500 dark:text-neutral-400" x-text="it.meta"></span>
+                </span>
+                <span x-show="d.type === 'item' && d.item && d.item.id === it.id">{{ check | safe }}</span>
+              </button>
+            </template>
+          </div>
+        </div>
+      </template>
+      <p x-show="q.trim() && !results.length" class="px-2.5 py-6 text-center text-sm text-gray-500 dark:text-neutral-400" x-text="'Nothing called “' + q.trim() + '”'"></p>
     </div>
   </template>
+
+  {# What's chosen, and what it means #}
+  <div class="px-6 py-4 border-t border-gray-200 dark:border-neutral-700 space-y-3" x-show="panel === 'dest' && d.type" x-cloak>
+    <template x-if="panel === 'dest' && d.type === 'item' && d.item">
+      <div x-data="{ get di() { return d.item || {}; } }">
+      <div class="space-y-2">
+        <p class="text-sm text-gray-800 dark:text-neutral-200"><span class="text-gray-500 dark:text-neutral-400" x-text="(kinds[di.kind] || {}).label + ':'"></span> <span class="font-medium" x-text="di.label"></span></p>
+        <template x-if="di.kind === 'product'">
+          <div class="space-y-2">
+            {{ checkbox(name="skip_buyers", id="skip-buyers", label="Leave out students who already bought it", x_model="d.skipBuyers") }}
+            <p class="text-xs text-gray-500 dark:text-neutral-400">A purchase within 7 days of a student’s click counts as a sale from this campaign.</p>
+          </div>
+        </template>
+        <p x-show="di.kind !== 'product'" class="text-xs text-gray-500 dark:text-neutral-400"
+           x-text="'Only students with access to ' + cmpOptLabel('course', di.course) + ' can open it. Who gets it will suggest them.'"></p>
+      </div>
+      </div>
+    </template>
+    <p x-show="panelError('dest')" class="text-sm text-red-600 dark:text-red-400" x-text="panelError('dest')"></p>
+  </div>
 
   <div class="p-4 border-t border-gray-200 dark:border-neutral-700 flex justify-end gap-2">
     {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}

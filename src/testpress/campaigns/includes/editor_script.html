@@ -1,13 +1,17 @@
 <script>
   window.CMP_PROTO = [
-    { name: 'Start', states: [['blank', 'New, nothing set'], ['template', 'New, from a template'], ['draft', 'Draft with things left'], ['ready', 'Draft ready to send']] },
-    { name: 'Editing (side panel)', states: [['edit-audience', 'Who gets it'], ['edit-push', 'Push notification'], ['edit-email', 'Email'], ['edit-dest', 'Where it opens']] },
-    { name: 'Problems', states: [['no-match', 'No students match'], ['deleted-batch', 'A chosen batch was deleted'], ['bad-link', 'Web link not valid'], ['save-failed', 'Save failed']] },
+    { name: 'Start', states: [['blank', 'New, nothing set'], ['template', 'New, from a template'], ['draft', 'Draft with things left'], ['ready', 'Draft ready to send (product)'], ['content', 'Draft ready to send (live class)']] },
+    { name: 'Editing (side panel)', states: [['edit-about', 'What it’s about'], ['edit-audience', 'Who gets it'], ['edit-push', 'Push notification'], ['edit-email', 'Email']] },
+    { name: 'Problems', states: [['no-access', 'Some students can’t open it'], ['no-match', 'No students match'], ['deleted-batch', 'A chosen batch was deleted'], ['bad-link', 'Web link not valid'], ['save-failed', 'Save failed']] },
     { name: 'Review and send', states: [['review', 'Review and send'], ['no-app', 'Nobody has the app'], ['send-failed', 'Sending failed']] },
   ];
   window.CMP_PROTO_DEFAULT = 'blank';
 
   const CMP_LIMITS = { title: 65, message: 240 };
+  const CMP_KINDS = CMP.kinds;
+  const CMP_CATALOG = CMP.catalog;
+  const CMP_ACCESS = { 'phy-11': 1640, 'chem-12': 1210, 'bio-neet': 2310, 'maths-jee': 980 };
+  const cmpItem = (id) => cmpCopy(CMP_CATALOG.find(x => x.id === id));
   const cmpEmptyRow = () => ({ id: Date.now() + Math.random(), type: 'batch', values: [], field: '', missing: false });
   const cmpOptLabel = (type, v) => {
     const list = { product: CMP.products, course: CMP.courses, batch: CMP.batches, students: CMP.students }[type] || [];
@@ -15,24 +19,43 @@
   };
   // Estimated count for an audience (prototype numbers)
   const cmpEstimate = (a, noMatch) => {
+    if (!a || !a.mode) return null;
     if (a.mode === 'all') return CMP_ALL_STUDENTS;
     const rows = (a.rows || []).filter(r => r.values.length);
-    if (a.mode !== 'some' || !rows.length) return null;
+    if (!rows.length) return null;
     if (noMatch && a.match === 'all') return 0;
-    const base = rows.reduce((t, r) => t + r.values.length * ({ product: 820, course: 1640, batch: 1180, field: 2300, students: 1 })[r.type], 0);
+    const base = rows.reduce((t, r) => t + r.values.reduce((s, v) => s + (r.type === 'course' && CMP_ACCESS[v] ? CMP_ACCESS[v] : ({ product: 820, course: 1640, batch: 1180, field: 2300, students: 1 })[r.type]), 0), 0);
     return a.match === 'all' && rows.length > 1 ? Math.round(base / 3.4) : base;
+  };
+  // Words to start from, based on what the campaign is about: [push title, push message, email subject, email body]
+  const cmpSuggest = (dest) => {
+    const it = dest.item, l = it ? it.label : '';
+    const when = it && it.meta.split(' · ')[1] || '';
+    const s = {
+      product: [l + ' is open', 'Seats are limited. Tap to see what’s inside and join today.', l + ' is now open for enrolment', '<p>Hi {name},</p><p>' + l + ' is now open. See what’s included and join before seats run out.</p>'],
+      course: ['New in ' + l, 'Fresh lessons are up. Tap to continue where you left off.', 'New lessons in ' + l, '<p>Hi {name},</p><p>We’ve added new lessons to ' + l + '. Pick up where you left off.</p>'],
+      chapter: [l + ' is up', 'Start the new chapter today.', 'New chapter: ' + l, '<p>Hi {name},</p><p>' + l + ' is now available in your course.</p>'],
+      video: ['New video: ' + l, 'Watch it before the next class.', 'New video: ' + l, '<p>Hi {name},</p><p>A new video is up: ' + l + '. Watch it before the next class.</p>'],
+      test: [l + ' is open', 'Take it today and see where you stand.', l + ' is open', '<p>Hi {name},</p><p>' + l + ' is now open. Take it today and see where you stand.</p>'],
+      notes: ['New notes: ' + l, 'Quick revision for the chapter.', 'New notes: ' + l, '<p>Hi {name},</p><p>Short notes for quick revision are up: ' + l + '.</p>'],
+      live: ['Live class: ' + l, when + '. Tap to join on time.', 'Live class: ' + l + ' – ' + when, '<p>Hi {name},</p><p>Join the live class “' + l + '” on ' + when + '.</p>'],
+      store: ['New in the store', 'Courses and test series for your exam.', 'New courses in the store', '<p>Hi {name},</p><p>We’ve added new courses and test series to the store.</p>'],
+    };
+    return s[it ? it.kind : dest.type] || null;
   };
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('campaignEditor', () => ({
       // The campaign as it is now. Side panels edit a copy (`d`), so Cancel changes nothing.
       name: '',
+      dest: { type: '', item: null, url: '', skipBuyers: true },
       audience: { mode: '', match: 'any', rows: [] },
       push: { on: false, title: '', message: '', image: null },
-      email: { on: false, subject: '', body: '' },
-      dest: { type: '', product: '', skipBuyers: true, url: '' },
-      d: {},
+      email: { on: false, subject: '', body: '', button: { on: true, label: '' } },
+      d: { button: { on: true, label: '' } },
       panel: '',
+      q: '',
+      suggested: false,
       nameDraft: '',
       triedPanel: false,
       preview: 'push',
@@ -43,44 +66,54 @@
       tplPick: null,
       fail: {},
       limits: CMP_LIMITS,
+      kinds: CMP_KINDS,
       templates: CMP_TEMPLATES,
-      products: CMP_PRODUCTS,
 
       init() {
         const s = cmpState() || 'blank';
         const id = Number(cmpParam('id'));
         const tpl = Number(cmpParam('template')) || (s === 'template' ? 1 : 0);
         if (id === 7 || s === 'draft' || s === 'save-failed') this.loadDraft(7);
-        else if (id || ['ready', 'review', 'no-app', 'send-failed', 'deleted-batch', 'bad-link', 'edit-audience', 'edit-push', 'edit-email', 'edit-dest'].includes(s)) this.loadDraft(8);
+        else if (s === 'content' || s === 'no-access') this.loadDraft(6);
+        else if (id || ['ready', 'review', 'no-app', 'send-failed', 'deleted-batch', 'bad-link', 'edit-about', 'edit-audience', 'edit-push', 'edit-email'].includes(s)) this.loadDraft(8);
         if (tpl) { const t = this.templates.find(x => x.id === tpl); if (t) { this.applyTemplate(t, false); this.name = t.name; } }
+        if (s === 'no-access') this.audience = { mode: 'all', match: 'any', rows: [] };
         if (s === 'no-match') { this.name = 'Repeaters – NEET crash course offer'; this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }, { id: 2, type: 'product', values: ['neet-crash'] }] }; }
         if (s === 'deleted-batch') this.audience.rows = [{ id: 1, type: 'batch', values: [], missing: 'NEET 2026 – Batch C' }];
-        if (s === 'bad-link') this.dest = { type: 'link', product: '', skipBuyers: true, url: 'testpress mock register' };
+        if (s === 'bad-link') this.dest = { type: 'link', item: null, url: 'testpress mock register', skipBuyers: true };
         if (s === 'no-app') this.fail.noApp = true;
         if (s === 'send-failed') this.fail.send = true;
         if (s === 'save-failed') this.fail.save = true;
-        const panels = { 'edit-audience': 'audience', 'edit-push': 'push', 'edit-email': 'email', 'edit-dest': 'dest', 'deleted-batch': 'audience', 'bad-link': 'dest' };
+        const panels = { 'edit-about': 'dest', 'edit-audience': 'audience', 'edit-push': 'push', 'edit-email': 'email', 'deleted-batch': 'audience', 'bad-link': 'dest' };
         if (panels[s]) setTimeout(() => { this.open(panels[s]); if (s === 'bad-link') this.triedPanel = true; }, 400);
         if (s === 'save-failed') setTimeout(() => this.save(), 400);
         if (['review', 'no-app', 'send-failed'].includes(s)) setTimeout(() => this.openReview(), 400);
         if (!this.push.on && this.email.on) this.preview = 'email';
+        this.$watch('q', () => cmpIcons());
         window.addEventListener('beforeunload', (e) => { if (this.saveState === 'failed') { e.preventDefault(); e.returnValue = ''; } });
       },
 
       loadDraft(id) {
         if (id === 7) {
           this.name = 'Repeaters 2026 – fee reminder';
+          this.dest = { type: '', item: null, url: '', skipBuyers: true };
           this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }] };
           this.push = { on: false, title: '', message: '', image: null };
-          this.email = { on: true, subject: '', body: '<p>Hi {name},</p><p>Your second fee instalment for Repeaters 2026 is due on 5 November. Pay early to keep your seat in the batch.</p>' };
-          this.dest = { type: '', product: '', skipBuyers: true, url: '' };
+          this.email = { on: true, subject: '', body: '<p>Hi {name},</p><p>Your second fee instalment for Repeaters 2026 is due on 5 November. Pay early to keep your seat in the batch.</p>', button: { on: true, label: '' } };
           this.savedAt = '2 hours ago';
+        } else if (id === 6) {
+          this.name = 'Physics doubt clinic this Saturday';
+          this.dest = { type: 'item', item: cmpItem('l-doubt'), url: '', skipBuyers: true };
+          this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['phy-11'] }] };
+          this.push = { on: true, title: 'Physics doubt clinic this Saturday', message: 'Bring your doubts from Units 1–4. 10 AM, online.', image: null };
+          this.email = { on: true, subject: 'Physics doubt clinic – Saturday, 10 AM', body: '<p>Hi {name},</p><p>Arun sir is taking doubts from Units 1–4 this Saturday at 10 AM. Note down your questions and join on time.</p>', button: { on: true, label: '' } };
+          this.savedAt = '10 minutes ago';
         } else {
           this.name = 'Biology notes – 30% off';
+          this.dest = { type: 'item', item: cmpItem('p-bio'), url: '', skipBuyers: true };
           this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['bio-neet'] }, { id: 2, type: 'batch', values: ['neet-a', 'neet-b'] }] };
           this.push = { on: true, title: 'Biology notes at 30% off', message: 'Handwritten notes for every NEET chapter. Offer ends Sunday.', image: 'bio-notes-banner.png' };
-          this.email = { on: true, subject: 'Biology Handwritten Notes – 30% off till Sunday', body: '<p>Hi {name},</p><p>Our toppers’ handwritten Biology notes cover every NEET chapter, with diagrams you can revise from in minutes.</p><p><a href="#campaign-link">Get the notes</a></p>' };
-          this.dest = { type: 'product', product: 'bio-notes', skipBuyers: true, url: '' };
+          this.email = { on: true, subject: 'Biology Handwritten Notes – 30% off till Sunday', body: '<p>Hi {name},</p><p>Our toppers’ handwritten Biology notes cover every NEET chapter, with diagrams you can revise from in minutes.</p>', button: { on: true, label: 'Get the notes' } };
           this.savedAt = 'yesterday';
         }
         this.saveState = 'saved';
@@ -88,10 +121,16 @@
 
       // ----- Side panels -----
       open(key) {
-        this.triedPanel = false;
+        this.triedPanel = false; this.q = ''; this.suggested = false;
         this.d = cmpCopy({ audience: this.audience, push: this.push, email: this.email, dest: this.dest }[key]);
-        if (key === 'audience' && !this.d.mode) this.d.mode = 'some';
-        if (key === 'audience' && !this.d.rows.length) this.d.rows.push(cmpEmptyRow());
+        if (key === 'audience') {
+          if (!this.d.mode) { const sug = this.audienceSuggestion; this.d = sug ? cmpCopy(sug.audience) : { mode: 'some', match: 'any', rows: [] }; }
+          if (this.d.mode === 'some' && !this.d.rows.length) this.d.rows.push(cmpEmptyRow());
+        }
+        // Start empty messages with words that fit what the campaign is about
+        const sg = cmpSuggest(this.dest);
+        if (key === 'push' && !this.d.title && !this.d.message && sg) { this.d.title = sg[0].slice(0, 65); this.d.message = sg[1]; this.suggested = true; }
+        if (key === 'email' && !this.d.subject && !this.d.body && sg) { this.d.subject = sg[2]; this.d.body = sg[3]; this.suggested = true; }
         this.panel = key;
         window.dispatchEvent(new CustomEvent('open-drawer-cmp-' + key));
         this.$nextTick(() => {
@@ -110,8 +149,7 @@
         if (key === 'push') { if (!d.title.trim()) return 'Add a title.'; if (!d.message.trim()) return 'Add a message.'; }
         if (key === 'email') { if (!d.subject.trim()) return 'Add a subject.'; if (!d.body.replace(/<[^>]*>/g, '').trim()) return 'Write the email.'; }
         if (key === 'dest') {
-          if (!d.type) return 'Choose where it opens.';
-          if (d.type === 'product' && !d.product) return 'Choose a product.';
+          if (!d.type) return 'Choose what this campaign is about.';
           if (d.type === 'link' && !this.validUrl(d.url)) return 'Enter a full web address, like https://example.com/page';
         }
         return '';
@@ -131,7 +169,52 @@
         cmpToast((k === 'push' ? 'Push notification' : 'Email') + ' removed', 'What you wrote is kept, in case you add it back.');
       },
 
+      // ----- What it's about -----
+      get results() {
+        const q = this.q.trim().toLowerCase();
+        const items = CMP_CATALOG.filter(x => !q || (x.label + ' ' + x.meta).toLowerCase().includes(q));
+        return Object.keys(CMP_KINDS).map(k => ({ kind: k, name: CMP_KINDS[k].group, items: items.filter(x => x.kind === k) })).filter(g => g.items.length);
+      },
+      pickItem(it) { this.d.type = 'item'; this.d.item = cmpCopy(it); },
+      pickFixed(t) { this.d.type = t; this.d.item = null; },
+      kindOf(dest) { return dest.type === 'item' && dest.item ? dest.item.kind : dest.type; },
+      icon(dest) { return dest.type === 'item' && dest.item ? CMP_KINDS[dest.item.kind].icon : ({ home: 'megaphone', store: 'store', link: 'globe' })[dest.type] || 'target'; },
+      get isProduct() { return this.kindOf(this.dest) === 'product'; },
+      get aboutTitle() {
+        const d = this.dest;
+        if (d.type === 'item' && d.item) return (d.item.kind === 'product' ? 'Promote ' : '') + d.item.label;
+        return ({ home: 'An announcement', store: 'Promote the store', link: d.url })[d.type] || '';
+      },
+      get aboutMeta() {
+        const d = this.dest;
+        if (d.type === 'item' && d.item) {
+          if (d.item.kind === 'product') return 'Product · sales within 7 days of a click are counted' + (d.skipBuyers ? ' · leaves out students who bought it' : '');
+          return CMP_KINDS[d.item.kind].label + ' · ' + d.item.meta;
+        }
+        return ({ home: 'Opens the app’s home screen', store: 'Opens the store', link: 'Opens in the browser' })[d.type] || '';
+      },
+      get destLabel() { const d = this.dest; return d.type === 'item' && d.item ? d.item.label : ({ home: 'App home', store: 'Store', link: d.url })[d.type] || ''; },
+      validUrl(u) { u = (u || '').trim(); return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(u) || /^[^\s.]+\.[a-z]{2,}(\/\S*)?$/i.test(u); },
+
       // ----- Who gets it -----
+      // Course content needs access; suggest exactly the students who can open it.
+      get accessCourse() { const it = this.dest.type === 'item' && this.dest.item; return it && it.course ? it.course : null; },
+      get audienceSuggestion() {
+        if (!this.accessCourse) return null;
+        return { title: 'Students with access to ' + cmpOptLabel('course', this.accessCourse), count: CMP_ACCESS[this.accessCourse],
+                 audience: { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: [this.accessCourse] }] } };
+      },
+      // Students in the audience who can't open the chosen content (prototype estimate)
+      get cantOpen() {
+        const c = this.accessCourse, a = this.audience;
+        if (!c || !a.mode || !this.estimate) return 0;
+        const onlyCourse = a.mode === 'some' && a.rows.length && a.rows.every(r => r.type === 'course' && r.values.length === 1 && r.values[0] === c);
+        return onlyCourse ? 0 : Math.max(0, this.estimate - CMP_ACCESS[c]);
+      },
+      useSuggestion() {
+        this.audience = cmpCopy(this.audienceSuggestion.audience); this.save(true);
+        cmpToast('Who gets it updated', 'Only students who can open it will get this campaign.');
+      },
       dEstimate() { return this.panel === 'audience' ? cmpEstimate(this.d, cmpState() === 'no-match') : null; },
       get estimate() { return cmpEstimate(this.audience, cmpState() === 'no-match'); },
       get audienceText() {
@@ -147,32 +230,34 @@
       removeRow(row) { this.d.rows = this.d.rows.filter(r => r.id !== row.id); },
       setType(row, type) { row.type = type; row.values = []; row.field = ''; row.missing = false; },
 
-      // ----- Where it opens -----
-      validUrl(u) { u = (u || '').trim(); return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(u) || /^[^\s.]+\.[a-z]{2,}(\/\S*)?$/i.test(u); },
-      productLabel(v) { const p = this.products.find(p => p.value === v); return p ? p.label : ''; },
-      get destLabel() { return ({ home: 'App home', store: 'Store', product: this.productLabel(this.dest.product), link: this.dest.url })[this.dest.type] || ''; },
+      // ----- Email button -----
+      get defaultButton() { const k = this.kindOf(this.dest); return CMP_KINDS[k] ? CMP_KINDS[k].button : ({ home: 'Open the app', store: 'Visit the store', link: 'Open the page' })[k] || 'Open'; },
+      buttonText(e) { return (e.button && e.button.label) || this.defaultButton; },
 
-      // ----- Each row's status: done | todo | off | problem, with the line shown under its title -----
+      // ----- Status of each row: done | todo | off | problem | warn, with the line under its title -----
       get rows() {
         const a = this.audience, p = this.push, e = this.email, ds = this.dest;
         const neither = !p.on && !e.on;
         const r = {};
+        if (!ds.type) r.dest = ['todo', 'A product, course, video, test or live class — or just an announcement'];
+        else if (ds.type === 'link' && !this.validUrl(ds.url)) r.dest = ['problem', '“' + ds.url + '” isn’t a full web address'];
+        else r.dest = ['done', ''];
         if (!a.mode) r.audience = ['todo', 'Choose who should get this campaign'];
         else if (a.rows.some(x => x.missing)) r.audience = ['problem', '“' + a.rows.find(x => x.missing).missing + '” was deleted. Choose another batch.'];
         else if (this.estimate === 0) r.audience = ['problem', 'No student matches these conditions'];
         else if (this.estimate === null) r.audience = ['todo', 'Choose at least one condition'];
-        else r.audience = ['done', this.audienceText];
-        r.push = p.on ? (p.title && p.message ? ['done', p.title] : ['problem', 'Add a title and message'])
+        else r.audience = [this.cantOpen ? 'warn' : 'done', ''];
+        r.push = p.on ? (p.title && p.message ? ['done', ''] : ['problem', 'Add a title and message'])
                       : [neither ? 'todo' : 'off', neither ? 'Send push, email or both' : 'Not sending'];
-        r.email = e.on ? (e.subject && e.body.replace(/<[^>]*>/g, '').trim() ? ['done', e.subject] : ['problem', !e.subject ? 'Add a subject' : 'Write the email'])
+        r.email = e.on ? (e.subject && e.body.replace(/<[^>]*>/g, '').trim() ? ['done', ''] : ['problem', !e.subject ? 'Add a subject' : 'Write the email'])
                        : [neither ? 'todo' : 'off', neither ? 'Send push, email or both' : 'Not sending'];
-        if (!ds.type) r.dest = ['todo', 'Choose what opens when they tap or click'];
-        else if (ds.type === 'link' && !this.validUrl(ds.url)) r.dest = ['problem', '“' + ds.url + '” isn’t a full web address'];
-        else if (ds.type === 'product' && !ds.product) r.dest = ['problem', 'Choose a product'];
-        else r.dest = ['done', this.destLabel];
         return r;
       },
-      get leftCount() { return Object.values(this.rows).filter(x => x[0] === 'todo' || x[0] === 'problem').length - (!this.push.on && !this.email.on ? 1 : 0) + (this.name.trim() ? 0 : 1); },
+      // A warning (some students can't open it) doesn't block sending
+      get leftCount() {
+        const n = Object.values(this.rows).filter(x => x[0] === 'todo' || x[0] === 'problem').length;
+        return n - (!this.push.on && !this.email.on ? 1 : 0) + (this.name.trim() ? 0 : 1);
+      },
       get ready() { return this.leftCount === 0; },
 
       // ----- Templates -----
@@ -180,7 +265,8 @@
       openTemplates() { this.tplPick = null; this.$dispatch('open-modal-use-template'); },
       applyTemplate(t, notify = true) {
         if (t.push) this.push = { on: true, title: t.push.title, message: t.push.message, image: t.push.image ? 'template-banner.png' : null };
-        if (t.email) this.email = { on: true, subject: t.email.subject, body: t.email.body };
+        // The email gets its button automatically, so a template's own link line isn't needed
+        if (t.email) this.email = { on: true, subject: t.email.subject, body: t.email.body.replace(/<p><a[^>]*>.*?<\/a><\/p>/, ''), button: this.email.button };
         this.preview = t.push ? 'push' : 'email';
         if (notify) { cmpToast('“' + t.name + '” added', 'Change anything you like. The template stays as it is.'); this.save(true); }
       },
