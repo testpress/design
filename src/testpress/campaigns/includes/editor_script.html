@@ -12,7 +12,7 @@
   const CMP_TREE = CMP.courseTree;
   const CMP_ACCESS = Object.fromEntries(CMP_TREE.map(c => [c.id, c.access]));
   // Everything a campaign can be about, flattened: products, courses, chapters and their content
-  const CMP_PRODUCT_ITEMS = CMP.products.map(p => ({ id: 'p-' + p.value, kind: 'product', label: p.label, meta: '₹' + p.price.toLocaleString('en-IN'), product: p.value }));
+  const CMP_PRODUCT_ITEMS = CMP.products.map(p => ({ id: 'p-' + p.value, kind: 'product', label: p.label, meta: '₹' + p.price.toLocaleString('en-IN'), product: p.value, image: p.image }));
   const CMP_INDEX = [...CMP_PRODUCT_ITEMS];
   CMP_TREE.forEach(c => {
     CMP_INDEX.push({ id: 'c-' + c.id, kind: 'course', label: c.label, meta: c.access.toLocaleString('en-IN') + ' students have access', course: c.id });
@@ -71,6 +71,7 @@
       openCh: {},
       isNew: !cmpParam('id'),
       suggested: false,
+      productImage: false,
       nameDraft: '',
       triedPanel: false,
       preview: 'push',
@@ -131,7 +132,7 @@
           this.name = 'Biology notes – 30% off';
           this.dest = { type: 'item', item: cmpItem('p-bio-notes'), url: '', skipBuyers: true };
           this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['bio-neet'] }, { id: 2, type: 'batch', values: ['neet-a', 'neet-b'] }] };
-          this.push = { on: true, title: 'Biology notes at 30% off', message: 'Handwritten notes for every NEET chapter. Offer ends Sunday.', image: 'bio-notes-banner.png' };
+          this.push = { on: true, title: 'Biology notes at 30% off', message: 'Handwritten notes for every NEET chapter. Offer ends Sunday.', image: { name: 'Biology Handwritten Notes – product image', url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&h=300&q=70' } };
           this.email = { on: true, subject: 'Biology Handwritten Notes – 30% off till Sunday', body: '<p>Hi {name},</p><p>Our toppers’ handwritten Biology notes cover every NEET chapter, with diagrams you can revise from in minutes.</p>', button: { on: true, label: 'Get the notes' } };
           this.savedAt = 'yesterday';
         }
@@ -150,12 +151,17 @@
         // Start empty messages with words that fit what the campaign is about
         const sg = cmpSuggest(this.dest);
         if (key === 'push' && !this.d.title && !this.d.message && sg) { this.d.title = sg[0].slice(0, 65); this.d.message = sg[1]; this.suggested = true; }
+        // Promoting a product: start with the product's own image
+        this.productImage = false;
+        if (key === 'push' && !this.push.on && !this.d.image && this.isProduct && this.dest.item.image) {
+          this.d.image = { name: this.dest.item.label + ' – product image', url: this.dest.item.image }; this.productImage = true;
+        }
         if (key === 'email' && !this.d.subject && !this.d.body && sg) { this.d.subject = sg[2]; this.d.body = sg[3]; this.suggested = true; }
         this.panel = key;
         window.dispatchEvent(new CustomEvent('open-drawer-cmp-' + key));
         this.$nextTick(() => {
           if (key === 'email') window.dispatchEvent(new CustomEvent('rte-set-email-body', { detail: this.d.body }));
-          if (key === 'push') window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: this.d.image ? [{ name: this.d.image, size: '184 KB', progress: 100, status: 'success', extension: 'png' }] : [] } }));
+          if (key === 'push') window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: this.d.image ? [{ name: this.d.image.name, size: this.productImage ? 'From the product' : '184 KB', progress: 100, status: 'success', extension: 'png', url: this.d.image.url }] : [] } }));
           cmpIcons();
         });
       },
@@ -178,6 +184,7 @@
         this.triedPanel = true;
         if (this.panelError(this.panel)) return;
         const k = this.panel;
+        if (k === 'dest' && !this.name.trim()) this.$nextTick(() => this.autoName());
         if (k === 'push' || k === 'email') { this.d.on = true; this.preview = k; }
         this[k] = cmpCopy(this.d);
         this.close();
@@ -212,6 +219,7 @@
       chooseIntent(intent) {
         if (intent === 'announce') {
           this.dest = { type: 'home', item: null, url: '', skipBuyers: true };
+          if (!this.name.trim()) this.autoName();
           if (this.panel === 'dest') this.close();
           this.save(true);
           return;
@@ -317,12 +325,22 @@
         return n - (!this.push.on && !this.email.on ? 1 : 0) + (this.name.trim() ? 0 : 1);
       },
       get ready() { return this.leftCount === 0; },
+      get leftNames() {
+        const r = this.rows, open = (k) => r[k][0] === 'todo' || r[k][0] === 'problem';
+        const l = [];
+        if (!this.name.trim()) l.push('Campaign name');
+        if (open('dest')) l.push('What it’s about');
+        if (open('audience')) l.push('Who gets it');
+        if (!this.push.on && !this.email.on) l.push('Push or email');
+        else { if (open('push')) l.push('Push notification'); if (open('email')) l.push('Email'); }
+        return l.join(', ');
+      },
 
       // ----- Templates -----
       get hasContent() { return !!(this.push.title || this.push.message || this.email.subject || this.email.body.replace(/<[^>]*>/g, '').trim()); },
       openTemplates() { this.tplPick = null; this.$dispatch('open-modal-use-template'); },
       applyTemplate(t, notify = true) {
-        if (t.push) this.push = { on: true, title: t.push.title, message: t.push.message, image: t.push.image ? 'template-banner.png' : null };
+        if (t.push) this.push = { on: true, title: t.push.title, message: t.push.message, image: t.push.image ? { name: 'template-banner.png', url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&h=300&q=70' } : null };
         // The email gets its button automatically, so a template's own link line isn't needed
         if (t.email) this.email = { on: true, subject: t.email.subject, body: t.email.body.replace(/<p><a[^>]*>.*?<\/a><\/p>/, ''), button: this.email.button };
         this.preview = t.push ? 'push' : 'email';
@@ -330,6 +348,12 @@
       },
 
       // ----- Name -----
+      // A new campaign is named after what it's about, so the name never holds up sending; rename any time
+      autoName() {
+        const d = this.dest;
+        const base = d.type === 'item' && d.item ? d.item.label : ({ home: 'Announcement', store: 'Store promotion', link: 'Link' })[d.type] || 'Campaign';
+        this.name = base + ' – 27 Oct';
+      },
       openRename() { this.nameDraft = this.name; this.$dispatch('open-modal-rename'); },
       rename() { if (!this.nameDraft.trim()) return; this.name = this.nameDraft.trim(); this.save(true); },
 
