@@ -1,96 +1,246 @@
-{# Campaigns table. Every row opens the campaign's page: a draft is reviewed and sent there, a sent one shows results.
-   Campaign: name with a badge only when it isn't simply sent (Draft, Sending, Couldn't send), then a dot line:
-   channels · who sent it (nothing else; what's left or failed shows on the campaign's page). Performance: who clicked of who got it, with a bar; product promotions add revenue and purchases (hover for the
-   product). 20 rows a page. #}
-{% from "../../../ui-system/components/progress.html" import progress %}
-{% from "../../../ui-system/components/table.html" import table, table_th %}
+{# The campaigns table, in the ui-system table card.
+   Toolbar: type switch (All / Promotional / Announcements, with counts), search, status, channel, More filters.
+   With rows selected, the toolbar becomes a bulk bar (export, archive, delete drafts).
+   Columns follow the type:
+   - All: Campaign, Type, Channel, Audience, Status, Delivery, Performance (revenue + purchases, or clicks + CTR), Date
+   - Promotional: Campaign, Channel, Product / Course, Audience, Status, Delivery, Purchases, Revenue, Sent date
+   - Announcements: Campaign, Channel, Content, Audience, Status, Delivery, Clicks, CTR, Sent date
+   "Not tracked" means attribution wasn't available; drafts and unsent campaigns say so in words, never 0. #}
+{% from "../../../ui-system/components/table.html" import table %}
 {% from "../../../ui-system/components/select.html" import select %}
 {% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/button_group.html" import button_group %}
 {% from "../../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../../ui-system/components/tooltip.html" import tooltip %}
 {% from "../../../ui-system/components/empty-state.html" import empty_state %}
 {% from "../../../ui-system/components/pagination.html" import pagination %}
+{% set seg_on = "!bg-gray-100 !text-gray-800 dark:!bg-neutral-700 dark:!text-white" %}
+{% set num = "px-3 py-3 whitespace-nowrap text-sm text-end text-gray-800 dark:text-neutral-200" %}
+{% set cell = "px-3 py-3 whitespace-nowrap text-sm" %}
+{% set muted = "text-gray-400 dark:text-neutral-500" %}
+{% set promo = "type === 'promo'" %}
+{% set ann = "type === 'announce'" %}
+{% set all = "!type" %}
 
-{% set filters %}
-  <div data-filter class="w-40" @change="status = $event.target.value === 'all' ? '' : $event.target.value">
-    {{ select(name="status", selected_value="all", options=[{value: "all", label: "Any status"}, {value: "draft", label: "Drafts"}, {value: "sending", label: "Sending"}, {value: "sent", label: "Sent"}, {value: "failed", label: "Couldn’t send"}], padding_class="py-1.5 px-3 pe-9") }}
-  </div>
-  <div data-filter class="w-52" @change="purposeFilter = $event.target.value === 'all' ? '' : $event.target.value">
-    {{ select(name="purpose", selected_value="all", options=[{value: "all", label: "All purposes"}, {value: "product", label: "Product promotions"}, {value: "announce", label: "Announcements and content"}], padding_class="py-1.5 px-3 pe-9") }}
-  </div>
-  <div data-filter class="w-40" @change="channel = $event.target.value === 'all' ? '' : $event.target.value">
-    {{ select(name="channel", selected_value="all", options=[{value: "all", label: "Push and email"}, {value: "push", label: "Push"}, {value: "email", label: "Email"}], padding_class="py-1.5 px-3 pe-9") }}
+{# A sortable header: the whole cell is the button; the icon shows the current direction #}
+{% macro sort_th(text, key, x_show="", end=false) %}
+<th scope="col" class="p-0" {% if x_show %}x-show="{{ x_show }}"{% endif %} :aria-sort="sortKey === '{{ key }}' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'">
+  <button type="button" @click="sortBy('{{ key }}')"
+          class="w-full flex items-center gap-x-1 px-3 py-2.5 text-sm font-normal whitespace-nowrap hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700 {% if end %}justify-end{% endif %}"
+          :class="sortKey === '{{ key }}' ? 'text-gray-800 dark:text-neutral-200' : 'text-gray-500 dark:text-neutral-400'">
+    {{ text }}
+    <svg x-show="sortKey !== '{{ key }}'" class="shrink-0 size-3.5 opacity-60" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+    <svg x-show="sortKey === '{{ key }}' && sortDir === 'asc'" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+    <svg x-show="sortKey === '{{ key }}' && sortDir === 'desc'" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+</th>
+{% endmacro %}
+{% macro plain_th(text, x_show="", end=false) %}
+<th scope="col" class="px-3 py-2.5 text-sm font-normal whitespace-nowrap text-gray-500 dark:text-neutral-400 {% if end %}text-end{% else %}text-start{% endif %}" {% if x_show %}x-show="{{ x_show }}"{% endif %}>{{ text }}</th>
+{% endmacro %}
+
+{# ---------- Toolbar ---------- #}
+{% set type_switch %}
+  {# Bulk bar, in place of the filters while rows are selected #}
+  <div x-show="selected.length" x-cloak class="flex flex-wrap items-center gap-2">
+    <p class="me-2 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="selected.length + ' selected'"></p>
+    {{ button(text="Export", variant="secondary", size="sm", icon="download", extra_attrs='@click="bulkExport()"') }}
+    <span x-show="canArchive">{{ button(text="Archive", variant="secondary", size="sm", icon="archive", extra_attrs='@click="bulkArchive()"') }}</span>
+    <span x-show="canDeleteDrafts">{{ button(text="Delete drafts", variant="secondary", size="sm", icon="trash-2", extra_attrs='@click="bulkDelete()"') }}</span>
+    {{ button(text="Clear selection", variant="ghost", size="sm", extra_attrs='@click="selected = []"') }}
   </div>
 {% endset %}
 
+{% set filters %}
+  <div x-show="!selected.length" class="flex flex-wrap items-center gap-2">
+    <div data-filter="status" class="w-44" @change="status = $event.target.value === 'all' ? '' : $event.target.value">
+      {{ select(name="status", selected_value="all", options=[{value: "all", label: "Any status"}, {value: "draft", label: "Draft"}, {value: "scheduled", label: "Scheduled"}, {value: "sending", label: "Sending"}, {value: "sent", label: "Sent"}, {value: "partial", label: "Partially failed"}, {value: "failed", label: "Failed"}, {value: "cancelled", label: "Cancelled"}], padding_class="py-1.5 px-3 pe-9") }}
+    </div>
+    <div data-filter="channel" class="w-40" @change="channel = $event.target.value === 'all' ? '' : $event.target.value">
+      {{ select(name="channel", selected_value="all", options=[{value: "all", label: "Any channel"}, {value: "email", label: "Email"}, {value: "push", label: "Push"}, {value: "both", label: "Email + Push"}], padding_class="py-1.5 px-3 pe-9") }}
+    </div>
+    {% set more_label %}More filters<span x-show="moreCount" x-cloak class="ms-1 inline-flex justify-center items-center size-5 rounded-full bg-primary-600 text-[11px] font-semibold text-white" x-text="moreCount"></span>{% endset %}
+    {{ button(text=more_label, variant="secondary", size="sm", icon="sliders-horizontal", extra_attrs='@click="openMore()"') }}
+  </div>
+{% endset %}
+
+{# ---------- Columns ---------- #}
 {% set header %}
-  {{ table_th("Campaign") }}
-  {{ table_th("Date") }}
-  {{ table_th("Performance") }}
-  {{ table_th("", class="w-12") }}
+  <th scope="col" class="ps-5 pe-2 py-2.5 w-10">
+    <input type="checkbox" class="shrink-0 size-4 border-gray-300 rounded-sm text-primary-600 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-600" :checked="allOnPage" @change="toggleAll()" aria-label="Select all on this page">
+  </th>
+  {{ sort_th("Campaign", "name") }}
+  {{ plain_th("Type", all) }}
+  {{ plain_th("Channel") }}
+  {{ plain_th("Product / Course", promo) }}
+  {{ plain_th("Content", ann) }}
+  {{ sort_th("Audience", "audience", end=true) }}
+  {{ plain_th("Status") }}
+  {{ sort_th("Delivery", "delivery") }}
+  {{ sort_th("Performance", "performance", all) }}
+  {{ sort_th("Purchases", "purchases", promo, end=true) }}
+  {{ sort_th("Revenue", "revenue", promo, end=true) }}
+  {{ sort_th("Clicks", "clicks", ann, end=true) }}
+  {{ sort_th("CTR", "ctr", ann, end=true) }}
+  {{ sort_th("Date", "date") }}
+  <th scope="col" class="w-12"><span class="sr-only">Actions</span></th>
 {% endset %}
 
 {% set pager %}
   <div class="flex flex-wrap items-center justify-between gap-3">
-    <p class="text-sm text-gray-500 dark:text-neutral-400" x-text="'Showing ' + ((page - 1) * perPage + 1) + '–' + Math.min(page * perPage, filtered.length) + ' of ' + filtered.length"></p>
-    <div>{{ pagination(x_items="pageItems", x_current="page", x_last="pageCount", x_go="goPage", show_go_to=false) }}</div>
+    <div class="flex items-center gap-x-3 text-sm text-gray-500 dark:text-neutral-400">
+      <span x-text="'Showing ' + ((page - 1) * perPage + 1) + '–' + Math.min(page * perPage, filtered.length) + ' of ' + filtered.length"></span>
+      <span class="text-gray-300 dark:text-neutral-600">·</span>
+      <span>Rows</span>
+      <div class="w-20" @change="perPage = Number($event.target.value)">
+        {{ select(name="per_page", selected_value="10", options=[{value: "10", label: "10"}, {value: "20", label: "20"}, {value: "50", label: "50"}], padding_class="py-1.5 px-2.5 pe-8") }}
+      </div>
+    </div>
+    <div x-show="pageCount > 1">{{ pagination(x_items="pageItems", x_current="page", x_last="pageCount", x_go="goPage", show_go_to=false) }}</div>
   </div>
 {% endset %}
 
-{% call table(pagination=pager, pagination_x_show="pageCount > 1", search_enabled=true, search_placeholder="Search campaigns", search_x_model="search", filters=filters, table_header=header, hoverable=true) %}
+{# Type switch, then active filters as chips, above the table #}
+<div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-3">
+  {{ button_group(items=[
+    { label: "All", attrs: 'x-text="\'All · \' + typeCount(\'\')" @click="type = \'\'" :class="!type && \'' ~ seg_on ~ '\'"' },
+    { label: "Promotional", attrs: 'x-text="\'Promotional · \' + typeCount(\'promo\')" @click="type = \'promo\'" :class="type === \'promo\' && \'' ~ seg_on ~ '\'"' },
+    { label: "Announcements", attrs: 'x-text="\'Announcements · \' + typeCount(\'announce\')" @click="type = \'announce\'" :class="type === \'announce\' && \'' ~ seg_on ~ '\'"' }
+  ]) }}
+<div x-show="chips.length" x-cloak class="flex flex-wrap items-center gap-2">
+  <template x-for="chip in chips" :key="chip[0]">
+    <span class="inline-flex items-center gap-x-1 py-1 ps-3 pe-1 rounded-full bg-white border border-gray-200 text-sm text-gray-800 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200">
+      <span x-text="chip[1]"></span>
+      <button type="button" @click="removeChip(chip[0])" class="size-5 inline-flex justify-center items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:hover:bg-neutral-700" :aria-label="'Remove ' + chip[1]">
+        <svg class="size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </span>
+  </template>
+  {{ button(text="Clear all", variant="link", size="sm", extra_attrs='@click="clearFilters()"') }}
+</div>
+</div>
+
+{% call table(left_filters=type_switch, search_enabled=true, search_placeholder="Search campaign name, product, or content...", search_x_model="search", filters=filters, table_header=header, hoverable=true, pagination=pager, pagination_x_show="filtered.length > 0") %}
   <template x-for="c in pageRows" :key="c.id">
-    <tr class="cursor-pointer" @click="if (!$event.target.closest('a,button,[role=menu]')) window.location.href = href(c)">
-      {# Campaign: name (+ badge when not just sent), then channels · who sent it #}
-      <td class="px-5 py-3 min-w-[18rem] max-w-md">
-        <div class="flex items-center gap-x-2 min-w-0">
-          <a :href="href(c)" class="truncate text-sm font-medium text-gray-800 hover:text-primary-600 dark:text-neutral-200 dark:hover:text-primary-400" x-text="c.name"></a>
-          <template x-if="c.status === 'draft'"><span class="shrink-0">{{ badge(text="Draft", size="xs") }}</span></template>
-          <template x-if="c.status === 'sending'"><span class="shrink-0">{{ badge(text="Sending", variant="info", size="xs", icon="loader-circle", extra_classes="[&_svg]:animate-spin") }}</span></template>
-          <template x-if="c.status === 'failed'"><span class="shrink-0">{{ badge(text="Couldn’t send", variant="danger", size="xs") }}</span></template>
-        </div>
-        <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">
-          <template x-for="(part, i) in subline(c)" :key="i">
-            <span><span x-show="i" class="mx-1 text-gray-300 dark:text-neutral-600">·</span><span :class="part[1]" x-text="part[0]"></span></span>
-          </template>
-        </p>
+    <tr class="cursor-pointer" :class="selected.includes(c.id) && '!bg-primary-50/60 dark:!bg-primary-500/10'"
+        @click="if (!$event.target.closest('a,button,input,[role=menu]')) window.location.href = href(c)">
+      <td class="ps-5 pe-2 py-3 w-10">
+        <input type="checkbox" class="shrink-0 size-4 border-gray-300 rounded-sm text-primary-600 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-600" :checked="selected.includes(c.id)" @change="toggleRow(c)" :aria-label="'Select ' + c.name">
       </td>
 
-      {# Date: sent date, or when the draft was last edited #}
-      <td class="px-5 py-3 whitespace-nowrap text-sm">
-        <span x-show="c.status !== 'draft'" class="text-gray-800 dark:text-neutral-200" x-text="c.sentShort"></span>
-        <span x-show="c.status === 'draft'" class="text-gray-500 dark:text-neutral-400" x-text="'Edited ' + (c.edited || '').toLowerCase()"></span>
+      {# Campaign: name, and (in All) what it's about #}
+      <td class="px-3 py-3 min-w-[12rem] max-w-[15rem]">
+        <a :href="href(c)" class="block truncate text-sm font-medium text-gray-800 hover:text-primary-600 dark:text-neutral-200 dark:hover:text-primary-400" x-text="c.name"></a>
+        <p x-show="!type" class="mt-0.5 truncate text-xs text-gray-500 dark:text-neutral-400" x-text="c.target"></p>
       </td>
 
-      {# Performance: who clicked of who got it, with a bar; product promotions add revenue (hover for the product).
-         Drafts show who it would go to. #}
-      <td class="px-5 py-3 whitespace-nowrap min-w-[15rem]">
-        <template x-if="c.status === 'sent' || c.status === 'sending'">
-          <div class="w-56">
-            <div class="flex items-baseline justify-between gap-x-2 text-sm">
-              <p><span class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.unique)"></span> <span class="text-gray-500 dark:text-neutral-400" x-text="'of ' + cmpNum(c.received) + ' clicked'"></span></p>
-              <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="cmpPct(c.unique, c.received)"></span>
-            </div>
-            <div class="mt-1.5">{{ progress(value_expr="c.received ? Math.round(c.unique / c.received * 100) : 0", color="teal", size="xs", label="Students who clicked") }}</div>
-            <template x-if="c.revenue">
-              <div class="mt-1.5 inline-flex">
-                {% set rev_trigger %}<span class="text-xs cursor-default"><span class="font-semibold text-gray-800 underline decoration-dotted decoration-gray-300 underline-offset-4 dark:text-neutral-200 dark:decoration-neutral-600" x-text="cmpMoney(c.revenue)"></span> <span class="text-gray-500 dark:text-neutral-400" x-text="'from ' + cmpNum(c.purchases) + (c.purchases === 1 ? ' purchase' : ' purchases')"></span></span>{% endset %}
-                {% set rev_tip %}<span class="block text-start font-medium" x-text="c.dest.label"></span><span class="block text-start">Purchases within 7 days of a click</span>{% endset %}
-                {{ tooltip(trigger=rev_trigger, content=rev_tip, placement="top", width="w-60") }}
-              </div>
-            </template>
-            <p x-show="c.revenue === 0" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">No purchases yet</p>
+      {# Type (All only) #}
+      <td x-show="{{ all }}" class="{{ cell }}">
+        <template x-if="c.type === 'promo'"><span>{{ badge(text="Promotional", variant="info", size="xs") }}</span></template>
+        <template x-if="c.type === 'announce'"><span>{{ badge(text="Announcement", size="xs") }}</span></template>
+      </td>
+
+      {# Channel #}
+      <td class="{{ cell }}">
+        <span class="inline-flex items-center gap-x-2 text-gray-600 dark:text-neutral-300" :title="channelText(c)">
+          <i x-show="c.channels.includes('email')" data-lucide="mail" class="size-4"></i>
+          <i x-show="c.channels.includes('push')" data-lucide="smartphone" class="size-4"></i>
+          <span class="sr-only" x-text="channelText(c)"></span>
+        </span>
+      </td>
+
+      {# Product / Course (Promotional) or Content (Announcements) #}
+      <td x-show="!({{ all }})" class="{{ cell }} max-w-[11rem]"><span class="block truncate text-gray-800 dark:text-neutral-200" x-text="c.target"></span></td>
+
+      {# Audience #}
+      <td class="{{ num }}" x-text="cmpNum(c.audience)"></td>
+
+      {# Status: always in words #}
+      <td class="{{ cell }}">
+        <template x-if="c.status === 'draft'"><span>{{ badge(text="Draft", size="xs") }}</span></template>
+        <template x-if="c.status === 'scheduled'"><span>{{ badge(text="Scheduled", variant="info", size="xs") }}</span></template>
+        <template x-if="c.status === 'sending'"><span>{{ badge(text="Sending", variant="info", size="xs", icon="loader-circle", extra_classes="[&_svg]:animate-spin") }}</span></template>
+        <template x-if="c.status === 'sent'"><span>{{ badge(text="Sent", variant="success", size="xs") }}</span></template>
+        <template x-if="c.status === 'partial'"><span>{{ badge(text="Partially failed", variant="warning", size="xs") }}</span></template>
+        <template x-if="c.status === 'failed'"><span>{{ badge(text="Failed", variant="danger", size="xs") }}</span></template>
+        <template x-if="c.status === 'cancelled'"><span>{{ badge(text="Cancelled", size="xs") }}</span></template>
+      </td>
+
+      {# Delivery #}
+      <td class="{{ cell }}">
+        <template x-if="isSentLike(c)">
+          <div>
+            <p class="text-gray-800 dark:text-neutral-200"><span x-text="cmpNum(c.delivered)"></span> <span class="text-gray-500 dark:text-neutral-400" x-text="'/ ' + cmpNum(c.audience)"></span></p>
+            <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="deliveryPct(c) + '% delivered'"></p>
           </div>
         </template>
-        <span x-show="c.status === 'draft'" class="text-sm text-gray-500 dark:text-neutral-400" x-text="c.estimate ? '≈ ' + cmpNum(c.estimate) + ' students' : '—'"></span>
-        <span x-show="c.status === 'failed'" class="text-sm text-gray-400 dark:text-neutral-500">Not sent</span>
+        <span x-show="c.status === 'failed'" class="text-red-600 dark:text-red-400">None delivered</span>
+        <span x-show="['draft', 'scheduled', 'cancelled'].includes(c.status)" class="{{ muted }}">Not sent yet</span>
       </td>
 
+      {# Performance (All): revenue + purchases for promotions, clicks + CTR for announcements #}
+      <td x-show="{{ all }}" class="{{ cell }}">
+        <template x-if="isSentLike(c) && c.type === 'promo' && c.revenue !== null">
+          <div>
+            <p class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpMoney(c.revenue) + ' revenue'"></p>
+            <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="cmpNum(c.purchases) + (c.purchases === 1 ? ' purchase' : ' purchases')"></p>
+          </div>
+        </template>
+        <template x-if="isSentLike(c) && c.type === 'announce'">
+          <div>
+            <p class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.clicks) + ' clicks'"></p>
+            <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="ctr(c) + '% CTR'"></p>
+          </div>
+        </template>
+        <span x-show="isSentLike(c) && c.type === 'promo' && c.revenue === null" class="{{ muted }}">Not tracked</span>
+        <span x-show="!isSentLike(c)" class="{{ muted }}">Not sent yet</span>
+      </td>
+
+      {# Purchases, Revenue (Promotional) #}
+      <td x-show="{{ promo }}" class="{{ num }}">
+        <span x-show="isSentLike(c) && c.purchases !== null" x-text="cmpNum(c.purchases)"></span>
+        <span x-show="isSentLike(c) && c.purchases === null" class="{{ muted }}">Not tracked</span>
+        <span x-show="!isSentLike(c)" class="{{ muted }}">—</span>
+      </td>
+      <td x-show="{{ promo }}" class="{{ num }}">
+        <template x-if="isSentLike(c) && c.revenue !== null">
+          <div class="inline-flex justify-end">
+            {% set rev_trigger %}<span class="font-semibold underline decoration-dotted decoration-gray-300 underline-offset-4 cursor-default dark:decoration-neutral-600" x-text="cmpMoney(c.revenue)"></span>{% endset %}
+            {% set rev_tip %}<span class="block text-start">Purchases of <span class="font-medium" x-text="c.target"></span> within 7 days of a student’s click on this campaign.</span>{% endset %}
+            {{ tooltip(trigger=rev_trigger, content=rev_tip, placement="left", width="w-64") }}
+          </div>
+        </template>
+        <span x-show="isSentLike(c) && c.revenue === null" class="{{ muted }}">Not tracked</span>
+        <span x-show="!isSentLike(c)" class="{{ muted }}">—</span>
+      </td>
+
+      {# Clicks, CTR (Announcements) #}
+      <td x-show="{{ ann }}" class="{{ num }}">
+        <span x-show="isSentLike(c)" x-text="cmpNum(c.clicks)"></span>
+        <span x-show="!isSentLike(c)" class="{{ muted }}">—</span>
+      </td>
+      <td x-show="{{ ann }}" class="{{ num }}">
+        <span x-show="isSentLike(c)" x-text="ctr(c) + '%'"></span>
+        <span x-show="!isSentLike(c)" class="{{ muted }}">—</span>
+      </td>
+
+      {# Date: scheduled for, sent on, or last edited #}
+      <td class="{{ cell }}">
+        <p :class="c.status === 'draft' ? 'text-gray-500 dark:text-neutral-400' : 'text-gray-800 dark:text-neutral-200'" x-text="dateText(c)"></p>
+        <p x-show="dateHint(c)" class="text-xs text-gray-500 dark:text-neutral-400" x-text="dateHint(c)"></p>
+      </td>
+
+      {# Actions: only what fits the status #}
       <td class="px-3 py-3 whitespace-nowrap text-end">
-        {{ dropdown(trigger="ellipsis-vertical", width="medium", items=[
-          { label: "Review and send", icon: "send", attrs: 'x-show="c.status === \'draft\'" @click="window.location.href = href(c)"' },
-          { label: "Edit", icon: "pencil", attrs: 'x-show="c.status === \'draft\'" @click="window.location.href = editHref(c)"' },
-          { label: "View results", icon: "chart-no-axes-column", attrs: 'x-show="c.status !== \'draft\'" @click="window.location.href = href(c)"' },
+        {{ dropdown(trigger="ellipsis-vertical", width="large", items=[
+          { label: "Edit draft", icon: "pencil", attrs: 'x-show="c.status === \'draft\'" @click="window.location.href = editHref(c)"' },
+          { label: "View details", icon: "eye", attrs: 'x-show="[\'draft\', \'scheduled\', \'sending\', \'failed\', \'cancelled\'].includes(c.status)" @click="window.location.href = href(c)"' },
+          { label: "View performance", icon: "chart-no-axes-column", attrs: 'x-show="[\'sent\', \'partial\'].includes(c.status)" @click="window.location.href = href(c)"' },
+          { label: "View delivery logs", icon: "list", attrs: 'x-show="[\'sent\', \'partial\', \'failed\'].includes(c.status)" @click="open = false; cmpToast(\'Delivery logs\', \'Prototype: this opens the campaign’s delivery log.\', \'info\')"' },
           { label: "Duplicate", icon: "copy", attrs: '@click="open = false; duplicate(c)"' },
+          { label: "Cancel scheduled campaign", icon: "circle-x", variant: "danger", attrs: 'x-show="c.status === \'scheduled\'" @click="open = false; askCancel(c)"' },
+          { label: "Archive", icon: "archive", attrs: 'x-show="[\'sent\', \'partial\', \'failed\', \'cancelled\'].includes(c.status)" @click="open = false; archive(c)"' },
           { label: "Delete draft", icon: "trash-2", variant: "danger", attrs: 'x-show="c.status === \'draft\'" @click="open = false; askDelete(c)"' }
         ]) }}
       </td>
@@ -99,8 +249,8 @@
 
   {# No matches for the search or filters #}
   <tr x-show="filtered.length === 0" x-cloak>
-    <td colspan="4" class="hover:bg-transparent">
-      {{ empty_state(title="No campaigns match", description="Try a different name, or clear the filters.", icon="search-x", compact=true, wrap_card=false, secondary_action_text="Clear filters", secondary_action_attrs='@click="clearFilters()"') }}
+    <td colspan="16" class="hover:bg-transparent">
+      {{ empty_state(title="No campaigns match", description="Try a different name, product or content, or clear the filters.", icon="search-x", compact=true, wrap_card=false, secondary_action_text="Clear filters", secondary_action_attrs='@click="clearFilters(); type = \'\'"') }}
     </td>
   </tr>
 {% endcall %}

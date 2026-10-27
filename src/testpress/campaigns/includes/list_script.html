@@ -1,91 +1,132 @@
 <script>
   window.CMP_PROTO = [
-    { name: 'Campaigns list', states: [['list', 'With campaigns'], ['intro', 'First visit (no campaigns)'], ['loading', 'Loading'], ['error', 'Couldn’t load']] },
-    { name: 'Search and filters', states: [['many', 'Lots of campaigns (100+)'], ['no-results', 'No matches']] },
+    { name: 'Campaigns list', states: [['list', 'With campaigns'], ['many', 'Lots of campaigns (100+)'], ['intro', 'First visit (no campaigns)'], ['loading', 'Loading'], ['error', 'Couldn’t load']] },
+    { name: 'Views', states: [['promo', 'Promotional view'], ['announce', 'Announcements view'], ['filtered', 'With active filters'], ['selected', 'Rows selected'], ['no-results', 'No matches']] },
     { name: 'After an action', states: [['duplicated', 'Duplicated a campaign'], ['deleted', 'Deleted a draft']] },
   ];
   window.CMP_PROTO_DEFAULT = 'list';
 
-  // How many days ago each sample campaign went out (newest first, and the 30-day numbers)
-  const CMP_DAYS = { 1: 3, 9: 5, 2: 7, 3: 15, 4: 22, 5: 60, 6: 0, 10: 0 };
-  // Prototype: a year of campaigns, to see the page with 100+
+  // ---------------------------------------------------------------------------------------------
+  // PROTOTYPE DATA — sample campaigns for this list only. No API contract is implied.
+  // type: promo | announce. status: draft | scheduled | sending | sent | partial | failed | cancelled
+  // delivered/audience are student counts; purchases/revenue only for promo (null = attribution not tracked).
+  // ---------------------------------------------------------------------------------------------
+  const CMP_LIST = [
+    { id: 1, name: 'October Course Launch', type: 'promo', target: 'NEET 2027 Crash Course', channels: ['email', 'push'], audience: 12450, status: 'sent', date: '2026-10-24', delivered: 11980, clicks: 1420, purchases: 42, revenue: 84000 },
+    { id: 2, name: 'New Mock Test Announcement', type: 'announce', target: 'Exam · NEET Mock Test 12', channels: ['push'], audience: 9200, status: 'sent', date: '2026-10-22', delivered: 8340, clicks: 684 },
+    { id: 3, name: 'Revision Course Promotion', type: 'promo', target: 'JEE Main Revision Batch', channels: ['email'], audience: 6800, status: 'scheduled', date: '2026-10-30' },
+    { id: 4, name: 'Live Class Reminder', type: 'announce', target: 'Live class · Doubt clinic – Units 1–4', channels: ['email', 'push'], audience: 3150, status: 'sending', date: '2026-10-27', delivered: 1820, clicks: 41 },
+    { id: 5, name: 'Diwali Offer', type: 'promo', target: 'All courses (store)', channels: ['email', 'push'], audience: 18420, status: 'sent', date: '2026-10-20', delivered: 17640, clicks: 2210, purchases: 68, revenue: 136000 },
+    { id: 6, name: 'UPSC Notes Released', type: 'announce', target: 'Chapter · Polity Notes', channels: ['email'], audience: 4100, status: 'sent', date: '2026-10-18', delivered: 3990, clicks: 412 },
+    { id: 7, name: 'CAT 2027 Course Promo', type: 'promo', target: 'CAT 2027 Complete Course', channels: ['push'], audience: 5300, status: 'sent', date: '2026-10-15', delivered: 4810, clicks: 590, purchases: 31, revenue: 62000 },
+    { id: 8, name: 'Biology Notes – 30% off', type: 'promo', target: 'Biology Handwritten Notes', channels: ['email', 'push'], audience: 2285, status: 'draft', edited: 'Yesterday' },
+    { id: 9, name: 'Organic Chemistry on YouTube', type: 'announce', target: 'YouTube · Organic Chemistry in 20 minutes', channels: ['push'], audience: 18420, status: 'sent', date: '2026-10-12', delivered: 14920, clicks: 2210 },
+    { id: 10, name: 'Hall Tickets for Mock Test 13', type: 'announce', target: 'Exam · NEET Mock Test 13', channels: ['email', 'push'], audience: 2600, status: 'failed', date: '2026-10-27' },
+    { id: 11, name: 'JEE Weekend Batch – Seats Open', type: 'promo', target: 'JEE Weekend Batch', channels: ['email', 'push'], audience: 1960, status: 'partial', date: '2026-10-05', delivered: 1320, clicks: 352, purchases: 9, revenue: 31491 },
+    { id: 12, name: 'Repeaters 2026 – Fee Reminder', type: 'announce', target: 'Opens the app', channels: ['email'], audience: 1180, status: 'draft', edited: '2 hours ago' },
+    { id: 13, name: 'Partner Bookstore Offer', type: 'promo', target: 'Partner store · Physics Galaxy', channels: ['email'], audience: 7400, status: 'sent', date: '2026-10-02', delivered: 7210, clicks: 380, purchases: null, revenue: null },
+    { id: 14, name: 'Onam Holidays', type: 'announce', target: 'Opens the app', channels: ['push'], audience: 18420, status: 'sent', date: '2026-08-28', delivered: 14760, clicks: 1320 },
+    { id: 15, name: 'Test Series Early Bird', type: 'promo', target: 'All India Mock Test Series', channels: ['email', 'push'], audience: 8800, status: 'cancelled', date: '2026-10-10' },
+    { id: 16, name: 'Physics Formula Sheet', type: 'announce', target: 'Link · brilliantpala.org/formulas', channels: ['email'], audience: 6200, status: 'scheduled', date: '2026-11-02' },
+  ];
+  // Prototype: a year of campaigns, to see paging and sorting with 100+
   const cmpMany = () => {
     const promos = ['NEET 2027 Crash Course', 'JEE Main Revision Batch', 'All India Mock Test Series', 'Biology Handwritten Notes'];
-    const news = [['live', 'Live class · '], ['exam', 'Exam · '], ['chapter', 'Chapter · '], ['video', 'Video · '], ['home', ''], ['link', '']];
-    const topics = ['Thermodynamics', 'Organic Chemistry', 'Human Physiology', 'Kinematics', 'Electrostatics', 'Genetics', 'Optics', 'Coordination Compounds'];
-    const out = [];
-    for (let i = 0; i < 104; i++) {
-      const days = 1 + Math.floor(i * 3.4), promo = i % 3 === 0, n = 1500 + (i * 977) % 16000, got = Math.round(n * 0.86), clicked = Math.round(got * (0.04 + (i % 7) / 40));
-      const date = new Date(2026, 9, 27 - days).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-      const t = topics[i % topics.length], k = news[i % news.length];
-      const p = promos[i % promos.length], bought = Math.round(clicked * (0.02 + (i % 5) / 100));
-      out.push(promo
-        ? { id: 1000 + i, name: p + ' – ' + ['offer', 'last seats', 'new batch', 'weekend sale'][i % 4], status: 'sent', sentBy: i % 2 ? 'Rahul Menon' : 'Priya Narayanan', channels: i % 2 ? ['push'] : ['push', 'email'], dest: { type: 'product', label: p, kind: 'product' },
-            sentShort: date, sentAt: date, days, targeted: n, received: got, unique: clicked, clicks: Math.round(clicked * 1.3), purchases: bought, revenue: bought * [4999, 3499, 999, 499][i % 4] }
-        : { id: 1000 + i, name: (k[0] === 'home' ? 'Notice: ' : k[0] === 'link' ? 'Read: ' : '') + t + (k[0] === 'live' ? ' – live class' : k[0] === 'exam' ? ' – mock test' : ''), status: 'sent', sentBy: i % 2 ? 'Rahul Menon' : 'Priya Narayanan', channels: i % 2 ? ['push'] : ['push', 'email'],
-            dest: k[0] === 'home' ? { type: 'home', label: 'App home' } : k[0] === 'link' ? { type: 'link', label: 'brilliantpala.org/blog' } : { type: 'item', kind: k[0], label: t },
-            sentShort: date, sentAt: date, days, targeted: n, received: got, unique: clicked, clicks: Math.round(clicked * 1.2), purchases: null, revenue: null });
-    }
-    for (let i = 0; i < 9; i++) out.push({ id: 2000 + i, name: topics[i % topics.length] + ' – draft', status: 'draft', channels: ['push'], missing: i % 2 ? ['Who gets it'] : [], dest: { type: 'home', label: 'App home' }, edited: i === 0 ? '1 day ago' : (i + 1) + ' days ago', estimate: 2000 + i * 310 });
-    return out;
+    const news = ['Live class · ', 'Exam · ', 'Chapter · ', 'YouTube · '];
+    const topics = ['Thermodynamics', 'Organic Chemistry', 'Human Physiology', 'Kinematics', 'Electrostatics', 'Genetics', 'Optics', 'Polity'];
+    return Array.from({ length: 110 }, (_, i) => {
+      const promo = i % 3 === 0, aud = 1500 + (i * 977) % 16000, del = Math.round(aud * 0.94), clicks = Math.round(del * (0.04 + (i % 7) / 50));
+      const d = new Date(2026, 9, 26 - Math.floor(i * 3.2)).toISOString().slice(0, 10);
+      const status = i % 23 === 5 ? 'failed' : i % 17 === 3 ? 'partial' : 'sent';
+      return promo
+        ? { id: 100 + i, name: promos[i % 4] + ' – ' + ['Offer', 'Last Seats', 'New Batch', 'Weekend Sale'][i % 4], type: 'promo', target: promos[i % 4], channels: i % 2 ? ['push'] : ['email', 'push'], audience: aud, status, date: d, delivered: status === 'failed' ? 0 : del, clicks: status === 'failed' ? 0 : clicks, purchases: status === 'failed' ? 0 : Math.round(clicks * 0.03), revenue: status === 'failed' ? 0 : Math.round(clicks * 0.03) * [2000, 3499, 999, 499][i % 4] }
+        : { id: 100 + i, name: topics[i % 8] + ' – ' + ['Live Class', 'Mock Test', 'New Chapter', 'New Video'][i % 4], type: 'announce', target: news[i % 4] + topics[i % 8], channels: i % 2 ? ['push'] : ['email', 'push'], audience: aud, status, date: d, delivered: status === 'failed' ? 0 : del, clicks: status === 'failed' ? 0 : clicks };
+    });
   };
+
+  const CMP_STATUS = {
+    draft: { label: 'Draft' }, scheduled: { label: 'Scheduled' }, sending: { label: 'Sending' }, sent: { label: 'Sent' },
+    partial: { label: 'Partially failed' }, failed: { label: 'Failed' }, cancelled: { label: 'Cancelled' },
+  };
+  const cmpFmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const cmpCompact = (n) => n >= 100000 ? '₹' + (n / 100000).toFixed(n % 100000 ? 2 : 0) + 'L' : cmpMoney(n);
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('campaignList', () => ({
       view: 'loading',
-      campaigns: cmpCopy(CMP_CAMPAIGNS),
+      campaigns: cmpCopy(CMP_LIST),
+      // What's showing
+      type: '',              // '' | promo | announce
       search: '',
       status: '',
-      channel: '',
-      purposeFilter: '',
+      channel: '',           // '' | email | push | both
+      product: '',
+      audienceSize: '',      // '' | small | medium | large
+      dateRange: '',
+      sortKey: 'date',
+      sortDir: 'desc',
+      page: 1,
+      perPage: 10,
+      selected: [],
       toDelete: null,
+      toCancel: null,
+      drawer: { product: '', audienceSize: '' },
 
       init() {
         const s = cmpState() || 'list';
-        if (s === 'no-results') this.search = 'scholarship';
-        this.campaigns.forEach(c => { if (c.days === undefined) c.days = CMP_DAYS[c.id] ?? 0; });
         if (s === 'many') this.campaigns = this.campaigns.concat(cmpMany());
-        // Drafts, sending and couldn't send first; then newest sent
-        const o = { draft: 0, sending: 1, failed: 1, sent: 2 };
-        this.campaigns.sort((a, b) => o[a.status] - o[b.status] || a.days - b.days);
-        // Back to page 1 whenever search or filters change
-        ['search', 'status', 'channel', 'purposeFilter'].forEach(k => this.$watch(k, () => { this.page = 1; }));
+        if (s === 'no-results') this.search = 'scholarship';
+        if (s === 'promo') this.type = 'promo';
+        if (s === 'announce') this.type = 'announce';
+        if (s === 'filtered') { this.status = 'sent'; this.channel = 'both'; this.product = 'NEET 2027 Crash Course'; }
+        if (s === 'selected') this.selected = [2, 6, 9];
+        ['search', 'status', 'channel', 'product', 'audienceSize', 'dateRange', 'type', 'perPage'].forEach(k => this.$watch(k, () => { this.page = 1; this.selected = []; }));
+        this.$watch('pageRows', () => cmpIcons());
         if (s === 'loading') return;
         setTimeout(() => {
           this.view = s === 'intro' ? 'intro' : s === 'error' ? 'error' : 'list';
           cmpIcons();
-          if (s === 'duplicated') cmpToast('Copy saved as a draft', 'Opening “NEET 2027 Crash Course launch (copy)”…');
+          if (s === 'duplicated') cmpToast('Copy saved as a draft', 'Opening “October Course Launch (copy)”…');
           if (s === 'deleted') cmpToast('Draft deleted');
+          // Show preset filters in their selects
+          this.$nextTick(() => this.syncSelects());
         }, 600);
-        this.$watch('filtered', () => cmpIcons());
       },
       retry() { this.view = 'loading'; setTimeout(() => { this.view = 'list'; cmpIcons(); }, 700); },
 
-      // Last 30 days, sent campaigns only (prototype numbers)
-      // Headline numbers for the chosen period, and the change from the period before it
-      period: 30,
-      statsFor(from, to) {
-        const sent = this.campaigns.filter(c => c.status === 'sent' && c.days > from && c.days <= to);
-        return {
-          sent: sent.length,
-          reached: sent.reduce((t, c) => t + (c.received || 0), 0),
-          clicked: sent.reduce((t, c) => t + (c.unique || 0), 0),
-          revenue: sent.reduce((t, c) => t + (c.revenue || 0), 0),
-        };
+      // ----- Summary (all campaigns, whatever is filtered) -----
+      get summary() {
+        const c = this.campaigns, n = (st) => c.filter(x => st.includes(x.status)).length;
+        return { total: c.length, sent: n(['sent']), scheduled: n(['scheduled']), drafts: n(['draft']), failed: n(['failed']) };
       },
-      get stats() {
-        const now = this.statsFor(-1, this.period);
-        // Prototype: the sample data has little history, so the previous period is made up from fixed ratios
-        const prev = { sent: Math.round(now.sent / 0.8) || 4, reached: Math.round(now.reached / 1.12), clicked: Math.round(now.clicked / 0.93), revenue: Math.round(now.revenue / 1.24) };
-        const change = (k) => { const d = prev[k] ? Math.round((now[k] - prev[k]) / prev[k] * 100) : 0; return { d, text: (d > 0 ? '↑ ' : d < 0 ? '↓ ' : '') + Math.abs(d) + '%', cls: d > 0 ? 'text-teal-600 dark:text-teal-400' : d < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500' }; };
-        return { ...now, change: { sent: change('sent'), reached: change('reached'), clicked: change('clicked'), revenue: change('revenue') } };
+      typeCount(t) { return this.campaigns.filter(c => !t || c.type === t).length; },
+
+      // ----- Filtering, sorting, pages -----
+      get filtered() {
+        const q = this.search.trim().toLowerCase();
+        const sizes = { small: [0, 2000], medium: [2000, 10000], large: [10000, Infinity] };
+        return this.campaigns.filter(c =>
+          (!this.type || c.type === this.type) &&
+          (!q || (c.name + ' ' + c.target).toLowerCase().includes(q)) &&
+          (!this.status || c.status === this.status) &&
+          (!this.channel || (this.channel === 'both' ? c.channels.length === 2 : c.channels.length === 1 && c.channels[0] === this.channel)) &&
+          (!this.product || c.target === this.product) &&
+          (!this.audienceSize || (c.audience >= sizes[this.audienceSize][0] && c.audience < sizes[this.audienceSize][1])) &&
+          (!this.dateRange || c.status === 'draft' || this.inRange(c.date)));
       },
-      get periodText() { return ({ 7: 'previous 7 days', 30: 'previous 30 days', 90: 'previous 3 months' })[this.period]; },
-      // ----- Pages: 20 rows each -----
-      page: 1,
-      perPage: 20,
+      inRange(d) { const [a, b] = this.dateRange.split(' → '); if (!d || !a) return true; const t = new Date(d), s = new Date(a), e = new Date(b || a); return t >= s && t <= e; },
+      sortValue(c, k) {
+        return ({ name: c.name.toLowerCase(), audience: c.audience, delivery: c.delivered ? c.delivered / c.audience : -1, purchases: c.purchases ?? -1, revenue: c.revenue ?? -1,
+                  clicks: c.clicks ?? -1, ctr: this.ctr(c) ?? -1, performance: c.type === 'promo' ? (c.revenue ?? -1) : (c.clicks ?? -1), date: c.date || '9999' })[k];
+      },
+      get sorted() {
+        const k = this.sortKey, dir = this.sortDir === 'asc' ? 1 : -1;
+        return this.filtered.slice().sort((a, b) => { const x = this.sortValue(a, k), y = this.sortValue(b, k); return x < y ? -dir : x > y ? dir : 0; });
+      },
+      sortBy(k) { if (this.sortKey === k) this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc'; else { this.sortKey = k; this.sortDir = k === 'name' ? 'asc' : 'desc'; } this.page = 1; },
+      sortIcon(k) { return this.sortKey !== k ? 'chevrons-up-down' : this.sortDir === 'asc' ? 'chevron-up' : 'chevron-down'; },
       get pageCount() { return Math.max(1, Math.ceil(this.filtered.length / this.perPage)); },
-      get pageRows() { return this.filtered.slice((this.page - 1) * this.perPage, this.page * this.perPage); },
+      get pageRows() { return this.sorted.slice((this.page - 1) * this.perPage, this.page * this.perPage); },
       get pageItems() {
         const n = this.pageCount, p = this.page;
         if (n <= 7) return Array.from({ length: n }, (_, i) => i + 1);
@@ -93,39 +134,75 @@
         if (p >= n - 3) return [1, '…', n - 4, n - 3, n - 2, n - 1, n];
         return [1, '…', p - 1, p, p + 1, '…', n];
       },
-      goPage(n) { this.page = n; cmpIcons(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+      goPage(n) { this.page = n; this.selected = []; },
 
-      get filtered() {
-        const q = this.search.trim().toLowerCase();
-        return this.campaigns.filter(c =>
-          (!q || c.name.toLowerCase().includes(q)) &&
-          (!this.status || c.status === this.status) &&
-          (!this.purposeFilter || cmpPurposeKey(c.dest) === this.purposeFilter) &&
-          (!this.channel || c.channels.includes(this.channel)));
+      // ----- Active filter chips -----
+      get chips() {
+        const ch = { email: 'Email only', push: 'Push only', both: 'Email + Push' }, sz = { small: 'Under 2,000 students', medium: '2,000–10,000 students', large: 'Over 10,000 students' };
+        const out = [];
+        if (this.status) out.push(['status', 'Status: ' + CMP_STATUS[this.status].label]);
+        if (this.channel) out.push(['channel', 'Channel: ' + ch[this.channel]]);
+        if (this.product) out.push(['product', 'Product: ' + this.product]);
+        if (this.audienceSize) out.push(['audienceSize', 'Audience: ' + sz[this.audienceSize]]);
+        if (this.dateRange) out.push(['dateRange', 'Date: ' + this.dateRange]);
+        return out;
       },
-      get filtersOn() { return !!(this.search || this.status || this.channel || this.purposeFilter); },
-      clearFilters() {
-        this.search = ''; this.status = ''; this.channel = ''; this.purposeFilter = '';
-        // reset the ui-system selects
-        this.$root.querySelectorAll('[data-filter] > div').forEach(el => el.dispatchEvent(new CustomEvent('set-selected-values', { detail: 'all' })));
+      get moreCount() { return [this.product, this.audienceSize, this.dateRange].filter(Boolean).length; },
+      removeChip(k) { this[k] = ''; this.syncSelects(); },
+      clearFilters() { this.search = ''; this.status = ''; this.channel = ''; this.product = ''; this.audienceSize = ''; this.dateRange = ''; this.syncSelects(); },
+      get filtersOn() { return !!(this.search || this.chips.length); },
+      // Keep the ui-system selects showing the current values
+      syncSelects() {
+        this.$root.querySelectorAll('[data-filter]').forEach(f => {
+          const v = this[f.dataset.filter] || 'all';
+          f.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: v }));
+        });
+      },
+      get productOptions() { return [...new Set(this.campaigns.filter(c => c.type === 'promo').map(c => c.target))].sort(); },
+      openMore() {
+        this.drawer = { product: this.product, audienceSize: this.audienceSize };
+        window.dispatchEvent(new CustomEvent('open-drawer-more-filters'));
+        this.$nextTick(() => this.syncSelects());
+      },
+      applyMore() {
+        this.product = this.drawer.product; this.audienceSize = this.drawer.audienceSize;
+        const dp = document.getElementById('campaign-date-range');
+        const picker = dp && dp.closest('[x-data]');
+        this.dateRange = picker && picker._x_dataStack[0].inputValue || '';
+        window.dispatchEvent(new CustomEvent('close-drawer-more-filters'));
       },
 
+      // ----- Selection and bulk actions -----
+      get allOnPage() { return this.pageRows.length > 0 && this.pageRows.every(c => this.selected.includes(c.id)); },
+      toggleAll() { const ids = this.pageRows.map(c => c.id); this.selected = this.allOnPage ? this.selected.filter(id => !ids.includes(id)) : [...new Set([...this.selected, ...ids])]; },
+      toggleRow(c) { this.selected = this.selected.includes(c.id) ? this.selected.filter(id => id !== c.id) : [...this.selected, c.id]; },
+      get selectedRows() { return this.campaigns.filter(c => this.selected.includes(c.id)); },
+      get canArchive() { return this.selectedRows.every(c => ['sent', 'partial', 'failed', 'cancelled'].includes(c.status)); },
+      get canDeleteDrafts() { return this.selectedRows.length > 0 && this.selectedRows.every(c => c.status === 'draft'); },
+      bulkExport() { cmpToast('Export started', this.selected.length + ' campaigns. The CSV downloads in a moment.'); this.selected = []; },
+      bulkArchive() { const n = this.selected.length; this.campaigns = this.campaigns.filter(c => !this.selected.includes(c.id)); this.selected = []; cmpToast(n + (n === 1 ? ' campaign archived' : ' campaigns archived'), 'Results are kept. Find them under Archived.'); },
+      bulkDelete() { const n = this.selected.length; this.campaigns = this.campaigns.filter(c => !this.selected.includes(c.id)); this.selected = []; cmpToast(n + (n === 1 ? ' draft deleted' : ' drafts deleted')); },
+
+      // ----- One campaign -----
+      statusLabel(c) { return CMP_STATUS[c.status].label; },
+      isSentLike(c) { return ['sent', 'partial', 'sending'].includes(c.status); },
+      ctr(c) { return c.delivered ? Math.round(c.clicks / c.delivered * 1000) / 10 : null; },
+      deliveryPct(c) { return c.audience ? Math.round(c.delivered / c.audience * 100) : 0; },
+      dateText(c) {
+        if (c.status === 'draft') return 'Edited ' + (c.edited || '').toLowerCase();
+        return cmpFmtDate(c.date);
+      },
+      dateHint(c) { return ({ scheduled: 'Scheduled', sending: 'Started', cancelled: 'Was scheduled', failed: 'Tried' })[c.status] || ''; },
+      channelText(c) { return c.channels.length === 2 ? 'Email + Push' : c.channels[0] === 'email' ? 'Email' : 'Push'; },
       href(c) {
-        const base = '{{ "/testpress/campaigns/" | url }}';
-        return base + 'detail/?id=' + c.id;
+        const base = '{{ "/testpress/campaigns/detail/" | url }}';
+        const st = { draft: 'review', scheduled: 'review', sending: 'sending', failed: 'failed', partial: 'partial', cancelled: 'review' }[c.status] || (c.type === 'promo' ? 'product' : 'youtube');
+        return base + '?state=' + st;
       },
-      editHref(c) { return '{{ "/testpress/campaigns/new/" | url }}?id=' + c.id; },
-      // The dot line under a name: channels · who sent it
-      subline(c) {
-        const p = c.channels.map(x => [x === 'push' ? 'Push' : 'Email', '']);
-        if (c.status !== 'draft' && c.sentBy) p.push(['Sent by ' + c.sentBy, '']);
-        return p;
-      },
-      ctr(c) { return c.targeted ? cmpPct(c.unique, c.targeted) : ''; },
-
+      editHref(c) { return '{{ "/testpress/campaigns/new/" | url }}?state=ready'; },
       duplicate(c) {
-        const copy = { ...cmpCopy(c), id: Date.now(), name: c.name + ' (copy)', status: 'draft', edited: 'Just now', missing: [], estimate: c.targeted || c.estimate, warning: null };
-        this.campaigns.unshift(copy);
+        this.campaigns.unshift({ ...cmpCopy(c), id: Date.now(), name: c.name + ' (copy)', status: 'draft', edited: 'Just now', delivered: undefined, clicks: undefined, purchases: undefined, revenue: undefined, date: undefined });
+        this.sortKey = 'date'; this.page = 1;
         cmpToast('Copy saved as a draft', 'Audience, message and link were copied. Nothing is sent yet.');
       },
       askDelete(c) { this.toDelete = c; this.$dispatch('open-modal-delete-draft'); },
@@ -135,6 +212,9 @@
         cmpToast('Draft deleted', '“' + this.toDelete.name + '” was removed.');
         this.toDelete = null;
       },
+      askCancel(c) { this.toCancel = c; this.$dispatch('open-modal-cancel-scheduled'); },
+      confirmCancel() { if (this.toCancel) { this.toCancel.status = 'cancelled'; cmpToast('Scheduled campaign cancelled', 'Nothing was sent. You can duplicate it later.'); this.toCancel = null; } },
+      archive(c) { this.campaigns = this.campaigns.filter(x => x.id !== c.id); cmpToast('Campaign archived', 'Its results are kept.'); },
     }));
   });
 </script>
