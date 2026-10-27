@@ -1,0 +1,72 @@
+{# The checklist. Each row: status (tick / to do / problem / not sending), title, one-line summary, and a button that
+   opens its side panel. "N things left" sits above so the admin knows why Send is disabled. #}
+{% from "../../../ui-system/components/button.html" import button %}
+
+<div class="mb-3 flex items-center justify-between">
+  <p class="text-sm" :class="ready ? 'text-primary-700 dark:text-primary-400 font-medium' : 'text-gray-500 dark:text-neutral-400'"
+     x-text="ready ? 'Everything’s ready. Review and send when you are.' : leftCount + (leftCount === 1 ? ' thing' : ' things') + ' left before you can send'"></p>
+</div>
+
+<div class="space-y-3">
+  {% for r in [
+    { key: "audience", title: "Who gets it", icon: "users", add: "Choose students" },
+    { key: "push", title: "Push notification", icon: "smartphone", add: "Add push" },
+    { key: "email", title: "Email", icon: "mail", add: "Add email" },
+    { key: "dest", title: "Where it opens", icon: "mouse-pointer-click", add: "Choose" }
+  ] %}
+  <div class="flex items-start gap-x-4 p-5 bg-white rounded-xl shadow-sm dark:bg-neutral-800">
+    {# Status #}
+    <span class="mt-0.5 shrink-0 size-9 inline-flex justify-center items-center rounded-full"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400': rows.{{ r.key }}[0] === 'done',
+            'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400': rows.{{ r.key }}[0] === 'problem',
+            'bg-gray-100 text-gray-400 dark:bg-neutral-700 dark:text-neutral-500': rows.{{ r.key }}[0] === 'todo' || rows.{{ r.key }}[0] === 'off'
+          }">
+      <svg x-show="rows.{{ r.key }}[0] === 'done'" class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <svg x-show="rows.{{ r.key }}[0] === 'problem'" x-cloak class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+      <i x-show="rows.{{ r.key }}[0] === 'todo' || rows.{{ r.key }}[0] === 'off'" data-lucide="{{ r.icon }}" class="size-4"></i>
+    </span>
+
+    {# Title and summary #}
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-gray-800 dark:text-neutral-100">{{ r.title }}</p>
+
+      {% if r.key == "audience" %}
+        <p x-show="rows.audience[0] === 'done'" class="mt-1 text-sm text-gray-600 dark:text-neutral-300">
+          <span class="font-medium text-gray-800 dark:text-neutral-100" x-text="'≈ ' + cmpNum(estimate) + ' students'"></span>
+          <span class="block mt-0.5 line-clamp-2 text-gray-500 dark:text-neutral-400" x-text="audienceText"></span>
+        </p>
+      {% elif r.key == "push" %}
+        <div x-show="rows.push[0] === 'done'" class="mt-1 flex items-start gap-x-3">
+          <div class="min-w-0 flex-1 text-sm">
+            <p class="truncate text-gray-800 dark:text-neutral-200" x-text="push.title"></p>
+            <p class="line-clamp-2 text-gray-500 dark:text-neutral-400" x-text="push.message"></p>
+          </div>
+          <img x-show="push.image" src="https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=200&h=100&q=60" alt="" class="shrink-0 w-16 aspect-[2/1] object-cover rounded-md">
+        </div>
+      {% elif r.key == "email" %}
+        <div x-show="rows.email[0] === 'done'" class="mt-1 text-sm">
+          <p class="truncate text-gray-800 dark:text-neutral-200" x-text="email.subject"></p>
+          <p class="text-gray-500 dark:text-neutral-400">From {{ campaigns.institute }}</p>
+        </div>
+      {% else %}
+        <div x-show="rows.dest[0] === 'done'" class="mt-1 text-sm">
+          <p class="truncate text-gray-800 dark:text-neutral-200" x-text="destLabel"></p>
+          <p class="text-gray-500 dark:text-neutral-400"
+             x-text="dest.type === 'product' ? 'Sales within 7 days of a click are counted' + (dest.skipBuyers ? ' · Leaves out students who bought it' : '') : dest.type === 'link' ? 'Opens in the browser' : 'Clicks are counted'"></p>
+        </div>
+      {% endif %}
+
+      <p x-show="rows.{{ r.key }}[0] !== 'done'" class="mt-1 text-sm"
+         :class="rows.{{ r.key }}[0] === 'problem' ? 'text-orange-700 dark:text-orange-400' : 'text-gray-500 dark:text-neutral-400'"
+         x-text="rows.{{ r.key }}[1]"></p>
+    </div>
+
+    {# Action #}
+    <div class="shrink-0">
+      <span x-show="rows.{{ r.key }}[0] === 'todo' || rows.{{ r.key }}[0] === 'off'">{{ button(text=r.add, variant="secondary", size="sm", extra_attrs='@click="open(\'' ~ r.key ~ '\')"') }}</span>
+      <span x-show="rows.{{ r.key }}[0] === 'done' || rows.{{ r.key }}[0] === 'problem'" x-cloak>{{ button(text="Edit", variant="secondary", size="sm", extra_attrs='@click="open(\'' ~ r.key ~ '\')"') }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>

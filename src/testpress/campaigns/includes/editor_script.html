@@ -1,35 +1,48 @@
 <script>
   window.CMP_PROTO = [
-    { name: 'Start', states: [['blank', 'New, blank'], ['template', 'New, from a template'], ['draft', 'Draft with things left'], ['ready', 'Draft ready to send']] },
-    { name: 'Who gets it', states: [['no-match', 'No students match'], ['deleted-batch', 'A chosen batch was deleted']] },
-    { name: 'Message', states: [['uploading', 'Image uploading'], ['bad-image', 'Image not accepted'], ['bad-link', 'Web link not valid']] },
-    { name: 'Saving and sending', states: [['save-failed', 'Save failed'], ['review', 'Review and send'], ['no-app', 'Review: nobody has the app'], ['send-failed', 'Review: sending failed']] },
+    { name: 'Start', states: [['blank', 'New, nothing set'], ['template', 'New, from a template'], ['draft', 'Draft with things left'], ['ready', 'Draft ready to send']] },
+    { name: 'Editing (side panel)', states: [['edit-audience', 'Who gets it'], ['edit-push', 'Push notification'], ['edit-email', 'Email'], ['edit-dest', 'Where it opens']] },
+    { name: 'Problems', states: [['no-match', 'No students match'], ['deleted-batch', 'A chosen batch was deleted'], ['bad-link', 'Web link not valid'], ['save-failed', 'Save failed']] },
+    { name: 'Review and send', states: [['review', 'Review and send'], ['no-app', 'Nobody has the app'], ['send-failed', 'Sending failed']] },
   ];
   window.CMP_PROTO_DEFAULT = 'blank';
 
-  const CMP_LIMITS = { title: 65, message: 240, subject: 120 };
+  const CMP_LIMITS = { title: 65, message: 240 };
   const cmpEmptyRow = () => ({ id: Date.now() + Math.random(), type: 'batch', values: [], field: '', missing: false });
+  const cmpOptLabel = (type, v) => {
+    const list = { product: CMP.products, course: CMP.courses, batch: CMP.batches, students: CMP.students }[type] || [];
+    const o = list.find(x => x.value === v); return o ? o.label : v;
+  };
+  // Estimated count for an audience (prototype numbers)
+  const cmpEstimate = (a, noMatch) => {
+    if (a.mode === 'all') return CMP_ALL_STUDENTS;
+    const rows = (a.rows || []).filter(r => r.values.length);
+    if (a.mode !== 'some' || !rows.length) return null;
+    if (noMatch && a.match === 'all') return 0;
+    const base = rows.reduce((t, r) => t + r.values.length * ({ product: 820, course: 1640, batch: 1180, field: 2300, students: 1 })[r.type], 0);
+    return a.match === 'all' && rows.length > 1 ? Math.round(base / 3.4) : base;
+  };
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('campaignEditor', () => ({
-      id: null,
+      // The campaign as it is now. Side panels edit a copy (`d`), so Cancel changes nothing.
       name: '',
       audience: { mode: '', match: 'any', rows: [] },
-      push: { on: true, title: '', message: '', image: null, imageState: 'none' }, // none | uploading | done | error
-      email: { on: true, subject: '', body: '' },
+      push: { on: false, title: '', message: '', image: null },
+      email: { on: false, subject: '', body: '' },
       dest: { type: '', product: '', skipBuyers: true, url: '' },
+      d: {},
+      panel: '',
+      nameDraft: '',
+      triedPanel: false,
       preview: 'push',
-      saveState: 'new',        // new | dirty | saving | saved | failed
+      saveState: 'new',     // new | saving | saved | failed
       savedAt: '',
       sending: false,
       sendError: false,
-      showLeft: false,
-      touchedUrl: false,
       tplPick: null,
       fail: {},
       limits: CMP_LIMITS,
-      conditionTypes: CMP_CONDITION_TYPES,
-      fields: CMP_FIELDS,
       templates: CMP_TEMPLATES,
       products: CMP_PRODUCTS,
 
@@ -37,138 +50,155 @@
         const s = cmpState() || 'blank';
         const id = Number(cmpParam('id'));
         const tpl = Number(cmpParam('template')) || (s === 'template' ? 1 : 0);
-        if (id === 7 || s === 'draft') this.loadDraft(7);
-        else if (id === 8 || ['ready', 'review', 'no-app', 'send-failed'].includes(s)) this.loadDraft(8);
-        else if (id) this.loadDraft(8);
+        if (id === 7 || s === 'draft' || s === 'save-failed') this.loadDraft(7);
+        else if (id || ['ready', 'review', 'no-app', 'send-failed', 'deleted-batch', 'bad-link', 'edit-audience', 'edit-push', 'edit-email', 'edit-dest'].includes(s)) this.loadDraft(8);
         if (tpl) { const t = this.templates.find(x => x.id === tpl); if (t) { this.applyTemplate(t, false); this.name = t.name; } }
-        if (s === 'no-match') { this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }, { id: 2, type: 'product', values: ['neet-crash'] }] }; }
-        if (s === 'deleted-batch') { this.loadDraft(8); this.audience.rows = [{ id: 1, type: 'batch', values: [], missing: 'NEET 2026 – Batch C' }]; }
-        if (s === 'uploading') { this.push.imageState = 'uploading'; this.push.image = 'neet-banner.png'; }
-        if (s === 'bad-image') { this.push.imageState = 'error'; }
-        if (s === 'bad-link') { this.loadDraft(8); this.dest = { type: 'link', product: '', skipBuyers: true, url: 'testpress mock register' }; this.touchedUrl = true; }
-        if (s === 'save-failed') { this.loadDraft(7); this.fail.save = true; this.name = 'Repeaters 2026 – fee reminder'; this.$nextTick(() => this.save()); }
+        if (s === 'no-match') { this.name = 'Repeaters – NEET crash course offer'; this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }, { id: 2, type: 'product', values: ['neet-crash'] }] }; }
+        if (s === 'deleted-batch') this.audience.rows = [{ id: 1, type: 'batch', values: [], missing: 'NEET 2026 – Batch C' }];
+        if (s === 'bad-link') this.dest = { type: 'link', product: '', skipBuyers: true, url: 'testpress mock register' };
         if (s === 'no-app') this.fail.noApp = true;
         if (s === 'send-failed') this.fail.send = true;
+        if (s === 'save-failed') this.fail.save = true;
+        const panels = { 'edit-audience': 'audience', 'edit-push': 'push', 'edit-email': 'email', 'edit-dest': 'dest', 'deleted-batch': 'audience', 'bad-link': 'dest' };
+        if (panels[s]) setTimeout(() => { this.open(panels[s]); if (s === 'bad-link') this.triedPanel = true; }, 400);
+        if (s === 'save-failed') setTimeout(() => this.save(), 400);
         if (['review', 'no-app', 'send-failed'].includes(s)) setTimeout(() => this.openReview(), 400);
-
-        if (!this.push.on) this.preview = 'email';
-        this.$watch('push', () => this.markDirty(), { deep: true });
-        this.$watch('email', () => this.markDirty(), { deep: true });
-        this.$watch('dest', () => this.markDirty(), { deep: true });
-        this.$watch('audience', () => { this.markDirty(); cmpIcons(); }, { deep: true });
-        this.$watch('name', () => this.markDirty());
-        this.$watch('email.on', (v) => { if (!v && this.preview === 'email') this.preview = 'push'; });
-        this.$watch('push.on', (v) => { if (!v && this.preview === 'push') this.preview = 'email'; });
-        window.addEventListener('beforeunload', (e) => { if (['dirty', 'failed'].includes(this.saveState)) { e.preventDefault(); e.returnValue = ''; } });
+        if (!this.push.on && this.email.on) this.preview = 'email';
+        window.addEventListener('beforeunload', (e) => { if (this.saveState === 'failed') { e.preventDefault(); e.returnValue = ''; } });
       },
 
       loadDraft(id) {
-        this.id = id;
         if (id === 7) {
           this.name = 'Repeaters 2026 – fee reminder';
           this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }] };
-          this.push.on = false;
+          this.push = { on: false, title: '', message: '', image: null };
           this.email = { on: true, subject: '', body: '<p>Hi {name},</p><p>Your second fee instalment for Repeaters 2026 is due on 5 November. Pay early to keep your seat in the batch.</p>' };
           this.dest = { type: '', product: '', skipBuyers: true, url: '' };
           this.savedAt = '2 hours ago';
         } else {
           this.name = 'Biology notes – 30% off';
           this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['bio-neet'] }, { id: 2, type: 'batch', values: ['neet-a', 'neet-b'] }] };
-          this.push = { on: true, title: 'Biology notes at 30% off', message: 'Handwritten notes for every NEET chapter. Offer ends Sunday.', image: 'bio-notes-banner.png', imageState: 'done' };
+          this.push = { on: true, title: 'Biology notes at 30% off', message: 'Handwritten notes for every NEET chapter. Offer ends Sunday.', image: 'bio-notes-banner.png' };
           this.email = { on: true, subject: 'Biology Handwritten Notes – 30% off till Sunday', body: '<p>Hi {name},</p><p>Our toppers’ handwritten Biology notes cover every NEET chapter, with diagrams you can revise from in minutes.</p><p><a href="#campaign-link">Get the notes</a></p>' };
           this.dest = { type: 'product', product: 'bio-notes', skipBuyers: true, url: '' };
           this.savedAt = 'yesterday';
         }
         this.saveState = 'saved';
-        this.$nextTick(() => { this.saveState = 'saved'; });
       },
 
-      markDirty() { if (this.saveState !== 'saving' && this.saveState !== 'new') this.saveState = 'dirty'; if (this.saveState === 'new' && this.touchedAny) this.saveState = 'dirty'; },
-      get touchedAny() { return !!(this.name || this.audience.mode || this.push.title || this.push.message || this.email.subject || this.email.body || this.dest.type); },
+      // ----- Side panels -----
+      open(key) {
+        this.triedPanel = false;
+        this.d = cmpCopy({ audience: this.audience, push: this.push, email: this.email, dest: this.dest }[key]);
+        if (key === 'audience' && !this.d.mode) this.d.mode = 'some';
+        if (key === 'audience' && !this.d.rows.length) this.d.rows.push(cmpEmptyRow());
+        this.panel = key;
+        window.dispatchEvent(new CustomEvent('open-drawer-cmp-' + key));
+        this.$nextTick(() => {
+          if (key === 'email') window.dispatchEvent(new CustomEvent('rte-set-email-body', { detail: this.d.body }));
+          if (key === 'push') window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: this.d.image ? [{ name: this.d.image, size: '184 KB', progress: 100, status: 'success', extension: 'png' }] : [] } }));
+          cmpIcons();
+        });
+      },
+      close() { window.dispatchEvent(new CustomEvent('close-drawer-cmp-' + this.panel)); },
+      panelError(key) {
+        const d = this.d; if (!this.triedPanel || this.panel !== key) return '';
+        if (key === 'audience') {
+          if (d.rows.some(r => r.missing)) return 'Replace the deleted batch, or remove it.';
+          if (d.mode === 'some' && !d.rows.some(r => r.values.length)) return 'Choose at least one batch, course, product, field or student.';
+        }
+        if (key === 'push') { if (!d.title.trim()) return 'Add a title.'; if (!d.message.trim()) return 'Add a message.'; }
+        if (key === 'email') { if (!d.subject.trim()) return 'Add a subject.'; if (!d.body.replace(/<[^>]*>/g, '').trim()) return 'Write the email.'; }
+        if (key === 'dest') {
+          if (!d.type) return 'Choose where it opens.';
+          if (d.type === 'product' && !d.product) return 'Choose a product.';
+          if (d.type === 'link' && !this.validUrl(d.url)) return 'Enter a full web address, like https://example.com/page';
+        }
+        return '';
+      },
+      apply() {
+        this.triedPanel = true;
+        if (this.panelError(this.panel)) return;
+        const k = this.panel;
+        if (k === 'push' || k === 'email') { this.d.on = true; this.preview = k; }
+        this[k] = cmpCopy(this.d);
+        this.close();
+        this.save(true);
+      },
+      removeChannel(k) {
+        this[k].on = false; this.close(); this.save(true);
+        if (this.preview === k) this.preview = k === 'push' ? 'email' : 'push';
+        cmpToast((k === 'push' ? 'Push notification' : 'Email') + ' removed', 'What you wrote is kept, in case you add it back.');
+      },
 
       // ----- Who gets it -----
-      typeOf(row) { return this.conditionTypes.find(t => t.key === row.type); },
-      addRow() { this.audience.rows.push(cmpEmptyRow()); cmpIcons(); },
-      removeRow(row) { this.audience.rows = this.audience.rows.filter(r => r.id !== row.id); },
+      dEstimate() { return this.panel === 'audience' ? cmpEstimate(this.d, cmpState() === 'no-match') : null; },
+      get estimate() { return cmpEstimate(this.audience, cmpState() === 'no-match'); },
+      get audienceText() {
+        if (this.audience.mode === 'all') return 'All registered students';
+        const verbs = { product: 'bought ', course: 'has access to ', batch: 'in ', field: '', students: '' };
+        const t = this.audience.rows.filter(r => r.values.length)
+          .map(r => verbs[r.type] + r.values.map(v => cmpOptLabel(r.type, v)).join(', '))
+          .join(this.audience.match === 'all' ? ', and ' : ', or ');
+        return t.charAt(0).toUpperCase() + t.slice(1);
+      },
+      get reach() { const n = this.estimate || 0; return { push: this.fail.noApp ? 0 : Math.round(n * 0.81), email: Math.round(n * 0.975) }; },
+      addRow() { this.d.rows.push(cmpEmptyRow()); cmpIcons(); },
+      removeRow(row) { this.d.rows = this.d.rows.filter(r => r.id !== row.id); },
       setType(row, type) { row.type = type; row.values = []; row.field = ''; row.missing = false; },
-      get filledRows() { return this.audience.rows.filter(r => r.values.length); },
-      get estimate() {
-        if (this.audience.mode === 'all') return CMP_ALL_STUDENTS;
-        if (this.audience.mode !== 'some' || !this.filledRows.length) return null;
-        if (cmpState() === 'no-match' && this.audience.match === 'all') return 0;
-        // prototype: a believable number from the selection
-        const base = this.filledRows.reduce((t, r) => t + r.values.length * ({ product: 820, course: 1640, batch: 1180, field: 2300, students: 1 })[r.type], 0);
-        return this.audience.match === 'all' && this.filledRows.length > 1 ? Math.round(base / 3.4) : base;
-      },
-      get reach() {
-        const n = this.estimate || 0;
-        return { push: this.fail.noApp ? 0 : Math.round(n * 0.81), email: Math.round(n * 0.975) };
-      },
 
-      // ----- Message -----
-      get pushTitle() { return this.push.title || 'Title'; },
-      get pushMessage() { return this.push.message || 'Your message shows here.'; },
-      countClass(len, max) { return len >= max ? 'text-red-600' : len > max * 0.9 ? 'text-orange-600' : 'text-gray-500 dark:text-neutral-400'; },
-      addImage() { this.push.imageState = 'uploading'; this.push.image = 'campaign-banner.png'; setTimeout(() => { this.push.imageState = 'done'; }, 1400); },
-      removeImage() { this.push.image = null; this.push.imageState = 'none'; },
-      insertLink() { this.$dispatch('cmp-insert-link'); },
+      // ----- Where it opens -----
+      validUrl(u) { u = (u || '').trim(); return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(u) || /^[^\s.]+\.[a-z]{2,}(\/\S*)?$/i.test(u); },
+      productLabel(v) { const p = this.products.find(p => p.value === v); return p ? p.label : ''; },
+      get destLabel() { return ({ home: 'App home', store: 'Store', product: this.productLabel(this.dest.product), link: this.dest.url })[this.dest.type] || ''; },
+
+      // ----- Each row's status: done | todo | off | problem, with the line shown under its title -----
+      get rows() {
+        const a = this.audience, p = this.push, e = this.email, ds = this.dest;
+        const neither = !p.on && !e.on;
+        const r = {};
+        if (!a.mode) r.audience = ['todo', 'Choose who should get this campaign'];
+        else if (a.rows.some(x => x.missing)) r.audience = ['problem', '“' + a.rows.find(x => x.missing).missing + '” was deleted. Choose another batch.'];
+        else if (this.estimate === 0) r.audience = ['problem', 'No student matches these conditions'];
+        else if (this.estimate === null) r.audience = ['todo', 'Choose at least one condition'];
+        else r.audience = ['done', this.audienceText];
+        r.push = p.on ? (p.title && p.message ? ['done', p.title] : ['problem', 'Add a title and message'])
+                      : [neither ? 'todo' : 'off', neither ? 'Send push, email or both' : 'Not sending'];
+        r.email = e.on ? (e.subject && e.body.replace(/<[^>]*>/g, '').trim() ? ['done', e.subject] : ['problem', !e.subject ? 'Add a subject' : 'Write the email'])
+                       : [neither ? 'todo' : 'off', neither ? 'Send push, email or both' : 'Not sending'];
+        if (!ds.type) r.dest = ['todo', 'Choose what opens when they tap or click'];
+        else if (ds.type === 'link' && !this.validUrl(ds.url)) r.dest = ['problem', '“' + ds.url + '” isn’t a full web address'];
+        else if (ds.type === 'product' && !ds.product) r.dest = ['problem', 'Choose a product'];
+        else r.dest = ['done', this.destLabel];
+        return r;
+      },
+      get leftCount() { return Object.values(this.rows).filter(x => x[0] === 'todo' || x[0] === 'problem').length - (!this.push.on && !this.email.on ? 1 : 0) + (this.name.trim() ? 0 : 1); },
+      get ready() { return this.leftCount === 0; },
 
       // ----- Templates -----
       get hasContent() { return !!(this.push.title || this.push.message || this.email.subject || this.email.body.replace(/<[^>]*>/g, '').trim()); },
       openTemplates() { this.tplPick = null; this.$dispatch('open-modal-use-template'); },
       applyTemplate(t, notify = true) {
-        if (t.push) { this.push.on = true; this.push.title = t.push.title; this.push.message = t.push.message; if (t.push.image) { this.push.image = 'template-banner.png'; this.push.imageState = 'done'; } }
-        if (t.email) { this.email.on = true; this.email.subject = t.email.subject; this.email.body = t.email.body; this.$nextTick(() => window.dispatchEvent(new CustomEvent('rte-set-email-body', { detail: t.email.body }))); }
-        if (!t.push && t.email && !this.push.title && !this.push.message) this.push.on = false;
-        if (!t.email && t.push && !this.email.subject) this.email.on = false;
-        if (notify) cmpToast('“' + t.name + '” added', 'Change anything you like. The template stays as it is.');
+        if (t.push) this.push = { on: true, title: t.push.title, message: t.push.message, image: t.push.image ? 'template-banner.png' : null };
+        if (t.email) this.email = { on: true, subject: t.email.subject, body: t.email.body };
+        this.preview = t.push ? 'push' : 'email';
+        if (notify) { cmpToast('“' + t.name + '” added', 'Change anything you like. The template stays as it is.'); this.save(true); }
       },
 
-      // ----- Where it opens -----
-      get productName() { const p = this.products.find(p => p.value === this.dest.product); return p ? p.label : ''; },
-      get urlValid() { return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(this.dest.url.trim()) || /^[^\s.]+\.[a-z]{2,}(\/\S*)?$/i.test(this.dest.url.trim()); },
-      get urlError() { return this.dest.type === 'link' && this.touchedUrl && this.dest.url && !this.urlValid ? 'Enter a full web address, like https://example.com/page' : ''; },
-      get destLabel() {
-        return ({ home: 'App home', store: 'Store', product: this.productName || 'A product', link: this.dest.url || 'A web link' })[this.dest.type] || '';
-      },
+      // ----- Name -----
+      openRename() { this.nameDraft = this.name; this.$dispatch('open-modal-rename'); },
+      rename() { if (!this.nameDraft.trim()) return; this.name = this.nameDraft.trim(); this.save(true); },
 
-      // ----- Checks -----
-      get left() {
-        const l = [];
-        if (!this.name.trim()) l.push(['Campaign name', 'name']);
-        if (!this.audience.mode) l.push(['Who gets it', 'audience']);
-        else if (this.audience.mode === 'some' && !this.filledRows.length) l.push(['Students to send to', 'audience']);
-        else if (this.audience.rows.some(r => r.missing)) l.push(['Replace the deleted batch', 'audience']);
-        else if (this.estimate === 0) l.push(['Students to send to', 'audience']);
-        if (!this.push.on && !this.email.on) l.push(['Turn on push or email', 'message']);
-        if (this.push.on && !this.push.title.trim()) l.push(['Push title', 'message']);
-        if (this.push.on && !this.push.message.trim()) l.push(['Push message', 'message']);
-        if (this.push.on && this.push.imageState === 'uploading') l.push(['Image still uploading', 'message']);
-        if (this.email.on && !this.email.subject.trim()) l.push(['Email subject', 'message']);
-        if (this.email.on && !this.email.body.replace(/<[^>]*>/g, '').trim()) l.push(['Email message', 'message']);
-        if (!this.dest.type) l.push(['Where it opens', 'dest']);
-        else if (this.dest.type === 'product' && !this.dest.product) l.push(['Product to open', 'dest']);
-        else if (this.dest.type === 'link' && !this.urlValid) l.push(['A valid web link', 'dest']);
-        return l;
-      },
-      done(section) { return !this.left.some(x => x[1] === section); },
-      get ready() { return this.left.length === 0 && this.estimate > 0; },
-      jump(section) { this.showLeft = false; const el = document.getElementById('cmp-' + section); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
-
-      // ----- Save -----
-      save() {
+      // ----- Save: drafts save after every change; the button saves on demand -----
+      save(quiet = false) {
         this.saveState = 'saving';
         setTimeout(() => {
-          if (this.fail.save) { this.fail.save = false; this.saveState = 'failed'; cmpToast('Couldn’t save the draft', 'Your changes are still here. Try again.', 'error'); return; }
-          if (!this.id) this.id = 99;
+          if (this.fail.save) { this.fail.save = false; this.saveState = 'failed'; cmpToast('Couldn’t save the draft', 'Your changes are still on this page. Try again.', 'error'); return; }
           this.saveState = 'saved'; this.savedAt = 'just now';
-          this.$nextTick(() => { this.saveState = 'saved'; });
-          cmpToast('Draft saved', 'Nothing is sent until you choose Send.');
-        }, 700);
+          if (!quiet) cmpToast('Draft saved', 'Nothing is sent until you choose Send.');
+        }, 600);
       },
-      get saveLabel() {
-        return ({ new: 'Not saved yet', dirty: 'Unsaved changes', saving: 'Saving…', saved: 'Saved ' + this.savedAt, failed: 'Couldn’t save' })[this.saveState];
-      },
+      get saveLabel() { return ({ new: 'Draft · not saved yet', saving: 'Saving…', saved: 'Draft · saved ' + this.savedAt, failed: 'Couldn’t save' })[this.saveState]; },
 
       // ----- Review and send -----
       openReview() { this.sendError = false; this.$dispatch('open-modal-review-send'); },
@@ -177,7 +207,6 @@
         this.sending = true; this.sendError = false;
         setTimeout(() => {
           if (this.fail.send) { this.fail.send = false; this.sending = false; this.sendError = true; return; }
-          this.saveState = 'saved';
           window.location.href = '{{ "/testpress/campaigns/report/" | url }}?state=sending&name=' + encodeURIComponent(this.name);
         }, 1200);
       },
