@@ -16,17 +16,29 @@ permalink: testpress/push_notifications/new/
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="pushSend">
-  {{ breadcrumb({ items: [{ label: "Push notifications", href: ("/testpress/push_notifications/" | url) }, { label: "New notification" }] }) }}
+  <div x-show="!tplMode">{{ breadcrumb({ items: [{ label: "Push notifications", href: ("/testpress/push_notifications/" | url) }, { label: "New notification" }] }) }}</div>
+  <div x-show="tplMode" x-cloak>{{ breadcrumb({ items: [{ label: "Push notifications", href: ("/testpress/push_notifications/" | url) }, { label: "Templates", href: ("/testpress/push_notifications/templates/" | url) }, { label: "Template" }] }) }}</div>
 
   <div class="mt-3 flex flex-wrap items-center justify-between gap-4">
-    <h1 class="text-xl font-semibold text-gray-800 dark:text-neutral-100">New push notification</h1>
+    <h1 class="text-xl font-semibold text-gray-800 dark:text-neutral-100" x-text="tplMode ? (tplId ? 'Edit template · ' + tplName : 'New template') : 'New push notification'">New push notification</h1>
     <div class="flex flex-wrap items-center gap-2">
-      <div x-show="!ready" class="me-2">
+      <div x-show="!ready && !tplMode" class="me-2">
         {% set left_trigger %}<span class="inline-flex items-center gap-x-1.5 text-sm font-medium text-orange-600 dark:text-orange-400 cursor-default"><span class="size-1.5 rounded-full bg-orange-500"></span><span x-text="leftItems.length + (leftItems.length === 1 ? ' thing left' : ' things left')"></span></span>{% endset %}
         {{ tooltip(trigger=left_trigger, content='<span x-text="leftItems.join(\', \')"></span>', placement="bottom") }}
       </div>
-      {{ button(text="Use a template", variant="ghost", icon="layout-template", extra_attrs='@click="openTemplates()"') }}
-      {{ button(text="Send", icon="send", extra_attrs='@click="openConfirm()" :disabled="!ready"') }}
+      <template x-if="!tplMode">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ button(text="Use a template", variant="ghost", icon="layout-template", extra_attrs='@click="openTemplates()"') }}
+          {{ button(text="Save as template", variant="secondary", extra_attrs='@click="openSaveTemplate()" :disabled="!msg.title || !msg.message"') }}
+          {{ button(text="Send", icon="send", extra_attrs='@click="openConfirm()" :disabled="!ready"') }}
+        </div>
+      </template>
+      <template x-if="tplMode">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ button(text="Cancel", variant="ghost", href=('/testpress/push_notifications/templates/' | url)) }}
+          {{ button(text="Save template", extra_attrs='@click="tplId ? saveTemplate() : openSaveTemplate()" :disabled="!msg.title || !msg.message"') }}
+        </div>
+      </template>
     </div>
   </div>
 
@@ -43,6 +55,7 @@ permalink: testpress/push_notifications/new/
   {% include "./includes/drawer_audience.html" %}
   {% include "./includes/confirm_modal.html" %}
   {% include "./includes/template_modal.html" %}
+  {% include "./includes/save_template_modal.html" %}
 </div>
 {{ toast_provider() }}
 {% include "./includes/prototype.html" %}

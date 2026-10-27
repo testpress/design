@@ -4,7 +4,8 @@ title: Push notification templates
 permalink: testpress/push_notifications/templates/
 ---
 
-{# Templates: reusable title, message and picture. "Use" starts a new notification with them filled in. #}
+{# Templates are saved notifications: what it opens, words, picture and who gets it — like the current LMS.
+   "Use" starts a notification with everything filled in; New and Edit open the send page in template mode. #}
 {% extends "layouts/admin_base.html" %}
 {% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
 {% from "../../ui-system/components/page-header.html" import page_header %}
@@ -12,66 +13,51 @@ permalink: testpress/push_notifications/templates/
 {% from "../../ui-system/components/table.html" import table, table_th %}
 {% from "../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../ui-system/components/empty-state.html" import empty_state %}
-{% from "../../ui-system/components/drawer.html" import drawer %}
 {% from "../../ui-system/components/modal.html" import modal %}
-{% from "../../ui-system/components/input.html" import input %}
-{% from "../../ui-system/components/textarea.html" import textarea %}
-{% from "../../ui-system/components/upload.html" import upload %}
 {% from "../../ui-system/components/toast.html" import toast_provider %}
+{% set new_url = ('/testpress/push_notifications/new/' | url) %}
 
 {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="pushTemplates">
   {{ breadcrumb({ items: [{ label: "Push notifications", href: ("/testpress/push_notifications/" | url) }, { label: "Templates" }] }) }}
   <div class="mt-3">
-    {% set actions %}<div x-show="items.length">{{ button(text="New template", icon="plus", extra_attrs='@click="openNew()"') }}</div>{% endset %}
+    {% set actions %}<div x-show="items.length">{{ button(text="New template", icon="plus", href=new_url ~ '?mode=template') }}</div>{% endset %}
     {{ page_header(title="Templates", actions=actions) }}
   </div>
 
   <div class="mt-6">
     <div x-show="!items.length" x-cloak>
-      {{ empty_state(title="No templates yet", description="Save words you send often, like a class reminder or a holiday notice.", icon="layout-template", primary_action_text="New template", primary_action_icon="plus", primary_action_attrs='@click="openNew()"', extra_classes="border-0 shadow-sm") }}
+      {{ empty_state(title="No templates yet", description="Save a notification you send often — the message, what it opens and who gets it — and send it again in a click.", icon="layout-template", primary_action_text="New template", primary_action_icon="plus", primary_action_href=new_url ~ '?mode=template', extra_classes="border-0 shadow-sm") }}
     </div>
     <div x-show="items.length">
-      {% set header %}{{ table_th("Template") }}{{ table_th("Updated") }}{{ table_th("", class="w-40") }}{% endset %}
-      {% call table(table_header=header, hoverable=true) %}
-        <template x-for="t in items" :key="t.id">
-          <tr class="cursor-pointer" @click="if (!$event.target.closest('a,button,[role=menu]')) openEdit(t)">
-            <td class="px-5 py-3 min-w-[18rem]">
-              <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="t.name"></p>
+      {% set header %}{{ table_th("Template") }}{{ table_th("Who gets it") }}{{ table_th("Updated") }}{{ table_th("", class="w-40") }}{% endset %}
+      {% call table(search_enabled=true, search_placeholder="Search templates", search_x_model="search", table_header=header, hoverable=true) %}
+        <template x-for="t in filtered" :key="t.id">
+          <tr class="cursor-pointer" @click="if (!$event.target.closest('a,button,[role=menu]')) window.location.href = '{{ new_url }}?mode=template&template=' + t.id">
+            <td class="px-5 py-3 min-w-[16rem] max-w-md">
+              <p class="truncate text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="t.name"></p>
               <p class="truncate text-xs text-gray-500 dark:text-neutral-400" x-text="t.title"></p>
             </td>
+            <td class="px-5 py-3 text-sm text-gray-600 dark:text-neutral-400 max-w-[18rem]"><span class="line-clamp-2" x-text="pnAudienceText(t.audience)"></span></td>
             <td class="px-5 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-neutral-400" x-text="t.updated"></td>
             <td class="px-3 py-3">
               <div class="flex items-center justify-end gap-x-1">
-                {{ button(text="Use", variant="ghost", size="sm", extra_attrs='@click="window.location.href = \'' ~ ('/testpress/push_notifications/new/' | url) ~ '?template=\' + t.id"') }}
+                {{ button(text="Use", variant="ghost", size="sm", extra_attrs='@click="window.location.href = \'' ~ new_url ~ '?template=\' + t.id"') }}
                 {{ dropdown(trigger="ellipsis-vertical", width="small", items=[
-                  { label: "Edit", icon: "pencil", attrs: '@click="open = false; openEdit(t)"' },
+                  { label: "Edit", icon: "pencil", attrs: '@click="open = false; window.location.href = \'' ~ new_url ~ '?mode=template&template=\' + t.id"' },
                   { label: "Delete", icon: "trash-2", variant: "danger", attrs: '@click="open = false; toDelete = t; $dispatch(\'open-modal-delete-template\')"' }
                 ]) }}
               </div>
             </td>
           </tr>
         </template>
+        <tr x-show="items.length && !filtered.length" x-cloak>
+          <td colspan="4">{{ empty_state(title="No templates match", icon="search-x", compact=true, wrap_card=false, secondary_action_text="Clear search", secondary_action_attrs='@click="search = \'\'"') }}</td>
+        </tr>
       {% endcall %}
     </div>
   </div>
-
-  {% call drawer(id="pn-template", size="lg", title="Template") %}
-    <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-      {{ input(name="tpl_name", id="tpl-name", label="Name", placeholder="e.g. Live class reminder", x_model="form.name", x_error="tried && !form.name.trim() ? 'Give it a name' : ''") }}
-      {{ input(name="tpl_title", id="tpl-title", label="Title", x_model="form.title", x_error="tried && !form.title.trim() ? 'Add a title' : ''", extra_attrs='maxlength="65"') }}
-      <div>
-        {{ textarea(name="tpl_message", id="tpl-message", label="Message", rows="4", x_model="form.message", extra_attrs='maxlength="240"') }}
-        <p x-show="tried && !form.message.trim()" class="mt-1.5 text-xs text-red-500">Add a message</p>
-      </div>
-      {{ upload(name="tpl_image", label="Picture (optional)", max_size="1MB", accepted_formats="png,jpg,jpeg", help_text="PNG or JPG up to 1 MB.", icon="image-plus", preview_class="h-12 aspect-[2/1] object-cover rounded-lg") }}
-    </div>
-    <div class="p-4 border-t border-gray-200 dark:border-neutral-700 flex justify-end gap-2">
-      {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}
-      {{ button(text="Save template", extra_attrs='@click="save()"') }}
-    </div>
-  {% endcall %}
 
   <div @modal-confirmed-delete-template.window="items = items.filter(x => x.id !== toDelete.id); pnToast('Template deleted')">
     {% call modal(id="delete-template", title="Delete this template?", size="sm", variant="danger", confirm_text="Delete template") %}
@@ -85,29 +71,16 @@ permalink: testpress/push_notifications/templates/
 
 {% block script %}
   {% include "./includes/data.html" %}
-  {% include "../../ui-system/scripts/upload_script.html" %}
   <script>
-    window.PN_PROTO = [{ name: 'Templates', states: [['list', 'With templates'], ['empty', 'No templates yet'], ['edit', 'Editing a template']] }];
+    window.PN_PROTO = [{ name: 'Templates', states: [['list', 'With templates'], ['empty', 'No templates yet'], ['saved', 'Just saved one']] }];
     window.PN_PROTO_DEFAULT = 'list';
     document.addEventListener('alpine:init', () => {
       Alpine.data('pushTemplates', () => ({
         items: pnState() === 'empty' ? [] : pnCopy(PN.templates),
-        form: { id: null, name: '', title: '', message: '' },
-        tried: false,
+        search: '',
         toDelete: null,
-        init() { if (pnState() === 'edit') setTimeout(() => this.openEdit(this.items[0]), 300); pnIcons(); },
-        openNew() { this.form = { id: null, name: '', title: '', message: '' }; this.tried = false; window.dispatchEvent(new CustomEvent('open-drawer-pn-template')); },
-        openEdit(t) { this.form = pnCopy(t); this.tried = false; window.dispatchEvent(new CustomEvent('open-drawer-pn-template')); },
-        save() {
-          this.tried = true;
-          const f = this.form;
-          if (!f.name.trim() || !f.title.trim() || !f.message.trim()) return;
-          const i = this.items.findIndex(x => x.id === f.id);
-          const t = { ...f, id: f.id || Date.now(), updated: 'Today' };
-          if (i >= 0) this.items.splice(i, 1, t); else this.items.unshift(t);
-          window.dispatchEvent(new CustomEvent('close-drawer-pn-template'));
-          pnToast(i >= 0 ? 'Template updated' : 'Template saved');
-        },
+        init() { if (pnState() === 'saved') pnToast('Template saved'); this.$watch('filtered', () => pnIcons()); pnIcons(); },
+        get filtered() { const q = this.search.trim().toLowerCase(); return this.items.filter(t => !q || (t.name + ' ' + t.title).toLowerCase().includes(q)); },
       }));
     });
   </script>
