@@ -1,0 +1,81 @@
+<script>
+  window.CMP_PROTO = [
+    { name: 'Campaigns list', states: [['list', 'With campaigns'], ['intro', 'First visit (no campaigns)'], ['loading', 'Loading'], ['error', 'Couldn’t load']] },
+    { name: 'Search and filters', states: [['no-results', 'No matches']] },
+    { name: 'After an action', states: [['duplicated', 'Duplicated a campaign'], ['deleted', 'Deleted a draft']] },
+  ];
+  window.CMP_PROTO_DEFAULT = 'list';
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('campaignList', () => ({
+      view: 'loading',
+      campaigns: cmpCopy(CMP_CAMPAIGNS),
+      search: '',
+      status: '',
+      channel: '',
+      purposeFilter: '',
+      toDelete: null,
+
+      init() {
+        const s = cmpState() || 'list';
+        if (s === 'no-results') this.search = 'scholarship';
+        if (s === 'loading') return;
+        setTimeout(() => {
+          this.view = s === 'intro' ? 'intro' : s === 'error' ? 'error' : 'list';
+          cmpIcons();
+          if (s === 'duplicated') cmpToast('Copy saved as a draft', 'Opening “NEET 2027 Crash Course launch (copy)”…');
+          if (s === 'deleted') cmpToast('Draft deleted');
+        }, 600);
+        this.$watch('filtered', () => cmpIcons());
+      },
+      retry() { this.view = 'loading'; setTimeout(() => { this.view = 'list'; cmpIcons(); }, 700); },
+
+      // Last 30 days, sent campaigns only (prototype numbers)
+      get stats() {
+        const sent = this.campaigns.filter(c => c.status === 'sent' && !c.legacy);
+        return {
+          sent: sent.length,
+          reached: sent.reduce((t, c) => t + (c.targeted || 0), 0),
+          clicked: sent.reduce((t, c) => t + (c.unique || 0), 0),
+          revenue: sent.reduce((t, c) => t + (c.revenue || 0), 0),
+          purchases: sent.reduce((t, c) => t + (c.purchases || 0), 0),
+        };
+      },
+      get filtered() {
+        const q = this.search.trim().toLowerCase();
+        return this.campaigns.filter(c =>
+          (!q || c.name.toLowerCase().includes(q)) &&
+          (!this.status || c.status === this.status || (this.status === 'sent' && c.status === 'sending')) &&
+          (!this.purposeFilter || cmpPurposeKey(c.dest) === this.purposeFilter) &&
+          (!this.channel || c.channels.includes(this.channel)));
+      },
+      get filtersOn() { return !!(this.search || this.status || this.channel || this.purposeFilter); },
+      clearFilters() {
+        this.search = ''; this.status = ''; this.channel = ''; this.purposeFilter = '';
+        // reset the ui-system selects
+        this.$root.querySelectorAll('[data-filter] > div').forEach(el => el.dispatchEvent(new CustomEvent('set-selected-values', { detail: 'all' })));
+      },
+
+      href(c) {
+        const base = '{{ "/testpress/campaigns/" | url }}';
+        return base + 'detail/?id=' + c.id;
+      },
+      editHref(c) { return '{{ "/testpress/campaigns/new/" | url }}?id=' + c.id; },
+      purpose(c) { return cmpPurpose(c); },
+      ctr(c) { return c.targeted ? cmpPct(c.unique, c.targeted) : ''; },
+
+      duplicate(c) {
+        const copy = { ...cmpCopy(c), id: Date.now(), name: c.name + ' (copy)', status: 'draft', edited: 'Just now', missing: [], estimate: c.targeted || c.estimate, warning: null, legacy: false };
+        this.campaigns.unshift(copy);
+        cmpToast('Copy saved as a draft', 'Audience, message and link were copied. Nothing is sent yet.');
+      },
+      askDelete(c) { this.toDelete = c; this.$dispatch('open-modal-delete-draft'); },
+      confirmDelete() {
+        if (!this.toDelete) return;
+        this.campaigns = this.campaigns.filter(c => c.id !== this.toDelete.id);
+        cmpToast('Draft deleted', '“' + this.toDelete.name + '” was removed.');
+        this.toDelete = null;
+      },
+    }));
+  });
+</script>

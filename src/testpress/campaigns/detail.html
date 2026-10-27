@@ -1,0 +1,88 @@
+---
+tags: testpress
+title: Campaign
+permalink: testpress/campaigns/detail/
+---
+
+{# One campaign's page.
+   - Draft: review and send here (no pop-up). What's left, what students get, who gets it, where it opens.
+   - Sending / sent / failed: results first (reach, clicks, purchases), then each channel, then what was sent.
+   Sent campaigns are read-only; Duplicate makes a new draft. Missing numbers say why ("Not tracked", "—"). #}
+{% extends "layouts/admin_base.html" %}
+{% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../ui-system/components/toast.html" import toast_provider %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" x-data="campaignDetail">
+  {{ breadcrumb({ items: [{ label: "Campaigns", href: ("/testpress/campaigns/" | url) }, { label: "Campaign" }] }) }}
+
+  <div class="mt-3 flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+      <h1 class="text-xl font-semibold text-gray-800 dark:text-neutral-100" x-text="c.name"></h1>
+      <p class="mt-1 flex flex-wrap items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400">
+        <span class="inline-flex items-center gap-x-1.5 font-medium"
+              :class="{ 'text-gray-800 dark:text-neutral-200': c.status === 'draft', 'text-blue-700 dark:text-blue-400': c.status === 'sending', 'text-teal-700 dark:text-teal-400': c.status === 'sent', 'text-red-600 dark:text-red-400': c.status === 'failed' }">
+          <span class="size-1.5 rounded-full" :class="{ 'bg-gray-400': c.status === 'draft', 'bg-blue-500 animate-pulse': c.status === 'sending', 'bg-teal-500': c.status === 'sent', 'bg-red-500': c.status === 'failed' }"></span>
+          <span x-text="statusLabel"></span>
+        </span>
+        <span class="text-gray-300 dark:text-neutral-600">·</span>
+        <span x-text="whenText"></span>
+        <span class="text-gray-300 dark:text-neutral-600">·</span>
+        <span x-text="purposeLabel"></span>
+        <span class="text-gray-300 dark:text-neutral-600">·</span>
+        <span x-text="channelText"></span>
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <template x-if="c.status === 'draft'">
+        <div class="flex flex-wrap items-center gap-2">
+          {{ dropdown(trigger="ellipsis-vertical", width="medium", items=[
+            { label: "Duplicate", icon: "copy", attrs: '@click="open = false; duplicate()"' },
+            { label: "Delete draft", icon: "trash-2", variant: "danger", attrs: '@click="open = false; $dispatch(\'open-modal-delete-draft\')"' }
+          ]) }}
+          {{ button(text="Edit", variant="secondary", icon="pencil", extra_attrs='@click="window.location.href = editHref()"') }}
+          {% set send_label %}<svg x-show="sending" x-cloak class="size-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg><span x-text="sending ? 'Sending…' : sendError ? 'Try again' : (c.targeted ? 'Send to ' + cmpNum(c.targeted) + ' students' : 'Send now')"></span>{% endset %}
+          {{ button(text=send_label, extra_attrs='@click="send()" :disabled="sending || left.length > 0 || !canSend"') }}
+        </div>
+      </template>
+      <template x-if="c.status !== 'draft'">
+        <div class="flex items-center gap-2">
+          {{ button(text="Duplicate", variant="secondary", icon="copy", extra_attrs='@click="duplicate()"') }}
+          <span x-show="c.status === 'failed'">{{ button(text="Try again", icon="rotate-cw", extra_attrs='@click="retry()"') }}</span>
+        </div>
+      </template>
+    </div>
+  </div>
+  <p x-show="c.status === 'draft' && !left.length" class="mt-2 text-xs text-gray-500 dark:text-neutral-400 sm:text-end">It goes out right away and can’t be edited after.</p>
+
+  <div class="mt-6">
+    {% include "./includes/report_skeleton.html" %}
+    <template x-if="!loading && c.status === 'draft'">
+      <div>{% include "./includes/detail_review.html" %}</div>
+    </template>
+    <template x-if="!loading && c.status !== 'draft'">
+      <div class="space-y-6">
+        {% include "./includes/report_notice.html" %}
+        <div x-show="c.status !== 'failed'" class="space-y-6">
+          {% include "./includes/report_stats.html" %}
+          {% include "./includes/report_channels.html" %}
+        </div>
+        {% include "./includes/report_sent.html" %}
+      </div>
+    </template>
+  </div>
+
+  {% include "./includes/delete_draft_modal.html" %}
+</div>
+{{ toast_provider() }}
+{% include "./includes/prototype.html" %}
+{% endblock content %}
+
+{% block script %}
+  {% include "./includes/data.html" %}
+  {% include "./includes/report_script.html" %}
+{% endblock script %}

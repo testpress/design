@@ -1,0 +1,199 @@
+{# Side panel: What it's about. Step 1 lists the choices under the two purposes (promote a product; share an
+   announcement or content); step 2 is a picker scoped to the choice, so it never lists everything at once:
+   - Promote a product: the whole store, or one product (search)
+   - Share course content: pick a course (search), then the whole course, something upcoming (live classes, exams),
+     or browse its chapters; search only looks inside that course
+   - A YouTube video or web page: a web address; its title and picture are looked up and shown #}
+{% from "../../../ui-system/components/drawer.html" import drawer %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% set opt = "w-full flex items-center gap-x-3 p-2.5 rounded-xl text-start transition-colors" %}
+{% set opt_on = "bg-primary-50 ring-1 ring-primary-600 dark:bg-primary-500/10 dark:ring-primary-500" %}
+{% set opt_off = "hover:bg-gray-50 dark:hover:bg-neutral-700/50" %}
+{% set ico = "shrink-0 size-9 inline-flex justify-center items-center rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300" %}
+{% set group = "px-2.5 pb-1 text-xs font-medium text-gray-500 dark:text-neutral-400" %}
+{% set check %}<svg class="ms-auto shrink-0 size-4 text-primary-600 dark:text-primary-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{% endset %}
+{% set chevron %}<svg class="ms-auto shrink-0 size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>{% endset %}
+{% set back_cls = "inline-flex items-center gap-x-1 text-sm text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200" %}
+{% set back_icon %}<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>{% endset %}
+
+{# One row in a list: icon, label, line under it, tick when picked #}
+{% macro item_row(click, picked, icon_expr, label_expr, meta_expr) %}
+<button type="button" @click="{{ click }}" class="w-full flex items-center gap-x-3 p-2.5 rounded-xl text-start transition-colors"
+        :class="{{ picked }} ? 'bg-primary-50 ring-1 ring-primary-600 dark:bg-primary-500/10 dark:ring-primary-500' : 'hover:bg-gray-50 dark:hover:bg-neutral-700/50'">
+  <span class="shrink-0 size-9 inline-flex justify-center items-center rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300"><i :data-lucide="{{ icon_expr }}" class="size-4"></i></span>
+  <span class="min-w-0">
+    <span class="block truncate text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="{{ label_expr }}"></span>
+    <span class="block truncate text-xs text-gray-500 dark:text-neutral-400" x-text="{{ meta_expr }}"></span>
+  </span>
+  <span x-show="{{ picked }}"><svg class="ms-auto shrink-0 size-4 text-primary-600 dark:text-primary-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+</button>
+{% endmacro %}
+
+{% call drawer(id="cmp-dest", size="lg", title="What’s it about?") %}
+  <template x-if="panel === 'dest'">
+    <div class="flex-1 flex flex-col min-h-0">
+
+      {# Top: back link and search for the current step #}
+      <div x-show="dstep !== 'intent'" class="px-6 pt-4 pb-3 space-y-3 border-b border-gray-100 dark:border-neutral-700">
+        <button type="button" x-show="dstep !== 'course'" @click="dstep = 'intent'; q = ''; cmpIcons()" class="{{ back_cls }}">{{ back_icon | safe }}Change what it’s about</button>
+        <button type="button" x-show="dstep === 'course'" @click="dstep = 'courses'; q = ''; cmpIcons()" class="{{ back_cls }}">{{ back_icon | safe }}All courses</button>
+        <p x-show="dstep === 'course'" class="text-base font-semibold text-gray-800 dark:text-neutral-100" x-text="course.label"></p>
+        <div x-show="dstep !== 'link'">
+          {{ input(name="about_search", id="about-search", placeholder="Search", icon="search", x_model="q", extra_attrs=':placeholder="dstep === \'product\' ? \'Search products\' : dstep === \'courses\' ? \'Search courses\' : \'Search in \' + course.label" autocomplete="off"') }}
+        </div>
+      </div>
+
+      <div class="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
+        {# Step 1: the choices, under the two purposes #}
+        <div x-show="dstep === 'intent'" class="space-y-6">
+          {% for g in [
+            { title: "Promote a product", items: [
+              { key: "product", label: "A product or the whole store", meta: "Purchases and revenue from it are counted", icon: "shopping-bag" }
+            ] },
+            { title: "Share an announcement or content", items: [
+              { key: "announce", label: "Just an announcement", meta: "Opens the app’s home screen", icon: "megaphone" },
+              { key: "content", label: "Course content", meta: "A course, chapter, recorded class, live class, test or exam", icon: "book-open" },
+              { key: "link", label: "A YouTube video or web page", meta: "Opens in YouTube or the browser", icon: "link" }
+            ] }
+          ] %}
+          <div class="space-y-1">
+            <p class="{{ group }}">{{ g.title }}</p>
+            {% for f in g.items %}
+            <button type="button" @click="chooseIntent('{{ f.key }}')" class="{{ opt }}" :class="intentOf(d) === '{{ f.key }}' ? '{{ opt_on }}' : '{{ opt_off }}'">
+              <span class="{{ ico }}"><i data-lucide="{{ f.icon }}" class="size-4"></i></span>
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">{{ f.label }}</span>
+                <span class="block text-xs text-gray-500 dark:text-neutral-400">{{ f.meta }}</span>
+              </span>
+              {% if f.key == "announce" %}<span x-show="intentOf(d) === 'announce'">{{ check | safe }}</span>{% else %}{{ chevron | safe }}{% endif %}
+            </button>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+
+        {# Promote a product #}
+        <div x-show="dstep === 'product'" class="space-y-1">
+          <button type="button" x-show="!q.trim()" @click="pickFixed('store')" class="{{ opt }}" :class="d.type === 'store' ? '{{ opt_on }}' : '{{ opt_off }}'">
+            <span class="{{ ico }}"><i data-lucide="store" class="size-4"></i></span>
+            <span><span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Whole store</span><span class="block text-xs text-gray-500 dark:text-neutral-400">All your courses and test series</span></span>
+            <span x-show="d.type === 'store'">{{ check | safe }}</span>
+          </button>
+          <p x-show="!q.trim()" class="{{ group }} pt-3">Products</p>
+          <template x-for="it in productResults" :key="it.id">
+            <div>{{ item_row("pickItem(it)", "isPicked(it.id)", "'shopping-bag'", "it.label", "it.meta") }}</div>
+          </template>
+          <p x-show="q.trim() && !productResults.length" class="py-6 text-center text-sm text-gray-500 dark:text-neutral-400" x-text="'No product called “' + q.trim() + '”'"></p>
+        </div>
+
+        {# Share course content, 1: which course #}
+        <div x-show="dstep === 'courses'" class="space-y-1">
+          <template x-for="c in courseResults" :key="c.id">
+            <button type="button" @click="goCourse(c.id)" class="{{ opt }} {{ opt_off }}">
+              <span class="{{ ico }}"><i data-lucide="book-open" class="size-4"></i></span>
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="c.label"></span>
+                <span class="block text-xs text-gray-500 dark:text-neutral-400" x-text="cmpNum(c.access) + ' students have access'"></span>
+              </span>
+              {{ chevron | safe }}
+            </button>
+          </template>
+          <p x-show="q.trim() && !courseResults.length" class="py-6 text-center text-sm text-gray-500 dark:text-neutral-400" x-text="'No course called “' + q.trim() + '”'"></p>
+        </div>
+
+        {# Share course content, 2: inside the course #}
+        <div x-show="dstep === 'course'" class="flex flex-col gap-5">
+          {# Searching inside the course #}
+          <div x-show="q.trim()" class="space-y-1">
+            <template x-for="it in inCourseResults" :key="it.id">
+              <div>{{ item_row("pickItem(it)", "isPicked(it.id)", "kinds[it.kind].icon", "it.label", "kinds[it.kind].label + ' · ' + it.meta") }}</div>
+            </template>
+            <p x-show="!inCourseResults.length" class="py-6 text-center text-sm text-gray-500 dark:text-neutral-400" x-text="'Nothing called “' + q.trim() + '” in ' + course.label"></p>
+          </div>
+
+          <div x-show="!q.trim()" class="space-y-5">
+            {{ item_row("pickById('c-' + dCourse)", "isPicked('c-' + dCourse)", "'book-open'", "'Whole course'", "cmpNum(course.access) + ' students have access'") }}
+
+            <div x-show="upcoming.length" class="space-y-1">
+              <p class="{{ group }}">Upcoming</p>
+              <template x-for="it in upcoming" :key="it.id">
+                <div>{{ item_row("pickItem(it)", "isPicked(it.id)", "kinds[it.kind].icon", "it.label", "kinds[it.kind].label + ' · ' + it.when") }}</div>
+              </template>
+            </div>
+
+            <div x-show="course.chapters.length" class="space-y-1">
+              <p class="{{ group }}">Chapters</p>
+              <template x-for="ch in course.chapters" :key="ch.id">
+                <div>
+                  <button type="button" @click="toggleCh(ch)" class="{{ opt }} {{ opt_off }}">
+                    <span class="{{ ico }}"><i data-lucide="folder" class="size-4"></i></span>
+                    <span class="min-w-0">
+                      <span class="block truncate text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="ch.label"></span>
+                      <span class="block text-xs text-gray-500 dark:text-neutral-400" x-text="ch.items.length + (ch.items.length === 1 ? ' item' : ' items')"></span>
+                    </span>
+                    <svg class="ms-auto shrink-0 size-4 text-gray-400 transition-transform" :class="openCh[ch.label] && 'rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                  </button>
+                  <div x-show="openCh[ch.label]" class="ms-6 ps-3 mt-1 space-y-1 border-s border-gray-200 dark:border-neutral-700">
+                    {{ item_row("pickById('ch-' + ch.id)", "isPicked('ch-' + ch.id)", "'folder-open'", "'Whole chapter'", "ch.label") }}
+                    <template x-for="it in chapterItems(ch)" :key="it.id">
+                      <div>{{ item_row("pickItem(it)", "isPicked(it.id)", "kinds[it.kind].icon", "it.label", "kinds[it.kind].label + (it.when ? ' · ' + it.when : '')") }}</div>
+                    </template>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <p x-show="!course.chapters.length" class="px-2.5 text-sm text-gray-500 dark:text-neutral-400">No chapters in this course yet.</p>
+          </div>
+        </div>
+
+        {# A YouTube video or web page: the address, then what students will see #}
+        <div x-show="dstep === 'link'" class="px-2 space-y-4">
+          {{ input(name="dest_url", id="dest-url", label="Web address", placeholder="https://youtube.com/watch?v=…", x_model="d.url", icon="link", help_text="YouTube links open in the YouTube app. Other links open in the browser. Clicks are counted, views on YouTube aren’t.") }}
+          <div x-show="metaLoading" class="flex items-center gap-x-3 p-3 rounded-xl ring-1 ring-gray-200 dark:ring-neutral-700">
+            <span class="shrink-0 w-24 aspect-video rounded-lg bg-gray-100 animate-pulse dark:bg-neutral-700"></span>
+            <span class="flex-1 space-y-2"><span class="block h-3 w-3/4 rounded bg-gray-100 animate-pulse dark:bg-neutral-700"></span><span class="block h-3 w-1/3 rounded bg-gray-100 animate-pulse dark:bg-neutral-700"></span></span>
+          </div>
+          <template x-if="!metaLoading && d.meta && d.meta.title">
+            <div class="flex items-center gap-x-3 p-3 rounded-xl ring-1 ring-gray-200 dark:ring-neutral-700">
+              <img x-show="d.meta.image" :src="d.meta.image" alt="" class="shrink-0 w-24 aspect-video object-cover rounded-lg bg-gray-100">
+              <span class="min-w-0">
+                <span class="block text-sm font-medium text-gray-800 line-clamp-2 dark:text-neutral-200" x-text="d.meta.title"></span>
+                <span class="mt-0.5 flex items-center gap-x-1.5 text-xs text-gray-500 dark:text-neutral-400">
+                  <span x-show="d.meta.youtube" class="inline-flex"><i data-lucide="youtube" class="size-3.5"></i></span>
+                  <span x-text="(d.meta.youtube ? 'YouTube' : cmpSite(d.url)) + (d.meta.author ? ' · ' + d.meta.author : '')"></span>
+                </span>
+              </span>
+            </div>
+          </template>
+          <p x-show="!metaLoading && d.meta && !d.meta.title && validUrl(d.url)" class="text-xs text-gray-500 dark:text-neutral-400">Couldn’t read this page’s title. It will still open.</p>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  {# What's chosen, and what it means #}
+  <div class="px-6 py-4 border-t border-gray-200 dark:border-neutral-700 space-y-2" x-show="panel === 'dest' && dstep !== 'intent' && dstep !== 'link' && d.type" x-cloak>
+    <p class="text-sm text-gray-800 dark:text-neutral-200" x-show="d.type === 'store'"><span class="text-gray-500 dark:text-neutral-400">Chosen:</span> <span class="font-medium">Whole store</span></p>
+    <template x-if="panel === 'dest' && d.type === 'item' && d.item">
+      <div x-data="{ get di() { return d.item || {}; } }" class="space-y-2">
+        <p class="text-sm text-gray-800 dark:text-neutral-200"><span class="text-gray-500 dark:text-neutral-400" x-text="(kinds[di.kind] || {}).label + ':'"></span> <span class="font-medium" x-text="di.label"></span></p>
+        <template x-if="di.kind === 'product'">
+          <div class="space-y-2">
+            {{ checkbox(name="skip_buyers", id="skip-buyers", label="Leave out students who already bought it", x_model="d.skipBuyers") }}
+            <p class="text-xs text-gray-500 dark:text-neutral-400">A purchase within 7 days of a student’s click counts towards this campaign.</p>
+          </div>
+        </template>
+        <p x-show="di.kind !== 'product'" class="text-xs text-gray-500 dark:text-neutral-400"
+           x-text="'Only students with access to ' + cmpOptLabel('course', di.course) + ' can open it. Who gets it will suggest them.'"></p>
+      </div>
+    </template>
+  </div>
+  <p x-show="panelError('dest')" class="px-6 pb-3 text-sm text-red-600 dark:text-red-400" x-text="panelError('dest')"></p>
+
+  <div x-show="dstep !== 'intent'" class="p-4 border-t border-gray-200 dark:border-neutral-700 flex justify-end gap-2">
+    {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}
+    {{ button(text="Save", extra_attrs='@click="apply()"') }}
+  </div>
+{% endcall %}

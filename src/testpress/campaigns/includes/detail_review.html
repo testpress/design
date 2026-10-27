@@ -1,0 +1,86 @@
+{# A draft's page is where it's reviewed and sent: what's left (if anything), what students get, then who gets it,
+   where it opens and how results are counted. Each part has an Edit link that opens its side panel in the editor. #}
+{% from "../../../ui-system/components/card.html" import card %}
+{% from "../../../ui-system/components/alert.html" import alert %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% set dt = "text-sm text-gray-500 dark:text-neutral-400" %}
+{% set dd = "mt-1 text-sm text-gray-800 dark:text-neutral-200" %}
+{% set edit_cls = "text-sm font-medium text-primary-600 hover:underline dark:text-primary-400" %}
+
+<div class="space-y-6">
+  {# Things left: sending stays off until they're done #}
+  <template x-if="left.length">
+    <div>
+      {% call alert(variant="warning", title="Finish these before sending") %}
+        <ul class="mt-1 space-y-1">
+          <template x-for="l in left" :key="l[0]">
+            <li class="flex items-center gap-x-2">
+              <span class="size-1 rounded-full bg-current"></span>
+              <a :href="editHref(l[1])" class="underline underline-offset-2" x-text="l[0]"></a>
+            </li>
+          </template>
+        </ul>
+      {% endcall %}
+    </div>
+  </template>
+  <template x-if="sendError">
+    <div>{{ alert(variant="danger", title="Couldn’t start sending", description="Nothing was sent. Check your connection and try again.") }}</div>
+  </template>
+  <template x-if="!left.length && c.channels.includes('push') && reach.push === 0">
+    <div>{{ alert(variant="warning", title="No one in this audience has the app", description="Only the email will go out. Remove the push notification, or change who gets it.") }}</div>
+  </template>
+
+  <div class="grid lg:grid-cols-12 gap-6 items-start">
+    {# What students get #}
+    <div class="lg:col-span-7 space-y-3">
+      <h2 class="text-base font-semibold text-gray-800 dark:text-neutral-100">What students get</h2>
+      {% include "./message_preview.html" %}
+    </div>
+
+    {# Who, where, and how it's counted #}
+    <div class="lg:col-span-5 space-y-3 lg:sticky lg:top-6">
+      <h2 class="text-base font-semibold text-gray-800 dark:text-neutral-100">Who gets it</h2>
+      {% call card(bordered=false, shadow=true, padding="p-5") %}
+        <dl class="space-y-5">
+          <div>
+            <div class="flex items-baseline justify-between gap-x-3">
+              <dt class="{{ dt }}">Students</dt>
+              <a :href="editHref('audience')" class="{{ edit_cls }}">Edit</a>
+            </div>
+            <dd class="mt-1">
+              <p class="text-2xl font-semibold text-gray-800 dark:text-neutral-100" x-text="c.targeted ? '≈ ' + cmpNum(c.targeted) : 'Not chosen yet'"></p>
+              <ul class="mt-2 space-y-1 text-sm text-gray-800 dark:text-neutral-200">
+                <template x-for="a in c.audience" :key="a"><li x-text="a"></li></template>
+              </ul>
+              <p x-show="c.audience.length > 1" class="mt-2 text-xs text-gray-500 dark:text-neutral-400">Students who match all of these.</p>
+            </dd>
+          </div>
+
+          <div x-show="c.targeted" class="pt-5 border-t border-gray-100 dark:border-neutral-700 space-y-2">
+            <div x-show="c.channels.includes('push')" class="flex items-center justify-between gap-x-3 text-sm">
+              <span class="inline-flex items-center gap-x-2 text-gray-500 dark:text-neutral-400"><i data-lucide="smartphone" class="size-4"></i>Push</span>
+              <span class="text-gray-800 dark:text-neutral-200"><span class="font-medium" x-text="cmpNum(reach.push)"></span> have the app</span>
+            </div>
+            <div x-show="c.channels.includes('email')" class="flex items-center justify-between gap-x-3 text-sm">
+              <span class="inline-flex items-center gap-x-2 text-gray-500 dark:text-neutral-400"><i data-lucide="mail" class="size-4"></i>Email</span>
+              <span class="text-gray-800 dark:text-neutral-200"><span class="font-medium" x-text="cmpNum(reach.email)"></span> have an email address</span>
+            </div>
+          </div>
+
+          <div class="pt-5 border-t border-gray-100 dark:border-neutral-700">
+            <div class="flex items-baseline justify-between gap-x-3">
+              <dt class="{{ dt }}">Opens</dt>
+              <a :href="editHref('dest')" class="{{ edit_cls }}">Edit</a>
+            </div>
+            <dd class="{{ dd }} break-words" x-text="cmpOpens(c)"></dd>
+          </div>
+
+          <div x-show="isProduct" class="pt-5 border-t border-gray-100 dark:border-neutral-700">
+            <dt class="{{ dt }}">Purchases counted</dt>
+            <dd class="{{ dd }}" x-text="'Purchases of ' + (c.dest && c.dest.label) + ' within 7 days of a student’s click.'"></dd>
+          </div>
+        </dl>
+      {% endcall %}
+    </div>
+  </div>
+</div>

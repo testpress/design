@@ -1,0 +1,411 @@
+<script>
+  window.CMP_PROTO = [
+    { name: 'Create', states: [['blank', 'New: choose the purpose'], ['announce', 'New announcement (opens the app)'], ['ready', 'Product promotion, ready'], ['content', 'Live class, ready'], ['youtube', 'YouTube video, ready']] },
+    { name: 'Edit a draft', states: [['draft', 'Draft with things left'], ['dup-missing', 'Copied campaign: product removed'], ['save-failed', 'Save failed']] },
+    { name: 'Side panels', states: [['edit-about', 'What it’s about: product'], ['edit-announce', 'What it’s about: announcement'], ['edit-course', 'Inside a course'], ['edit-link', 'YouTube or web link'], ['edit-audience', 'Who gets it'], ['edit-push', 'Push notification'], ['edit-email', 'Email']] },
+    { name: 'Problems', states: [['no-access', 'Some students can’t open it'], ['no-match', 'No students match'], ['deleted-batch', 'A chosen batch was deleted'], ['bad-link', 'Web link not valid']] },
+  ];
+  window.CMP_PROTO_DEFAULT = 'blank';
+
+  const CMP_LIMITS = { title: 65, message: 240 };
+  const CMP_KINDS = CMP.kinds;
+  const CMP_TREE = CMP.courseTree;
+  const CMP_ACCESS = Object.fromEntries(CMP_TREE.map(c => [c.id, c.access]));
+  // Everything a campaign can be about, flattened: products, courses, chapters and their content
+  const CMP_PRODUCT_ITEMS = CMP.products.map(p => ({ id: 'p-' + p.value, kind: 'product', label: p.label, meta: '₹' + p.price.toLocaleString('en-IN'), product: p.value, image: p.image }));
+  const CMP_INDEX = [...CMP_PRODUCT_ITEMS];
+  CMP_TREE.forEach(c => {
+    CMP_INDEX.push({ id: 'c-' + c.id, kind: 'course', label: c.label, meta: c.access.toLocaleString('en-IN') + ' students have access', course: c.id });
+    c.chapters.forEach(ch => {
+      CMP_INDEX.push({ id: 'ch-' + ch.id, kind: 'chapter', label: ch.label, meta: c.label, course: c.id });
+      ch.items.forEach(it => CMP_INDEX.push({ ...it, meta: c.label + (it.when ? ' · ' + it.when : ' › ' + ch.label.split(' · ')[0]), course: c.id, chapter: ch.label }));
+    });
+  });
+  const cmpItem = (id) => cmpCopy(CMP_INDEX.find(x => x.id === id));
+  const cmpEmptyRow = () => ({ id: Date.now() + Math.random(), type: 'batch', values: [], field: '', missing: false });
+  const cmpOptLabel = (type, v) => {
+    const list = { product: CMP.products, notbought: CMP.products, course: CMP.courses, batch: CMP.batches, students: CMP.students }[type] || [];
+    const o = list.find(x => x.value === v); return o ? o.label : v;
+  };
+  // Estimated count for an audience (prototype numbers)
+  const cmpEstimate = (a, noMatch) => {
+    if (!a || !a.mode) return null;
+    if (a.mode === 'all') return CMP_ALL_STUDENTS;
+    const rows = (a.rows || []).filter(r => r.values.length);
+    if (!rows.length) return null;
+    if (noMatch && a.match === 'all') return 0;
+    const base = rows.reduce((t, r) => t + r.values.reduce((s, v) => s + (r.type === 'course' && CMP_ACCESS[v] ? CMP_ACCESS[v] : ({ product: 820, notbought: 3100, course: 1640, batch: 1180, field: 2300, students: 1 })[r.type]), 0), 0);
+    return a.match === 'all' && rows.length > 1 ? Math.round(base / 3.4) : base;
+  };
+  // Words to start from, based on what the campaign is about: [push title, push message, email subject, email body]
+  const cmpSuggest = (dest) => {
+    const it = dest.item, l = it ? it.label : '';
+    const when = it && it.meta.split(' · ')[1] || '';
+    const s = {
+      product: [l + ' is open', 'Seats are limited. Tap to see what’s inside and join today.', l + ' is now open for enrolment', '<p>Hi {name},</p><p>' + l + ' is now open. See what’s included and join before seats run out.</p>'],
+      course: ['New in ' + l, 'Fresh lessons are up. Tap to continue where you left off.', 'New lessons in ' + l, '<p>Hi {name},</p><p>We’ve added new lessons to ' + l + '. Pick up where you left off.</p>'],
+      chapter: [l + ' is up', 'Start the new chapter today.', 'New chapter: ' + l, '<p>Hi {name},</p><p>' + l + ' is now available in your course.</p>'],
+      video: ['New video: ' + l, 'Watch it before the next class.', 'New video: ' + l, '<p>Hi {name},</p><p>A new video is up: ' + l + '. Watch it before the next class.</p>'],
+      test: [l + ' is open', 'Take it today and see where you stand.', l + ' is open', '<p>Hi {name},</p><p>' + l + ' is now open. Take it today and see where you stand.</p>'],
+      notes: ['New notes: ' + l, 'Quick revision for the chapter.', 'New notes: ' + l, '<p>Hi {name},</p><p>Short notes for quick revision are up: ' + l + '.</p>'],
+      exam: [l + ' – ' + when, 'Be ready on time. Tap to see the details.', l + ' – ' + when, '<p>Hi {name},</p><p>' + l + ' ' + when.charAt(0).toLowerCase() + when.slice(1) + '. Revise the chapters and be ready on time.</p>'],
+      live: ['Live class: ' + l, when + '. Tap to join on time.', 'Live class: ' + l + ' – ' + when, '<p>Hi {name},</p><p>Join the live class “' + l + '” on ' + when + '.</p>'],
+      store: ['New in the store', 'Courses and test series for your exam.', 'New courses in the store', '<p>Hi {name},</p><p>We’ve added new courses and test series to the store.</p>'],
+    };
+    const m = dest.meta || {};
+    if (dest.type === 'link' && m.title) return m.youtube
+      ? [m.title.slice(0, 65), 'New on our YouTube channel. Tap to watch.', 'New video: ' + m.title, '<p>Hi {name},</p><p>We’ve posted a new video: ' + m.title + '. Watch it when you have a few minutes.</p>']
+      : [m.title.slice(0, 65), 'Tap to read it.', m.title, '<p>Hi {name},</p><p>We thought you’d find this useful: ' + m.title + '.</p>'];
+    return s[it ? it.kind : dest.type] || null;
+  };
+
+  const cmpIsYouTube = (u) => /(^|\/\/|\.)(youtube\.com|youtu\.be)\//i.test(u || '');
+  const cmpSite = (u) => { try { return new URL(/^https?:/i.test(u) ? u : 'https://' + u).hostname.replace(/^www\./, ''); } catch (e) { return u; } };
+  const cmpFetchMeta = async (u) => {
+    const url = /^https?:/i.test(u) ? u : 'https://' + u;
+    try {
+      if (cmpIsYouTube(url)) {
+        const r = await fetch('https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(url));
+        if (!r.ok) throw 0; const j = await r.json();
+        return { youtube: true, title: j.title, author: j.author_name, image: j.thumbnail_url && j.thumbnail_url.replace('hqdefault', 'mqdefault') };
+      }
+      const r = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url));
+      const j = await r.json(); if (j.status !== 'success') throw 0;
+      return { youtube: false, title: j.data.title, author: j.data.publisher, image: j.data.image && j.data.image.url };
+    } catch (e) { return { youtube: cmpIsYouTube(url), title: '', author: '', image: '' }; }
+  };
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('campaignEditor', () => ({
+      // The campaign as it is now. Side panels edit a copy (`d`), so Cancel changes nothing.
+      name: '',
+      dest: { type: '', item: null, url: '', meta: null, skipBuyers: true },
+      audience: { mode: '', match: 'any', rows: [] },
+      push: { on: false, title: '', message: '', image: null },
+      email: { on: false, subject: '', body: '', button: { on: true, label: '' } },
+      d: { button: { on: true, label: '' } },
+      panel: '',
+      q: '',
+      dstep: 'intent',   // what-it's-about panel: intent | product | courses | course | link
+      dCourse: null,
+      openCh: {},
+      isNew: !cmpParam('id'),
+      suggested: false,
+      productImage: false,
+      nameDraft: '',
+      triedPanel: false,
+      preview: 'push',
+      saveState: 'new',     // new | saving | saved | failed
+      savedAt: '',
+      fail: {},
+      metaLoading: false,
+      limits: CMP_LIMITS,
+      kinds: CMP_KINDS,
+
+      init() {
+        const s = cmpState() || 'blank';
+        const id = Number(cmpParam('id'));
+        if (id === 7 || s === 'draft' || s === 'save-failed') this.loadDraft(7);
+        else if (s === 'content' || s === 'no-access' || s === 'edit-course') this.loadDraft(6);
+        else if (s === 'youtube' || s === 'edit-link') this.loadDraft(9);
+        else if (s === 'announce' || s === 'edit-announce') this.loadDraft(5);
+        else if (id || ['ready', 'dup-missing', 'deleted-batch', 'bad-link', 'edit-about', 'edit-audience', 'edit-push', 'edit-email'].includes(s)) this.loadDraft(8);
+        if (s === 'announce') { this.isNew = true; this.name = 'Announcement – 27 Oct'; this.saveState = 'new'; }
+        else if (s !== 'blank') this.isNew = false;
+        if (s === 'dup-missing') { this.name = 'NEET 2026 Crash Course launch (copy)'; this.dest.item = { ...this.dest.item, label: 'NEET 2026 Crash Course', gone: true }; this.savedAt = 'just now'; }
+        if (s === 'no-access') this.audience = { mode: 'all', match: 'any', rows: [] };
+        if (s === 'no-match') { this.name = 'Repeaters – NEET crash course offer'; this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }, { id: 2, type: 'product', values: ['neet-crash'] }] }; }
+        if (s === 'deleted-batch') this.audience.rows = [{ id: 1, type: 'batch', values: [], missing: 'NEET 2026 – Batch C' }];
+        if (s === 'bad-link') this.dest = { type: 'link', item: null, url: 'testpress mock register', meta: null, skipBuyers: true };
+        if (s === 'save-failed') this.fail.save = true;
+        if (s === 'edit-course') setTimeout(() => this.openAbout(), 400);
+        const panels = { 'edit-about': 'dest', 'edit-announce': 'dest', 'edit-link': 'dest', 'edit-audience': 'audience', 'edit-push': 'push', 'edit-email': 'email', 'deleted-batch': 'audience', 'bad-link': 'dest' };
+        if (panels[s]) setTimeout(() => { this.open(panels[s]); if (s === 'bad-link') this.triedPanel = true; }, 400);
+        if (s === 'save-failed') setTimeout(() => this.save(), 400);
+        if (!this.push.on && this.email.on) this.preview = 'email';
+        this.$watch('q', () => cmpIcons());
+        // A web link: look up its title and picture as it's typed
+        let t; this.$watch('d.url', (u) => { clearTimeout(t); if (this.panel !== 'dest' || this.dstep !== 'link') return; t = setTimeout(() => { if (u === this.dest.url && this.dest.meta) return; this.lookUp(u); }, 500); });
+        window.addEventListener('beforeunload', (e) => { if (this.saveState === 'failed') { e.preventDefault(); e.returnValue = ''; } });
+      },
+
+      loadDraft(id) {
+        if (id === 5) {
+          this.name = 'Holiday on 2 November';
+          this.dest = { type: 'home', item: null, url: '', meta: null, skipBuyers: true };
+          this.audience = { mode: 'all', match: 'any', rows: [] };
+          this.push = { on: true, title: 'Holiday on Monday, 2 November', message: 'The institute is closed. Live classes move to Tuesday at the same time.', image: null };
+          this.email = { on: false, subject: '', body: '', button: { on: true, label: '' } };
+          this.savedAt = '5 minutes ago';
+        } else if (id === 9) {
+          this.name = 'Organic Chemistry – new lesson on YouTube';
+          this.dest = { type: 'link', item: null, url: 'https://www.youtube.com/watch?v=8m3L9tK', skipBuyers: true,
+                        meta: { youtube: true, title: 'Organic Chemistry in 20 minutes | NEET 2027', author: 'Brilliant Pala', image: 'https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?auto=format&fit=crop&w=600&h=300&q=70' } };
+          this.audience = { mode: 'all', match: 'any', rows: [] };
+          this.push = { on: true, title: 'Organic Chemistry in 20 minutes', message: 'New on our YouTube channel. Tap to watch.', image: { name: 'Video thumbnail', url: this.dest.meta.image } };
+          this.email = { on: false, subject: '', body: '', button: { on: true, label: '' } };
+          this.savedAt = 'just now';
+        } else if (id === 7) {
+          this.name = 'Repeaters 2026 – fee reminder';
+          this.dest = { type: 'home', item: null, url: '', meta: null, skipBuyers: true };
+          this.audience = { mode: '', match: 'any', rows: [] };
+          this.push = { on: false, title: '', message: '', image: null };
+          this.email = { on: true, subject: '', body: '<p>Hi {name},</p><p>Your second fee instalment for Repeaters 2026 is due on 5 November. Pay early to keep your seat in the batch.</p>', button: { on: true, label: '' } };
+          this.savedAt = '2 hours ago';
+        } else if (id === 6) {
+          this.name = 'Physics doubt clinic this Saturday';
+          this.dest = { type: 'item', item: cmpItem('l-doubt'), url: '', meta: null, skipBuyers: true };
+          this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['phy-11'] }] };
+          this.push = { on: true, title: 'Physics doubt clinic this Saturday', message: 'Bring your doubts from Units 1–4. 10 AM, online.', image: null };
+          this.email = { on: true, subject: 'Physics doubt clinic – Saturday, 10 AM', body: '<p>Hi {name},</p><p>Arun sir is taking doubts from Units 1–4 this Saturday at 10 AM. Note down your questions and join on time.</p>', button: { on: true, label: '' } };
+          this.savedAt = '10 minutes ago';
+        } else {
+          this.name = 'Biology notes – 30% off';
+          this.dest = { type: 'item', item: cmpItem('p-bio-notes'), url: '', meta: null, skipBuyers: true };
+          this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'course', values: ['bio-neet'] }, { id: 2, type: 'batch', values: ['neet-a', 'neet-b'] }, { id: 3, type: 'notbought', values: ['bio-notes'] }] };
+          this.push = { on: true, title: 'Biology notes at 30% off', message: 'Handwritten notes for every NEET chapter. Offer ends Sunday.', image: { name: 'Biology Handwritten Notes – product image', url: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&h=300&q=70' } };
+          this.email = { on: true, subject: 'Biology Handwritten Notes – 30% off till Sunday', body: '<p>Hi {name},</p><p>Our toppers’ handwritten Biology notes cover every NEET chapter, with diagrams you can revise from in minutes.</p>', button: { on: true, label: 'Get the notes' } };
+          this.savedAt = 'yesterday';
+        }
+        this.saveState = 'saved';
+      },
+
+      // ----- Side panels -----
+      open(key) {
+        if (key === 'dest') return this.openAbout();
+        this.triedPanel = false; this.q = ''; this.suggested = false;
+        this.d = cmpCopy({ audience: this.audience, push: this.push, email: this.email, dest: this.dest }[key]);
+        if (key === 'audience') {
+          if (!this.d.mode) { const sug = this.audienceSuggestion; this.d = sug ? cmpCopy(sug.audience) : { mode: 'some', match: 'any', rows: [] }; }
+          if (this.d.mode === 'some' && !this.d.rows.length) this.d.rows.push(cmpEmptyRow());
+        }
+        // Start empty messages with words that fit what the campaign is about
+        const sg = cmpSuggest(this.dest);
+        if (key === 'push' && !this.d.title && !this.d.message && sg) { this.d.title = sg[0].slice(0, 65); this.d.message = sg[1]; this.suggested = true; }
+        // Start with the product's image, or the video's or page's picture
+        this.productImage = false;
+        const pic = this.isProduct ? this.dest.item.image : (this.dest.type === 'link' && this.dest.meta && this.dest.meta.image);
+        if (key === 'push' && !this.push.on && !this.d.image && pic) {
+          this.d.image = { name: 'Picture of ' + this.destLabel, url: pic }; this.productImage = true;
+        }
+        if (key === 'email' && !this.d.subject && !this.d.body && sg) { this.d.subject = sg[2]; this.d.body = sg[3]; this.suggested = true; }
+        this.panel = key;
+        window.dispatchEvent(new CustomEvent('open-drawer-cmp-' + key));
+        this.$nextTick(() => {
+          if (key === 'email') window.dispatchEvent(new CustomEvent('rte-set-email-body', { detail: this.d.body }));
+          if (key === 'push') window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: this.d.image ? [{ name: this.d.image.name, size: this.productImage ? 'auto' : '184 KB', progress: 100, status: 'success', extension: 'png', url: this.d.image.url }] : [] } }));
+          cmpIcons();
+        });
+      },
+      close() { window.dispatchEvent(new CustomEvent('close-drawer-cmp-' + this.panel)); },
+      panelError(key) {
+        const d = this.d; if (!this.triedPanel || this.panel !== key) return '';
+        if (key === 'audience') {
+          if (d.rows.some(r => r.missing)) return 'Replace the deleted batch, or remove it.';
+          if (d.mode === 'some' && !d.rows.some(r => r.values.length)) return 'Choose at least one batch, course, product, field or student.';
+        }
+        if (key === 'push') { if (!d.title.trim()) return 'Add a title.'; if (!d.message.trim()) return 'Add a message.'; }
+        if (key === 'email') { if (!d.subject.trim()) return 'Add a subject.'; if (!d.body.replace(/<[^>]*>/g, '').trim()) return 'Write the email.'; }
+        if (key === 'dest') {
+          if (!d.type || (d.item && d.item.gone)) return this.dstep === 'product' ? 'Choose a product or the whole store.' : this.dstep === 'link' ? 'Enter a web address.' : 'Choose the course, or something inside it.';
+          if (d.type === 'link' && !this.validUrl(d.url)) return 'Enter a full web address, like https://example.com/page';
+        }
+        return '';
+      },
+      apply() {
+        this.triedPanel = true;
+        if (this.panelError(this.panel)) return;
+        const k = this.panel;
+        if (k === 'dest' && !this.name.trim()) this.$nextTick(() => this.autoName());
+        if (k === 'push' || k === 'email') { this.d.on = true; this.preview = k; }
+        this[k] = cmpCopy(this.d);
+        this.close();
+        this.save(true);
+      },
+      removeChannel(k) {
+        this[k].on = false; this.close(); this.save(true);
+        if (this.preview === k) this.preview = k === 'push' ? 'email' : 'push';
+        cmpToast((k === 'push' ? 'Push notification' : 'Email') + ' removed', 'What you wrote is kept, in case you add it back.');
+      },
+
+      // ----- What it's about: pick the intent, then a picker scoped to it -----
+      get showIntro() { return this.isNew && !this.dest.type; },
+      get purposeInfo() { return CMP_PURPOSES[cmpPurposeKey(this.dest)]; },
+      intentOf(dest) {
+        if (dest.type === 'store' || (dest.item && dest.item.kind === 'product')) return 'product';
+        if (dest.type === 'item') return 'content';
+        return ({ home: 'announce', link: 'link' })[dest.type] || '';
+      },
+      openAbout(step) {
+        this.triedPanel = false; this.q = ''; this.openCh = {};
+        this.d = cmpCopy(this.dest);
+        const intent = this.intentOf(this.dest);
+        this.dCourse = this.dest.item && this.dest.item.course || null;
+        if (this.dCourse && this.dest.item.chapter) this.openCh[this.dest.item.chapter] = true;
+        this.dstep = step || ({ product: 'product', content: this.dCourse ? 'course' : 'courses', link: 'link' })[intent] || 'intent';
+        if (this.dstep === 'link' && this.d.type !== 'link') { this.d.type = 'link'; this.d.item = null; this.d.url = this.d.url || ''; }
+        this.panel = 'dest';
+        window.dispatchEvent(new CustomEvent('open-drawer-cmp-dest'));
+        this.$nextTick(() => cmpIcons());
+      },
+      // From the start screen or the panel's first step
+      chooseIntent(intent) {
+        if (intent === 'announce') {
+          this.dest = { type: 'home', item: null, url: '', meta: null, skipBuyers: true };
+          if (!this.name.trim()) this.autoName();
+          if (this.panel === 'dest') this.close();
+          this.save(true);
+          return;
+        }
+        if (this.panel !== 'dest') return this.openAbout({ product: 'product', content: 'courses', link: 'link' }[intent]);
+        this.q = ''; this.dstep = { product: 'product', content: 'courses', link: 'link' }[intent];
+        if (intent === 'link') { this.d.type = 'link'; this.d.item = null; this.d.meta = this.d.meta || null; } else if (this.intentOf(this.d) !== intent) { this.d.type = ''; this.d.item = null; }
+        cmpIcons();
+      },
+      goCourse(id) { this.dCourse = id; this.q = ''; this.openCh = {}; this.dstep = 'course'; cmpIcons(); },
+      get course() { return CMP_TREE.find(c => c.id === this.dCourse) || { chapters: [], label: '' }; },
+      get productResults() { const q = this.q.trim().toLowerCase(); return CMP_PRODUCT_ITEMS.filter(x => !q || x.label.toLowerCase().includes(q)); },
+      get courseResults() { const q = this.q.trim().toLowerCase(); return CMP_TREE.filter(c => !q || c.label.toLowerCase().includes(q)); },
+      get upcoming() { return CMP_INDEX.filter(x => x.course === this.dCourse && x.upcoming); },
+      get inCourseResults() {
+        const q = this.q.trim().toLowerCase();
+        return CMP_INDEX.filter(x => x.course === this.dCourse && x.kind !== 'course' && x.label.toLowerCase().includes(q));
+      },
+      chapterItems(ch) { return CMP_INDEX.filter(x => x.course === this.dCourse && x.chapter === ch.label); },
+      toggleCh(ch) { this.openCh[ch.label] = !this.openCh[ch.label]; cmpIcons(); },
+      pickItem(it) { this.d.type = 'item'; this.d.item = cmpCopy(it); },
+      pickById(id) { this.pickItem(CMP_INDEX.find(x => x.id === id)); },
+      pickFixed(t) { this.d.type = t; this.d.item = null; },
+      isPicked(id) { return this.d.type === 'item' && this.d.item && !this.d.item.gone && this.d.item.id === id; },
+      kindOf(dest) { return dest.type === 'item' && dest.item ? dest.item.kind : (dest.type === 'link' && dest.meta && dest.meta.youtube ? 'youtube' : dest.type); },
+      async lookUp(u) {
+        if (!this.validUrl(u)) { this.d.meta = null; return; }
+        this.metaLoading = true;
+        const m = await cmpFetchMeta(u.trim());
+        if (this.panel === 'dest' && this.d.url === u) { this.d.meta = m; }
+        this.metaLoading = false;
+      },
+      get isProduct() { return this.kindOf(this.dest) === 'product'; },
+      get aboutTitle() {
+        const d = this.dest;
+        if (d.type === 'item' && d.item) return (d.item.kind === 'product' ? 'Promote ' : '') + d.item.label;
+        if (d.type === 'link' && d.meta && d.meta.title) return d.meta.title;
+        return ({ home: 'An announcement', store: 'Promote the store', link: d.url })[d.type] || '';
+      },
+      get aboutMeta() {
+        const d = this.dest;
+        if (d.type === 'item' && d.item) {
+          if (d.item.kind === 'product') return 'Product · sales within 7 days of a click are counted' + (d.skipBuyers ? ' · leaves out students who bought it' : '');
+          return CMP_KINDS[d.item.kind].label + ' · ' + d.item.meta;
+        }
+        if (d.type === 'link') return d.meta && d.meta.youtube ? 'YouTube video · opens in the YouTube app' : cmpSite(d.url) + ' · opens in the browser';
+        return ({ home: 'Opens the app’s home screen', store: 'Opens the store' })[d.type] || '';
+      },
+      get destLabel() { const d = this.dest; return d.type === 'item' && d.item ? d.item.label : d.type === 'link' && d.meta && d.meta.title ? d.meta.title : ({ home: 'App home', store: 'Store', link: d.url })[d.type] || ''; },
+      validUrl(u) { u = (u || '').trim(); return /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(u) || /^[^\s.]+\.[a-z]{2,}(\/\S*)?$/i.test(u); },
+
+      // ----- Who gets it -----
+      // Course content needs access; suggest exactly the students who can open it.
+      get accessCourse() { const it = this.dest.type === 'item' && this.dest.item; return it && it.course ? it.course : null; },
+      get audienceSuggestion() {
+        if (!this.accessCourse) return null;
+        return { title: 'Students with access to ' + cmpOptLabel('course', this.accessCourse), count: CMP_ACCESS[this.accessCourse],
+                 audience: { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: [this.accessCourse] }] } };
+      },
+      // Students in the audience who can't open the chosen content (prototype estimate)
+      get cantOpen() {
+        const c = this.accessCourse, a = this.audience;
+        if (!c || !a.mode || !this.estimate) return 0;
+        const onlyCourse = a.mode === 'some' && a.rows.length && a.rows.every(r => r.type === 'course' && r.values.length === 1 && r.values[0] === c);
+        return onlyCourse ? 0 : Math.max(0, this.estimate - CMP_ACCESS[c]);
+      },
+      useSuggestion() {
+        this.audience = cmpCopy(this.audienceSuggestion.audience); this.save(true);
+        cmpToast('Who gets it updated', 'Only students who can open it will get this campaign.');
+      },
+      dEstimate() { return this.panel === 'audience' ? cmpEstimate(this.d, cmpState() === 'no-match') : null; },
+      get estimate() { return cmpEstimate(this.audience, cmpState() === 'no-match'); },
+      get audienceText() {
+        if (this.audience.mode === 'all') return 'All registered students';
+        const verbs = { product: 'bought ', notbought: 'didn’t buy ', course: 'has access to ', batch: 'in ', field: '', students: '' };
+        const t = this.audience.rows.filter(r => r.values.length)
+          .map(r => verbs[r.type] + r.values.map(v => cmpOptLabel(r.type, v)).join(', '))
+          .join(this.audience.match === 'all' ? ', and ' : ', or ');
+        return t.charAt(0).toUpperCase() + t.slice(1);
+      },
+      get reach() { const n = this.estimate || 0; return { push: this.fail.noApp ? 0 : Math.round(n * 0.81), email: Math.round(n * 0.975) }; },
+      addRow() { this.d.rows.push(cmpEmptyRow()); cmpIcons(); },
+      removeRow(row) { this.d.rows = this.d.rows.filter(r => r.id !== row.id); },
+      setType(row, type) { row.type = type; row.values = []; row.field = ''; row.missing = false; },
+
+      // ----- Email button -----
+      get defaultButton() { const k = this.kindOf(this.dest); return CMP_KINDS[k] ? CMP_KINDS[k].button : ({ home: 'Open the app', store: 'Visit the store', link: 'Open the page', youtube: 'Watch on YouTube' })[k] || 'Open'; },
+      buttonText(e) { return (e.button && e.button.label) || this.defaultButton; },
+
+      // ----- Status of each row: done | todo | off | problem | warn, with the line under its title -----
+      get rows() {
+        const a = this.audience, p = this.push, e = this.email, ds = this.dest;
+        const neither = !p.on && !e.on;
+        const r = {};
+        if (!ds.type) r.dest = ['todo', 'A product, course, video, test or live class — or just an announcement'];
+        else if (ds.type === 'link' && !this.validUrl(ds.url)) r.dest = ['problem', '“' + ds.url + '” isn’t a full web address'];
+        else r.dest = ['done', ''];
+        if (!a.mode) r.audience = ['todo', 'Choose who should get this campaign'];
+        else if (a.rows.some(x => x.missing)) r.audience = ['problem', '“' + a.rows.find(x => x.missing).missing + '” was deleted. Choose another batch.'];
+        else if (this.estimate === 0) r.audience = ['problem', 'No student matches these conditions'];
+        else if (this.estimate === null) r.audience = ['todo', 'Choose at least one condition'];
+        else r.audience = [this.cantOpen ? 'warn' : 'done', ''];
+        if (ds.item && ds.item.gone) r.dest = ['problem', '“' + ds.item.label + '” is no longer in the store. Choose another product.'];
+        r.push = p.on ? (p.title && p.message ? ['done', ''] : ['problem', 'Add a title and message'])
+                      : [neither ? 'todo' : 'off', neither ? 'Send push, email or both' : 'Not sending'];
+        r.email = e.on ? (e.subject && e.body.replace(/<[^>]*>/g, '').trim() ? ['done', ''] : ['problem', !e.subject ? 'Add a subject' : 'Write the email'])
+                       : [neither ? 'todo' : 'off', neither ? 'Send push, email or both' : 'Not sending'];
+        return r;
+      },
+      // A warning (some students can't open it) doesn't block sending
+      get leftCount() {
+        const n = Object.values(this.rows).filter(x => x[0] === 'todo' || x[0] === 'problem').length;
+        return n - (!this.push.on && !this.email.on ? 1 : 0) + (this.name.trim() ? 0 : 1);
+      },
+      get ready() { return this.leftCount === 0; },
+      get leftNames() {
+        const r = this.rows, open = (k) => r[k][0] === 'todo' || r[k][0] === 'problem';
+        const l = [];
+        if (!this.name.trim()) l.push('Campaign name');
+        if (open('dest')) l.push('What it’s about');
+        if (open('audience')) l.push('Who gets it');
+        if (!this.push.on && !this.email.on) l.push('Push or email');
+        else { if (open('push')) l.push('Push notification'); if (open('email')) l.push('Email'); }
+        return l.join(', ');
+      },
+
+      // ----- Name -----
+      // A new campaign is named after what it's about, so the name never holds up sending; rename any time
+      autoName() {
+        const d = this.dest;
+        const base = d.type === 'item' && d.item ? d.item.label : d.type === 'link' && d.meta && d.meta.title ? d.meta.title.split(' | ')[0] : ({ home: 'Announcement', store: 'Store promotion', link: cmpSite(d.url) })[d.type] || 'Campaign';
+        this.name = base + ' – 27 Oct';
+      },
+      openRename() { this.nameDraft = this.name; this.$dispatch('open-modal-rename'); },
+      rename() { if (!this.nameDraft.trim()) return; this.name = this.nameDraft.trim(); this.save(true); },
+
+      // ----- Save: drafts save after every change; the button saves on demand -----
+      save(quiet = false) {
+        this.saveState = 'saving';
+        setTimeout(() => {
+          if (this.fail.save) { this.fail.save = false; this.saveState = 'failed'; cmpToast('Couldn’t save the draft', 'Your changes are still on this page. Try again.', 'error'); return; }
+          this.saveState = 'saved'; this.savedAt = 'just now';
+          if (!quiet) cmpToast('Draft saved', 'Nothing is sent until you choose Send.');
+        }, 600);
+      },
+      get saveLabel() { return ({ new: 'Draft · not saved yet', saving: 'Saving…', saved: 'Draft · saved ' + this.savedAt, failed: 'Couldn’t save' })[this.saveState]; },
+
+      // ----- Review and send: saves, then opens the campaign's page, where it's reviewed and sent -----
+      goReview() {
+        if (!this.ready) return;
+        this.save(true);
+        setTimeout(() => { window.location.href = '{{ "/testpress/campaigns/detail/" | url }}?state=review&name=' + encodeURIComponent(this.name); }, 700);
+      },
+    }));
+  });
+</script>

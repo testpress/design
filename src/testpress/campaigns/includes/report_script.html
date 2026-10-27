@@ -1,0 +1,111 @@
+<script>
+  window.CMP_PROTO = [
+    { name: 'Draft: review and send', states: [['review', 'Ready to send'], ['review-left', 'Things left'], ['no-app', 'No one has the app'], ['send-failed', 'Couldn’t start sending']] },
+    { name: 'After sending', states: [['sending', 'Sending'], ['product', 'Product promotion (purchases)'], ['youtube', 'YouTube video'], ['store', 'Store (no purchases yet)'], ['no-clicks', 'No clicks yet'], ['partial', 'Some emails failed'], ['failed', 'Couldn’t send']] },
+    { name: 'Other', states: [['legacy', 'Sent before Campaigns'], ['loading', 'Loading']] },
+  ];
+  window.CMP_PROTO_DEFAULT = 'product';
+  const CMP_DETAIL_STATE_ID = { review: 8, 'review-left': 7, 'no-app': 8, 'send-failed': 8, product: 1, youtube: 9, store: 2, 'no-clicks': 3, partial: 4, failed: 10, legacy: 5, sending: 6, loading: 1 };
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('campaignDetail', () => {
+      const s = cmpState();
+      const id = Number(cmpParam('id')) || CMP_DETAIL_STATE_ID[s] || 1;
+      const c = cmpCopy(CMP_CAMPAIGNS.find(x => x.id === id) || CMP_CAMPAIGNS[0]);
+      if (cmpParam('name')) c.name = cmpParam('name'); // just came from the editor
+      if (s === 'no-app') c.reach = { push: 0, email: c.reach.email };
+      return {
+        c,
+        loading: true,
+        sending: false,
+        sendError: false,
+        failNext: s === 'send-failed',
+        toDelete: c,
+        init() {
+          if (s === 'loading') return;
+          setTimeout(() => { this.loading = false; cmpIcons(); }, 500);
+          if (c.status === 'sending') this.tick();
+        },
+
+        // ----- Header -----
+        get statusLabel() { return ({ draft: 'Draft', sending: 'Sending', sent: 'Sent', failed: 'Couldn’t send' })[this.c.status]; },
+        get whenText() {
+          const c = this.c;
+          if (c.status === 'draft') return 'Edited ' + (c.edited || 'just now').toLowerCase();
+          return (c.status === 'sending' ? 'Started ' : '') + c.sentAt + (c.sentBy ? ' by ' + c.sentBy : '');
+        },
+        get purposeLabel() { return CMP_PURPOSES[cmpPurposeKey(this.c.dest)].label; },
+        get channelText() { return (this.c.channels.length === 2 ? 'Push and email' : this.c.channels[0] === 'push' ? 'Push' : 'Email'); },
+        get isProduct() { return cmpPurposeKey(this.c.dest) === 'product' && this.c.dest && this.c.dest.type === 'product'; },
+
+        // ----- Draft: what's left, who it reaches, send -----
+        get left() {
+          return (this.c.missing || []).map(m => [m, { 'Email subject': 'email', 'Who gets it': 'audience', 'Where it opens': 'dest', 'Push notification': 'push' }[m] || '']);
+        },
+        get reach() { return this.c.reach || { push: 0, email: 0 }; },
+        get canSend() { return !(this.c.channels.length === 1 && this.c.channels[0] === 'push' && this.reach.push === 0); },
+        editHref(panel) {
+          const map = { audience: 'edit-audience', dest: 'edit-about', push: 'edit-push', email: 'edit-email' };
+          return '{{ "/testpress/campaigns/new/" | url }}?id=' + this.c.id + (panel && map[panel] ? '&state=' + map[panel] : '');
+        },
+        send() {
+          if (this.sending) return; // one click = one send
+          this.sending = true; this.sendError = false;
+          setTimeout(() => {
+            this.sending = false;
+            if (this.failNext) { this.failNext = false; this.sendError = true; return; }
+            // It's on its way: the page turns into the sending view
+            const c = this.c, n = c.targeted;
+            Object.assign(c, { status: 'sending', sentAt: 'Today, ' + new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }), sentBy: 'You',
+              push: c.channels.includes('push') ? { sent: 0, skipped: 0, failed: 0, unique: 0, clicks: 0 } : null,
+              email: c.channels.includes('email') ? { sent: 0, skipped: 0, failed: 0, unique: 0, clicks: 0 } : null,
+              unique: 0, clicks: 0, purchases: 0, revenue: 0, received: 0 });
+            cmpToast('Sending started', 'You can leave this page. Numbers update as it goes.');
+            this.$nextTick(() => cmpIcons());
+            this.tick(n);
+          }, 1200);
+        },
+
+        // Prototype: numbers grow while it sends, then it finishes
+        tick(total) {
+          const t = setInterval(() => {
+            const p = this.c.push, e = this.c.email, n = total || 3150;
+            const pMax = Math.round(n * 0.81), eMax = Math.round(n * 0.97);
+            if (p && p.sent < pMax) { p.sent = Math.min(pMax, p.sent + Math.round(n / 8)); p.unique += Math.round(n / 110); p.clicks += Math.round(n / 95); }
+            else if (e && e.sent < eMax) { e.sent = Math.min(eMax, e.sent + Math.round(n / 4)); e.unique += Math.round(n / 300); e.clicks += Math.round(n / 260); }
+            else {
+              clearInterval(t);
+              if (p) p.skipped = n - pMax; if (e) e.skipped = n - eMax;
+              this.c.status = 'sent'; this.c.sentShort = 'Today';
+              cmpToast('Campaign sent', 'All messages went out.'); this.$nextTick(() => cmpIcons());
+            }
+            this.c.unique = (p ? p.unique : 0) + (e ? Math.round(e.unique * 0.6) : 0);
+            this.c.clicks = (p ? p.clicks : 0) + (e ? e.clicks : 0);
+            this.c.received = Math.max(p ? p.sent : 0, e ? e.sent : 0);
+          }, 1400);
+        },
+
+        // ----- Sent -----
+        get both() { return (this.c.push && this.c.email) ? Math.max(0, this.c.push.unique + this.c.email.unique - this.c.unique) : 0; },
+        rate(ch) { return ch && ch.sent ? cmpPct(ch.unique, ch.sent) : '—'; },
+        channelRows() {
+          return [['push', 'Push', 'smartphone', 'No app installed'], ['email', 'Email', 'mail', 'No email address']]
+            .filter(r => this.c.channels.includes(r[0]) && this.c[r[0]]).map(r => ({ key: r[0], label: r[1], icon: r[2], skipReason: r[3], d: this.c[r[0]] }));
+        },
+        retry() {
+          cmpToast('Sending again', 'Only students who didn’t get it are included.');
+          Object.assign(this.c, { status: 'sending', sentAt: 'Today, now' });
+          this.$nextTick(() => cmpIcons());
+          this.tick(this.c.targeted);
+        },
+        duplicate() {
+          cmpToast('Copy saved as a draft', 'Opening it now…');
+          setTimeout(() => { window.location.href = '{{ "/testpress/campaigns/new/" | url }}?state=ready'; }, 900);
+        },
+        confirmDelete() {
+          window.location.href = '{{ "/testpress/campaigns/" | url }}?state=deleted';
+        },
+      };
+    });
+  });
+</script>

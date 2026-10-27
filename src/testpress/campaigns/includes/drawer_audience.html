@@ -1,0 +1,90 @@
+{# Side panel: Who gets it. All students, or students matching conditions (the same filters as custom push
+   notifications). The count updates as conditions change; the final list is fixed when the campaign is sent. #}
+{% from "../../../ui-system/components/drawer.html" import drawer %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+{% from "../../../ui-system/components/select.html" import select %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/alert.html" import alert %}
+{% set opts = { product: campaigns.products, notbought: campaigns.products, course: campaigns.courses, batch: campaigns.batches, students: campaigns.students } %}
+{% set type_options = [] %}
+{% for t in campaigns.conditionTypes %}{% set type_options = (type_options.push({ value: t.key, label: t.label }), type_options) %}{% endfor %}
+{% set field_options = [] %}
+{% for f in campaigns.fields %}{% set field_options = (field_options.push({ value: f.value, label: f.label }), field_options) %}{% endfor %}
+{% set pick = "$event.target.closest('[x-data]')._x_dataStack[0].selected" %}
+{% set preset = "x-init=\"$nextTick(() => $el.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: %s })))\"" %}
+
+{% call drawer(id="cmp-audience", size="lg", title="Who gets it") %}
+  <template x-if="d && panel === 'audience'">
+    <div class="flex-1 overflow-y-auto p-6 space-y-6">
+      <div class="grid sm:grid-cols-2 gap-3">
+        {{ radio(name="audience_mode", value="some", label="Choose students", description="By batch, course, purchase or profile", variant="card", x_model="d.mode") }}
+        {{ radio(name="audience_mode", value="all", label="All students", description="18,420 registered", variant="card", x_model="d.mode") }}
+      </div>
+
+      <div x-show="d.mode === 'some'" class="space-y-3">
+        <div x-show="d.rows.length > 1" class="flex items-center gap-x-2 text-sm text-gray-600 dark:text-neutral-400">
+          <span>Students who match</span>
+          <div class="w-24" @change="d.match = {{ pick }}" x-init="$nextTick(() => $el.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: d.match })))">
+            {{ select(name="match", selected_value="any", options=[{ value: "any", label: "any" }, { value: "all", label: "all" }], padding_class="py-1.5 px-2.5 pe-8") }}
+          </div>
+          <span>of these</span>
+        </div>
+
+        <template x-for="row in d.rows" :key="row.id">
+          <div class="p-3 rounded-xl bg-gray-50 dark:bg-neutral-900/50">
+            <div class="flex items-start gap-2">
+              <div class="flex-1 min-w-0 space-y-2">
+                <div @change="setType(row, {{ pick }})" x-init="$nextTick(() => $el.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: row.type })))">
+                  {{ select(name="condition_type", options=type_options, selected_value="batch") }}
+                </div>
+                {% for key, list in opts %}
+                <template x-if="row.type === '{{ key }}'">
+                  <div @change="row.values = {{ pick }}.slice(); row.missing = false"
+                       x-init="$nextTick(() => row.values.length && $el.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: row.values })))">
+                    {{ select(name="condition_" ~ key, options=list, multiple=true, search=true, placeholder=({ product: "Choose products", notbought: "Choose products", course: "Choose courses", batch: "Choose batches", students: "Search students by name" })[key], error_message=("" if key != "batch" else "")) }}
+                  </div>
+                </template>
+                {% endfor %}
+                <template x-if="row.type === 'field'">
+                  <div class="flex flex-col sm:flex-row gap-2">
+                    <div class="sm:w-44 shrink-0" @change="row.field = {{ pick }}; row.values = []">
+                      {{ select(name="condition_field", options=field_options, placeholder="Choose a field") }}
+                    </div>
+                    {% for f in campaigns.fields %}
+                    <template x-if="row.field === '{{ f.value }}'">
+                      <div class="flex-1 min-w-0" @change="row.values = {{ pick }}.slice()">
+                        {% set vals = [] %}{% for v in f["values"] %}{% set vals = (vals.push({ value: v, label: v }), vals) %}{% endfor %}
+                        {{ select(name="condition_value_" ~ f.value, options=vals, multiple=true, placeholder="is any of…") }}
+                      </div>
+                    </template>
+                    {% endfor %}
+                  </div>
+                </template>
+                <p x-show="row.missing" class="text-xs text-red-600 dark:text-red-400" x-text="'“' + row.missing + '” was deleted. Choose another batch.'"></p>
+              </div>
+              {{ button(variant="ghost", size="sm", icon="x", extra_attrs='@click="removeRow(row)" x-show="d.rows.length > 1" aria-label="Remove condition"') }}
+            </div>
+          </div>
+        </template>
+
+        {{ button(text="Add a condition", variant="link", size="sm", icon="plus", extra_attrs='@click="addRow()"') }}
+      </div>
+
+      <template x-if="dEstimate() === 0">
+        <div>{{ alert(variant="warning", size="sm", title="No student matches all of these", description="Switch to “any”, or remove a condition.") }}</div>
+      </template>
+      <p x-show="panelError('audience')" class="text-sm text-red-600 dark:text-red-400" x-text="panelError('audience')"></p>
+    </div>
+  </template>
+
+  <div class="p-4 border-t border-gray-200 dark:border-neutral-700 flex flex-wrap items-center justify-between gap-3">
+    <p class="text-sm text-gray-800 dark:text-neutral-200">
+      <template x-if="dEstimate() !== null"><span><span class="font-semibold" x-text="'≈ ' + cmpNum(dEstimate())"></span> students right now<span x-show="d.mode === 'some' && d.rows.length > 1" class="block text-xs text-gray-500 dark:text-neutral-400">A student who matches more than one gets it once.</span></span></template>
+      <template x-if="dEstimate() === null"><span class="text-gray-500 dark:text-neutral-400">Choose who gets it</span></template>
+    </p>
+    <div class="flex gap-2">
+      {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}
+      {{ button(text="Save", extra_attrs='@click="apply()"') }}
+    </div>
+  </div>
+{% endcall %}
