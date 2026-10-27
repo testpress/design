@@ -1,12 +1,12 @@
 <script>
   window.CMP_PROTO = [
     { name: 'Campaigns list', states: [['list', 'With campaigns'], ['intro', 'First visit (no campaigns)'], ['loading', 'Loading'], ['error', 'Couldn’t load']] },
-    { name: 'Search and filters', states: [['many', 'Lots of campaigns (100+)'], ['no-results', 'No matches'], ['only-drafts', 'Nothing sent yet (only drafts)']] },
+    { name: 'Search and filters', states: [['many', 'Lots of campaigns (100+)'], ['no-results', 'No matches']] },
     { name: 'After an action', states: [['duplicated', 'Duplicated a campaign'], ['deleted', 'Deleted a draft']] },
   ];
   window.CMP_PROTO_DEFAULT = 'list';
 
-  // How many days ago each sample campaign went out (for the period filter)
+  // How many days ago each sample campaign went out (newest first, and the 30-day numbers)
   const CMP_DAYS = { 1: 3, 9: 5, 2: 7, 3: 15, 4: 22, 5: 60, 6: 0, 10: 0 };
   // Prototype: a year of campaigns, to see the page with 100+
   const cmpMany = () => {
@@ -26,7 +26,7 @@
             dest: k[0] === 'home' ? { type: 'home', label: 'App home' } : k[0] === 'link' ? { type: 'link', label: 'brilliantpala.org/blog' } : { type: 'item', kind: k[0], label: t },
             sentShort: date, sentAt: date, days, targeted: n, received: got, unique: clicked, clicks: Math.round(clicked * 1.2), purchases: null, revenue: null });
     }
-    for (let i = 0; i < 9; i++) out.push({ id: 2000 + i, name: topics[i % topics.length] + ' – draft', status: 'draft', channels: ['push'], missing: i % 2 ? ['Who gets it'] : [], dest: { type: 'home', label: 'App home' }, edited: (i + 1) + ' days ago', estimate: 2000 + i * 310 });
+    for (let i = 0; i < 9; i++) out.push({ id: 2000 + i, name: topics[i % topics.length] + ' – draft', status: 'draft', channels: ['push'], missing: i % 2 ? ['Who gets it'] : [], dest: { type: 'home', label: 'App home' }, edited: i === 0 ? '1 day ago' : (i + 1) + ' days ago', estimate: 2000 + i * 310 });
     return out;
   };
 
@@ -35,6 +35,7 @@
       view: 'loading',
       campaigns: cmpCopy(CMP_CAMPAIGNS),
       search: '',
+      status: '',
       channel: '',
       purposeFilter: '',
       toDelete: null,
@@ -42,9 +43,13 @@
       init() {
         const s = cmpState() || 'list';
         if (s === 'no-results') this.search = 'scholarship';
-        if (s === 'only-drafts') this.campaigns = this.campaigns.filter(c => c.status === 'draft');
         this.campaigns.forEach(c => { if (c.days === undefined) c.days = CMP_DAYS[c.id] ?? 0; });
         if (s === 'many') this.campaigns = this.campaigns.concat(cmpMany());
+        // Drafts, sending and couldn't send first; then newest sent
+        const o = { draft: 0, sending: 1, failed: 1, sent: 2 };
+        this.campaigns.sort((a, b) => o[a.status] - o[b.status] || a.days - b.days);
+        // Back to page 1 whenever search or filters change
+        ['search', 'status', 'channel', 'purposeFilter'].forEach(k => this.$watch(k, () => { this.page = 1; }));
         if (s === 'loading') return;
         setTimeout(() => {
           this.view = s === 'intro' ? 'intro' : s === 'error' ? 'error' : 'list';
@@ -56,68 +61,53 @@
       },
       retry() { this.view = 'loading'; setTimeout(() => { this.view = 'list'; cmpIcons(); }, 700); },
 
-      // ----- What's shown: needs you, then sent campaigns by purpose -----
-      // A section starts with its 3 latest; Show more adds 10 at a time
-      count: { attention: 3, product: 3, announce: 3 },
-      sortBy: { product: 'newest', announce: 'newest' },
-      period: 30,
-      get onlyPurpose() { return this.purposeFilter; },
+      // Last 30 days, sent campaigns only (prototype numbers)
+      get stats() {
+        const sent = this.campaigns.filter(c => c.status === 'sent' && c.days <= 30);
+        return {
+          sent: sent.length,
+          reached: sent.reduce((t, c) => t + (c.targeted || 0), 0),
+          clicked: sent.reduce((t, c) => t + (c.unique || 0), 0),
+          revenue: sent.reduce((t, c) => t + (c.revenue || 0), 0),
+          purchases: sent.reduce((t, c) => t + (c.purchases || 0), 0),
+        };
+      },
+      // ----- Pages: 20 rows each -----
+      page: 1,
+      perPage: 20,
+      get pageCount() { return Math.max(1, Math.ceil(this.filtered.length / this.perPage)); },
+      get pageRows() { return this.filtered.slice((this.page - 1) * this.perPage, this.page * this.perPage); },
+      get pageItems() {
+        const n = this.pageCount, p = this.page;
+        if (n <= 7) return Array.from({ length: n }, (_, i) => i + 1);
+        if (p <= 4) return [1, 2, 3, 4, 5, '…', n];
+        if (p >= n - 3) return [1, '…', n - 4, n - 3, n - 2, n - 1, n];
+        return [1, '…', p - 1, p, p + 1, '…', n];
+      },
+      goPage(n) { this.page = n; cmpIcons(); window.scrollTo({ top: 0, behavior: 'smooth' }); },
+
       get filtered() {
         const q = this.search.trim().toLowerCase();
         return this.campaigns.filter(c =>
           (!q || c.name.toLowerCase().includes(q)) &&
+          (!this.status || c.status === this.status || (this.status === 'sent' && c.status === 'sending')) &&
           (!this.purposeFilter || cmpPurposeKey(c.dest) === this.purposeFilter) &&
           (!this.channel || c.channels.includes(this.channel)));
       },
-      get attention() { const o = { failed: 0, sending: 1, draft: 2 }; return this.filtered.filter(c => c.status in o).sort((a, b) => o[a.status] - o[b.status]); },
-      get sent() { return this.filtered.filter(c => c.status === 'sent' && (!this.period || c.days <= this.period)); },
-      sorted(list, key) {
-        const by = { newest: (a, b) => a.days - b.days, revenue: (a, b) => (b.revenue || 0) - (a.revenue || 0), clicked: (a, b) => (b.unique || 0) - (a.unique || 0) }[this.sortBy[key]];
-        return list.slice().sort(by);
-      },
-      get promotions() { return this.sorted(this.sent.filter(c => cmpPurposeKey(c.dest) === 'product'), 'product'); },
-      get announcements() { return this.sorted(this.sent.filter(c => cmpPurposeKey(c.dest) === 'announce'), 'announce'); },
-      shown(list, key) { return list.slice(0, this.count[key]); },
-      showMore(key, all) { this.count[key] = all ? 9999 : this.count[key] + 10; cmpIcons(); },
-      showFewer(key) { this.count[key] = 3; cmpIcons(); },
-      get periodLabel() { return ({ 30: 'last 30 days', 90: 'last 3 months', 0: 'all time' })[this.period]; },
-      get promoTotals() { const l = this.promotions; return { count: l.length, revenue: l.reduce((t, c) => t + (c.revenue || 0), 0), purchases: l.reduce((t, c) => t + (c.purchases || 0), 0) }; },
-      get announceTotals() { const l = this.announcements; return { count: l.length, clicked: l.reduce((t, c) => t + (c.unique || 0), 0) }; },
-      get filtersOn() { return !!(this.search || this.channel || this.purposeFilter || this.period !== 30); },
+      get filtersOn() { return !!(this.search || this.status || this.channel || this.purposeFilter); },
       clearFilters() {
-        this.search = ''; this.channel = ''; this.purposeFilter = ''; this.period = 30;
+        this.search = ''; this.status = ''; this.channel = ''; this.purposeFilter = '';
         // reset the ui-system selects
-        this.$root.querySelectorAll('[data-filter]').forEach(f => f.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: f.dataset.reset || 'all' })));
+        this.$root.querySelectorAll('[data-filter] > div').forEach(el => el.dispatchEvent(new CustomEvent('set-selected-values', { detail: 'all' })));
       },
-
-      // ----- One campaign -----
-      purposeLine(c) {
-        const d = c.dest;
-        if (!d || d.type === 'home') return 'Opens the app';
-        if (d.type === 'product') return d.label;
-        if (d.type === 'store') return 'The whole store';
-        if (d.type === 'item') return CMP.kinds[d.kind].label + ' · ' + d.label;
-        if (d.type === 'link' && d.youtube) return 'YouTube video';
-        return cmpPurpose(c);
-      },
-      thumbOf(c) {
-        const d = c.dest || {};
-        if (d.type === 'product') { const p = CMP.products.find(x => x.label === d.label); if (p) return p.image; }
-        return c.content && c.content.push && c.content.push.imageUrl || null;
-      },
-      iconOf(c) {
-        const d = c.dest || {};
-        if (d.type === 'item') return CMP.kinds[d.kind].icon;
-        return ({ home: 'megaphone', link: 'link', store: 'store' })[d.type] || 'megaphone';
-      },
-      sendPct(c) { return c.targeted ? Math.round(c.received / c.targeted * 100) : 0; },
-      get newHref() { return '{{ "/testpress/campaigns/new/" | url }}'; },
 
       href(c) {
         const base = '{{ "/testpress/campaigns/" | url }}';
         return base + 'detail/?id=' + c.id;
       },
       editHref(c) { return '{{ "/testpress/campaigns/new/" | url }}?id=' + c.id; },
+      purpose(c) { return cmpPurpose(c); },
+      ctr(c) { return c.targeted ? cmpPct(c.unique, c.targeted) : ''; },
 
       duplicate(c) {
         const copy = { ...cmpCopy(c), id: Date.now(), name: c.name + ' (copy)', status: 'draft', edited: 'Just now', missing: [], estimate: c.targeted || c.estimate, warning: null };
