@@ -1,7 +1,7 @@
 {# Campaigns table. Every row opens the campaign's page: a draft is reviewed and sent there, a sent one shows results.
    Campaign: name with a badge only when it isn't simply sent (Draft, Sending, Couldn't send), then a dot line:
-   channels · who sent it (nothing else; what's left or failed shows on the campaign's page). Clicked: who clicked of who got it, with a bar. Revenue: product promotions only; hover for
-   the product and purchases. "—" means it doesn't apply. 20 rows a page. #}
+   channels · who sent it (nothing else; what's left or failed shows on the campaign's page). Performance: who clicked of who got it, with a bar; product promotions add revenue and purchases (hover for the
+   product). 20 rows a page. #}
 {% from "../../../ui-system/components/progress.html" import progress %}
 {% from "../../../ui-system/components/table.html" import table, table_th %}
 {% from "../../../ui-system/components/select.html" import select %}
@@ -26,8 +26,7 @@
 {% set header %}
   {{ table_th("Campaign") }}
   {{ table_th("Date") }}
-  {{ table_th("Clicked") }}
-  {{ table_th("Revenue", class="text-end") }}
+  {{ table_th("Performance") }}
   {{ table_th("", class="w-12") }}
 {% endset %}
 
@@ -62,32 +61,30 @@
         <span x-show="c.status === 'draft'" class="text-gray-500 dark:text-neutral-400" x-text="'Edited ' + (c.edited || '').toLowerCase()"></span>
       </td>
 
-      {# Clicked: of who got it, with a bar. Drafts show who it would go to. #}
-      <td class="px-5 py-3 whitespace-nowrap min-w-[12rem]">
+      {# Performance: who clicked of who got it, with a bar; product promotions add revenue (hover for the product).
+         Drafts show who it would go to. #}
+      <td class="px-5 py-3 whitespace-nowrap min-w-[15rem]">
         <template x-if="c.status === 'sent' || c.status === 'sending'">
-          <div class="w-44">
+          <div class="w-56">
             <div class="flex items-baseline justify-between gap-x-2 text-sm">
-              <p><span class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.unique)"></span> <span class="text-gray-500 dark:text-neutral-400" x-text="'of ' + cmpNum(c.received)"></span></p>
+              <p><span class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.unique)"></span> <span class="text-gray-500 dark:text-neutral-400" x-text="'of ' + cmpNum(c.received) + ' clicked'"></span></p>
               <span class="text-xs text-gray-500 dark:text-neutral-400" x-text="cmpPct(c.unique, c.received)"></span>
             </div>
             <div class="mt-1.5">{{ progress(value_expr="c.received ? Math.round(c.unique / c.received * 100) : 0", color="teal", size="xs", label="Students who clicked") }}</div>
+            <template x-if="c.revenue">
+              <div class="mt-1.5 inline-flex">
+                {% set rev_trigger %}<span class="text-xs cursor-default"><span class="font-semibold text-gray-800 underline decoration-dotted decoration-gray-300 underline-offset-4 dark:text-neutral-200 dark:decoration-neutral-600" x-text="cmpMoney(c.revenue)"></span> <span class="text-gray-500 dark:text-neutral-400" x-text="'from ' + cmpNum(c.purchases) + (c.purchases === 1 ? ' purchase' : ' purchases')"></span></span>{% endset %}
+                {% set rev_tip %}<span class="block text-start font-medium" x-text="c.dest.label"></span><span class="block text-start">Purchases within 7 days of a click</span>{% endset %}
+                {{ tooltip(trigger=rev_trigger, content=rev_tip, placement="top", width="w-60") }}
+              </div>
+            </template>
+            <p x-show="c.revenue === 0" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">No purchases yet</p>
           </div>
         </template>
         <span x-show="c.status === 'draft'" class="text-sm text-gray-500 dark:text-neutral-400" x-text="c.estimate ? '≈ ' + cmpNum(c.estimate) + ' students' : '—'"></span>
         <span x-show="c.status === 'failed'" class="text-sm text-gray-400 dark:text-neutral-500">Not sent</span>
       </td>
 
-      {# Revenue: product promotions only; hover for what was bought #}
-      <td class="px-5 py-3 whitespace-nowrap text-sm text-end">
-        <template x-if="c.status !== 'draft' && c.revenue !== null && c.revenue !== undefined">
-          <div class="inline-flex justify-end">
-            {% set rev_trigger %}<span class="font-medium text-gray-800 underline decoration-dotted decoration-gray-300 underline-offset-4 cursor-default dark:text-neutral-200 dark:decoration-neutral-600" x-text="cmpMoney(c.revenue)"></span>{% endset %}
-            {% set rev_tip %}<span class="block text-start font-medium" x-text="c.dest.label"></span><span class="block text-start" x-text="cmpNum(c.purchases) + (c.purchases === 1 ? ' purchase' : ' purchases') + ' within 7 days of a click'"></span>{% endset %}
-            {{ tooltip(trigger=rev_trigger, content=rev_tip, placement="left", width="w-64") }}
-          </div>
-        </template>
-        <span x-show="c.status === 'draft' || c.revenue === null || c.revenue === undefined" class="text-gray-400 dark:text-neutral-500">—</span>
-      </td>
       <td class="px-3 py-3 whitespace-nowrap text-end">
         {{ dropdown(trigger="ellipsis-vertical", width="medium", items=[
           { label: "Review and send", icon: "send", attrs: 'x-show="c.status === \'draft\'" @click="window.location.href = href(c)"' },
@@ -102,7 +99,7 @@
 
   {# No matches for the search or filters #}
   <tr x-show="filtered.length === 0" x-cloak>
-    <td colspan="5" class="hover:bg-transparent">
+    <td colspan="4" class="hover:bg-transparent">
       {{ empty_state(title="No campaigns match", description="Try a different name, or clear the filters.", icon="search-x", compact=true, wrap_card=false, secondary_action_text="Clear filters", secondary_action_attrs='@click="clearFilters()"') }}
     </td>
   </tr>
