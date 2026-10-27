@@ -1,0 +1,62 @@
+{# The three rows: status, title, one-line summary, and a button that opens the row's side panel. #}
+{% from "../../../ui-system/components/button.html" import button %}
+{% set tick %}<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>{% endset %}
+{% set bang %}<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>{% endset %}
+
+<div class="space-y-3">
+  {% for r in [
+    { key: "opens", title: "When they tap", icon: "mouse-pointer-click", add: "Change" },
+    { key: "msg", title: "Message", icon: "message-square-text", add: "Write" },
+    { key: "audience", title: "Who gets it", icon: "users", add: "Choose students" }
+  ] %}
+  <div class="flex items-start gap-x-4 p-5 bg-white rounded-xl shadow-sm dark:bg-neutral-800">
+    <span class="mt-0.5 shrink-0 size-9 inline-flex justify-center items-center rounded-full"
+          :class="{
+            'bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400': rows.{{ r.key }}[0] === 'done',
+            'bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-orange-400': rows.{{ r.key }}[0] === 'problem',
+            'bg-gray-100 text-gray-400 dark:bg-neutral-700 dark:text-neutral-500': rows.{{ r.key }}[0] === 'todo'
+          }">
+      <span x-show="rows.{{ r.key }}[0] === 'done'">{{ tick | safe }}</span>
+      <span x-show="rows.{{ r.key }}[0] === 'problem'" x-cloak>{{ bang | safe }}</span>
+      <i x-show="rows.{{ r.key }}[0] === 'todo'" data-lucide="{{ r.icon }}" class="size-4"></i>
+    </span>
+
+    <div class="min-w-0 flex-1">
+      <p class="text-sm font-semibold text-gray-800 dark:text-neutral-100">{{ r.title }}</p>
+
+      {% if r.key == "opens" %}
+        <div class="mt-1 text-sm">
+          <p class="truncate text-gray-800 dark:text-neutral-200" x-text="opensTitle"></p>
+          <p class="text-gray-500 dark:text-neutral-400" x-text="opensMeta"></p>
+        </div>
+      {% elif r.key == "msg" %}
+        <div x-show="rows.msg[0] === 'done'" class="mt-1 flex items-start gap-x-3">
+          <div class="min-w-0 flex-1 text-sm">
+            <p class="truncate text-gray-800 dark:text-neutral-200" x-text="msg.title"></p>
+            <p class="line-clamp-2 text-gray-500 dark:text-neutral-400" x-text="msg.message"></p>
+          </div>
+          <img x-show="msg.image" :src="msg.image && msg.image.url" alt="" class="shrink-0 w-16 aspect-[2/1] object-cover rounded-md">
+        </div>
+      {% else %}
+        <div x-show="rows.audience[0] === 'done'" class="mt-1 text-sm">
+          <p class="font-medium text-gray-800 dark:text-neutral-100" x-text="'≈ ' + pnNum(estimate) + ' students · ' + pnNum(withApp(estimate)) + ' have the app'"></p>
+          <p class="mt-0.5 line-clamp-2 text-gray-500 dark:text-neutral-400" x-text="audienceText"></p>
+        </div>
+      {% endif %}
+
+      <p x-show="rows.{{ r.key }}[0] !== 'done'" class="mt-1 text-sm"
+         :class="rows.{{ r.key }}[0] === 'problem' ? 'text-orange-700 dark:text-orange-400' : 'text-gray-500 dark:text-neutral-400'"
+         x-text="rows.{{ r.key }}[1]"></p>
+    </div>
+
+    <div class="shrink-0">
+      {% if r.key == "opens" %}
+        {{ button(text="Change", variant="secondary", size="sm", extra_attrs='@click="open(\'opens\')"') }}
+      {% else %}
+        <span x-show="rows.{{ r.key }}[0] === 'todo'">{{ button(text=r.add, variant="secondary", size="sm", extra_attrs='@click="open(\'' ~ r.key ~ '\')"') }}</span>
+        <span x-show="rows.{{ r.key }}[0] !== 'todo'" x-cloak>{{ button(text="Edit", variant="secondary", size="sm", extra_attrs='@click="open(\'' ~ r.key ~ '\')"') }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
