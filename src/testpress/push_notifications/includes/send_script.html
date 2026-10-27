@@ -1,8 +1,8 @@
 <script>
   window.PN_PROTO = [
-    { name: 'Start', states: [['blank', 'New notification'], ['youtube', 'YouTube video (ready)'], ['content', 'Live class (ready)'], ['template', 'From a template']] },
-    { name: '“Opens when tapped” field', states: [['pick-root', 'Clicked the field'], ['pick-products', 'Products'], ['pick-course', 'Inside a course'], ['pick-chapter', 'Inside a chapter'], ['pick-search', 'Typed a search'], ['pick-link', 'Pasted a YouTube link'], ['pick-bad', 'Typed something not found']] },
-    { name: 'Other', states: [['edit-audience', 'Who gets it'], ['no-access', 'Some students can’t open it'], ['no-match', 'No students match']] },
+    { name: 'Start', states: [['blank', 'New notification'], ['youtube', 'YouTube video (ready)'], ['product', 'Product (ready)'], ['template', 'From a template']] },
+    { name: '“Opens when tapped” field', states: [['pick-root', 'Clicked the field'], ['pick-products', 'Products'], ['pick-search', 'Typed a search'], ['pick-link-empty', 'A link (empty)'], ['pick-link', 'A link: pasted YouTube'], ['pick-bad', 'Typed something not found']] },
+    { name: 'Other', states: [['edit-audience', 'Who gets it'], ['no-match', 'No students match']] },
     { name: 'Sending', states: [['confirm', 'Confirm send'], ['no-app', 'Nobody has the app'], ['send-failed', 'Sending failed']] },
   ];
   window.PN_PROTO_DEFAULT = 'blank';
@@ -11,23 +11,36 @@
   const PN_YT = 'https://www.youtube.com/watch?v=k3Xq2-thermo';
   const PN_TREE = PN.courseTree;
   const PN_ACCESS = Object.fromEntries(PN_TREE.map(c => [c.id, c.access]));
-  // Everything that can be opened, flat, each with the path shown under it
+  // Everything that can be opened, flat. Chapters can hold sub-chapters at any depth; `anc` lists every course and
+  // chapter above an item, so a search can be limited to whatever you're inside.
   const PN_INDEX = [];
-  PN.products.forEach(p => PN_INDEX.push({ id: 'p-' + p.value, type: 'product', label: p.label, meta: 'Product · ' + p.meta, image: p.image, path: ['Products', p.label] }));
-  PN_TREE.forEach(c => {
-    PN_INDEX.push({ id: 'c-' + c.id, type: 'course', label: c.label, meta: 'Course · ' + c.access.toLocaleString('en-IN') + ' students have access', image: c.image, course: c.id, path: [c.label] });
-    c.chapters.forEach(ch => {
-      PN_INDEX.push({ id: 'ch-' + ch.id, type: 'chapter', label: ch.label, meta: 'Chapter · ' + c.label, image: c.image, course: c.id, chapter: ch.id, path: [c.label, ch.label] });
-      ch.items.forEach(it => PN_INDEX.push({ ...it, type: 'content', meta: PN.kinds[it.kind].label + ' · ' + (it.when || c.label + ' › ' + ch.label.split(' · ')[0]), image: it.image || null, course: c.id, chapter: ch.id, path: [c.label, ch.label.split(' · ')[0], it.label] }));
+  const PN_NODES = {};
+  const pnShort = (l) => l.split(' · ')[0];
+  const pnCount = (n) => (n.items || []).length + (n.chapters || []).reduce((t, c) => t + pnCount(c), 0);
+  PN.products.forEach(p => PN_INDEX.push({ id: 'p-' + p.value, type: 'product', label: p.label, hint: p.meta, meta: 'Product · ' + p.meta, image: p.image, path: ['Products', p.label] }));
+  const pnWalk = (node, course, anc, path) => {
+    (node.chapters || []).forEach(ch => {
+      const cpath = [...path, ch.label], canc = [...anc, ch.id];
+      PN_NODES[ch.id] = { ...ch, kind: 'chapter', course };
+      PN_INDEX.push({ id: 'ch-' + ch.id, type: 'chapter', label: ch.label, hint: pnCount(ch) + ' items', meta: 'Chapter · ' + path.map(pnShort).join(' › '), image: PN_NODES[course].image, course, anc, path: cpath.map(pnShort) });
+      pnWalk(ch, course, canc, cpath);
     });
+    (node.items || []).forEach(it => PN_INDEX.push({ ...it, type: 'content', course, anc, hint: it.when || PN.kinds[it.kind].label,
+      meta: PN.kinds[it.kind].label + ' · ' + (it.when || path.map(pnShort).join(' › ')), image: it.image || null, path: [...path.map(pnShort), it.label] }));
+  };
+  // Courses, chapters and content are left out for now; products and links only
+  if (PN.pickCourses) PN_TREE.forEach(c => {
+    PN_NODES[c.id] = { ...c, kind: 'course', course: c.id };
+    PN_INDEX.push({ id: 'c-' + c.id, type: 'course', label: c.label, hint: c.access.toLocaleString('en-IN') + ' students', meta: 'Course · ' + c.access.toLocaleString('en-IN') + ' students have access', image: c.image, course: c.id, anc: [], path: [c.label] });
+    pnWalk(c, c.id, [c.id], [c.label]);
   });
   const pnFind = (id) => pnCopy(PN_INDEX.find(x => x.id === id));
   const pnIsUrl = (u) => /^(https?:\/\/)?[^\s.]+\.[^\s]{2,}$/i.test((u || '').trim());
   const pnLink = (u) => {
     u = (u || '').trim();
-    if (/youtu\.?be/i.test(u)) return { type: 'link', site: 'youtube', label: PN.links.youtube.title, meta: 'YouTube · opens in the YouTube app', image: PN.links.youtube.image, url: u, path: ['YouTube', PN.links.youtube.title] };
+    if (/youtu\.?be/i.test(u)) return { type: 'link', site: 'youtube', label: PN.links.youtube.title, hint: 'YouTube', meta: 'YouTube · opens in the YouTube app', image: PN.links.youtube.image, url: u, path: ['YouTube', PN.links.youtube.title] };
     const site = u.replace(/^https?:\/\//, '').split('/')[0];
-    return { type: 'link', site, label: site, meta: 'Website · opens in the browser', image: PN.links.web.image, title: PN.links.web.title, url: u, path: [site] };
+    return { type: 'link', site, label: site, hint: 'Website', meta: 'Website · opens in the browser', image: PN.links.web.image, title: PN.links.web.title, url: u, path: [site] };
   };
   // Words to start from for what it opens: [title, message]
   const pnWords = (o) => {
@@ -57,7 +70,7 @@
     return a.match === 'all' && rows.length > 1 ? Math.round(base / 3.4) : base;
   };
   const PN_HOME = { type: 'home', label: 'App home', meta: 'Opens the app’s home screen', path: [] };
-  const pnPicker = () => ({ open: false, q: '', level: 'root', course: null, chapter: null, index: 0 });
+  const pnPicker = () => ({ open: false, q: '', level: 'root', stack: [], index: 0 });
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('pushSend', () => ({
@@ -81,14 +94,13 @@
       init() {
         const s = pnState() || 'blank';
         if (['youtube', 'confirm', 'no-app', 'send-failed', 'edit-audience'].includes(s) || pnParam('again')) this.loadYoutube();
-        if (['content', 'no-access'].includes(s)) this.loadLive();
+        if (s === 'product') this.loadProduct();
         if (s === 'template' || pnParam('template')) this.applyTemplate(this.templates.find(t => t.id === Number(pnParam('template') || 2)), false);
-        if (s === 'no-access') this.audience = { mode: 'all', match: 'any', rows: [] };
         if (s === 'no-match') this.audience = { mode: 'some', match: 'all', rows: [{ id: 1, type: 'batch', values: ['repeaters'] }, { id: 2, type: 'product', values: ['neet-crash'] }] };
         if (s === 'no-app') this.fail.noApp = true;
         if (s === 'send-failed') this.fail.send = true;
-        const picker = { 'pick-root': () => {}, 'pick-products': () => this.goLevel('products'), 'pick-course': () => this.goCourse('phy-11'), 'pick-chapter': () => { this.goCourse('phy-11'); this.goChapter('phy-4'); },
-          'pick-search': () => { this.pk.q = 'thermo'; }, 'pick-link': () => { this.pk.q = PN_YT; }, 'pick-bad': () => { this.pk.q = 'organic chemistry crash'; } }[s];
+        const picker = { 'pick-root': () => {}, 'pick-products': () => this.goLevel('products'), 'pick-search': () => { this.pk.q = 'neet'; },
+          'pick-link-empty': () => this.goLevel('link'), 'pick-link': () => { this.goLevel('link'); this.pk.q = PN_YT; }, 'pick-bad': () => { this.pk.q = 'organic chemistry crash'; } }[s];
         if (picker) setTimeout(() => { this.open('msg'); setTimeout(() => { this.pk.open = true; picker(); pnIcons(); }, 350); }, 300);
         const panels = { 'edit-audience': 'audience', 'no-match': 'audience' };
         if (panels[s]) setTimeout(() => this.open(panels[s]), 400);
@@ -100,10 +112,10 @@
         this.msg = { opens: o, title: o.label, message: 'New video on our YouTube channel. Watch it before Saturday’s test.', image: { name: 'YouTube thumbnail', url: o.image, from: 'the video' }, auto: { title: true, message: false, image: true } };
         this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['phy-11'] }] };
       },
-      loadLive() {
-        const o = pnFind('l-doubt'), w = pnWords(o);
-        this.msg = { opens: o, title: w[0], message: w[1], image: null, auto: { title: true, message: true, image: false } };
-        this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'course', values: ['phy-11'] }] };
+      loadProduct() {
+        const o = pnFind('p-neet-crash'), w = pnWords(o);
+        this.msg = { opens: o, title: w[0], message: w[1], image: { name: o.label + ' – picture', url: o.image, from: 'the product' }, auto: { title: true, message: true, image: true } };
+        this.audience = { mode: 'some', match: 'any', rows: [{ id: 1, type: 'batch', values: ['neet-a', 'neet-b'] }] };
       },
 
       // ----- Side panels -----
@@ -138,61 +150,70 @@
       },
 
       // ----- "Opens when tapped": click to browse (Products › … / Courses › course › chapter › content), type to search, paste a link -----
-      goLevel(level) { this.pk.level = level; this.pk.q = ''; this.pk.index = 0; pnIcons(); },
-      goCourse(id) { this.pk.course = id; this.pk.chapter = null; this.goLevel('course'); },
-      goChapter(id) { this.pk.chapter = id; this.goLevel('chapter'); },
+      goLevel(level) { this.pk.level = level; this.pk.q = ''; this.pk.index = 0; this.$nextTick(() => this.$refs.pkin && this.$refs.pkin.focus()); pnIcons(); },
+      goNode(id) { this.pk.stack.push(id); this.goLevel('node'); },
+      goCourse(id) { this.pk.stack = [id]; this.goLevel('node'); },
       up() {
         const l = this.pk.level;
-        if (l === 'chapter') this.goLevel('course');
-        else if (l === 'course') this.goLevel('courses');
+        if (l === 'node') { this.pk.stack.pop(); this.goLevel(this.pk.stack.length ? 'node' : 'courses'); }
         else if (l !== 'root') this.goLevel('root');
       },
-      get pkCourse() { return PN_TREE.find(c => c.id === this.pk.course) || { chapters: [] }; },
-      get pkChapter() { return this.pkCourse.chapters.find(c => c.id === this.pk.chapter) || { items: [], label: '' }; },
+      get pkNode() { return PN_NODES[this.pk.stack[this.pk.stack.length - 1]] || { chapters: [], items: [] }; },
       // Where you are while browsing, shown in the field
       get crumbs() {
         const l = this.pk.level;
         if (l === 'products') return ['Products'];
         if (l === 'courses') return ['Courses'];
-        if (l === 'course') return [this.pkCourse.label];
-        if (l === 'chapter') return [this.pkCourse.label, this.pkChapter.label.split(' · ')[0]];
+        if (l === 'link') return ['A link'];
+        if (l === 'node') return this.pk.stack.map(id => pnShort(PN_NODES[id].label));
         return [];
+      },
+      get pkHeading() {
+        const l = this.pk.level, q = this.pk.q.trim();
+        if (l === 'root') return q ? 'Results' : 'What should it open?';
+        if (l === 'products') return 'Products';
+        if (l === 'courses') return 'Courses';
+        if (l === 'link') return 'A YouTube video or any website';
+        return q ? 'In ' + this.pkNode.label : this.pkNode.label;
       },
       // Dropdown rows: { head } group heading, { item } to pick, { go } to step into, { hint } a note
       get pkRows() {
         const q = this.pk.q.trim().toLowerCase(), l = this.pk.level, rows = [];
         const match = (x) => !q || (x.label + ' ' + (x.meta || '')).toLowerCase().includes(q);
-        if (l === 'root' && q && pnIsUrl(this.pk.q)) return [{ head: 'Link' }, { item: pnLink(this.pk.q) }];
+        if (l === 'link') return pnIsUrl(this.pk.q) ? [{ item: pnLink(this.pk.q) }] : [{ hint: q ? 'That isn’t a full link yet. Copy it from the browser’s address bar.' : 'Paste the link, like https://youtube.com/watch?v=…' }];
+        // A link pasted into search still works
+        if (l === 'root' && q && pnIsUrl(this.pk.q)) return [{ item: pnLink(this.pk.q) }];
         if (l === 'root' && !q) return [
-          { go: 'products', label: 'Products', meta: 'The whole store, or one product', icon: 'shopping-bag' },
-          { go: 'courses', label: 'Courses', meta: 'A course, chapter, video, test, exam, notes or live class', icon: 'book-open' },
-          { hint: 'Or paste a link — a YouTube video or any website' },
+          { go: 'products', label: 'Products', side: 'Store or one product', icon: 'shopping-bag' },
+          { go: 'link', label: 'A link', side: 'YouTube or any website', icon: 'link' },
         ];
         if (l === 'root') {
-          [['product', 'Products'], ['course', 'Courses'], ['chapter', 'Chapters'], ['content', 'Content']].forEach(([t, h]) => {
+          [['product', 'Products']].concat(PN.pickCourses ? [['course', 'Courses'], ['chapter', 'Chapters'], ['content', 'Content']] : []).forEach(([t, h]) => {
             const found = PN_INDEX.filter(x => x.type === t && match(x)).slice(0, 5);
-            if (found.length) rows.push({ head: h }, ...found.map(x => ({ item: x })));
+            if (found.length) rows.push({ head: h }, ...found.map(x => ({ item: x, sub: x.path.slice(0, -1).join(' › ') || x.hint })));
           });
-          if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '”. To open a website, paste its full address.' });
+          if (!rows.length) rows.push({ hint: 'No product called “' + this.pk.q.trim() + '”. For a website or YouTube video, choose A link.' });
           return rows;
         }
         if (l === 'products') {
-          if (!q || 'all products store'.includes(q)) rows.push({ item: { id: 'store', type: 'store', label: 'All products (store)', meta: 'Opens your course store', image: null, path: ['All products'] } });
+          if (!q || 'all products store'.includes(q)) rows.push({ item: { id: 'store', type: 'store', label: 'All products (store)', hint: 'Store', meta: 'Opens your course store', image: null, path: ['All products'] } });
           PN_INDEX.filter(x => x.type === 'product' && match(x)).forEach(x => rows.push({ item: x }));
         }
-        if (l === 'courses') PN_TREE.filter(c => match(c)).forEach(c => rows.push({ go: 'course', id: c.id, label: c.label, meta: c.access.toLocaleString('en-IN') + ' students have access', icon: 'book-open' }));
-        if (l === 'course') {
-          const c = this.pkCourse;
+        if (l === 'courses') PN_TREE.filter(c => match(c)).forEach(c => rows.push({ go: 'node', id: c.id, label: c.label, side: c.access.toLocaleString('en-IN') + ' students', icon: 'book-open' }));
+        if (l === 'node') {
+          const n = this.pkNode;
           if (!q) {
-            rows.push({ item: pnFind('c-' + c.id), whole: 'Use the whole course' });
-            const up = PN_INDEX.filter(x => x.course === c.id && x.upcoming);
-            if (up.length) rows.push({ head: 'Upcoming' }, ...up.map(x => ({ item: x })));
-            rows.push({ head: 'Chapters' }, ...c.chapters.map(ch => ({ go: 'chapter', id: ch.id, label: ch.label, meta: ch.items.length + (ch.items.length === 1 ? ' item' : ' items'), icon: 'folder' })));
-          } else PN_INDEX.filter(x => x.course === c.id && x.type !== 'course' && match(x)).forEach(x => rows.push({ item: x }));
-        }
-        if (l === 'chapter') {
-          if (!q) rows.push({ item: pnFind('ch-' + this.pk.chapter), whole: 'Use the whole chapter' });
-          PN_INDEX.filter(x => x.chapter === this.pk.chapter && x.type === 'content' && match(x)).forEach(x => rows.push({ item: x }));
+            rows.push({ item: pnFind((n.kind === 'course' ? 'c-' : 'ch-') + n.id), whole: n.kind === 'course' ? 'Use the whole course' : 'Use the whole chapter' });
+            if (n.kind === 'course') {
+              const up = PN_INDEX.filter(x => x.course === n.id && x.upcoming);
+              if (up.length) rows.push({ head: 'Upcoming' }, ...up.map(x => ({ item: x })));
+            }
+            if ((n.chapters || []).length) rows.push({ head: n.kind === 'course' ? 'Chapters' : 'Sub-chapters' }, ...n.chapters.map(ch => ({ go: 'node', id: ch.id, label: ch.label, side: pnCount(ch) + ' items', icon: 'folder' })));
+            const items = PN_INDEX.filter(x => x.type === 'content' && x.anc[x.anc.length - 1] === n.id);
+            if (items.length) rows.push({ head: 'In this ' + (n.kind === 'course' ? 'course' : 'chapter') }, ...items.map(x => ({ item: x })));
+          } else {
+            PN_INDEX.filter(x => (x.anc || []).includes(n.id) && match(x)).forEach(x => rows.push({ item: x, sub: x.path.slice(this.pk.stack.length, -1).join(' › ') || x.hint }));
+          }
         }
         if (!rows.length) rows.push({ hint: 'Nothing called “' + this.pk.q.trim() + '” here' });
         return rows;
@@ -202,8 +223,7 @@
       isActive(r) { const c = this.pkChoices[this.pk.index]; return !!c && this.rowKey(c) === this.rowKey(r); },
       isPicked(o) { const p = this.d.opens; return !!o && !!p && p.type !== 'home' && (p.id ? p.id === o.id : p.url === o.url); },
       choose(r) {
-        if (r.go === 'course') return this.goCourse(r.id);
-        if (r.go === 'chapter') return this.goChapter(r.id);
+        if (r.go === 'node') return this.goNode(r.id);
         if (r.go) return this.goLevel(r.go);
         this.pick(r.item);
       },
