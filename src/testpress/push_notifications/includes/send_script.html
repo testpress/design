@@ -3,7 +3,7 @@
     { name: 'Start', states: [['blank', 'Add template'], ['template', 'Edit a template'], ['youtube', 'YouTube video (ready)'], ['product', 'Product (ready)']] },
     { name: '“Opens when tapped” field', states: [['pick-root', 'Clicked the field'], ['pick-products', 'Products'], ['pick-search', 'Typed a search'], ['pick-link-empty', 'A link (empty)'], ['pick-link', 'A link: pasted YouTube'], ['pick-bad', 'Typed something not found']] },
     { name: 'Other', states: [['edit-audience', 'Who gets it']] },
-    { name: 'Sending', states: [['confirm', 'Confirm send'], ['send-failed', 'Sending failed']] },
+    { name: 'Sending', states: [['send-failed', 'Sending failed']] },
     { name: 'Name', states: [['save-template', 'Renaming the template']] },
   ];
   window.PN_PROTO_DEFAULT = 'blank';
@@ -115,7 +115,6 @@
       linkMeta: {},     // fetched details of pasted links, by address
       device: 'android',
       sending: false,
-      sendError: false,
       tplPick: null,
       // Template mode: this page creates or edits a template (everything but sending)
       tplMode: true,
@@ -130,7 +129,7 @@
 
       init() {
         const s = pnState() || 'blank';
-        if (['youtube', 'confirm', 'no-app', 'send-failed', 'edit-audience'].includes(s) || pnParam('again')) this.loadYoutube();
+        if (['youtube', 'send-failed', 'edit-audience'].includes(s) || pnParam('again')) this.loadYoutube();
         if (s === 'product') this.loadProduct();
         const tplArg = Number(pnParam('template')) || (s === 'template' ? 2 : 0);
         if (tplArg) { const t = this.templates.find(x => x.id === tplArg); this.applyTemplate(t, false); this.tplId = t.id; this.tplName = t.name; }
@@ -143,7 +142,6 @@
         if (picker) setTimeout(() => { this.open('msg'); setTimeout(() => { this.pk.open = true; picker(); pnIcons(); }, 350); }, 300);
         const panels = { 'edit-audience': 'audience', 'no-match': 'audience' };
         if (panels[s]) setTimeout(() => this.open(panels[s]), 400);
-        if (['confirm', 'no-app', 'send-failed'].includes(s)) setTimeout(() => this.openConfirm(), 400);
         this.$watch('pk.q', (q) => {
           this.pk.index = 0; pnIcons();
           clearTimeout(this._linkTimer);
@@ -384,15 +382,14 @@
         pnToast(this.tplId ? 'Template updated' : 'Template saved', '“' + this.displayName + '”');
         setTimeout(() => { window.location.href = '{{ "/testpress/push_notifications/" | url }}?state=saved'; }, 900);
       },
-      saveAndSend() { this.openConfirm(); },
+      saveAndSend() { this.send(); },
 
       // ----- Send -----
-      openConfirm() { this.sendError = false; this.$dispatch('open-modal-confirm-send'); },
       send() {
         if (this.sending) return; // one click = one send
-        this.sending = true; this.sendError = false;
+        this.sending = true;
         setTimeout(() => {
-          if (this.fail.send) { this.fail.send = false; this.sending = false; this.sendError = true; return; }
+          if (this.fail.send) { this.fail.send = false; this.sending = false; pnToast('Couldn’t send', 'Nothing was sent. Check your connection and try again.', 'error'); return; }
           window.location.href = '{{ "/testpress/push_notifications/" | url }}?state=sent';
         }, 1200);
       },
