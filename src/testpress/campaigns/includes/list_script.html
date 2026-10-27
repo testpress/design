@@ -1,10 +1,34 @@
 <script>
   window.CMP_PROTO = [
     { name: 'Campaigns list', states: [['list', 'With campaigns'], ['intro', 'First visit (no campaigns)'], ['loading', 'Loading'], ['error', 'Couldn’t load']] },
-    { name: 'Search and filters', states: [['no-results', 'No matches'], ['only-drafts', 'Nothing sent yet (only drafts)']] },
+    { name: 'Search and filters', states: [['many', 'Lots of campaigns (100+)'], ['no-results', 'No matches'], ['only-drafts', 'Nothing sent yet (only drafts)']] },
     { name: 'After an action', states: [['duplicated', 'Duplicated a campaign'], ['deleted', 'Deleted a draft']] },
   ];
   window.CMP_PROTO_DEFAULT = 'list';
+
+  // How many days ago each sample campaign went out (for the period filter)
+  const CMP_DAYS = { 1: 3, 9: 5, 2: 7, 3: 15, 4: 22, 5: 60, 6: 0, 10: 0 };
+  // Prototype: a year of campaigns, to see the page with 100+
+  const cmpMany = () => {
+    const promos = ['NEET 2027 Crash Course', 'JEE Main Revision Batch', 'All India Mock Test Series', 'Biology Handwritten Notes'];
+    const news = [['live', 'Live class · '], ['exam', 'Exam · '], ['chapter', 'Chapter · '], ['video', 'Video · '], ['home', ''], ['link', '']];
+    const topics = ['Thermodynamics', 'Organic Chemistry', 'Human Physiology', 'Kinematics', 'Electrostatics', 'Genetics', 'Optics', 'Coordination Compounds'];
+    const out = [];
+    for (let i = 0; i < 104; i++) {
+      const days = 1 + Math.floor(i * 3.4), promo = i % 3 === 0, n = 1500 + (i * 977) % 16000, got = Math.round(n * 0.86), clicked = Math.round(got * (0.04 + (i % 7) / 40));
+      const date = new Date(2026, 9, 27 - days).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const t = topics[i % topics.length], k = news[i % news.length];
+      const p = promos[i % promos.length], bought = Math.round(clicked * (0.02 + (i % 5) / 100));
+      out.push(promo
+        ? { id: 1000 + i, name: p + ' – ' + ['offer', 'last seats', 'new batch', 'weekend sale'][i % 4], status: 'sent', channels: i % 2 ? ['push'] : ['push', 'email'], dest: { type: 'product', label: p, kind: 'product' },
+            sentShort: date, sentAt: date, days, targeted: n, received: got, unique: clicked, clicks: Math.round(clicked * 1.3), purchases: bought, revenue: bought * [4999, 3499, 999, 499][i % 4] }
+        : { id: 1000 + i, name: (k[0] === 'home' ? 'Notice: ' : k[0] === 'link' ? 'Read: ' : '') + t + (k[0] === 'live' ? ' – live class' : k[0] === 'exam' ? ' – mock test' : ''), status: 'sent', channels: i % 2 ? ['push'] : ['push', 'email'],
+            dest: k[0] === 'home' ? { type: 'home', label: 'App home' } : k[0] === 'link' ? { type: 'link', label: 'brilliantpala.org/blog' } : { type: 'item', kind: k[0], label: t },
+            sentShort: date, sentAt: date, days, targeted: n, received: got, unique: clicked, clicks: Math.round(clicked * 1.2), purchases: null, revenue: null });
+    }
+    for (let i = 0; i < 9; i++) out.push({ id: 2000 + i, name: topics[i % topics.length] + ' – draft', status: 'draft', channels: ['push'], missing: i % 2 ? ['Who gets it'] : [], dest: { type: 'home', label: 'App home' }, edited: (i + 1) + ' days ago', estimate: 2000 + i * 310 });
+    return out;
+  };
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('campaignList', () => ({
@@ -19,6 +43,8 @@
         const s = cmpState() || 'list';
         if (s === 'no-results') this.search = 'scholarship';
         if (s === 'only-drafts') this.campaigns = this.campaigns.filter(c => c.status === 'draft');
+        this.campaigns.forEach(c => { if (c.days === undefined) c.days = CMP_DAYS[c.id] ?? 0; });
+        if (s === 'many') this.campaigns = this.campaigns.concat(cmpMany());
         if (s === 'loading') return;
         setTimeout(() => {
           this.view = s === 'intro' ? 'intro' : s === 'error' ? 'error' : 'list';
@@ -31,9 +57,10 @@
       retry() { this.view = 'loading'; setTimeout(() => { this.view = 'list'; cmpIcons(); }, 700); },
 
       // ----- What's shown: needs you, then sent campaigns by purpose -----
-      limit: 3,
-      more: { product: false, announce: false },
-      showLegacy: false,
+      // A section starts with its 3 latest; Show more adds 10 at a time
+      count: { attention: 3, product: 3, announce: 3 },
+      sortBy: { product: 'newest', announce: 'newest' },
+      period: 30,
       get onlyPurpose() { return this.purposeFilter; },
       get filtered() {
         const q = this.search.trim().toLowerCase();
@@ -42,20 +69,25 @@
           (!this.purposeFilter || cmpPurposeKey(c.dest) === this.purposeFilter) &&
           (!this.channel || c.channels.includes(this.channel)));
       },
-      get attention() { return this.filtered.filter(c => ['draft', 'sending', 'failed'].includes(c.status)); },
-      get sent() { return this.filtered.filter(c => c.status === 'sent' && !c.legacy); },
-      get promotions() { return this.sent.filter(c => cmpPurposeKey(c.dest) === 'product'); },
-      get announcements() { return this.sent.filter(c => cmpPurposeKey(c.dest) === 'announce'); },
-      get legacy() { return this.filtered.filter(c => c.legacy); },
-      shown(list, key) { return this.more[key] ? list : list.slice(0, this.limit); },
-      toggle(key) { this.more[key] = !this.more[key]; cmpIcons(); },
+      get attention() { const o = { failed: 0, sending: 1, draft: 2 }; return this.filtered.filter(c => c.status in o).sort((a, b) => o[a.status] - o[b.status]); },
+      get sent() { return this.filtered.filter(c => c.status === 'sent' && (!this.period || c.days <= this.period)); },
+      sorted(list, key) {
+        const by = { newest: (a, b) => a.days - b.days, revenue: (a, b) => (b.revenue || 0) - (a.revenue || 0), clicked: (a, b) => (b.unique || 0) - (a.unique || 0) }[this.sortBy[key]];
+        return list.slice().sort(by);
+      },
+      get promotions() { return this.sorted(this.sent.filter(c => cmpPurposeKey(c.dest) === 'product'), 'product'); },
+      get announcements() { return this.sorted(this.sent.filter(c => cmpPurposeKey(c.dest) === 'announce'), 'announce'); },
+      shown(list, key) { return list.slice(0, this.count[key]); },
+      showMore(key, all) { this.count[key] = all ? 9999 : this.count[key] + 10; cmpIcons(); },
+      showFewer(key) { this.count[key] = 3; cmpIcons(); },
+      get periodLabel() { return ({ 30: 'last 30 days', 90: 'last 3 months', 0: 'all time' })[this.period]; },
       get promoTotals() { const l = this.promotions; return { count: l.length, revenue: l.reduce((t, c) => t + (c.revenue || 0), 0), purchases: l.reduce((t, c) => t + (c.purchases || 0), 0) }; },
       get announceTotals() { const l = this.announcements; return { count: l.length, clicked: l.reduce((t, c) => t + (c.unique || 0), 0) }; },
-      get filtersOn() { return !!(this.search || this.channel || this.purposeFilter); },
+      get filtersOn() { return !!(this.search || this.channel || this.purposeFilter || this.period !== 30); },
       clearFilters() {
-        this.search = ''; this.channel = ''; this.purposeFilter = '';
+        this.search = ''; this.channel = ''; this.purposeFilter = ''; this.period = 30;
         // reset the ui-system selects
-        this.$root.querySelectorAll('[data-filter] > div').forEach(el => el.dispatchEvent(new CustomEvent('set-selected-values', { detail: 'all' })));
+        this.$root.querySelectorAll('[data-filter]').forEach(f => f.firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: f.dataset.reset || 'all' })));
       },
 
       // ----- One campaign -----
@@ -88,7 +120,7 @@
       editHref(c) { return '{{ "/testpress/campaigns/new/" | url }}?id=' + c.id; },
 
       duplicate(c) {
-        const copy = { ...cmpCopy(c), id: Date.now(), name: c.name + ' (copy)', status: 'draft', edited: 'Just now', missing: [], estimate: c.targeted || c.estimate, warning: null, legacy: false };
+        const copy = { ...cmpCopy(c), id: Date.now(), name: c.name + ' (copy)', status: 'draft', edited: 'Just now', missing: [], estimate: c.targeted || c.estimate, warning: null };
         this.campaigns.unshift(copy);
         cmpToast('Copy saved as a draft', 'Audience, message and link were copied. Nothing is sent yet.');
       },

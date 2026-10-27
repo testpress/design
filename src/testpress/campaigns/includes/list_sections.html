@@ -1,11 +1,12 @@
 {# Sent campaigns, split by purpose so each shows what matters for it:
    - Product promotions: product picture, then reached → clicked → bought, and revenue
    - Announcements and content: what it opened, and how many clicked
-   Each section shows its latest few; "Show all" opens the rest. Old pushes sit behind a quiet link at the end. #}
+   Each section shows its latest few; "Show more" adds the next ten. #}
 {% from "../../../ui-system/components/button.html" import button %}
 {% from "../../../ui-system/components/dropdown.html" import dropdown %}
 {% from "../../../ui-system/components/progress.html" import progress %}
 {% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/select.html" import select %}
 {% set head = "flex flex-wrap items-end justify-between gap-x-4 gap-y-1 mb-3" %}
 {% set h2 = "text-base font-semibold text-gray-800 dark:text-neutral-100" %}
 {% set total = "text-sm text-gray-500 dark:text-neutral-400" %}
@@ -37,8 +38,13 @@
   {# ---------------- Product promotions ---------------- #}
   <section x-show="!onlyPurpose || onlyPurpose === 'product'">
     <div class="{{ head }}">
-      <h2 class="{{ h2 }}">Product promotions</h2>
-      <p class="{{ total }}" x-show="promoTotals.count"><span class="font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpMoney(promoTotals.revenue)"></span> from <span x-text="promoTotals.purchases"></span> purchases · last 30 days</p>
+      <div>
+        <h2 class="{{ h2 }}">Product promotions</h2>
+        <p class="mt-0.5 {{ total }}" x-show="promoTotals.count"><span class="font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpMoney(promoTotals.revenue)"></span> from <span x-text="cmpNum(promoTotals.purchases)"></span> purchases · <span x-text="promotions.length + (promotions.length === 1 ? ' campaign' : ' campaigns')"></span> · <span x-text="periodLabel"></span></p>
+      </div>
+      <div x-show="promotions.length > 1" class="w-44" @change="sortBy.product = $event.target.value; count.product = 3">
+        {{ select(name="sort_product", selected_value="newest", options=[{value: "newest", label: "Newest first"}, {value: "revenue", label: "Most revenue"}, {value: "clicked", label: "Most clicked"}], padding_class="py-1.5 px-3 pe-9") }}
+      </div>
     </div>
     <div class="space-y-3">
       <template x-for="c in shown(promotions, 'product')" :key="c.id">
@@ -67,14 +73,19 @@
         <div>{{ empty_state(title="No product promotions yet", description="Promote a course, test series or the store, and see what it brings in.", icon="shopping-bag", compact=true, extra_classes="border-0 shadow-sm", secondary_action_text="Promote a product", secondary_action_attrs='@click="window.location.href = newHref"') }}</div>
       </template>
     </div>
-    <div x-show="promotions.length > limit" class="mt-3">{{ button(variant="link", size="sm", extra_attrs='@click="toggle(\'product\')" x-text="more.product ? \'Show fewer\' : \'Show all \' + promotions.length"') }}</div>
+    {% set key = "product" %}{% set list = "promotions" %}{% include "./list_more.html" %}
   </section>
 
   {# ---------------- Announcements and content ---------------- #}
   <section x-show="!onlyPurpose || onlyPurpose === 'announce'">
     <div class="{{ head }}">
-      <h2 class="{{ h2 }}">Announcements and content</h2>
-      <p class="{{ total }}" x-show="announceTotals.count"><span class="font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpNum(announceTotals.clicked)"></span> students clicked · last 30 days</p>
+      <div>
+        <h2 class="{{ h2 }}">Announcements and content</h2>
+        <p class="mt-0.5 {{ total }}" x-show="announceTotals.count"><span class="font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpNum(announceTotals.clicked)"></span> students clicked · <span x-text="announcements.length + (announcements.length === 1 ? ' campaign' : ' campaigns')"></span> · <span x-text="periodLabel"></span></p>
+      </div>
+      <div x-show="announcements.length > 1" class="w-44" @change="sortBy.announce = $event.target.value; count.announce = 3">
+        {{ select(name="sort_announce", selected_value="newest", options=[{value: "newest", label: "Newest first"}, {value: "clicked", label: "Most clicked"}], padding_class="py-1.5 px-3 pe-9") }}
+      </div>
     </div>
     <div class="space-y-3">
       <template x-for="c in shown(announcements, 'announce')" :key="c.id">
@@ -99,24 +110,7 @@
         <div>{{ empty_state(title="No announcements yet", description="Share news, a class or exam, a YouTube video or any link.", icon="megaphone", compact=true, extra_classes="border-0 shadow-sm", secondary_action_text="Share an announcement", secondary_action_attrs='@click="window.location.href = newHref"') }}</div>
       </template>
     </div>
-    <div x-show="announcements.length > limit" class="mt-3">{{ button(variant="link", size="sm", extra_attrs='@click="toggle(\'announce\')" x-text="more.announce ? \'Show fewer\' : \'Show all \' + announcements.length"') }}</div>
-  </section>
-
-  {# Old pushes: kept, but out of the way #}
-  <section x-show="legacy.length && !onlyPurpose">
-    <button type="button" @click="showLegacy = !showLegacy" class="inline-flex items-center gap-x-1.5 text-sm text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200">
-      <i data-lucide="history" class="size-4"></i>
-      <span x-text="legacy.length + (legacy.length === 1 ? ' push' : ' pushes') + ' sent before Campaigns'"></span>
-      <svg class="size-3.5 transition-transform" :class="showLegacy && 'rotate-180'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-    </button>
-    <div x-show="showLegacy" x-cloak class="mt-3 space-y-2">
-      <template x-for="c in legacy" :key="c.id">
-        <a :href="href(c)" class="flex items-center justify-between gap-x-4 px-4 py-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow dark:bg-neutral-800">
-          <span class="truncate text-sm text-gray-800 dark:text-neutral-200" x-text="c.name"></span>
-          <span class="shrink-0 text-xs text-gray-500 dark:text-neutral-400" x-text="c.sentShort + ' · results weren’t recorded'"></span>
-        </a>
-      </template>
-    </div>
+    {% set key = "announce" %}{% set list = "announcements" %}{% include "./list_more.html" %}
   </section>
 
   {# Search or filters match nothing #}
