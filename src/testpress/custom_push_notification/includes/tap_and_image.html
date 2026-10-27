@@ -1,7 +1,7 @@
 {# Added to the existing Notification Content section: what a tap opens, and an optional image.
    "When tapped, open" is one field, like the TPSentinel search: click to browse Products › and Courses › course ›
    chapter › … (any depth), or A link; type to search everything; leave empty for app home.
-   State lives in the section's `pushContent` (includes/tap_script.html); a choice fills Title, Summary and Image. #}
+   State lives in the section's `pushContent` (includes/tap_script.html); a choice fills only the Image. #}
 {% from "../../../ui-system/components/upload.html" import upload %}
 {% set label_cls = "block text-sm font-medium leading-6 text-gray-900" %}
 
@@ -10,18 +10,17 @@
   <label for="pk-input" class="block mb-2 text-sm font-medium leading-6 text-gray-900">When tapped, open</label>
 
   <div @click="$refs.pkin.focus(); pk.open = true"
-       class="relative flex flex-wrap items-center gap-1.5 min-h-[42px] ps-9 pe-3 py-1.5 bg-white border border-gray-200 rounded-lg cursor-text focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700">
-    <svg x-show="pk.level !== 'link'" class="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+       :class="opens.type !== 'home' && pk.level === 'root' && !pk.q ? 'ps-3' : 'ps-9'"
+       class="relative flex flex-wrap items-center gap-1.5 min-h-[42px] pe-16 py-1.5 bg-white border border-gray-200 rounded-lg cursor-pointer focus-within:border-primary-700 focus-within:ring-1 focus-within:ring-primary-700 dark:bg-neutral-800 dark:border-neutral-700">
+    <svg x-show="pk.level !== 'link' && !(opens.type !== 'home' && pk.level === 'root' && !pk.q)" class="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
     <svg x-show="pk.level === 'link'" class="absolute start-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
 
-    {# What's chosen #}
+    {# What's chosen, shown like a select's value (Preline advanced select): icon, name, where it lives #}
     <template x-if="opens.type !== 'home' && pk.level === 'root' && !pk.q">
-      <span class="inline-flex items-center gap-x-1.5 max-w-full py-1 ps-2 pe-1 rounded-md bg-primary-50 text-sm text-primary-800 dark:bg-primary-500/10 dark:text-primary-300">
-        <i :data-lucide="opensIcon(opens)" class="size-3.5 shrink-0"></i>
-        <span class="truncate" x-text="opens.path.join(' › ')"></span>
-        <button type="button" @click.stop="clearOpens()" aria-label="Clear" class="shrink-0 size-5 inline-flex justify-center items-center rounded hover:bg-primary-100 dark:hover:bg-primary-500/20">
-          <svg class="size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </button>
+      <span class="flex items-center gap-x-2 min-w-0 max-w-full">
+        <span class="shrink-0 inline-flex"><i :data-lucide="opensIcon(opens)" class="size-4 text-gray-500"></i></span>
+        <span class="truncate text-sm text-gray-800 dark:text-neutral-200" x-text="opens.label"></span>
+        <span x-show="opens.path.length > 1" class="truncate text-sm text-gray-400" x-text="opens.path.slice(0, -1).join(' › ')"></span>
       </span>
     </template>
 
@@ -32,6 +31,13 @@
       </span>
     </template>
 
+    <div class="absolute end-2.5 top-1/2 -translate-y-1/2 flex items-center gap-x-1">
+      <button type="button" x-show="opens.type !== 'home'" @click.stop="clearOpens()" aria-label="Clear"
+              class="size-6 inline-flex justify-center items-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-neutral-700">
+        <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+      <svg class="shrink-0 size-3.5 text-gray-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/></svg>
+    </div>
     <input x-ref="pkin" id="pk-input" type="search" autocomplete="off" spellcheck="false"
            x-model="pk.q" @focus="pk.open = true" @keydown="pkKeydown($event)"
            :placeholder="pk.level === 'link' ? 'https://' : pk.level !== 'root' ? 'Search' : (opens.type === 'home' ? 'Search a product, course or content' : '')"
@@ -40,7 +46,7 @@
   </div>
   <p x-show="opens.type === 'home'" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400">Leave empty to open the app’s home screen.</p>
   <p x-show="opens.type !== 'home'" class="mt-1.5 text-xs text-gray-500 dark:text-neutral-400" x-text="opensWhere(opens) + '.' + (accessCourse ? ' Only students with access to ' + accessCourse + ' can open it.' : '')"></p>
-  <p x-show="opens.type !== 'home' && filled" x-cloak class="mt-1 text-xs text-primary-700" x-text="(hasImage && auto.image ? 'Title, summary and image' : 'Title and summary') + ' filled from ' + fillSource + '. Change anything.'"></p>
+  <p x-show="opens.type !== 'home' && auto.image" x-cloak class="mt-1 text-xs text-primary-700" x-text="'Image filled from ' + fillSource + '. Replace or remove it if you like.'"></p>
 
   {# Dropdown: heading, then one-line rows (icon, name, hint) #}
   <div x-show="pk.open" x-cloak x-transition.opacity.duration.100ms
