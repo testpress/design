@@ -8,6 +8,42 @@
     'bio-notes': { name: 'Biology Handwritten Notes', price: 0, plans: 1, chapters: 38, image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&w=600&h=300&q=70' },
   };
   const pushInr = (n) => '₹' + Number(n).toLocaleString('en-IN');
+  const PUSH_IMG = (id) => 'https://images.unsplash.com/photo-' + id + '?auto=format&fit=crop&w=600&h=300&q=70';
+  // Courses with chapters; chapters can hold sub-chapters at any depth
+  const PUSH_COURSES = [
+    { id: 'phy-11', name: 'Physics Class 11', image: PUSH_IMG('1635070041078-e363dbe005cb'), chapters: [
+      { id: 'phy-1', name: 'Chapter 1 · Units and measurement', items: [
+        { id: 'v-units1', kind: 'video', name: 'Units – Lecture 1', image: PUSH_IMG('1509228468518-180dd4864904') },
+        { id: 'n-units', kind: 'notes', name: 'Units – short notes' },
+        { id: 't-units', kind: 'test', name: 'Units chapter test' }] },
+      { id: 'phy-4', name: 'Chapter 4 · Thermodynamics', items: [
+        { id: 'v-thermo3', kind: 'video', name: 'Thermodynamics – Lecture 3', image: PUSH_IMG('1532094349884-543bc11b234d') },
+        { id: 'l-doubt', kind: 'live', name: 'Doubt clinic – Units 1–4', when: 'Sat, 10:00 AM' }],
+        chapters: [
+          { id: 'phy-4-1', name: '4.1 Laws of thermodynamics', items: [
+            { id: 'v-laws1', kind: 'video', name: 'First law – Lecture 1' },
+            { id: 't-laws', kind: 'test', name: 'Practice set 4.1' }] },
+          { id: 'phy-4-2', name: '4.2 Heat engines', items: [
+            { id: 'v-engines', kind: 'video', name: 'Carnot engine explained' }] }] }] },
+    { id: 'chem-12', name: 'Chemistry Class 12', image: PUSH_IMG('1603126857599-f6e157fa2fe6'), chapters: [
+      { id: 'chem-1', name: 'Chapter 1 · Organic chemistry basics', items: [
+        { id: 'v-organic', kind: 'video', name: 'Organic chemistry basics', image: PUSH_IMG('1603126857599-f6e157fa2fe6') },
+        { id: 'l-organic', kind: 'live', name: 'Organic chemistry revision', when: 'Today, 6:00 PM' }] }] },
+    { id: 'bio-neet', name: 'Biology for NEET', image: PUSH_IMG('1530026405186-ed1f139313f8'), chapters: [
+      { id: 'bio-2', name: 'Chapter 2 · Cell structure', items: [
+        { id: 'v-cell', kind: 'video', name: 'Cell structure – Lecture 2', image: PUSH_IMG('1530026405186-ed1f139313f8') },
+        { id: 'n-cell', kind: 'notes', name: 'Cell structure – short notes' }] },
+      { id: 'bio-mock', name: 'Mock tests', items: [
+        { id: 'e-mock12', kind: 'exam', name: 'NEET Mock Test 12', when: 'Opens 1 Nov' }] }] },
+  ];
+  const PUSH_KINDS = { video: 'Video', notes: 'Notes', test: 'Test', exam: 'Exam', live: 'Live class' };
+  // Chapters of a course as one list, sub-chapters indented with "— "
+  const pushChapterList = (course) => {
+    const out = [];
+    const walk = (list, depth) => (list || []).forEach(ch => { out.push({ value: ch.id, label: '— '.repeat(depth) + ch.name, ch }); walk(ch.chapters, depth + 1); });
+    walk(course.chapters, 0);
+    return out;
+  };
 
   document.addEventListener('alpine:init', () => {
     Alpine.data('pushContent', (init = {}) => ({
@@ -15,6 +51,7 @@
       summary: init.summary || '',
       tap: init.tap || 'home',
       product: init.product || '',
+      course: '', chapter: '', item: '',
       // true = holds words or a picture filled from the product (safe to refill)
       auto: { title: false, summary: false, image: false },
       hasImage: !!init.image,
@@ -25,18 +62,59 @@
         window.dispatchEvent(new CustomEvent('set-uploaded-file', { detail: { name: 'push_image', files: f ? [{ progress: 100, status: 'success', extension: 'png', ...f }] : [] } }));
       },
       get filled() { return this.auto.title || this.auto.summary || this.auto.image; },
+      get fillSource() { return this.tap === 'product' ? 'the product' : this.item ? 'the ' + PUSH_KINDS[this.contentItem.kind].toLowerCase() : this.chapter ? 'the chapter' : 'the course'; },
+      // Fill only fields that are empty or were filled by us before
+      fill(title, summary, image) {
+        if (!this.title.trim() || this.auto.title) { this.title = title.slice(0, 65); this.auto.title = true; }
+        if (!this.summary.trim() || this.auto.summary) { this.summary = summary; this.auto.summary = true; }
+        if (!this.hasImage || this.auto.image) {
+          if (image) { this.showImage({ name: 'From ' + this.fillSource, size: '', url: image }); this.hasImage = true; this.auto.image = true; }
+          else if (this.auto.image) { this.showImage(null); this.hasImage = false; this.auto.image = false; }
+        }
+      },
+      // ----- Course content: course → chapter (or whole course) → content (or whole chapter) -----
+      get courseObj() { return PUSH_COURSES.find(c => c.id === this.course); },
+      get chapterObj() { return this.courseObj && (pushChapterList(this.courseObj).find(x => x.value === this.chapter) || {}).ch; },
+      get contentItem() { return (this.chapterObj && this.chapterObj.items.find(i => i.id === this.item)) || {}; },
+      setCourse(v) {
+        this.course = v; this.chapter = ''; this.item = '';
+        const opts = [{ value: '', label: 'Whole course' }, ...pushChapterList(this.courseObj).map(({ value, label }) => ({ value, label }))];
+        this.$nextTick(() => { const el = this.$refs.chapterWrap.firstElementChild; el.dispatchEvent(new CustomEvent('set-options', { detail: opts })); el.dispatchEvent(new CustomEvent('set-selected-values', { detail: '' })); });
+        this.fillContent();
+      },
+      setChapter(v) {
+        this.chapter = v; this.item = '';
+        const opts = [{ value: '', label: 'Whole chapter' }, ...(this.chapterObj ? this.chapterObj.items.map(i => ({ value: i.id, label: PUSH_KINDS[i.kind] + ' · ' + i.name })) : [])];
+        this.$nextTick(() => { const el = this.$refs.itemWrap.firstElementChild; el.dispatchEvent(new CustomEvent('set-options', { detail: opts })); el.dispatchEvent(new CustomEvent('set-selected-values', { detail: '' })); });
+        this.fillContent();
+      },
+      setItem(v) { this.item = v; this.fillContent(); },
+      fillContent() {
+        const c = this.courseObj; if (!c) return;
+        const ch = this.chapterObj, it = this.contentItem;
+        if (it.id) {
+          const words = {
+            video: ['New video: ' + it.name, 'Watch it before your next class.'],
+            notes: ['New notes: ' + it.name, 'Quick revision for the chapter.'],
+            test: [it.name + ' is open', 'Take it today and see where you stand.'],
+            exam: [it.name, (it.when || '') + '. Revise and be ready on time.'],
+            live: ['Live class: ' + it.name, (it.when || '') + '. Tap to join on time.'],
+          }[it.kind];
+          return this.fill(words[0], words[1], it.kind === 'video' ? (it.image || c.image) : null);
+        }
+        if (ch) return this.fill(ch.name.split(' · ').pop(), 'A new chapter is up in ' + c.name + '. Tap to start it.', c.image);
+        this.fill('New in ' + c.name, 'Fresh lessons are up. Tap to continue where you left off.', c.image);
+      },
       setProduct(value) {
         this.product = value;
         const p = PUSH_PRODUCTS[value]; if (!p) return;
         const price = p.price === 0 ? 'Free' : p.was ? 'Now ' + pushInr(p.price) + ' (was ' + pushInr(p.was) + ')' : (p.plans > 1 ? 'From ' : '') + pushInr(p.price);
         const inside = [p.chapters && p.chapters + ' chapters', p.tests && p.tests + ' mock tests', p.hours].filter(Boolean).join(', ');
-        if (!this.title.trim() || this.auto.title) { this.title = p.name; this.auto.title = true; }
-        if (!this.summary.trim() || this.auto.summary) { this.summary = [price, inside].filter(Boolean).join(' · ') + '. Tap to see what’s included.'; this.auto.summary = true; }
-        if (!this.hasImage || this.auto.image) { this.showImage({ name: 'From the product', size: '', url: p.image }); this.hasImage = true; this.auto.image = true; }
+        this.fill(p.name, [price, inside].filter(Boolean).join(' · ') + '. Tap to see what’s included.', p.image);
       },
       // The admin uploaded or removed a picture themselves
       imageChanged(f) {
-        if (f && f.name === 'From the product') return;
+        if (f && /^From /.test(f.name)) return;
         this.hasImage = !!f; this.auto.image = false;
       },
     }));
