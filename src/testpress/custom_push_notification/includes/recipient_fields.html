@@ -1,0 +1,133 @@
+{# Who gets the notification: Recipient Type, then one ui-system select per chosen type.
+   Each select writes back to createTemplateComponents (`pick`), which drives isCriteriaSelected.
+   Set `prefill` before including to start with the detail page's saved choices. #}
+{% from "../../../ui-system/components/select.html" import select %}
+{% set av = "https://images.unsplash.com/photo-" %}
+{% set batch_options = [{value: "1", label: "Pathology"}, {value: "2", label: "Dental"}, {value: "3", label: "Residency"}, {value: "4", label: "NEET Coaching"}, {value: "5", label: "Charted Accountants"}] %}
+
+<div class="col-span-full sm:ml-4" @change="pick('notification_criteria', $event)">
+  {{ select(name="recipient_type", id="push-recipient-type", label="Recipient Type", placeholder="Select one or more criteria to send notification", multiple=true, selected_value=("2" if prefill else ""), options=[
+    {value: "1", label: "Specific Users", description: "Notify specific users."},
+    {value: "2", label: "Product Purchased", description: "Notify users who purchased a specific product."},
+    {value: "3", label: "Course Access", description: "Notify users with access to a specific course."},
+    {value: "4", label: "Batch Access", description: "Notify users with access to a specific batch."},
+    {value: "5", label: "Custom Field Criteria", description: "Notify users based on matching custom field criteria."}
+  ]) }}
+</div>
+
+<div class="col-span-full sm:ml-4" x-cloak x-show="isCriteriaSelected(1)" @change="pick('users', $event)">
+  {{ select(name="users", id="push-users", label="Select Users", placeholder="Choose users", multiple=true, search=true, options=[
+    {value: "1", label: "James", icon: '<img src="' ~ av ~ '1659482633369-9fe69af50bfb?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80" alt="">'},
+    {value: "2", label: "Lori", icon: '<img src="' ~ av ~ '1659482634023-2c4fda99ac0c?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80" alt="">'},
+    {value: "3", label: "David", icon: '<img src="' ~ av ~ '1568602471122-7832951cc4c5?auto=format&fit=facearea&facepad=2&w=80&h=80&q=80" alt="">'},
+    {value: "4", label: "Ella", icon: '<img src="' ~ av ~ '1659482634023-2c4fda99ac0c?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80" alt="">'},
+    {value: "5", label: "Ols", icon: '<img src="' ~ av ~ '1659482633369-9fe69af50bfb?auto=format&fit=facearea&facepad=2.5&w=80&h=80&q=80" alt="">'}
+  ]) }}
+</div>
+
+<div class="col-span-full sm:ml-4" x-cloak x-show="isCriteriaSelected(4)" @change="pick('batches', $event)">
+  {% if prefill %}
+  <div class="flex justify-between items-center mb-2">
+    <label for="push-batches" class="block text-sm font-medium text-gray-800 dark:text-white">Select Batches</label>
+              <div class="hs-dropdown relative inline-flex [--strategy:fixed] [--placement:bottom-right]">
+                <button id="hs-dropdown-tags" type="button" class="hs-dropdown-toggle inline-flex items-center gap-x-1 text-sm font-medium text-green-600 hover:text-green-500">
+                  Assign via tags
+                </button>
+
+                <div class="hs-dropdown-menu hs-dropdown-open:opacity-100 opacity-0 hidden z-[100] transition-[opacity,margin] duration-100 bg-white dark:bg-neutral-900 border border-gray-100 dark:border-neutral-700 text-sm text-gray-800 dark:text-neutral-200 rounded-lg shadow-md p-4 w-80 whitespace-normal flex flex-col gap-y-2" aria-labelledby="hs-dropdown-tags">
+
+                  <!-- Selected Tags (Emerald Badges) -->
+                  <div x-show="tags.selectedItems.length > 0" class="flex flex-wrap gap-1 mt-1">
+                    <template x-for="(tag, index) in tags.selectedItems" :key="tag">
+                      <span class="inline-flex items-center py-0.5 pl-2 pr-0.5 rounded-full text-xs bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
+                        <span x-text="tag"></span>
+                        <button @click.stop="tags.removeTag(index)" type="button" class="flex-shrink-0 ml-0.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-emerald-400 dark:text-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 hover:text-emerald-600 dark:hover:text-emerald-300 focus:outline-none">
+                          <span class="sr-only">Remove option</span>
+                          <svg class="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
+                            <path stroke-linecap="round" stroke-width="1.5" d="M1 1l6 6m0-6L1 7"></path>
+                          </svg>
+                        </button>
+                      </span>
+                    </template>
+                  </div>
+
+                  <!-- Search Input -->
+                  <div class="pt-1" @click.stop>
+                    <input type="text"
+                           x-model="tags.tagSearch"
+                           @keydown.enter.prevent="addTagAndPopulateBatches({name: tags.tagSearch, batches: []})"
+                           placeholder="Search tags"
+                           class="block w-full text-xs sm:text-sm bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-md text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:focus:ring-emerald-500 focus:border-emerald-600 dark:focus:border-emerald-500 py-1.5 px-2">
+                  </div>
+
+                  <!-- Scrollable Option List -->
+                  <div @click.stop class="overflow-y-auto max-h-40 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+                    <template x-for="tag in filteredTags" :key="tag.name">
+                      <div class="relative group">
+                         <div @click="addTagAndPopulateBatches(tag)"
+                              class="py-1.5 px-2 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md flex items-center justify-between">
+                          <div class="flex flex-col items-start gap-0.5 min-w-0 text-left">
+                            <span class="text-sm text-gray-800 dark:text-neutral-200" x-text="tag.name"></span>
+                            <span class="text-xs text-gray-500 dark:text-neutral-400 leading-4 whitespace-normal break-words" x-text="tags.getBatchPreview(tag)"></span>
+                          </div>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Create Tag Option -->
+                    <template x-if="tags.tagSearch.trim() && !tags.items.some(t => t.name.toLowerCase() === tags.tagSearch.toLowerCase().trim())">
+                      <div @click="addTagAndPopulateBatches({name: tags.tagSearch, batches: []})" class="py-2.5 px-3 w-full text-sm text-gray-800 dark:text-neutral-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-neutral-800 rounded-md">
+                        <div class="flex items-center gap-x-2">
+                          <svg class="shrink-0 size-4 text-emerald-600 dark:text-emerald-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14"></path>
+                            <path d="M12 5v14"></path>
+                          </svg>
+                          <span>Add "<span x-text="tags.tagSearch" class="font-medium"></span>" as new tag</span>
+                        </div>
+                      </div>
+                    </template>
+
+                    <!-- Empty State -->
+                    <template x-if="!tags.tagSearch.trim() && filteredTags.length === 0">
+                      <div class="py-10 px-3 text-center">
+                        <p class="text-sm text-gray-500 font-medium">No tags available</p>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+  </div>
+  {{ select(name="batches", id="push-batches", placeholder="Choose batches", multiple=true, search=true, options=batch_options) }}
+  {% else %}
+  {{ select(name="batches", id="push-batches", label="Select Batches", placeholder="Choose batches", multiple=true, search=true, options=batch_options) }}
+  {% endif %}
+</div>
+
+<div class="col-span-full sm:ml-4" x-cloak x-show="isCriteriaSelected(2)" @change="pick('products', $event)">
+  {{ select(name="products", id="push-products", label="Select Products", placeholder="Choose products", multiple=true, search=true, selected_value=("1,2,3" if prefill else ""), options=[
+    {value: "1", label: "Pathology Residency Course"},
+    {value: "2", label: "NEET package"},
+    {value: "3", label: "Knowledge of wealth"}
+  ]) }}
+</div>
+
+<div class="col-span-full sm:ml-4" x-cloak x-show="isCriteriaSelected(3)" @change="pick('courses', $event)">
+  {{ select(name="courses", id="push-courses", label="Select Courses", placeholder="Choose courses", multiple=true, search=true, options=batch_options) }}
+</div>
+
+<div class="col-span-full sm:ml-4" x-cloak x-show="isCriteriaSelected(5)">
+  <label for="push-custom-fields" class="block mb-2 text-sm font-medium text-gray-800 dark:text-white">Select Custom Field Criteria</label>
+  <div class="flex items-start gap-x-3">
+    <div class="flex-1 min-w-0" @change="pick('customdieldcritertia', $event)">
+      {{ select(name="custom_fields", id="push-custom-fields", placeholder="Choose criteria", multiple=true, search=true, options=[
+        {value: "1", label: "Age should be 25 plus"},
+        {value: "2", label: "Should be Active user"},
+        {value: "3", label: "Student Name should contain Mad"}
+      ]) }}
+    </div>
+    <button type="button" class="shrink-0 whitespace-nowrap min-h-[42px] py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700" aria-haspopup="dialog" aria-expanded="false" aria-controls="create-criteria" data-hs-overlay="#create-criteria">
+      <svg class="shrink-0 size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      Add<span class="hidden sm:inline-block">&nbsp;New Criteria</span>
+    </button>
+  </div>
+</div>
