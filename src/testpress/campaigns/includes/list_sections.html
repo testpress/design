@@ -1,0 +1,126 @@
+{# Sent campaigns, split by purpose so each shows what matters for it:
+   - Product promotions: product picture, then reached → clicked → bought, and revenue
+   - Announcements and content: what it opened, and how many clicked
+   Each section shows its latest few; "Show all" opens the rest. Old pushes sit behind a quiet link at the end. #}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/progress.html" import progress %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% set head = "flex flex-wrap items-end justify-between gap-x-4 gap-y-1 mb-3" %}
+{% set h2 = "text-base font-semibold text-gray-800 dark:text-neutral-100" %}
+{% set total = "text-sm text-gray-500 dark:text-neutral-400" %}
+{% set rowcard = "group relative flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-3 p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow dark:bg-neutral-800" %}
+{% set thumb = "shrink-0 w-20 sm:w-28 aspect-[2/1] rounded-lg object-cover bg-gray-100 dark:bg-neutral-700" %}
+{% set tile = "shrink-0 w-20 sm:w-28 aspect-[2/1] rounded-lg inline-flex justify-center items-center bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-300" %}
+{% set meta = "mt-1 flex items-center gap-x-1.5 text-xs text-gray-500 dark:text-neutral-400" %}
+{% set menu = [
+  { label: "View results", icon: "chart-no-axes-column", attrs: '@click="window.location.href = href(c)"' },
+  { label: "Duplicate", icon: "copy", attrs: '@click="open = false; duplicate(c)"' }
+] %}
+
+{# Name line shared by both: name, channels, date #}
+{% macro name_block() %}
+<div class="min-w-0 flex-1">
+  <a :href="href(c)" class="block truncate text-sm font-semibold text-gray-800 after:absolute after:inset-0 dark:text-neutral-100" x-text="c.name"></a>
+  <div class="mt-1 flex items-center gap-x-1.5 text-xs text-gray-500 dark:text-neutral-400">
+    <i x-show="c.channels.includes('push')" data-lucide="smartphone" class="size-3.5 shrink-0" aria-label="Push"></i>
+    <i x-show="c.channels.includes('email')" data-lucide="mail" class="size-3.5 shrink-0" aria-label="Email"></i>
+    <span class="text-gray-300 dark:text-neutral-600">·</span>
+    <span class="truncate" x-text="purposeLine(c)"></span>
+    <span class="text-gray-300 dark:text-neutral-600">·</span>
+    <span class="shrink-0" x-text="c.sentShort"></span>
+  </div>
+</div>
+{% endmacro %}
+
+<div class="space-y-10">
+  {# ---------------- Product promotions ---------------- #}
+  <section x-show="!onlyPurpose || onlyPurpose === 'product'">
+    <div class="{{ head }}">
+      <h2 class="{{ h2 }}">Product promotions</h2>
+      <p class="{{ total }}" x-show="promoTotals.count"><span class="font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpMoney(promoTotals.revenue)"></span> from <span x-text="promoTotals.purchases"></span> purchases · last 30 days</p>
+    </div>
+    <div class="space-y-3">
+      <template x-for="c in shown(promotions, 'product')" :key="c.id">
+        <div class="{{ rowcard }}">
+          <template x-if="thumbOf(c)"><img :src="thumbOf(c)" alt="" class="{{ thumb }}"></template>
+          <template x-if="!thumbOf(c)"><span class="{{ tile }}"><i data-lucide="store" class="size-5"></i></span></template>
+          {{ name_block() }}
+
+          {# Reached → clicked → bought #}
+          <div class="hidden md:flex items-center gap-x-3 text-sm">
+            <div class="text-end"><p class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.received)"></p><p class="text-xs text-gray-500 dark:text-neutral-400">got it</p></div>
+            <i data-lucide="chevron-right" class="size-4 text-gray-300 dark:text-neutral-600"></i>
+            <div class="text-end"><p class="font-medium text-gray-800 dark:text-neutral-200" x-text="cmpNum(c.unique)"></p><p class="text-xs text-gray-500 dark:text-neutral-400" x-text="cmpPct(c.unique, c.received) + ' clicked'"></p></div>
+            <i data-lucide="chevron-right" class="size-4 text-gray-300 dark:text-neutral-600"></i>
+            <div class="text-end"><p class="font-medium text-gray-800 dark:text-neutral-200" x-text="c.purchases === null ? '—' : cmpNum(c.purchases)"></p><p class="text-xs text-gray-500 dark:text-neutral-400">bought</p></div>
+          </div>
+
+          <div class="order-last sm:order-none basis-full sm:basis-auto sm:w-32 flex sm:block items-baseline gap-x-2 sm:text-end">
+            <p class="text-base font-semibold" :class="c.revenue ? 'text-gray-800 dark:text-neutral-100' : 'text-gray-400 dark:text-neutral-500'" x-text="c.revenue === null ? 'Not counted' : cmpMoney(c.revenue)"></p>
+            <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="c.revenue === null ? 'Whole store' : (c.revenue ? 'revenue' : 'No purchases yet')"></p>
+          </div>
+          <div class="relative z-10 sm:order-last">{{ dropdown(trigger="ellipsis-vertical", width="medium", items=menu) }}</div>
+        </div>
+      </template>
+      <template x-if="!promotions.length">
+        <div>{{ empty_state(title="No product promotions yet", description="Promote a course, test series or the store, and see what it brings in.", icon="shopping-bag", compact=true, extra_classes="border-0 shadow-sm", secondary_action_text="Promote a product", secondary_action_attrs='@click="window.location.href = newHref"') }}</div>
+      </template>
+    </div>
+    <div x-show="promotions.length > limit" class="mt-3">{{ button(variant="link", size="sm", extra_attrs='@click="toggle(\'product\')" x-text="more.product ? \'Show fewer\' : \'Show all \' + promotions.length"') }}</div>
+  </section>
+
+  {# ---------------- Announcements and content ---------------- #}
+  <section x-show="!onlyPurpose || onlyPurpose === 'announce'">
+    <div class="{{ head }}">
+      <h2 class="{{ h2 }}">Announcements and content</h2>
+      <p class="{{ total }}" x-show="announceTotals.count"><span class="font-semibold text-gray-800 dark:text-neutral-100" x-text="cmpNum(announceTotals.clicked)"></span> students clicked · last 30 days</p>
+    </div>
+    <div class="space-y-3">
+      <template x-for="c in shown(announcements, 'announce')" :key="c.id">
+        <div class="{{ rowcard }}">
+          <template x-if="thumbOf(c)"><img :src="thumbOf(c)" alt="" class="{{ thumb }}"></template>
+          <template x-if="!thumbOf(c)"><span class="{{ tile }}"><i :data-lucide="iconOf(c)" class="size-5"></i></span></template>
+          {{ name_block() }}
+
+          {# One figure: who clicked, with a bar for the share #}
+          <div class="order-last sm:order-none basis-full sm:basis-auto sm:w-48">
+            <div class="flex items-baseline justify-between gap-x-2">
+              <p class="text-sm font-semibold text-gray-800 dark:text-neutral-100"><span x-text="cmpNum(c.unique)"></span> <span class="font-normal text-gray-500 dark:text-neutral-400">clicked</span></p>
+              <p class="text-xs text-gray-500 dark:text-neutral-400" x-text="cmpPct(c.unique, c.received)"></p>
+            </div>
+            <div class="mt-1.5">{{ progress(value_expr="c.received ? Math.round(c.unique / c.received * 100) : 0", color="teal", size="xs", label="Share who clicked") }}</div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400" x-text="'of ' + cmpNum(c.received) + ' who got it'"></p>
+          </div>
+          <div class="relative z-10 sm:order-last">{{ dropdown(trigger="ellipsis-vertical", width="medium", items=menu) }}</div>
+        </div>
+      </template>
+      <template x-if="!announcements.length">
+        <div>{{ empty_state(title="No announcements yet", description="Share news, a class or exam, a YouTube video or any link.", icon="megaphone", compact=true, extra_classes="border-0 shadow-sm", secondary_action_text="Share an announcement", secondary_action_attrs='@click="window.location.href = newHref"') }}</div>
+      </template>
+    </div>
+    <div x-show="announcements.length > limit" class="mt-3">{{ button(variant="link", size="sm", extra_attrs='@click="toggle(\'announce\')" x-text="more.announce ? \'Show fewer\' : \'Show all \' + announcements.length"') }}</div>
+  </section>
+
+  {# Old pushes: kept, but out of the way #}
+  <section x-show="legacy.length && !onlyPurpose">
+    <button type="button" @click="showLegacy = !showLegacy" class="inline-flex items-center gap-x-1.5 text-sm text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200">
+      <i data-lucide="history" class="size-4"></i>
+      <span x-text="legacy.length + (legacy.length === 1 ? ' push' : ' pushes') + ' sent before Campaigns'"></span>
+      <svg class="size-3.5 transition-transform" :class="showLegacy && 'rotate-180'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div x-show="showLegacy" x-cloak class="mt-3 space-y-2">
+      <template x-for="c in legacy" :key="c.id">
+        <a :href="href(c)" class="flex items-center justify-between gap-x-4 px-4 py-3 bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow dark:bg-neutral-800">
+          <span class="truncate text-sm text-gray-800 dark:text-neutral-200" x-text="c.name"></span>
+          <span class="shrink-0 text-xs text-gray-500 dark:text-neutral-400" x-text="c.sentShort + ' · results weren’t recorded'"></span>
+        </a>
+      </template>
+    </div>
+  </section>
+
+  {# Search or filters match nothing #}
+  <template x-if="filtersOn && !attention.length && !promotions.length && !announcements.length">
+    <div>{{ empty_state(title="No campaigns match", description="Try a different name, or clear the filters.", icon="search-x", compact=true, extra_classes="border-0 shadow-sm", secondary_action_text="Clear filters", secondary_action_attrs='@click="clearFilters()"') }}</div>
+  </template>
+</div>

@@ -1,7 +1,7 @@
 <script>
   window.CMP_PROTO = [
     { name: 'Campaigns list', states: [['list', 'With campaigns'], ['intro', 'First visit (no campaigns)'], ['loading', 'Loading'], ['error', 'Couldn’t load']] },
-    { name: 'Search and filters', states: [['no-results', 'No matches']] },
+    { name: 'Search and filters', states: [['no-results', 'No matches'], ['only-drafts', 'Nothing sent yet (only drafts)']] },
     { name: 'After an action', states: [['duplicated', 'Duplicated a campaign'], ['deleted', 'Deleted a draft']] },
   ];
   window.CMP_PROTO_DEFAULT = 'list';
@@ -11,7 +11,6 @@
       view: 'loading',
       campaigns: cmpCopy(CMP_CAMPAIGNS),
       search: '',
-      status: '',
       channel: '',
       purposeFilter: '',
       toDelete: null,
@@ -19,6 +18,7 @@
       init() {
         const s = cmpState() || 'list';
         if (s === 'no-results') this.search = 'scholarship';
+        if (s === 'only-drafts') this.campaigns = this.campaigns.filter(c => c.status === 'draft');
         if (s === 'loading') return;
         setTimeout(() => {
           this.view = s === 'intro' ? 'intro' : s === 'error' ? 'error' : 'list';
@@ -30,39 +30,62 @@
       },
       retry() { this.view = 'loading'; setTimeout(() => { this.view = 'list'; cmpIcons(); }, 700); },
 
-      // Last 30 days, sent campaigns only (prototype numbers)
-      get stats() {
-        const sent = this.campaigns.filter(c => c.status === 'sent' && !c.legacy);
-        return {
-          sent: sent.length,
-          reached: sent.reduce((t, c) => t + (c.targeted || 0), 0),
-          clicked: sent.reduce((t, c) => t + (c.unique || 0), 0),
-          revenue: sent.reduce((t, c) => t + (c.revenue || 0), 0),
-          purchases: sent.reduce((t, c) => t + (c.purchases || 0), 0),
-        };
-      },
+      // ----- What's shown: needs you, then sent campaigns by purpose -----
+      limit: 3,
+      more: { product: false, announce: false },
+      showLegacy: false,
+      get onlyPurpose() { return this.purposeFilter; },
       get filtered() {
         const q = this.search.trim().toLowerCase();
         return this.campaigns.filter(c =>
           (!q || c.name.toLowerCase().includes(q)) &&
-          (!this.status || c.status === this.status || (this.status === 'sent' && c.status === 'sending')) &&
           (!this.purposeFilter || cmpPurposeKey(c.dest) === this.purposeFilter) &&
           (!this.channel || c.channels.includes(this.channel)));
       },
-      get filtersOn() { return !!(this.search || this.status || this.channel || this.purposeFilter); },
+      get attention() { return this.filtered.filter(c => ['draft', 'sending', 'failed'].includes(c.status)); },
+      get sent() { return this.filtered.filter(c => c.status === 'sent' && !c.legacy); },
+      get promotions() { return this.sent.filter(c => cmpPurposeKey(c.dest) === 'product'); },
+      get announcements() { return this.sent.filter(c => cmpPurposeKey(c.dest) === 'announce'); },
+      get legacy() { return this.filtered.filter(c => c.legacy); },
+      shown(list, key) { return this.more[key] ? list : list.slice(0, this.limit); },
+      toggle(key) { this.more[key] = !this.more[key]; cmpIcons(); },
+      get promoTotals() { const l = this.promotions; return { count: l.length, revenue: l.reduce((t, c) => t + (c.revenue || 0), 0), purchases: l.reduce((t, c) => t + (c.purchases || 0), 0) }; },
+      get announceTotals() { const l = this.announcements; return { count: l.length, clicked: l.reduce((t, c) => t + (c.unique || 0), 0) }; },
+      get filtersOn() { return !!(this.search || this.channel || this.purposeFilter); },
       clearFilters() {
-        this.search = ''; this.status = ''; this.channel = ''; this.purposeFilter = '';
+        this.search = ''; this.channel = ''; this.purposeFilter = '';
         // reset the ui-system selects
         this.$root.querySelectorAll('[data-filter] > div').forEach(el => el.dispatchEvent(new CustomEvent('set-selected-values', { detail: 'all' })));
       },
+
+      // ----- One campaign -----
+      purposeLine(c) {
+        const d = c.dest;
+        if (!d || d.type === 'home') return 'Opens the app';
+        if (d.type === 'product') return d.label;
+        if (d.type === 'store') return 'The whole store';
+        if (d.type === 'item') return CMP.kinds[d.kind].label + ' · ' + d.label;
+        if (d.type === 'link' && d.youtube) return 'YouTube video';
+        return cmpPurpose(c);
+      },
+      thumbOf(c) {
+        const d = c.dest || {};
+        if (d.type === 'product') { const p = CMP.products.find(x => x.label === d.label); if (p) return p.image; }
+        return c.content && c.content.push && c.content.push.imageUrl || null;
+      },
+      iconOf(c) {
+        const d = c.dest || {};
+        if (d.type === 'item') return CMP.kinds[d.kind].icon;
+        return ({ home: 'megaphone', link: 'link', store: 'store' })[d.type] || 'megaphone';
+      },
+      sendPct(c) { return c.targeted ? Math.round(c.received / c.targeted * 100) : 0; },
+      get newHref() { return '{{ "/testpress/campaigns/new/" | url }}'; },
 
       href(c) {
         const base = '{{ "/testpress/campaigns/" | url }}';
         return base + 'detail/?id=' + c.id;
       },
       editHref(c) { return '{{ "/testpress/campaigns/new/" | url }}?id=' + c.id; },
-      purpose(c) { return cmpPurpose(c); },
-      ctr(c) { return c.targeted ? cmpPct(c.unique, c.targeted) : ''; },
 
       duplicate(c) {
         const copy = { ...cmpCopy(c), id: Date.now(), name: c.name + ' (copy)', status: 'draft', edited: 'Just now', missing: [], estimate: c.targeted || c.estimate, warning: null, legacy: false };
