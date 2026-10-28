@@ -1,0 +1,453 @@
+<script>
+  // The backend runs a migration in steps (app/tasks/domain_migration.py). Each one is shown as a step of a "run"
+  // with its own log, the way GitHub Actions shows a job: PENDING → DNS_VALIDATING → SSL_CREATING → VERIFYING → READY → SWITCHING → SUCCESS.
+  // Three kinds of run: setup (abc.testpress.in → custom domain), change (custom → another custom domain, then the old one is
+  // removed from our servers) and revert (back to abc.testpress.in, then the custom domain is removed).
+  const CD_CURRENT = 'abc.testpress.in';
+  const CD_ME = 'Priya Narayanan';
+  const CD_STEPS = [
+    { key: 'check', name: 'Check the domain' },
+    { key: 'dns', name: 'Point your domain to Testpress' },
+    { key: 'ssl', name: 'Get an SSL certificate' },
+    { key: 'verify', name: 'Test the site on HTTPS' },
+    { key: 'switch', name: 'Switch to the new domain' },
+  ];
+  // Step-by-step help for the DNS record, per domain provider
+  const CD_PROVIDERS = [
+    { id: 'godaddy', label: 'GoDaddy', steps: ['Sign in to GoDaddy and open <b>My Products</b>.', 'Next to your domain, choose <b>DNS</b>.', 'Select <b>Add New Record</b>, pick <b>CNAME</b>, fill in Name and Value, and save.'] },
+    { id: 'cloudflare', label: 'Cloudflare', steps: ['Open your domain in Cloudflare and go to <b>DNS → Records</b>.', 'Select <b>Add record</b> and pick <b>CNAME</b>.', 'Fill in Name and Target, set <b>Proxy status</b> to <b>DNS only</b> (grey cloud), and save.'] },
+    { id: 'hostinger', label: 'Hostinger', steps: ['In hPanel, open <b>Domains</b> and choose your domain.', 'Go to <b>DNS / Nameservers</b>.', 'Under <b>Manage DNS records</b>, pick <b>CNAME</b>, fill in Name and Target, and select <b>Add Record</b>.'] },
+    { id: 'namecheap', label: 'Namecheap', steps: ['Open <b>Domain List</b> and select <b>Manage</b> next to your domain.', 'Go to <b>Advanced DNS</b>.', 'Select <b>Add New Record</b>, pick <b>CNAME Record</b>, fill in Host and Value, and save with the tick.'] },
+    { id: 'other', label: 'Other', steps: ['Sign in where you bought the domain (or where its DNS is managed).', 'Find the DNS settings, often called <b>DNS records</b>, <b>Zone editor</b> or <b>Manage DNS</b>.', 'Add a new <b>CNAME</b> record with the Name and Value above, and save.'] },
+  ];
+  // DNS checks stop after this long; the person fixes the record and runs again
+  const CD_DNS_LIMIT = 30 * 60 * 1000;
+  const CD_TWO_PART = ['co.in', 'ac.in', 'org.in', 'net.in', 'edu.in', 'gov.in', 'co.uk', 'com.au', 'com.sg', 'co.za'];
+
+  const cdSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const cdClock = (d = new Date()) => d.toTimeString().slice(0, 8);
+  const cdCopy = (o) => JSON.parse(JSON.stringify(o));
+  const cdFmt = (sec) => { sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return h ? `${h}h ${m}m` : m ? `${m}m ${s}s` : `${s}s`; };
+  const cdTimer = (sec) => { sec = Math.max(0, Math.ceil(sec)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); };
+
+  // learn.example.com → { host: 'learn', zone: 'example.com' }
+  function cdSplit(domain) {
+    const parts = domain.split('.');
+    const zoneLen = CD_TWO_PART.includes(parts.slice(-2).join('.')) ? 3 : 2;
+    return { host: parts.slice(0, -zoneLen).join('.'), zone: parts.slice(-zoneLen).join('.') };
+  }
+
+  // Removing a domain from our side: its SSL certificate, then its server config
+  const cdRemoveSteps = (old) => [
+    { key: 'ssl_remove', name: `Remove the SSL certificate for ${old}` },
+    { key: 'cleanup', name: `Remove ${old} from our servers` },
+  ];
+  function cdStepDefs(kind, from) {
+    if (kind === 'revert') return [{ key: 'switch', name: `Switch back to ${CD_CURRENT}` }, ...cdRemoveSteps(from)];
+    return kind === 'change' ? [...CD_STEPS, ...cdRemoveSteps(from)] : CD_STEPS;
+  }
+  function cdSteps(statuses = {}, kind = 'setup', from = CD_CURRENT) {
+    return cdStepDefs(kind, from).map((s) => ({ ...s, status: statuses[s.key] || 'queued', time: '', logs: [], open: false }));
+  }
+  const CD_TIMES = { check: '1s', dns: '10m 2s', ssl: '2m 56s', verify: '1s', switch: '2s', ssl_remove: '48s', cleanup: '3s' };
+  const L = (t, text, level = 'info') => ({ t, text, level });
+
+  // Logs per step, for a finished or seeded run
+  const CD_LOGS = {
+    check: (d) => [L('10:40:01', `Requested by ${CD_ME}`, 'muted'), L('10:40:01', `Domain: ${d}`), L('10:40:01', 'Not a testpress.in address', 'ok'), L('10:40:01', 'Valid domain name', 'ok'), L('10:40:02', 'Not used by another institute', 'ok')],
+    dnsWaiting: (d, found) => [
+      L('10:40:02', `Looking up the CNAME record of ${d}`),
+      L('10:40:02', `Expected value: ${CD_CURRENT}`, 'muted'),
+      L('10:40:03', found ? `Found ${found}, expected ${CD_CURRENT}` : 'No CNAME record found', 'warn'),
+      L('10:45:03', found ? `Checked again: still ${found}` : 'Checked again: no CNAME record found', 'warn'),
+      L('10:50:04', found ? `Checked again: still ${found}` : 'Checked again: no CNAME record found', 'warn'),
+    ],
+    dnsDone: (d) => [L('10:40:02', `Looking up the CNAME record of ${d}`), L('10:40:02', `Expected value: ${CD_CURRENT}`, 'muted'), L('10:40:03', 'No CNAME record found', 'warn'), L('10:45:03', 'Checked again: no CNAME record found', 'warn'), L('10:50:04', `Found ${d} → ${CD_CURRENT}`, 'ok'), L('10:50:04', 'DNS verified after 3 checks', 'ok')],
+    dnsTimeout: (d) => [L('09:12:40', `Looking up the CNAME record of ${d}`), L('09:12:40', `Expected value: ${CD_CURRENT}`, 'muted'), L('09:12:41', 'No CNAME record found', 'warn'), L('…', 'Checked again 29 times', 'muted'), L('09:42:44', 'No CNAME record found', 'warn'), L('09:42:44', 'Stopped after 30 minutes: the CNAME record wasn’t found', 'error')],
+    sslDone: (d) => [L('10:50:05', 'Started the certificate workflow · run 12873551920', 'muted'), L('10:50:09', `Requesting a certificate for ${d}`), L('10:50:31', 'Proving that the domain points to Testpress (HTTP-01 challenge)'), L('10:51:02', 'Domain ownership confirmed', 'ok'), L('10:51:40', 'Certificate issued · valid until 26 Jan 2027', 'ok'), L('10:52:18', 'Installing the certificate on Testpress servers'), L('10:53:01', 'Certificate installed', 'ok'), L('10:53:01', 'Workflow finished: success', 'ok')],
+    sslFailed: (d) => [L('10:50:05', 'Started the certificate workflow · run 12873551920', 'muted'), L('10:50:09', `Requesting a certificate for ${d}`), L('10:50:12', `Error: the CAA record on ${cdSplit(d).zone} only lets digicert.com issue certificates`, 'error'), L('10:50:12', 'Workflow finished: failure', 'error')],
+    verifyDone: (d) => [L('10:53:12', `GET https://${d}/api/v2.3/settings/`), L('10:53:12', '200 OK · 182 ms', 'muted'), L('10:53:12', `Site answers as ${CD_CURRENT}`, 'ok')],
+    verifyFailed: (d) => [L('10:53:12', `GET https://${d}/api/v2.3/settings/`), L('10:53:12', '200 OK · 176 ms', 'muted'), L('10:53:12', `Tenant mismatch: expected ${CD_CURRENT}, got xyz.testpress.in`, 'error')],
+    switchDone: (from, d) => [L('11:02:40', `Confirmed by ${CD_ME}`, 'muted'), L('11:02:40', `Institute address changed: ${from} → ${d}`, 'ok'), from === CD_CURRENT ? L('11:02:41', 'Signed-in users stay signed in; their session moves over on their next visit', 'muted') : L('11:02:41', 'Signed out 1,284 active sessions', 'muted')]
+      .concat(d === CD_CURRENT ? [] : [L('11:02:41', `${CD_CURRENT} now redirects to ${d}`, 'ok')]),
+    sslRemove: (old) => [L('11:02:44', 'Started the certificate removal workflow · run 12874410077', 'muted'), L('11:02:47', `Deleting the certificate for ${old}`), L('11:03:28', 'Certificate deleted', 'ok'), L('11:03:30', 'Workflow finished: success', 'ok')],
+    sslRemoveFailed: (old) => [L('11:02:44', 'Started the certificate removal workflow · run 12874410077', 'muted'), L('11:02:47', `Deleting the certificate for ${old}`), L('11:03:17', 'Error: load balancer API didn’t respond in 30 s', 'error'), L('11:03:18', 'Workflow finished: failure', 'error')],
+    cleanup: (old) => [L('11:03:31', `Removing ${old} from the Testpress server config`), L('11:03:33', 'Removed', 'ok'), L('11:03:33', `${old} no longer opens your site`, 'ok')],
+  };
+  // The log of a finished step (also what's streamed when it runs in the prototype)
+  function cdLines(r, key) {
+    return {
+      check: () => CD_LOGS.check(r.domain), dns: () => CD_LOGS.dnsDone(r.domain), ssl: () => CD_LOGS.sslDone(r.domain), verify: () => CD_LOGS.verifyDone(r.domain),
+      switch: () => CD_LOGS.switchDone(r.from || CD_CURRENT, r.domain), ssl_remove: () => CD_LOGS.sslRemove(r.from), cleanup: () => CD_LOGS.cleanup(r.from),
+      // Cancelled after the new domain's certificate was (being) made: remove the new domain, not the old one
+      cancel_ssl: () => CD_LOGS.sslRemove(r.domain), cancel_cleanup: () => CD_LOGS.cleanup(r.domain),
+    }[key]();
+  }
+
+  // Earlier runs, shown in the Runs list
+  function cdHistory() {
+    const r1 = { id: 1, domain: 'learn.exmple.com', by: 'Rahul Menon', started: '12 Oct, 4:05 PM', duration: '6m 12s', status: 'cancelled', attempt: 1,
+      steps: cdSteps({ check: 'done', dns: 'cancelled', ssl: 'skipped', verify: 'skipped', switch: 'skipped' }) };
+    r1.steps[0].logs = CD_LOGS.check(r1.domain); r1.steps[0].time = '1s';
+    r1.steps[1].logs = CD_LOGS.dnsWaiting(r1.domain).slice(0, 3).concat([L('16:11:20', 'Cancelled by Rahul Menon', 'muted')]); r1.steps[1].time = '6m';
+    const r2 = { id: 2, domain: 'learn.example.com', by: CD_ME, started: '14 Oct, 9:12 AM', duration: '30m 4s', status: 'failed', attempt: 1,
+      steps: cdSteps({ check: 'done', dns: 'failed', ssl: 'skipped', verify: 'skipped', switch: 'skipped' }) };
+    r2.steps[0].logs = CD_LOGS.check(r2.domain); r2.steps[0].time = '1s';
+    r2.steps[1].logs = CD_LOGS.dnsTimeout(r2.domain); r2.steps[1].time = '30m';
+    return [r2, r1];
+  }
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('customDomain', () => ({
+      current: CD_CURRENT,
+      providers: CD_PROVIDERS,
+      provider: 'godaddy',
+      domain: '',
+      domainError: '',
+      setupStep: 'domain', // 'domain' → 'dns' (the record to add), then the run starts
+      pendingDomain: '',
+      starting: false,
+      runs: cdHistory(),
+      viewingId: null,     // an older run opened from the Runs list
+      liveDomain: '',      // the custom domain in use, once a run has switched
+      changing: false,     // moving from one custom domain to another: setup shows over the live view
+      now: Date.now(),
+      nextCheckAt: 0,      // automatic DNS check
+      manualAt: 0,         // last "Check now" (the API allows one a minute)
+      checking: false,
+      rerunning: false,
+      ack: false,
+      token: 0,            // stops an animation when the prototype state changes
+
+      init() {
+        setInterval(() => { this.now = Date.now(); this.autoCheck(); }, 1000);
+        window.addEventListener('cd-state', (e) => this.applyState(e.detail));
+        this.applyState('first_time');
+      },
+
+      // ---- what's on screen ----
+      get latest() { return this.runs[0] || null; },
+      // Never null, so the run view can tear down without errors when the last run goes away
+      get run() { return this.runs.find((r) => r.id === this.viewingId) || this.latest || { id: 0, domain: '', status: 'queued', attempt: 1, steps: [] }; },
+      get isLatest() { return this.run && this.latest && this.run.id === this.latest.id; },
+      get active() { return this.latest && ['running', 'waiting', 'ready'].includes(this.latest.status); },
+      // Setup shows when nothing is in progress and the latest run didn't just end in a way the person must see
+      get view() {
+        const l = this.latest;
+        if (this.viewingId) return 'run';
+        if (l && !l.dismissed && (['running', 'waiting', 'ready', 'failed'].includes(l.status) || (l.status === 'success' && l.kind === 'revert'))) return 'run';
+        if (this.liveDomain && !this.changing) return 'live';
+        return 'setup';
+      },
+      get address() { return this.liveDomain || CD_CURRENT; },
+      get split() { return cdSplit(this.view === 'setup' ? (this.pendingDomain || 'learn.yourschool.com') : this.run.domain); },
+      get stepNow() { return this.run && (this.run.steps.find((s) => ['running', 'waiting', 'failed'].includes(s.status)) || null); },
+      get duration() {
+        const r = this.run;
+        if (!r) return '';
+        return r.startTs && ['running', 'waiting', 'ready'].includes(r.status) ? cdFmt((this.now - r.startTs) / 1000) : r.duration;
+      },
+      get title() {
+        const r = this.run, s = this.stepNow;
+        if (!r) return '';
+        return {
+          waiting: 'Waiting for your DNS record',
+          running: r.cancelling ? 'Cancelling, removing ' + r.domain + '…' : s ? s.name + '…' : 'Running…',
+          ready: 'Ready to switch',
+          failed: 'Failed at: ' + (s ? s.name : ''),
+          cancelled: 'Cancelled',
+          success: r.kind === 'revert' ? 'Back on ' + r.domain : 'Switched to ' + r.domain,
+        }[r.status];
+      },
+      get nextCheckIn() { return cdTimer((this.nextCheckAt - this.now) / 1000); },
+      get cooldown() { return Math.max(0, 60 - (this.now - this.manualAt) / 1000); },
+      get providerSteps() { return (this.providers.find((p) => p.id === this.provider) || this.providers[0]).steps; },
+      runSummary(r) {
+        const s = r.steps.find((x) => ['running', 'waiting', 'failed', 'cancelled'].includes(x.status));
+        if (r.status === 'success') return ({ revert: 'Reverted from ' + r.from, change: 'Moved from ' + r.from }[r.kind] || 'Switched') + ' · ' + r.duration;
+        if (r.status === 'ready') return 'Ready to switch';
+        if (r.status === 'failed') return 'Failed at: ' + s.name + (r.duration ? ' · ' + r.duration : '');
+        if (r.status === 'cancelled') return 'Cancelled at: ' + (s ? s.name : '');
+        if (r.status === 'waiting') return 'Waiting for the DNS record';
+        if (r.cancelling) return 'Cancelling…';
+        return s ? s.name + '…' : 'Running…';
+      },
+      stepNote(s) {
+        return { queued: '', skipped: 'Skipped', cancelled: 'Cancelled', running: 'Running', waiting: 'Needs you', failed: s.time ? 'Failed after ' + s.time : 'Failed', done: s.time }[s.status];
+      },
+
+      // ---- setup ----
+      validate(value) {
+        let d = value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        if (!d) return [d, 'Enter the domain you want to use, like learn.yourschool.com.'];
+        if (d === 'testpress.in' || d.endsWith('.testpress.in')) return [d, 'testpress.in addresses can’t be used. Enter a domain you own.'];
+        if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(d)) return [d, 'That doesn’t look like a domain. Try something like learn.yourschool.com.'];
+        if (!cdSplit(d).host) return [d, `Use a subdomain, like learn.${d}. A main domain such as ${d} can’t point to Testpress.`];
+        if (d === 'learn.coachingcentre.com') return [d, 'This domain is already used by another Testpress site.'];
+        return [d, ''];
+      },
+      next() {
+        const [d, err] = this.validate(this.domain);
+        this.domainError = err;
+        if (err) return;
+        this.pendingDomain = d;
+        this.setupStep = 'dns';
+        this.icons();
+      },
+      start() {
+        this.starting = true;
+        const token = ++this.token;
+        setTimeout(() => {
+          if (token !== this.token) return;
+          Object.assign(this, { starting: false, setupStep: 'domain' });
+          this.newRun(this.pendingDomain);
+          this.pendingDomain = '';
+        }, 700);
+      },
+      makeRun(kind, domain, from) {
+        const id = (this.latest ? this.latest.id : 0) + 1;
+        this.runs.unshift({ id, kind, domain, from, by: CD_ME, started: 'Today, ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }), startTs: Date.now(), duration: '', status: 'running', attempt: 1, confirmed: kind === 'revert', steps: cdSteps({}, kind, from) });
+        this.viewingId = null;
+      },
+      async newRun(d) {
+        this.makeRun(this.liveDomain ? 'change' : 'setup', d, this.address);
+        this.changing = false;
+        this.domain = '';
+        const token = this.token;
+        const live = () => this.runs[0];
+        const check = live().steps[0];
+        check.status = 'running'; check.open = true;
+        for (const line of CD_LOGS.check(d)) { if (token !== this.token) return; await cdSleep(260); check.logs.push({ ...line, t: cdClock() }); }
+        check.status = 'done'; check.time = '2s'; check.open = false;
+        const dns = live().steps[1];
+        dns.status = 'waiting'; dns.open = true; live().status = 'waiting';
+        dns.logs.push(L(cdClock(), `Looking up the CNAME record of ${d}`), L(cdClock(), `Expected value: ${CD_CURRENT}`, 'muted'));
+        await cdSleep(500);
+        if (token !== this.token) return;
+        dns.logs.push(L(cdClock(), 'No CNAME record found', 'warn'));
+        this.nextCheckAt = Date.now() + 20 * 1000; // prototype: 20 s so the flow can be played through; the real wait is 5 minutes
+        this.icons();
+      },
+
+      // ---- DNS ----
+      async checkNow(auto = false) {
+        const r = this.latest, dns = r && r.steps[1];
+        if (!dns || dns.status !== 'waiting' || this.checking) return;
+        if (!auto) this.manualAt = Date.now();
+        this.checking = true;
+        const token = this.token;
+        dns.logs.push(L(cdClock(), auto ? 'Scheduled check' : `Checked now by ${CD_ME}`, 'muted'));
+        await cdSleep(900);
+        if (token !== this.token) return;
+        this.checking = false;
+        // Prototype: the record is found, except the first time a wrong record was seen (it's still wrong)
+        if (r.foundWrong && !r.recordAdded) { dns.logs.push(L(cdClock(), r.foundWrong ? `Found ${r.foundWrong}, expected ${CD_CURRENT}` : 'No CNAME record found', 'warn')); r.recordAdded = true; return; }
+        dns.logs.push(L(cdClock(), `Found ${r.domain} → ${CD_CURRENT}`, 'ok'), L(cdClock(), 'DNS verified', 'ok'));
+        dns.status = 'done'; dns.time = cdFmt((Date.now() - r.startTs) / 1000);
+        await cdSleep(600);
+        dns.open = false;
+        this.runFrom('ssl', token);
+      },
+      autoCheck() {
+        const r = this.latest;
+        if (r && r.status === 'waiting' && r.startTs && this.now - r.startTs > CD_DNS_LIMIT) return this.failDns(r);
+        if (this.nextCheckAt && this.now >= this.nextCheckAt && this.latest && this.latest.status === 'waiting') {
+          this.nextCheckAt = Date.now() + 5 * 60 * 1000;
+          this.checkNow(true);
+        }
+      },
+
+      failDns(r) {
+        const dns = r.steps[1];
+        dns.logs.push(L(cdClock(), 'Stopped after 30 minutes: the CNAME record wasn’t found', 'error'));
+        Object.assign(dns, { status: 'failed', time: '30m', open: true });
+        r.steps.slice(2).forEach((s) => { s.status = 'skipped'; });
+        r.status = 'failed'; r.duration = cdFmt((this.now - r.startTs) / 1000);
+        this.icons();
+      },
+
+      // ---- every step after DNS, streamed line by line. Stops at the switch until it's confirmed. ----
+      async runFrom(key, token = this.token) {
+        const r = this.latest;
+        r.status = 'running';
+        for (let i = r.steps.findIndex((x) => x.key === key); i < r.steps.length; i++) {
+          const s = r.steps[i];
+          if (s.key === 'switch' && !r.confirmed) { s.status = 'waiting'; s.open = true; r.status = 'ready'; this.icons(); return; }
+          const t0 = Date.now();
+          s.status = 'running'; s.open = true;
+          s.logs = r.attempt > 1 && s.logs.length ? s.logs.concat([L(cdClock(), `Re-run, attempt ${r.attempt}`, 'muted')]) : [];
+          for (const line of cdLines(r, s.key)) { await cdSleep(s.key === 'switch' ? 450 : 650); if (token !== this.token) return; s.logs.push({ ...line, t: cdClock() }); }
+          s.status = 'done'; s.time = cdFmt((Date.now() - t0) / 1000);
+          if (s.key === 'switch') this.switched(r);
+          await cdSleep(400);
+          if (token !== this.token) return;
+          s.open = false;
+        }
+        r.duration = cdFmt((Date.now() - r.startTs) / 1000);
+        if (r.cancelling) { r.status = 'cancelled'; this.toast('Run cancelled', `${r.domain} is removed from our servers. ${this.address} stays your address.`); this.icons(); return; }
+        r.status = 'success';
+        if (r.kind !== 'setup') this.toast(r.kind === 'revert' ? 'Back on ' + r.domain : 'Moved to ' + r.domain, `${r.from} is removed from our servers.`);
+        this.icons();
+      },
+      // The address changes as soon as the switch step is done; removing the old domain carries on after
+      switched(r) {
+        this.liveDomain = r.kind === 'revert' ? '' : r.domain;
+        if (r.kind === 'setup') this.toast('Switched to ' + r.domain, 'Everyone stays signed in.');
+      },
+      async rerun() {
+        const r = this.latest, s = this.stepNow;
+        if (!s || this.rerunning) return;
+        this.rerunning = true;
+        r.attempt += 1; r.status = 'running'; r.startTs = r.startTs || Date.now();
+        r.steps.forEach((x) => { if (x.status === 'skipped') x.status = 'queued'; });
+        const token = this.token;
+        await cdSleep(300);
+        this.rerunning = false;
+        if (token === this.token) this.runFrom(s.key, token);
+      },
+
+      // ---- switch, cancel, start over ----
+      switchDomain() {
+        this.latest.confirmed = true;
+        this.runFrom('switch');
+      },
+      startRevert() {
+        this.makeRun('revert', CD_CURRENT, this.liveDomain);
+        this.runFrom('switch');
+      },
+      // Once the SSL step has started, the new domain has a certificate (or is getting one) and server config on our
+      // side, so cancelling also removes them, as extra steps on the same run
+      get cancelCleans() {
+        const ssl = this.latest && this.latest.steps.find((s) => s.key === 'ssl');
+        return !!ssl && ['running', 'done'].includes(ssl.status);
+      },
+      cancelRun() {
+        const r = this.latest, clean = this.cancelCleans;
+        this.token++;
+        // A change cancelled before its switch never removes the old domain, so those steps go
+        r.steps = r.steps.filter((s) => !(['ssl_remove', 'cleanup'].includes(s.key) && s.status === 'queued'));
+        r.steps.forEach((s) => {
+          if (['running', 'waiting'].includes(s.status)) { s.status = 'cancelled'; s.logs.push(L(cdClock(), `Cancelled by ${CD_ME}`, 'muted')); }
+          else if (s.status === 'queued') s.status = 'skipped';
+          s.open = false;
+        });
+        this.domain = r.domain;
+        if (clean) {
+          r.steps.push(
+            { key: 'cancel_ssl', name: `Remove the SSL certificate for ${r.domain}`, status: 'queued', time: '', logs: [], open: false },
+            { key: 'cancel_cleanup', name: `Remove ${r.domain} from our servers`, status: 'queued', time: '', logs: [], open: false },
+          );
+          Object.assign(r, { cancelling: true, confirmed: true });
+          this.runFrom('cancel_ssl');
+          return;
+        }
+        r.duration = this.duration; r.status = 'cancelled';
+        this.toast('Run cancelled', `${this.address} stays your address.`);
+        this.icons();
+      },
+      startOver() {
+        this.domain = this.latest.domain;
+        this.changing = !!this.liveDomain;
+        this.setupStep = 'domain';
+        this.latest.dismissed = true;
+        this.viewingId = null;
+        this.icons();
+      },
+      changeDomain() {
+        Object.assign(this, { changing: true, domain: '', domainError: '', setupStep: 'domain' });
+        this.icons();
+      },
+      openRun(id) { this.viewingId = this.latest && id === this.latest.id && this.view !== 'setup' && this.view !== 'live' ? null : id; window.scrollTo({ top: 0, behavior: 'smooth' }); this.icons(); },
+
+      // ---- helpers ----
+      copy(text, label) {
+        navigator.clipboard && navigator.clipboard.writeText(text);
+        if (label) this.toast(label + ' copied', '');
+      },
+      shareText() {
+        const s = this.split, domain = this.view === 'setup' ? this.pendingDomain : this.run.domain;
+        return [
+          `Please add this DNS record for ${s.zone}:`, '',
+          `Type: CNAME`, `Name: ${s.host}`, `Value: ${CD_CURRENT}`, `TTL: default`, '',
+          `If ${s.host}.${s.zone} already has an A or CNAME record, delete it first.`,
+          this.provider === 'cloudflare' ? 'Cloudflare: set Proxy status to "DNS only" (grey cloud).' : '',
+          `This connects ${domain} to our Testpress site.`,
+        ].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
+      },
+      toast(title, description, variant = 'success') {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { variant, title, description, position: 'bottom-right' } }));
+      },
+      icons() { this.$nextTick(() => window.lucide && window.lucide.createIcons()); },
+
+      // ---- prototype only ----
+      applyState(id) {
+        this.token++;
+        Object.assign(this, { runs: cdHistory(), changing: false, setupStep: 'domain', pendingDomain: '', viewingId: null, liveDomain: '', domain: '', domainError: '', starting: false, checking: false, rerunning: false, manualAt: 0, ack: false, nextCheckAt: Date.now() + 192 * 1000 });
+        ['cd-cancel', 'cd-switch', 'cd-share', 'cd-dns', 'cd-revert'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
+        const d = 'learn.example.com';
+        const all = { check: 'done', dns: 'done', ssl: 'done', verify: 'done', switch: 'done', ssl_remove: 'done', cleanup: 'done' };
+        // A seeded run; finished steps get their logs. Returns the run and its steps by key.
+        const make = (status, statuses, o = {}) => {
+          const kind = o.kind || 'setup', from = o.from || CD_CURRENT;
+          const r = { id: o.id || 3, kind, domain: o.domain || d, from, by: CD_ME, started: o.started || 'Today, 10:40 AM', startTs: Date.now() - 14 * 60 * 1000, duration: '22m 40s', status, attempt: 1, confirmed: kind === 'revert', steps: cdSteps(statuses, kind, from) };
+          r.steps.forEach((s) => { if (s.status === 'done') { s.logs = cdLines(r, s.key); s.time = CD_TIMES[s.key]; } });
+          if (['success', 'failed', 'cancelled'].includes(status)) r.startTs = null;
+          this.runs.unshift(r);
+          return { r, ...Object.fromEntries(r.steps.map((s) => [s.key, s])) };
+        };
+        // Live on learn.example.com since an earlier run
+        const live = () => { make('success', all, { started: '21 Oct, 10:40 AM' }); this.liveDomain = d; };
+        const nd = 'courses.example.com';
+        let x;
+        switch (id) {
+          case 'first_time': this.runs = []; break;
+          case 'setup': this.latest.dismissed = true; break;
+          case 'setup_dns': this.latest.dismissed = true; this.domain = this.pendingDomain = 'learn.example.com'; this.setupStep = 'dns'; break;
+          case 'setup_error': this.latest.dismissed = true; this.domain = 'example.com'; this.validate && ([, this.domainError] = this.validate('example.com')); break;
+          case 'dns_none': x = make('waiting', { check: 'done', dns: 'waiting' }); x.dns.logs = CD_LOGS.dnsWaiting(d); x.dns.open = true; break;
+          case 'dns_wrong': x = make('waiting', { check: 'done', dns: 'waiting' }); x.r.foundWrong = 'example.wixdns.net'; x.dns.logs = CD_LOGS.dnsWaiting(d, 'example.wixdns.net'); x.dns.open = true; break;
+          case 'ssl': x = make('running', { check: 'done', dns: 'done', ssl: 'running' }); x.ssl.logs = CD_LOGS.sslDone(d).slice(0, 3); x.ssl.open = true;
+            (async (token) => { const ssl = this.latest.steps[2]; for (const line of CD_LOGS.sslDone(d).slice(3)) { await cdSleep(1100); if (token !== this.token) return; ssl.logs.push({ ...line, t: cdClock() }); } ssl.status = 'done'; ssl.time = '3m 2s'; ssl.open = false; this.runFrom('verify', token); })(this.token);
+            break;
+          case 'ready': x = make('ready', { check: 'done', dns: 'done', ssl: 'done', verify: 'done', switch: 'waiting' }); x.switch.open = true; break;
+          case 'failed_ssl': x = make('failed', { check: 'done', dns: 'done', ssl: 'failed', verify: 'skipped', switch: 'skipped' }); x.r.duration = '10m 9s'; x.ssl.logs = CD_LOGS.sslFailed(d); x.ssl.time = '7s'; x.ssl.open = true; break;
+          case 'failed_verify': x = make('failed', { check: 'done', dns: 'done', ssl: 'done', verify: 'failed', switch: 'skipped' }); x.r.duration = '13m 11s'; x.verify.logs = CD_LOGS.verifyFailed(d); x.verify.time = '1s'; x.verify.open = true; break;
+          case 'failed_dns': this.runs[0].steps[1].open = true; break;
+          case 'cancelled': x = make('cancelled', { check: 'done', dns: 'cancelled', ssl: 'skipped', verify: 'skipped', switch: 'skipped' }); x.r.duration = '4m 10s'; x.dns.logs = CD_LOGS.dnsWaiting(d).slice(0, 3).concat([L('10:44:12', `Cancelled by ${CD_ME}`, 'muted')]); this.domain = d; break;
+          case 'live': live(); break;
+          // Change: courses.example.com replaces learn.example.com
+          case 'changing': live(); this.changing = true; break;
+          case 'change_ready': live(); x = make('ready', { check: 'done', dns: 'done', ssl: 'done', verify: 'done', switch: 'waiting' }, { id: 4, kind: 'change', domain: nd, from: d }); x.switch.open = true; break;
+          case 'change_cleanup': live(); x = make('running', { check: 'done', dns: 'done', ssl: 'done', verify: 'done', switch: 'done' }, { id: 4, kind: 'change', domain: nd, from: d }); x.r.confirmed = true; this.liveDomain = nd; this.runFrom('ssl_remove'); break;
+          case 'changed': live(); make('success', all, { id: 4, kind: 'change', domain: nd, from: d }); this.liveDomain = nd; break;
+          // Revert: back to abc.testpress.in
+          case 'revert_confirm': live(); this.$nextTick(() => window.dispatchEvent(new CustomEvent('open-modal-cd-revert'))); break;
+          case 'revert_running': live(); this.startRevert(); break;
+          case 'reverted': live(); make('success', all, { id: 4, kind: 'revert', domain: CD_CURRENT, from: d }).r.duration = '1m 34s'; this.liveDomain = ''; break;
+          case 'revert_failed': live(); x = make('failed', { switch: 'done', ssl_remove: 'failed', cleanup: 'skipped' }, { id: 4, kind: 'revert', domain: CD_CURRENT, from: d }); x.r.duration = '36s'; x.ssl_remove.logs = CD_LOGS.sslRemoveFailed(d); x.ssl_remove.time = '34s'; x.ssl_remove.open = true; this.liveDomain = ''; break;
+        }
+        this.icons();
+      },
+    }));
+
+    Alpine.data('cdPrototype', () => ({
+      open: false,
+      // Has this browser opened the switcher before? (only stops the pulse; storage may be unavailable)
+      opened: (() => { try { return localStorage.getItem('cd-prototype-opened') === '1'; } catch (e) { return false; } })(),
+      seen() { this.opened = true; try { localStorage.setItem('cd-prototype-opened', '1'); } catch (e) {} },
+      state: 'first_time',
+      groups: [
+        { name: 'Set up', states: [['first_time', 'First time'], ['setup', 'Set up, with earlier runs'], ['setup_error', 'Main domain entered'], ['setup_dns', 'Add the DNS record']] },
+        { name: 'Run in progress', states: [['dns_none', 'Waiting: no DNS record'], ['dns_wrong', 'Waiting: record points elsewhere'], ['ssl', 'Getting SSL certificate (plays)'], ['ready', 'Ready to switch']] },
+        { name: 'Run ended', states: [['failed_ssl', 'Failed: SSL certificate'], ['failed_verify', 'Failed: HTTPS test'], ['failed_dns', 'Failed: DNS record not found'], ['cancelled', 'Cancelled']] },
+        { name: 'Live on custom domain', states: [['live', 'Live'], ['changing', 'Change domain: setup'], ['change_ready', 'Change: ready to switch'], ['change_cleanup', 'Change: removing old domain (plays)'], ['changed', 'Change: done']] },
+        { name: 'Revert to abc.testpress.in', states: [['revert_confirm', 'Confirm'], ['revert_running', 'Running (plays)'], ['revert_failed', 'Failed: removing certificate'], ['reverted', 'Done']] },
+      ],
+      // Stays open after a pick, so states can be clicked through; closes on a click outside or Escape
+      pick(id) {
+        this.state = id;
+        window.dispatchEvent(new CustomEvent('cd-state', { detail: id }));
+      },
+    }));
+  });
+</script>

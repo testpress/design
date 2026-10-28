@@ -1,0 +1,169 @@
+{#
+  One run, shown like a GitHub Actions job: a header, then each step as a row that opens to its log.
+  The step that needs something (add a DNS record, fix a failure, confirm the switch) opens by itself,
+  with what to do above its log.
+#}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/alert.html" import alert %}
+{% from "./status_icon.html" import status_icon %}
+{% from "./record.html" import record %}
+
+
+{% set panel = "p-4 sm:p-5 rounded-xl bg-white border border-gray-200 dark:bg-neutral-800 dark:border-neutral-700" %}
+
+<section class="bg-white rounded-2xl shadow-sm dark:bg-neutral-800">
+  <!-- ===== Run header ===== -->
+  <div class="flex flex-wrap items-start gap-4 p-5 sm:p-6">
+    <div class="pt-0.5">{{ status_icon("run.status === 'ready' ? 'waiting' : run.status", "size-6") }}</div>
+    <div class="flex-1 min-w-[14rem]">
+      <h2 class="text-base font-semibold text-gray-800 dark:text-neutral-100" x-text="title"></h2>
+      <p class="mt-1 flex flex-wrap items-center gap-x-1.5 text-sm text-gray-500 dark:text-neutral-400">
+        <span x-text="run.from || current"></span>
+        <i data-lucide="arrow-right" class="size-3.5 shrink-0"></i>
+        <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="run.domain"></span>
+      </p>
+      <p class="mt-2 text-xs text-gray-500 dark:text-neutral-400">
+        Run #<span x-text="run.id"></span>
+        <span x-show="run.attempt > 1">· Attempt <span x-text="run.attempt"></span></span>
+        · <span x-text="run.by"></span> · <span x-text="run.started"></span>
+        <span x-show="duration">· <span x-text="duration"></span></span>
+      </p>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <!-- Any run opened from the Runs list gets a way back to where the page was (live domain, setup or the run in progress) -->
+      <template x-if="viewingId">
+        {{ button(text="Back", variant="secondary", icon="arrow-left", extra_attrs='@click="viewingId = null; icons()"') }}
+      </template>
+      <!-- No cancelling once the address has switched (or a revert has started) -->
+      <template x-if="isLatest && ['running', 'waiting', 'ready'].includes(run.status) && !run.confirmed">
+        {{ button(text="Cancel run", variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-cd-cancel\')"') }}
+      </template>
+      <template x-if="isLatest && run.kind === 'revert' && run.status === 'success'">
+        {{ button(text="Set up a custom domain", variant="secondary", extra_attrs='@click="latest.dismissed = true; icons()"') }}
+      </template>
+      <template x-if="isLatest && run.status === 'failed'">
+        <div class="flex gap-2">
+          <!-- Once the address has switched there's nothing to start over; only the clean-up can be re-run -->
+          <template x-if="run.kind !== 'revert' && !['ssl_remove', 'cleanup'].includes(stepNow && stepNow.key)">
+            {{ button(text="Start over", variant="secondary", extra_attrs='@click="startOver()"') }}
+          </template>
+          {{ button(text='<span x-text="rerunning ? \'Starting…\' : (stepNow && stepNow.key === \'dns\' ? \'Run again\' : \'Re-run failed step\')"></span>', icon="rotate-cw", extra_attrs='@click="stepNow.key === \'dns\' ? newRun(run.domain) : rerun()" :disabled="rerunning"') }}
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ===== Steps ===== -->
+  <ol class="px-2 pb-2 sm:px-3 sm:pb-3 space-y-0.5">
+    <template x-for="(s, i) in run.steps" :key="s.key">
+      <!-- In a domain change, removing the old domain only shows once the switch is confirmed -->
+      <li x-show="!(run.kind === 'change' && !run.confirmed && ['ssl_remove', 'cleanup'].includes(s.key))" class="rounded-lg" :class="s.open && 'bg-gray-50 dark:bg-neutral-900/50'">
+        <button type="button" @click="s.open = !s.open; icons()" :aria-expanded="s.open"
+                class="w-full flex items-center gap-x-3 py-2.5 px-3 rounded-lg text-start hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-neutral-900/50">
+          <svg class="shrink-0 size-4 text-gray-400 transition-transform" :class="s.open && 'rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          {{ status_icon("s.status") }}
+          <span class="flex-1 min-w-0 text-sm"
+                :class="['queued', 'skipped'].includes(s.status) ? 'text-gray-400 dark:text-neutral-500' : 'text-gray-800 font-medium dark:text-neutral-200'"
+                x-text="s.name"></span>
+          <span class="shrink-0 text-xs"
+                :class="{ 'text-amber-700 font-medium dark:text-amber-400': s.status === 'waiting', 'text-red-600 dark:text-red-400': s.status === 'failed', 'text-gray-500 dark:text-neutral-400': !['waiting', 'failed'].includes(s.status) }"
+                x-text="stepNote(s)"></span>
+        </button>
+
+        <div x-show="s.open" class="ps-3 pe-3 pb-3 sm:ps-[3.25rem] space-y-3">
+
+          <!-- What to do. The record itself was shown during setup; it opens again from here. -->
+          <template x-if="isLatest && s.key === 'dns' && s.status === 'waiting'">
+            <div class="{{ panel }}">
+              <template x-if="run.foundWrong">
+                <div class="mb-4">
+                  {% call alert(variant="warning", style="soft", size="sm") %}
+                    <p class="font-semibold" x-text="run.domain + ' points to ' + run.foundWrong"></p>
+                    <p class="mt-1">Edit that record so its value is <span class="font-mono" x-text="current"></span>. Don’t add a second record.</p>
+                  {% endcall %}
+                </div>
+              </template>
+              <div class="flex flex-wrap items-center gap-3">
+                <template x-if="s.status === 'waiting'">
+                  <p class="flex-1 min-w-[12rem] flex items-center gap-x-2 text-sm text-gray-600 dark:text-neutral-400">
+                    <span class="relative flex size-2"><span class="absolute inline-flex size-full rounded-full bg-amber-400 opacity-60 animate-ping"></span><span class="relative inline-flex size-2 rounded-full bg-amber-500"></span></span>
+                    <span x-show="!checking">Looking for <span class="font-mono text-gray-800 dark:text-neutral-200" x-text="split.host + ' → ' + current"></span></span>
+                    <span x-show="checking">Checking…</span>
+                  </p>
+                </template>
+                {{ button(text="Show DNS record", variant="ghost", icon="file-text", extra_attrs='@click="$dispatch(\'open-modal-cd-dns\')"') }}
+                <template x-if="s.status === 'waiting'">
+                  {{ button(text='<span x-text="checking ? \'Checking…\' : cooldown > 0 ? \'Check again in \' + Math.ceil(cooldown) + \'s\' : \'Check now\'"></span>', variant="secondary", icon="refresh-cw", extra_attrs='@click="checkNow()" :disabled="checking || cooldown > 0"') }}
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="isLatest && s.key === 'ssl' && s.status === 'failed'">
+            <div class="{{ panel }}">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">Your domain only allows DigiCert to issue certificates</h3>
+              <p class="mt-1 text-sm text-gray-600 dark:text-neutral-400">Add this CAA record on <span x-text="split.zone"></span> so we can get one too. Keep the existing one. Then re-run this step.</p>
+              <div class="mt-3">{{ record("CAA", "'@'", "'0 issue \"letsencrypt.org\"'", "Name", "Value") }}</div>
+            </div>
+          </template>
+
+          <template x-if="isLatest && s.key === 'verify' && s.status === 'failed'">
+            <div class="{{ panel }}">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100"><span x-text="run.domain"></span> opens a different Testpress site</h3>
+              <p class="mt-1 text-sm text-gray-600 dark:text-neutral-400">It’s still connected to xyz.testpress.in. Contact support to free it up, then re-run this step.</p>
+              <div class="mt-3">{{ button(text="Contact support", variant="secondary", icon="life-buoy", href="#") }}</div>
+            </div>
+          </template>
+
+          <template x-if="isLatest && ['ssl_remove', 'cleanup'].includes(s.key) && s.status === 'failed'">
+            <div class="{{ panel }}">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">Your site already works on <span x-text="run.domain"></span></h3>
+              <p class="mt-1 text-sm text-gray-600 dark:text-neutral-400">We couldn’t finish removing <span x-text="run.from"></span> from our servers. Re-run this step. If it fails again, contact support.</p>
+            </div>
+          </template>
+
+          <template x-if="isLatest && s.key === 'ssl' && s.status === 'running'">
+            <p class="text-sm text-gray-600 dark:text-neutral-400">Nothing to do here.</p>
+          </template>
+
+          <template x-if="isLatest && s.key === 'switch' && s.status === 'waiting'">
+            <div class="{{ panel }}">
+              <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100"><span x-text="run.domain"></span> is ready</h3>
+              <ul class="mt-2 space-y-1 text-sm text-gray-600 list-disc ps-5 dark:text-neutral-400">
+                <li x-show="run.kind !== 'change'">Everyone stays signed in. They move to the new address on their next visit.</li>
+                <li x-show="run.kind === 'change'">Everyone is signed out once and signs in again at the new address.</li>
+                <li x-show="run.kind !== 'change'">Links to <span x-text="current"></span> keep working. They open the new address.</li>
+                <li x-show="run.kind === 'change'">Then we remove <span x-text="run.from"></span> from our servers. Links to it stop working.</li>
+              </ul>
+              <div class="mt-4">
+                {{ button(text='<span x-text="\'Switch to \' + run.domain"></span>', extra_attrs='@click="ack = false; $dispatch(\'open-modal-cd-switch\')"') }}
+              </div>
+            </div>
+          </template>
+
+          <!-- Log -->
+          <template x-if="s.logs.length">
+            <div class="py-2 rounded-lg bg-white border border-gray-200 font-mono text-xs leading-5 overflow-x-auto dark:bg-neutral-950 dark:border-neutral-700" role="log" :aria-label="s.name + ' log'">
+              <template x-for="(l, n) in s.logs" :key="n">
+                <div class="flex gap-x-3 px-3 hover:bg-gray-50 dark:hover:bg-neutral-900">
+                  <span class="w-5 shrink-0 text-end text-gray-400 select-none dark:text-neutral-600" x-text="n + 1"></span>
+                  <span class="shrink-0 text-gray-400 select-none dark:text-neutral-500" x-text="l.t"></span>
+                  <span class="min-w-0 whitespace-pre-wrap break-words"
+                        :class="{ 'text-green-700 dark:text-green-400': l.level === 'ok', 'text-red-600 dark:text-red-400': l.level === 'error', 'text-amber-700 dark:text-amber-400': l.level === 'warn', 'text-gray-500 dark:text-neutral-500': l.level === 'muted', 'text-gray-800 dark:text-neutral-200': l.level === 'info' }"
+                        x-text="({ ok: '✓ ', error: '✗ ', warn: '! ' }[l.level] || '') + l.text"></span>
+                </div>
+              </template>
+              <div x-show="s.status === 'running'" class="flex gap-x-3 px-3 text-gray-400">
+                <span class="w-5 shrink-0"></span><span class="animate-pulse">▍</span>
+              </div>
+            </div>
+          </template>
+          <template x-if="!s.logs.length && s.status !== 'waiting'">
+            <p class="text-sm text-gray-500 dark:text-neutral-400" x-text="s.status === 'skipped' ? 'Didn’t run.' : s.status === 'running' ? 'Starting…' : 'Starts after the step above.'"></p>
+          </template>
+        </div>
+      </li>
+    </template>
+  </ol>
+</section>
