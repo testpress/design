@@ -115,7 +115,6 @@
       changing: false,     // moving from one custom domain to another: setup shows over the live view
       now: Date.now(),
       nextCheckAt: 0,      // automatic DNS check
-      lastCheckedAt: 0,    // shown as "Last checked 8s ago" while waiting
       manualAt: 0,         // last "Check now" (the API allows one a minute)
       checking: false,
       rerunning: false,
@@ -162,9 +161,10 @@
           success: r.kind === 'revert' ? 'Back on ' + r.domain : 'Switched to ' + r.domain,
         }[r.status];
       },
-      get lastChecked() {
-        const sec = Math.max(0, Math.round((this.now - this.lastCheckedAt) / 1000));
-        return sec < 5 ? 'just now' : sec < 60 ? sec + 's ago' : Math.floor(sec / 60) + ' min ago';
+      // Countdown to the next automatic DNS check, shown under "Looking for …"
+      get nextCheckIn() {
+        const sec = Math.max(1, Math.ceil((this.nextCheckAt - this.now) / 1000));
+        return sec < 60 ? sec + 's' : cdTimer(sec);
       },
       get cooldown() { return Math.max(0, 60 - (this.now - this.manualAt) / 1000); },
       get providerSteps() { return (this.providers.find((p) => p.id === this.provider) || this.providers[0]).steps; },
@@ -231,7 +231,6 @@
         await cdSleep(500);
         if (token !== this.token) return;
         dns.logs.push(L(cdClock(), 'No CNAME record found', 'warn'));
-        this.lastCheckedAt = Date.now();
         this.nextCheckAt = Date.now() + CD_DNS_EVERY;
         this.icons();
       },
@@ -247,7 +246,6 @@
         await cdSleep(900);
         if (token !== this.token) return;
         this.checking = false;
-        this.lastCheckedAt = Date.now();
         // Prototype: automatic checks find nothing twice, then the record; Check now finds it at once,
         // except the first time a wrong record was seen (it's still wrong)
         if (auto && (r.autoChecks = (r.autoChecks || 0) + 1) < 3) {
@@ -395,7 +393,7 @@
       // ---- prototype only ----
       applyState(id) {
         this.token++;
-        Object.assign(this, { runs: cdHistory(), changing: false, setupStep: 'domain', pendingDomain: '', viewingId: null, liveDomain: '', domain: '', domainError: '', starting: false, checking: false, rerunning: false, manualAt: 0, ack: false, nextCheckAt: Date.now() + CD_DNS_EVERY, lastCheckedAt: Date.now() - 6 * 1000 });
+        Object.assign(this, { runs: cdHistory(), changing: false, setupStep: 'domain', pendingDomain: '', viewingId: null, liveDomain: '', domain: '', domainError: '', starting: false, checking: false, rerunning: false, manualAt: 0, ack: false, nextCheckAt: Date.now() + CD_DNS_EVERY });
         ['cd-cancel', 'cd-switch', 'cd-share', 'cd-dns', 'cd-revert'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
         const d = 'learn.example.com';
         const all = { check: 'done', dns: 'done', ssl: 'done', verify: 'done', switch: 'done', ssl_remove: 'done', cleanup: 'done' };
