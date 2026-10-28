@@ -21,9 +21,9 @@
     { id: 'other', label: 'Other', steps: ['Sign in where you bought the domain (or where its DNS is managed).', 'Find the DNS settings, often called <b>DNS records</b>, <b>Zone editor</b> or <b>Manage DNS</b>.', 'Add a new <b>CNAME</b> record with the Name and Value above, and save.'] },
   ];
   // DNS checks stop after this long; the person fixes the record and runs again
-  const CD_DNS_LIMIT = 30 * 60 * 1000;
-  // Prototype only: how often the automatic DNS check runs, so the log visibly grows while waiting
-  const CD_DNS_EVERY = 15 * 1000;
+  // DNS: checked right away, then again every 5 minutes; after 3 more misses (15 minutes) the step fails
+  const CD_DNS_RETRIES = 3;
+  const CD_DNS_EVERY = 5 * 60 * 1000;
   const CD_TWO_PART = ['co.in', 'ac.in', 'org.in', 'net.in', 'edu.in', 'gov.in', 'co.uk', 'com.au', 'com.sg', 'co.za'];
 
   const cdSleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -65,7 +65,7 @@
       L('10:50:04', found ? `Checked again: still ${found}` : 'Checked again: no CNAME record found', 'warn'),
     ],
     dnsDone: (d) => [L('10:40:02', `Looking up the CNAME record of ${d}`), L('10:40:02', `Expected value: ${CD_CURRENT}`, 'muted'), L('10:40:03', 'No CNAME record found', 'warn'), L('10:45:03', 'Checked again: no CNAME record found', 'warn'), L('10:50:04', `Found ${d} → ${CD_CURRENT}`, 'ok'), L('10:50:04', 'DNS verified after 3 checks', 'ok')],
-    dnsTimeout: (d) => [L('09:12:40', `Looking up the CNAME record of ${d}`), L('09:12:40', `Expected value: ${CD_CURRENT}`, 'muted'), L('09:12:41', 'No CNAME record found', 'warn'), L('…', 'Checked again 29 times', 'muted'), L('09:42:44', 'No CNAME record found', 'warn'), L('09:42:44', 'Stopped after 30 minutes: the CNAME record wasn’t found', 'error')],
+    dnsTimeout: (d) => [L('09:12:40', `Looking up the CNAME record of ${d}`), L('09:12:40', `Expected value: ${CD_CURRENT}`, 'muted'), L('09:12:41', 'No CNAME record found', 'warn'), L('09:17:41', 'Checked again: no CNAME record found', 'warn'), L('09:22:41', 'Checked again: no CNAME record found', 'warn'), L('09:27:42', 'Checked again: no CNAME record found', 'warn'), L('09:27:42', 'Stopped after 15 minutes: the CNAME record wasn’t found', 'error')],
     sslDone: (d) => [L('10:50:05', 'Started the certificate workflow · run 12873551920', 'muted'), L('10:50:09', `Requesting a certificate for ${d}`), L('10:50:31', 'Proving that the domain points to Testpress (HTTP-01 challenge)'), L('10:51:02', 'Domain ownership confirmed', 'ok'), L('10:51:40', 'Certificate issued · valid until 26 Jan 2027', 'ok'), L('10:52:18', 'Installing the certificate on Testpress servers'), L('10:53:01', 'Certificate installed', 'ok'), L('10:53:01', 'Workflow finished: success', 'ok')],
     sslFailed: (d) => [L('10:50:05', 'Started the certificate workflow · run 12873551920', 'muted'), L('10:50:09', `Requesting a certificate for ${d}`), L('10:50:12', `Error: the CAA record on ${cdSplit(d).zone} only lets digicert.com issue certificates`, 'error'), L('10:50:12', 'Workflow finished: failure', 'error')],
     verifyDone: (d) => [L('10:53:12', `GET https://${d}/api/v2.3/settings/`), L('10:53:12', '200 OK · 182 ms', 'muted'), L('10:53:12', `Site answers as ${CD_CURRENT}`, 'ok')],
@@ -92,10 +92,10 @@
       steps: cdSteps({ check: 'done', dns: 'cancelled', ssl: 'skipped', verify: 'skipped', switch: 'skipped' }) };
     r1.steps[0].logs = CD_LOGS.check(r1.domain); r1.steps[0].time = '1s';
     r1.steps[1].logs = CD_LOGS.dnsWaiting(r1.domain).slice(0, 3).concat([L('16:11:20', 'Cancelled by Rahul Menon', 'muted')]); r1.steps[1].time = '6m';
-    const r2 = { id: 2, domain: 'learn.example.com', by: CD_ME, started: '14 Oct, 9:12 AM', duration: '30m 4s', status: 'failed', attempt: 1,
+    const r2 = { id: 2, domain: 'learn.example.com', by: CD_ME, started: '14 Oct, 9:12 AM', duration: '15m 2s', status: 'failed', attempt: 1,
       steps: cdSteps({ check: 'done', dns: 'failed', ssl: 'skipped', verify: 'skipped', switch: 'skipped' }) };
     r2.steps[0].logs = CD_LOGS.check(r2.domain); r2.steps[0].time = '1s';
-    r2.steps[1].logs = CD_LOGS.dnsTimeout(r2.domain); r2.steps[1].time = '30m';
+    r2.steps[1].logs = CD_LOGS.dnsTimeout(r2.domain); r2.steps[1].time = '15m';
     return [r2, r1];
   }
 
@@ -163,7 +163,7 @@
       },
       // Countdown to the next automatic DNS check, shown under "Looking for …"
       get nextCheckIn() {
-        const sec = Math.max(1, Math.ceil((this.nextCheckAt - this.now) / 1000));
+        const sec = Math.min(CD_DNS_EVERY / 1000, Math.max(1, Math.ceil((this.nextCheckAt - this.now) / 1000)));
         return sec < 60 ? sec + 's' : cdTimer(sec);
       },
       get cooldown() { return Math.max(0, 60 - (this.now - this.manualAt) / 1000); },
@@ -246,10 +246,11 @@
         await cdSleep(900);
         if (token !== this.token) return;
         this.checking = false;
-        // Prototype: automatic checks find nothing twice, then the record; Check now finds it at once,
-        // except the first time a wrong record was seen (it's still wrong)
-        if (auto && (r.autoChecks = (r.autoChecks || 0) + 1) < 3) {
+        // Prototype: automatic checks never find the record, so the third one fails the step;
+        // Check now finds it at once, except the first time a wrong record was seen (it's still wrong)
+        if (auto) {
           dns.logs.push(L(cdClock(), r.foundWrong ? `Checked again: still ${r.foundWrong}` : 'Checked again: no CNAME record found', 'warn'));
+          if ((r.autoChecks = (r.autoChecks || 0) + 1) >= CD_DNS_RETRIES) this.failDns(r);
           return;
         }
         if (r.foundWrong && !r.recordAdded) { dns.logs.push(L(cdClock(), r.foundWrong ? `Found ${r.foundWrong}, expected ${CD_CURRENT}` : 'No CNAME record found', 'warn')); r.recordAdded = true; return; }
@@ -261,7 +262,6 @@
       },
       autoCheck() {
         const r = this.latest;
-        if (r && r.status === 'waiting' && r.startTs && this.now - r.startTs > CD_DNS_LIMIT) return this.failDns(r);
         if (this.nextCheckAt && this.now >= this.nextCheckAt && this.latest && this.latest.status === 'waiting') {
           this.nextCheckAt = Date.now() + CD_DNS_EVERY;
           this.checkNow(true);
@@ -270,8 +270,8 @@
 
       failDns(r) {
         const dns = r.steps[1];
-        dns.logs.push(L(cdClock(), 'Stopped after 30 minutes: the CNAME record wasn’t found', 'error'));
-        Object.assign(dns, { status: 'failed', time: '30m', open: true });
+        dns.logs.push(L(cdClock(), 'Stopped after 15 minutes: the CNAME record wasn’t found', 'error'));
+        Object.assign(dns, { status: 'failed', time: '15m', open: true });
         r.steps.slice(2).forEach((s) => { s.status = 'skipped'; });
         r.status = 'failed'; r.duration = cdFmt((this.now - r.startTs) / 1000);
         this.icons();
@@ -415,8 +415,8 @@
           case 'setup': this.latest.dismissed = true; break;
           case 'setup_dns': this.latest.dismissed = true; this.domain = this.pendingDomain = 'learn.example.com'; this.setupStep = 'dns'; break;
           case 'setup_error': this.latest.dismissed = true; this.domain = 'example.com'; this.validate && ([, this.domainError] = this.validate('example.com')); break;
-          case 'dns_none': x = make('waiting', { check: 'done', dns: 'waiting' }); x.dns.logs = CD_LOGS.dnsWaiting(d); x.dns.open = true; break;
-          case 'dns_wrong': x = make('waiting', { check: 'done', dns: 'waiting' }); x.r.foundWrong = 'example.wixdns.net'; x.dns.logs = CD_LOGS.dnsWaiting(d, 'example.wixdns.net'); x.dns.open = true; break;
+          case 'dns_none': x = make('waiting', { check: 'done', dns: 'waiting' }); x.dns.logs = CD_LOGS.dnsWaiting(d); x.dns.open = true; x.r.autoChecks = 2; this.nextCheckAt = Date.now() + 60 * 1000; break;
+          case 'dns_wrong': x = make('waiting', { check: 'done', dns: 'waiting' }); x.r.foundWrong = 'example.wixdns.net'; x.dns.logs = CD_LOGS.dnsWaiting(d, 'example.wixdns.net'); x.dns.open = true; x.r.autoChecks = 2; this.nextCheckAt = Date.now() + 60 * 1000; break;
           case 'ssl': x = make('running', { check: 'done', dns: 'done', ssl: 'running' }); x.ssl.logs = CD_LOGS.sslDone(d).slice(0, 3); x.ssl.open = true;
             (async (token) => { const ssl = this.latest.steps[2]; for (const line of CD_LOGS.sslDone(d).slice(3)) { await cdSleep(1100); if (token !== this.token) return; ssl.logs.push({ ...line, t: cdClock() }); } ssl.status = 'done'; ssl.time = '3m 2s'; ssl.open = false; this.runFrom('verify', token); })(this.token);
             break;
