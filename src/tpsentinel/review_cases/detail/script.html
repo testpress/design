@@ -236,14 +236,16 @@
         ic,
         c, d, all,
         missing: !found,
-        tab: ['overview', 'evidence', 'activity', 'history'].includes(params.get('tab')) ? params.get('tab') : 'overview',
+        // Old links used ?tab=evidence; those land on Snapshots
+        tab: params.get('tab') === 'evidence' ? 'snapshots' : ['overview', 'snapshots', 'recordings', 'activity', 'history'].includes(params.get('tab')) ? params.get('tab') : 'overview',
         sessionIdx: d.sessions.length - 1,
         menu: null,
         viewer: null,
         newReview: null,
         decision: { choice: '', reason: '', notes: '', confirming: false, error: '', submitting: false },
         justSubmitted: false,
-        evidenceFilter: { session: '', anomaly: '', source: '', availability: '', q: '' },
+        snapshotFilter: { session: '', type: '', anomaly: '', availability: '' },
+        recordingFilter: { session: '', source: '', anomaly: '', availability: '' },
         activityFilter: { session: '', type: '', q: '' },
         historyFilter: { type: '', actor: '' },
         flagReasons: FLAG_REASONS,
@@ -305,6 +307,7 @@
           return d.concernType === 'evidence' ? 'Set from how much required evidence is missing' : 'Set from the severity of what AI found';
         },
         relative, waited, exact, day, dayTime, dur, span,
+        clockAt: ts => clock(new Date(ts)),
 
         // ---------- queue: Previous / Next follow the list the case was opened from ----------
         get sequence() {
@@ -361,8 +364,8 @@
         },
         get requestedKindCount() { return this.requestedEvidence.length; },
         openRequestedEvidence() {
-          this.evidenceFilter = { session: '', anomaly: '', source: '', availability: '', q: d.request.what === 'snapshots' ? 'Periodic' : 'recording' };
-          this.tab = 'evidence';
+          if (d.request.what === 'snapshots') { this.resetSnapshots(); this.snapshotFilter.type = 'periodic'; this.tab = 'snapshots'; }
+          else { this.resetRecordings(); this.tab = 'recordings'; }
           this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
         },
         get enrolledOn() {
@@ -413,9 +416,11 @@
         indicatorLabel(key) { return INDICATOR_BY_KEY[key].label; },
         stateLabel(a) { return ARTIFACT_STATE[a.state].label; },
         stateNote(a) { return ARTIFACT_STATE[a.state].note; },
+        // An anomaly's media opens where it lives: Snapshots if it has any stills, else Recordings
         openEvidenceFor(key) {
-          this.evidenceFilter = { session: '', anomaly: key, source: '', availability: '', q: '' };
-          this.tab = 'evidence';
+          const media = d.events.filter(e => e.key === key).flatMap(e => e.artifacts);
+          if (!media.length || media.some(a => a.media === 'image')) { this.resetSnapshots(); this.snapshotFilter.anomaly = key; this.tab = 'snapshots'; }
+          else { this.resetRecordings(); this.recordingFilter.anomaly = key; this.tab = 'recordings'; }
           this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
         },
         openGapSession(g) {
@@ -465,27 +470,56 @@
           return [...d.sessionMedia].filter(m => m.kind === 'periodic' || m.kind === 'recording').sort((a, b) => b.at - a.at).slice(0, 4);
         },
 
-        // ---------- Evidence tab ----------
-        get allEvidence() {
-          return [...d.events.flatMap(e => e.artifacts), ...d.sessionMedia].sort((a, b) => b.at - a.at);
+        // ---------- Snapshots and Recordings tabs ----------
+        // Stills (periodic and anomaly) go to Snapshots; full recordings and anomaly clips go to Recordings
+        get allSnapshots() {
+          return [...d.events.flatMap(e => e.artifacts), ...d.sessionMedia].filter(a => a.media === 'image').sort((a, b) => b.at - a.at);
         },
-        get evidenceAnomalies() { return [...new Set(d.events.map(e => e.key))].map(k => ({ key: k, label: INDICATOR_BY_KEY[k].label })); },
-        get filteredEvidence() {
-          const f = this.evidenceFilter, q = f.q.trim().toLowerCase();
-          return this.allEvidence.filter(a =>
+        get allRecordings() { return d.sessionMedia.filter(a => a.kind === 'recording'); },
+        get allClips() { return d.events.flatMap(e => e.artifacts).filter(a => a.kind === 'clip').sort((a, b) => b.at - a.at); },
+        get recordingCount() { return this.allRecordings.length + this.allClips.length; },
+        anomaliesIn(list) { return [...new Set(list.filter(a => a.anomaly).map(a => a.anomaly))].map(k => [k, INDICATOR_BY_KEY[k].label]); },
+        // Latest session first, so the groups read in the same order as the rest of the page
+        bySession(list) {
+          return [...d.sessions].reverse().map(s => ({ session: s, items: list.filter(a => a.session === s.n) })).filter(g => g.items.length);
+        },
+
+        get filteredSnapshots() {
+          const f = this.snapshotFilter;
+          return this.allSnapshots.filter(a =>
             (!f.session || a.session === +f.session) &&
-            (!f.anomaly || (f.anomaly === '*' ? !!a.anomaly : a.anomaly === f.anomaly)) &&
-            (!f.source || a.source === f.source) &&
-            (!f.availability || a.state === f.availability) &&
-            (!q || `${this.artifactLabel(a)} session ${a.session} ${a.anomaly ? INDICATOR_BY_KEY[a.anomaly].label : ''} ${this.stateLabel(a)}`.toLowerCase().includes(q)));
+            (!f.type || (f.type === 'periodic' ? a.kind === 'periodic' : !!a.anomaly)) &&
+            (!f.anomaly || a.anomaly === f.anomaly) &&
+            (!f.availability || a.state === f.availability));
         },
-        get evidenceFiltered() { const f = this.evidenceFilter; return !!(f.session || f.anomaly || f.source || f.availability || f.q); },
-        resetEvidence() { this.evidenceFilter = { session: '', anomaly: '', source: '', availability: '', q: '' }; },
-        // Events with no media still appear, so nothing is silently missing
-        get eventsWithoutMedia() {
-          const f = this.evidenceFilter;
-          if (f.source || f.availability || f.q) return [];
-          return d.events.filter(e => !e.artifacts.length && (!f.session || e.session === +f.session) && (!f.anomaly || f.anomaly === '*' || e.key === f.anomaly));
+        get snapshotsFiltered() { const f = this.snapshotFilter; return !!(f.session || f.type || f.anomaly || f.availability); },
+        resetSnapshots() { this.snapshotFilter = { session: '', type: '', anomaly: '', availability: '' }; },
+
+        // Full recordings have no anomaly, so an anomaly filter leaves only clips
+        get filteredRecordings() {
+          const f = this.recordingFilter;
+          if (f.anomaly) return [];
+          return this.allRecordings.filter(a =>
+            (!f.session || a.session === +f.session) &&
+            (!f.source || a.source === f.source) &&
+            (!f.availability || a.state === f.availability));
+        },
+        get filteredClips() {
+          const f = this.recordingFilter;
+          return this.allClips.filter(a =>
+            (!f.session || a.session === +f.session) &&
+            (!f.source || a.source === f.source) &&
+            (!f.anomaly || a.anomaly === f.anomaly) &&
+            (!f.availability || a.state === f.availability));
+        },
+        get recordingsFiltered() { const f = this.recordingFilter; return !!(f.session || f.source || f.anomaly || f.availability); },
+        resetRecordings() { this.recordingFilter = { session: '', source: '', anomaly: '', availability: '' }; },
+        get recordingsOff() { return d.sessions.every(s => s.coverage.webcam.status === 'not_required' && s.coverage.screen.status === 'not_required'); },
+
+        // Anomalies with no media still appear in both tabs, so nothing is silently missing
+        eventsWithoutMedia(f) {
+          if (f.availability || f.source || f.type === 'periodic') return [];
+          return d.events.filter(e => !e.artifacts.length && (!f.session || e.session === +f.session) && (!f.anomaly || e.key === f.anomaly));
         },
 
         // ---------- Activity tab ----------
