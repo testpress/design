@@ -1,0 +1,58 @@
+{% include "src/ui-system/scripts/select_script.html" %}
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('securityPage', (config) => ({
+    saved: { ...config.settings },
+    limit: config.settings.limit,
+    limitOff: config.settings.limit_off,
+    period: config.settings.period,
+    action: config.settings.action,
+    requireViewer: config.settings.require_viewer_id,
+    viewers: config.viewers,
+    newViewer: '',
+
+    get limitError() {
+      if (this.limitOff) return '';
+      return this.limit === '' || Number(this.limit) < 10 ? 'Enter at least 10 licenses, or turn the limit off.' : '';
+    },
+
+    toast(title, variant = 'success') {
+      this.$dispatch('toast', { title, variant });
+    },
+
+    save() {
+      if (this.limitError) return document.getElementById('rate_limit').focus();
+      this.saved = { limit: this.limit, limit_off: this.limitOff, period: this.period, action: this.action, require_viewer_id: this.requireViewer };
+      this.toast('Security settings saved');
+    },
+
+    reset() {
+      this.limit = this.saved.limit;
+      this.limitOff = this.saved.limit_off;
+      this.requireViewer = this.saved.require_viewer_id;
+      this.period = this.saved.period;
+      this.action = this.saved.action;
+      // The custom selects keep their own state; push the saved values back into them.
+      ['period', 'action'].forEach((key) => {
+        this.$refs[key + 'Field'].firstElementChild.dispatchEvent(new CustomEvent('set-selected-values', { detail: this[key] }));
+      });
+    },
+
+    toggleBlock(viewer) {
+      const block = viewer.status !== 'blocked';
+      viewer.status = block ? 'blocked' : 'flagged';
+      this.toast((block ? 'Blocked ' : 'Unblocked ') + viewer.id);
+    },
+
+    addBlock() {
+      const id = this.newViewer.trim();
+      if (!id) return;
+      const existing = this.viewers.find((v) => v.id === id);
+      if (existing) existing.status = 'blocked';
+      else this.viewers.unshift({ id, status: 'blocked', source: 'Manual', triggers: 0, last_triggered: 'Just now' });
+      this.newViewer = '';
+      this.toast('Blocked ' + id);
+    }
+  }));
+});
+</script>

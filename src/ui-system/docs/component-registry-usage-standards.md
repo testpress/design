@@ -346,6 +346,37 @@ Used when content or data is unavailable.
 
 ---
 
+## progress
+
+### Purpose
+
+Used for showing a share of a total, such as a breakdown bar or a completion level.
+
+### Allowed Variants
+
+* primary
+* success
+* warning
+* danger
+* neutral
+
+### Supported Parameters
+
+* value
+* max
+* variant
+* size (sm, md, lg)
+* label (accessible name)
+* extra_classes
+
+### Usage Rules
+
+* Always pass `label` so the bar has an accessible name.
+* Show the number next to the bar; the bar alone is not enough.
+
+
+---
+
 # Navigation
 
 ## breadcrumbs

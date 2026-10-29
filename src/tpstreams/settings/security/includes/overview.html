@@ -1,0 +1,61 @@
+{% from "src/ui-system/components/stats-card.html" import stats_card %}
+{% from "src/ui-system/components/card.html" import card %}
+{% from "src/ui-system/components/progress.html" import progress %}
+
+{% set overview = security_settings.overview %}
+{% set sources_total = 0 %}
+{% for source in overview.sources %}{% set sources_total = sources_total + source.count %}{% endfor %}
+
+<section aria-labelledby="overview-heading">
+  <h2 id="overview-heading" class="text-lg font-semibold text-gray-800 dark:text-white">Overview</h2>
+  <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Viewers that TPStreams flagged or blocked for this organization.</p>
+
+  <div class="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4" :class="action === 'monitor' ? 'lg:grid-cols-3' : ''">
+    {{ stats_card(
+      title="Flagged viewers",
+      value=overview.flagged.total,
+      meta="+" ~ overview.flagged.last_7_days ~ " in the last 7 days · +" ~ overview.flagged.last_30_days ~ " in 30 days",
+      icon="flag"
+    ) }}
+    {{ stats_card(
+      title="Blocked viewers",
+      value=overview.blocked.total,
+      meta="+" ~ overview.blocked.last_7_days ~ " in the last 7 days · +" ~ overview.blocked.last_30_days ~ " in 30 days",
+      icon="ban"
+    ) }}
+    <div x-show="action === 'monitor'" x-cloak>
+      {{ stats_card(
+        title="Would have been refused",
+        value=overview.would_have_been_refused,
+        meta="Last 7 days · while the action is Monitor",
+        icon="eye",
+        icon_color="text-primary-600 dark:text-primary-500"
+      ) }}
+    </div>
+  </div>
+
+  <div class="mt-4 grid grid-cols-1 lg:grid-cols-5 gap-4">
+    <div class="lg:col-span-3">
+      {% call card(title="Restricted viewers by source", extra_classes="h-full") %}
+        <ul class="space-y-4">
+          {% for source in overview.sources %}
+          <li class="grid grid-cols-[6.5rem_1fr_2rem] items-center gap-x-3 text-sm">
+            <span class="text-gray-500 dark:text-neutral-400">{{ source.label }}</span>
+            {{ progress(value=source.count, max=sources_total, variant=source.variant, label=source.label ~ ": " ~ source.count) }}
+            <span class="text-end font-semibold tabular-nums text-gray-800 dark:text-neutral-200">{{ source.count }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+      {% endcall %}
+    </div>
+    <div class="lg:col-span-2">
+      {% call card(title="Viewer ID coverage", extra_classes="h-full") %}
+        <p class="text-3xl font-semibold text-gray-800 dark:text-white">{{ overview.no_viewer_id_percent }}%<span class="ms-1.5 text-sm font-medium text-gray-500 dark:text-neutral-400">of licenses had no viewer ID</span></p>
+        <p class="mt-3 text-sm text-gray-500 dark:text-neutral-400">
+          Over the last 7 days. Licenses without a viewer ID can't be rate-limited or traced to a student.
+          <a href="#" class="font-medium text-primary-600 hover:underline dark:text-primary-500">See the integration guide <i data-lucide="arrow-right" class="inline size-3.5"></i></a>
+        </p>
+      {% endcall %}
+    </div>
+  </div>
+</section>

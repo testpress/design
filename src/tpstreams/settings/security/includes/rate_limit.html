@@ -1,0 +1,112 @@
+{% from "src/ui-system/components/card.html" import card %}
+{% from "src/ui-system/components/input.html" import input %}
+{% from "src/ui-system/components/select.html" import select %}
+{% from "src/ui-system/components/switch.html" import switch %}
+{% from "src/ui-system/components/alert.html" import alert %}
+{% from "src/ui-system/components/button.html" import button %}
+
+{% set settings = security_settings.settings %}
+
+<section aria-labelledby="rate-limit-heading">
+  <h2 id="rate-limit-heading" class="text-lg font-semibold text-gray-800 dark:text-white">License rate limiting</h2>
+  <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-neutral-400">Cap how many DRM licenses a single viewer can request in a window. Genuine students almost never reach a sensible limit; a leaked login draining your library does.</p>
+
+  {% if read_only %}
+  {% call card(padding="p-0", extra_classes="mt-5") %}
+    <dl class="divide-y divide-gray-200 dark:divide-neutral-700 text-sm">
+      <div class="grid gap-1 p-5 md:grid-cols-3 md:gap-6">
+        <dt class="font-medium text-gray-800 dark:text-neutral-200">Licenses per viewer</dt>
+        <dd class="md:col-span-2 text-gray-500 dark:text-neutral-400">{{ "Limit off" if settings.limit_off else settings.limit ~ " licenses" }}</dd>
+      </div>
+      <div class="grid gap-1 p-5 md:grid-cols-3 md:gap-6">
+        <dt class="font-medium text-gray-800 dark:text-neutral-200">Window</dt>
+        <dd class="md:col-span-2 text-gray-500 dark:text-neutral-400">{% for o in security_settings.period_options %}{% if o.value == settings.period %}{{ o.label }}{% endif %}{% endfor %}</dd>
+      </div>
+      <div class="grid gap-1 p-5 md:grid-cols-3 md:gap-6">
+        <dt class="font-medium text-gray-800 dark:text-neutral-200">Action when exceeded</dt>
+        <dd class="md:col-span-2 text-gray-500 dark:text-neutral-400">{% for o in security_settings.action_options %}{% if o.value == settings.action %}{{ o.label }}{% endif %}{% endfor %}</dd>
+      </div>
+      <div class="grid gap-1 p-5 md:grid-cols-3 md:gap-6">
+        <dt class="font-medium text-gray-800 dark:text-neutral-200">Require viewer ID</dt>
+        <dd class="md:col-span-2 text-gray-500 dark:text-neutral-400">{{ "On" if settings.require_viewer_id else "Off" }}</dd>
+      </div>
+    </dl>
+  {% endcall %}
+  {% else %}
+  <form @submit.prevent="save()" novalidate>
+    {% call card(padding="p-0", extra_classes="mt-5") %}
+      <div class="divide-y divide-gray-200 dark:divide-neutral-700">
+
+        <div class="grid gap-3 p-5 md:grid-cols-3 md:gap-6">
+          <div>
+            <label for="rate_limit" class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Licenses per viewer</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">Per viewer, per window. Turn off to allow unlimited licenses.</p>
+          </div>
+          <div class="md:col-span-2 space-y-3">
+            <div class="max-w-xs">
+              {{ input(
+                name="rate_limit",
+                type="number",
+                x_model="limit",
+                x_error="limitError",
+                help_text="licenses per viewer, per window",
+                help_text_class="text-sm",
+                extra_attrs=':disabled="limitOff" min="10" step="10"'
+              ) }}
+            </div>
+            {{ switch(id="limit_off", x_model="limitOff", size="sm", label="Turn limit off") }}
+          </div>
+        </div>
+
+        <div class="grid gap-3 p-5 md:grid-cols-3 md:gap-6">
+          <div>
+            <label for="period" class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Window</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">The period the limit is counted over.</p>
+          </div>
+          <div class="md:col-span-2 max-w-xs" x-ref="periodField" @change="period = $event.target.value">
+            {{ select(id="period", name="period", options=security_settings.period_options, selected_value=settings.period) }}
+          </div>
+        </div>
+
+        <div class="grid gap-3 p-5 md:grid-cols-3 md:gap-6">
+          <div>
+            <label for="action" class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Action when exceeded</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">What happens once a viewer passes the limit.</p>
+          </div>
+          <div class="md:col-span-2 space-y-3">
+            <div class="max-w-md" x-ref="actionField" @change="action = $event.target.value">
+              {{ select(id="action", name="action", options=security_settings.action_options, selected_value=settings.action) }}
+            </div>
+            <div x-show="action === 'monitor'" x-cloak>
+              {% call alert(variant="info", size="sm") %}In <b>Monitor</b>, no viewer is ever refused. Use it to see who would be affected before you enforce.{% endcall %}
+            </div>
+          </div>
+        </div>
+
+        <div class="grid gap-3 p-5 md:grid-cols-3 md:gap-6">
+          <div>
+            <span class="block text-sm font-medium text-gray-800 dark:text-neutral-200">Require viewer ID</span>
+            <p class="mt-1 text-xs text-gray-500 dark:text-neutral-400">Reject license requests that carry no viewer ID, so every license is traceable.</p>
+          </div>
+          <div class="md:col-span-2 space-y-3">
+            {{ switch(id="require_viewer_id", x_model="requireViewer", size="sm", label="Require a viewer ID on every request") }}
+            <div x-show="requireViewer" x-cloak>
+              {% call alert(variant="warning", size="sm") %}
+                <b>{{ security_settings.overview.no_viewer_id_percent }}% of your licenses in the last 7 days had no viewer ID.</b>
+                Turning this on will start failing those requests until the integrations send one.
+                <a href="#" class="font-semibold underline">Review integration docs</a>.
+              {% endcall %}
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-x-2 p-5">
+          {{ button(text="Save changes", type="submit") }}
+          {{ button(text="Cancel", variant="secondary", extra_attrs='@click="reset()"') }}
+        </div>
+
+      </div>
+    {% endcall %}
+  </form>
+  {% endif %}
+</section>

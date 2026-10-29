@@ -1,0 +1,50 @@
+{% from "src/ui-system/components/input.html" import input %}
+{% from "src/ui-system/components/button.html" import button %}
+{% from "src/ui-system/components/badge.html" import badge %}
+{% from "src/ui-system/components/table.html" import table, table_th, table_td %}
+
+{% set header %}
+  {{ table_th(text="Viewer ID") }}
+  {{ table_th(text="Status") }}
+  {{ table_th(text="Source") }}
+  {{ table_th(text="Triggers") }}
+  {{ table_th(text="Last triggered") }}
+  {% if not read_only %}{{ table_th(text="Action", class="text-end") }}{% endif %}
+{% endset %}
+
+<section aria-labelledby="restricted-heading">
+  <h2 id="restricted-heading" class="text-lg font-semibold text-gray-800 dark:text-white">Restricted viewers</h2>
+  <p class="mt-1 max-w-3xl text-sm text-gray-500 dark:text-neutral-400">Flagged and blocked viewers. Blocking takes effect within 60 seconds; unblocking is one click and fully reversible.</p>
+
+  {% if not read_only %}
+  <form class="mt-5 flex flex-col sm:flex-row sm:items-end gap-3" @submit.prevent="addBlock()">
+    <div class="w-full sm:max-w-xs">
+      {{ input(name="new_viewer", label="Block a viewer by ID", placeholder="e.g. student_90213", x_model="newViewer") }}
+    </div>
+    {{ button(text="Add block", variant="secondary", type="submit", icon="ban") }}
+  </form>
+  {% endif %}
+
+  <div class="mt-5">
+    {% call table(table_header=header, hoverable=true) %}
+      <template x-for="viewer in viewers" :key="viewer.id">
+        <tr>
+          {% call table_td(class="font-mono text-gray-800 dark:text-neutral-200") %}<span x-text="viewer.id"></span>{% endcall %}
+          {% call table_td() %}
+            <template x-if="viewer.status === 'blocked'">{{ badge(text="Blocked", variant="danger", size="sm") }}</template>
+            <template x-if="viewer.status === 'flagged'">{{ badge(text="Flagged", variant="warning", size="sm") }}</template>
+          {% endcall %}
+          {% call table_td(class="text-gray-800 dark:text-neutral-200") %}<span x-text="viewer.source"></span>{% endcall %}
+          {% call table_td(class="tabular-nums text-gray-800 dark:text-neutral-200") %}<span x-text="viewer.triggers"></span>{% endcall %}
+          {% call table_td(class="text-gray-500 dark:text-neutral-400") %}<span x-text="viewer.last_triggered"></span>{% endcall %}
+          {% if not read_only %}
+          {% call table_td(class="text-end") %}
+            <template x-if="viewer.status === 'blocked'">{{ button(text="Unblock", variant="secondary", size="sm", extra_attrs='@click="toggleBlock(viewer)"') }}</template>
+            <template x-if="viewer.status === 'flagged'">{{ button(text="Block", variant="secondary", size="sm", extra_attrs='@click="toggleBlock(viewer)"') }}</template>
+          {% endcall %}
+          {% endif %}
+        </tr>
+      </template>
+    {% endcall %}
+  </div>
+</section>
