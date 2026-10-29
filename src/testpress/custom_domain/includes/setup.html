@@ -1,0 +1,91 @@
+{#
+  No run in progress. Setup is two screens:
+  1. the domain, with what will happen;
+  2. the one DNS record to add, with help per provider. Starting the run comes after the record is added.
+#}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% set how = [
+  ["You add one DNS record", "At GoDaddy, Cloudflare or wherever the domain is managed. We show exactly what to add."],
+  ["We get an SSL certificate", "Automatic."],
+  ["We test your site", "Automatic. We open the new address and check it shows your site."],
+  ["You switch when ready", "Everyone stays signed in. Old links keep working."]
+] %}
+
+<!-- 1. Domain -->
+<section x-show="setupStep === 'domain'" class="grid lg:grid-cols-5 gap-5 p-5 bg-white rounded-2xl shadow-sm dark:bg-neutral-800">
+  <!-- Centred in its column, so the space beside the taller "How it works" panel is shared above and below -->
+  <div class="lg:col-span-3 flex flex-col justify-center items-center py-4 text-center">
+    <span class="size-10 inline-flex items-center justify-center rounded-full bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
+      <i data-lucide="globe" class="size-5"></i>
+    </span>
+    <h2 class="mt-3 font-semibold text-gray-800 dark:text-neutral-100" x-text="changing ? 'Move to another domain' : 'Use your own domain'"></h2>
+    <p class="mt-1 max-w-sm text-sm text-gray-500 dark:text-neutral-400">
+      Students and staff open your site at an address like learn.yourschool.com instead of
+      <span class="font-medium text-gray-700 dark:text-neutral-200" x-text="address"></span>.
+    </p>
+
+    <form class="mt-5 w-full max-w-sm space-y-3 text-start" @submit.prevent="next()" novalidate>
+      {{ input(
+        name="domain",
+        label="Domain",
+        placeholder="learn.yourschool.com",
+        x_model="domain",
+        x_error="domainError",
+        help_text="A subdomain of a domain you own, like learn. or courses.",
+        extra_attrs='autocomplete="off" spellcheck="false" @input="domainError = \'\'"'
+      ) }}
+      <div class="flex flex-col gap-2">
+        {{ button(text="Continue", type="submit", icon="arrow-right", icon_position="right", full_width=true) }}
+        <template x-if="changing">
+          {{ button(text="Cancel", variant="ghost", full_width=true, extra_attrs='@click="changing = false; icons()"') }}
+        </template>
+      </div>
+    </form>
+  </div>
+
+  <div class="lg:col-span-2 p-4 rounded-xl bg-gray-50 dark:bg-neutral-900/60">
+    <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">How it works</h3>
+    <ol class="mt-3 space-y-3">
+      {% for item in how %}
+      <li class="flex gap-x-3">
+        <span class="shrink-0 size-5 mt-px inline-flex items-center justify-center rounded-full bg-white text-[11px] font-semibold text-gray-600 shadow-sm dark:bg-neutral-800 dark:text-neutral-300">{{ loop.index }}</span>
+        <div>
+          <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ item[0] }}</p>
+          <p class="text-[13px] text-gray-500 dark:text-neutral-400">{{ item[1] }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+    <p class="mt-4 text-xs text-gray-500 dark:text-neutral-400">Until you switch, your site stays on <span x-text="address"></span>.</p>
+  </div>
+</section>
+
+<!-- 2. DNS record: the record and the start button on the left, provider help beside it (same shape as step 1) -->
+<section x-show="setupStep === 'dns'" x-cloak class="p-5 bg-white rounded-2xl shadow-sm dark:bg-neutral-800">
+  <div class="grid lg:grid-cols-5 gap-5">
+    <div class="lg:col-span-3 flex flex-col">
+      <button type="button" @click="setupStep = 'domain'; icons()" class="self-start inline-flex items-center gap-x-1.5 text-[13px] text-gray-500 hover:text-gray-800 focus:outline-none focus-visible:underline dark:text-neutral-400 dark:hover:text-neutral-200">
+        <i data-lucide="arrow-left" class="size-3.5"></i>
+        <span x-text="pendingDomain"></span>
+        <span class="text-primary-600 dark:text-primary-400">Change</span>
+      </button>
+
+      <h2 class="mt-3 font-semibold text-gray-800 dark:text-neutral-100">Add one DNS record</h2>
+      <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+        Add it where you manage <span class="font-medium text-gray-700 dark:text-neutral-200" x-text="split.zone"></span>.
+      </p>
+
+      <div class="mt-4">{% include "./dns_record.html" %}</div>
+
+      <!-- Sits at the bottom, level with the end of the provider panel -->
+      <div class="mt-6 lg:mt-auto lg:pt-6">
+        {{ button(text='<span x-text="starting ? \'Starting…\' : \'I’ve added it, start setup\'"></span>', extra_attrs='@click="start()" :disabled="starting"') }}
+      </div>
+    </div>
+
+    <div class="lg:col-span-2 p-4 rounded-xl bg-gray-50 dark:bg-neutral-900/60">
+      {% include "./dns_providers.html" %}
+    </div>
+  </div>
+</section>

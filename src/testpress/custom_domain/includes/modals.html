@@ -1,0 +1,47 @@
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+
+<div @modal-confirmed-cd-cancel.window="cancelRun()"
+     @modal-confirmed-cd-switch.window="switchDomain()"
+     @modal-confirmed-cd-share.window="copy(shareText(), 'Steps')"
+     @modal-confirmed-cd-revert.window="startRevert()">
+
+  {% call modal(id="cd-cancel", title="Cancel this run?", variant="danger", confirm_text="Cancel run", cancel_text="Keep running") %}
+    <p x-show="!cancelCleans">We stop checking <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="latest && latest.domain"></span>. Your site stays on <span x-text="address"></span>. You can start again any time.</p>
+    <p x-show="cancelCleans">We remove the SSL certificate for <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="latest && latest.domain"></span> and take it off our servers. Your site stays on <span x-text="address"></span>. You can start again any time.</p>
+  {% endcall %}
+
+  {# Moving off abc.testpress.in keeps everyone signed in (session handoff). Moving off a custom domain can't,
+     because that domain is removed, so only then do we ask to confirm signing everyone out. #}
+  {% call modal(id="cd-switch", title="Switch your site’s address?", confirm_text="Switch now", confirm_attrs=':disabled="latest && latest.kind === \'change\' && !ack"') %}
+    <div class="space-y-4">
+      <p>
+        <span x-text="latest && latest.from"></span> →
+        <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="latest && latest.domain"></span>
+      </p>
+      <p x-show="latest && latest.kind !== 'change'">Everyone stays signed in. Links to <span x-text="current"></span> open the new address.</p>
+      <div x-show="latest && latest.kind === 'change'">
+        {{ checkbox(name="cd-ack", label="Sign everyone out now", description="Students and staff sign in again at the new address. Do this outside class hours.", x_model="ack", extra_classes="mt-1") }}
+      </div>
+    </div>
+  {% endcall %}
+
+  {% call modal(id="cd-dns", title="DNS record to add", size="lg", confirm_text="", cancel_text="Close") %}
+    {% include "./dns_help.html" %}
+  {% endcall %}
+
+  {% call modal(id="cd-revert", title="Revert to your Testpress address?", variant="danger", confirm_text="Revert", confirm_attrs=':disabled="!ack"') %}
+    <div class="space-y-4">
+      <p>
+        <span x-text="liveDomain"></span> →
+        <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="current"></span>
+      </p>
+      <p><span x-text="liveDomain"></span> stops opening your site. We remove its SSL certificate and take it off our servers.</p>
+      {{ checkbox(name="cd-ack-revert", label="Sign everyone out now", description="Students and staff sign in again at your Testpress address. Do this outside class hours.", x_model="ack", extra_classes="mt-1") }}
+    </div>
+  {% endcall %}
+
+  {% call modal(id="cd-share", title="Send to the person who manages your domain", confirm_text="Copy text", cancel_text="Close") %}
+    <pre class="p-3 rounded-lg bg-gray-50 font-mono text-xs leading-5 text-gray-800 whitespace-pre-wrap dark:bg-neutral-900 dark:text-neutral-200" x-text="run ? shareText() : ''"></pre>
+  {% endcall %}
+</div>
