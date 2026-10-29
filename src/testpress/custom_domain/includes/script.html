@@ -4,6 +4,8 @@
   // Three kinds of run: setup (abc.testpress.in → custom domain), change (custom → another custom domain, then the old one is
   // removed from our servers) and revert (back to abc.testpress.in, then the custom domain is removed).
   const CD_CURRENT = 'abc.testpress.in';
+  // Placeholder: the IP a root domain (yourschool.com) points to with an A record. A root domain can't have a CNAME.
+  const CD_IP = '13.235.27.10';
   const CD_ME = 'Priya Narayanan';
   const CD_STEPS = [
     { key: 'check', name: 'Check the domain' },
@@ -48,6 +50,12 @@
     if (kind === 'revert') return [{ key: 'switch', name: `Switch back to ${CD_CURRENT}` }, ...cdRemoveSteps(from)];
     return kind === 'change' ? [...CD_STEPS, ...cdRemoveSteps(from)] : CD_STEPS;
   }
+  // The one record to add: CNAME for a subdomain (learn → abc.testpress.in), A for a root domain (@ → IP)
+  function cdRecord(domain) {
+    const { host } = cdSplit(domain);
+    return host ? { type: 'CNAME', name: host, value: CD_CURRENT } : { type: 'A', name: '@', value: CD_IP };
+  }
+
   function cdSteps(statuses = {}, kind = 'setup', from = CD_CURRENT) {
     return cdStepDefs(kind, from).map((s) => ({ ...s, status: statuses[s.key] || 'queued', time: '', logs: [], open: false }));
   }
@@ -57,15 +65,15 @@
   // Logs per step, for a finished or seeded run
   const CD_LOGS = {
     check: (d) => [L('10:40:01', `Requested by ${CD_ME}`, 'muted'), L('10:40:01', `Domain: ${d}`), L('10:40:01', 'Not a testpress.in address', 'ok'), L('10:40:01', 'Valid domain name', 'ok'), L('10:40:02', 'Not used by another institute', 'ok')],
-    dnsWaiting: (d, found) => [
-      L('10:40:02', `Looking up the CNAME record of ${d}`),
-      L('10:40:02', `Expected value: ${CD_CURRENT}`, 'muted'),
-      L('10:40:03', found ? `Found ${found}, expected ${CD_CURRENT}` : 'No CNAME record found', 'warn'),
-      L('10:45:03', found ? `Checked again: still ${found}` : 'Checked again: no CNAME record found', 'warn'),
-      L('10:50:04', found ? `Checked again: still ${found}` : 'Checked again: no CNAME record found', 'warn'),
-    ],
-    dnsDone: (d) => [L('10:40:02', `Looking up the CNAME record of ${d}`), L('10:40:02', `Expected value: ${CD_CURRENT}`, 'muted'), L('10:40:03', 'No CNAME record found', 'warn'), L('10:45:03', 'Checked again: no CNAME record found', 'warn'), L('10:50:04', `Found ${d} → ${CD_CURRENT}`, 'ok'), L('10:50:04', 'DNS verified after 3 checks', 'ok')],
-    dnsTimeout: (d) => [L('09:12:40', `Looking up the CNAME record of ${d}`), L('09:12:40', `Expected value: ${CD_CURRENT}`, 'muted'), L('09:12:41', 'No CNAME record found', 'warn'), L('09:17:41', 'Checked again: no CNAME record found', 'warn'), L('09:22:41', 'Checked again: no CNAME record found', 'warn'), L('09:27:42', 'Checked again: no CNAME record found', 'warn'), L('09:27:42', 'Stopped after 15 minutes: the CNAME record wasn’t found', 'error')],
+    dnsWaiting: (d, found) => { const r = cdRecord(d); return [
+      L('10:40:02', `Looking up the ${r.type} record of ${d}`),
+      L('10:40:02', `Expected value: ${r.value}`, 'muted'),
+      L('10:40:03', found ? `Found ${found}, expected ${r.value}` : `No ${r.type} record found`, 'warn'),
+      L('10:45:03', found ? `Checked again: still ${found}` : `Checked again: no ${r.type} record found`, 'warn'),
+      L('10:50:04', found ? `Checked again: still ${found}` : `Checked again: no ${r.type} record found`, 'warn'),
+    ]; },
+    dnsDone: (d) => { const r = cdRecord(d); return [L('10:40:02', `Looking up the ${r.type} record of ${d}`), L('10:40:02', `Expected value: ${r.value}`, 'muted'), L('10:40:03', `No ${r.type} record found`, 'warn'), L('10:45:03', `Checked again: no ${r.type} record found`, 'warn'), L('10:50:04', `Found ${d} → ${r.value}`, 'ok'), L('10:50:04', 'DNS verified after 3 checks', 'ok')]; },
+    dnsTimeout: (d) => { const r = cdRecord(d); return [L('09:12:40', `Looking up the ${r.type} record of ${d}`), L('09:12:40', `Expected value: ${r.value}`, 'muted'), L('09:12:41', `No ${r.type} record found`, 'warn'), L('09:17:41', `Checked again: no ${r.type} record found`, 'warn'), L('09:22:41', `Checked again: no ${r.type} record found`, 'warn'), L('09:27:42', `Checked again: no ${r.type} record found`, 'warn'), L('09:27:42', `Stopped after 15 minutes: the ${r.type} record wasn’t found`, 'error')]; },
     sslDone: (d) => [L('10:50:05', 'Started the certificate workflow · run 12873551920', 'muted'), L('10:50:09', `Requesting a certificate for ${d}`), L('10:50:31', 'Proving that the domain points to Testpress (HTTP-01 challenge)'), L('10:51:02', 'Domain ownership confirmed', 'ok'), L('10:51:40', 'Certificate issued · valid until 26 Jan 2027', 'ok'), L('10:52:18', 'Installing the certificate on Testpress servers'), L('10:53:01', 'Certificate installed', 'ok'), L('10:53:01', 'Workflow finished: success', 'ok')],
     sslFailed: (d) => [L('10:50:05', 'Started the certificate workflow · run 12873551920', 'muted'), L('10:50:09', `Requesting a certificate for ${d}`), L('10:50:12', `Error: the CAA record on ${cdSplit(d).zone} only lets digicert.com issue certificates`, 'error'), L('10:50:12', 'Workflow finished: failure', 'error')],
     verifyDone: (d) => [L('10:53:12', `GET https://${d}/api/v2.3/settings/`), L('10:53:12', '200 OK · 182 ms', 'muted'), L('10:53:12', `Site answers as ${CD_CURRENT}`, 'ok')],
@@ -142,6 +150,7 @@
         return 'setup';
       },
       get address() { return this.liveDomain || CD_CURRENT; },
+      get record() { return cdRecord(this.view === 'setup' ? (this.pendingDomain || 'learn.yourschool.com') : this.run.domain); },
       get split() { return cdSplit(this.view === 'setup' ? (this.pendingDomain || 'learn.yourschool.com') : this.run.domain); },
       get stepNow() { return this.run && (this.run.steps.find((s) => ['running', 'waiting', 'failed'].includes(s.status)) || null); },
       get duration() {
@@ -167,7 +176,8 @@
         return sec < 60 ? sec + 's' : cdTimer(sec);
       },
       get cooldown() { return Math.max(0, 60 - (this.now - this.manualAt) / 1000); },
-      get providerSteps() { return (this.providers.find((p) => p.id === this.provider) || this.providers[0]).steps; },
+      get providerSteps() { return this.stepsFor(this.provider); },
+      stepsFor(id) { return (this.providers.find((p) => p.id === id) || this.providers[0]).steps.map((t) => t.replaceAll('CNAME', this.record.type)); },
       runSummary(r) {
         const s = r.steps.find((x) => ['running', 'waiting', 'failed', 'cancelled'].includes(x.status));
         if (r.status === 'success') return ({ revert: 'Reverted from ' + r.from, change: 'Moved from ' + r.from }[r.kind] || 'Switched') + ' · ' + r.duration;
@@ -183,23 +193,32 @@
       },
 
       // ---- setup ----
+      // Cleans what people type or paste (spaces, https://, paths, ports, a trailing dot), then says exactly what's wrong
       validate(value) {
-        let d = value.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-        if (!d) return [d, 'Enter the domain you want to use, like learn.yourschool.com.'];
+        const raw = value.trim().toLowerCase();
+        if (!raw) return ['', 'Enter the domain you want to use, like learn.yourschool.com.'];
+        if (/^[^/\s]+@/.test(raw.replace(/^[a-z]+:\/\//, ''))) return [raw, 'Enter a domain, not an email address. For example learn.yourschool.com.'];
+        const d = raw.replace(/\s+/g, '').replace(/^[a-z]+:\/\//, '').replace(/[/?#].*$/, '').replace(/:\d*$/, '').replace(/^\.+|\.+$/g, '');
+        if (d.includes('*')) return [d, 'Wildcards can’t be used. Enter one domain, like learn.yourschool.com.'];
+        if (d.includes('_')) return [d, 'Domains can’t contain _. Use - instead.'];
+        if (d.includes('..')) return [d, 'There are two dots in a row. Check the domain.'];
+        if (!d.includes('.')) return [d, `Add the ending, like ${d}.com or ${d}.in.`];
         if (d === 'testpress.in' || d.endsWith('.testpress.in')) return [d, 'testpress.in addresses can’t be used. Enter a domain you own.'];
-        if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(d)) return [d, 'That doesn’t look like a domain. Try something like learn.yourschool.com.'];
-        if (!cdSplit(d).host) return [d, `Use a subdomain, like learn.${d}. A main domain such as ${d} can’t point to Testpress.`];
+        if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(d)) return [d, 'That doesn’t look like a domain. Use letters, numbers, - and dots, like learn.yourschool.com.'];
+        if (d === this.liveDomain) return [d, 'This is already your site’s address.'];
         if (d === 'learn.coachingcentre.com') return [d, 'This domain is already used by another Testpress site.'];
         return [d, ''];
       },
       next() {
         const [d, err] = this.validate(this.domain);
         this.domainError = err;
+        if (d) this.domain = d;   // show the cleaned value
         if (err) return;
         this.pendingDomain = d;
         this.setupStep = 'dns';
         this.icons();
       },
+      useWww() { this.domain = this.pendingDomain = 'www.' + this.pendingDomain; this.icons(); },
       start() {
         this.starting = true;
         const token = ++this.token;
@@ -227,10 +246,11 @@
         check.status = 'done'; check.time = '2s'; check.open = false;
         const dns = live().steps[1];
         dns.status = 'waiting'; dns.open = true; live().status = 'waiting';
-        dns.logs.push(L(cdClock(), `Looking up the CNAME record of ${d}`), L(cdClock(), `Expected value: ${CD_CURRENT}`, 'muted'));
+        const rec = cdRecord(d);
+        dns.logs.push(L(cdClock(), `Looking up the ${rec.type} record of ${d}`), L(cdClock(), `Expected value: ${rec.value}`, 'muted'));
         await cdSleep(500);
         if (token !== this.token) return;
-        dns.logs.push(L(cdClock(), 'No CNAME record found', 'warn'));
+        dns.logs.push(L(cdClock(), `No ${rec.type} record found`, 'warn'));
         this.nextCheckAt = Date.now() + CD_DNS_EVERY;
         this.icons();
       },
@@ -242,6 +262,7 @@
         if (!auto) this.manualAt = Date.now();
         this.checking = true;
         const token = this.token;
+        const rec = cdRecord(r.domain);
         if (!auto) dns.logs.push(L(cdClock(), `Checked now by ${CD_ME}`, 'muted'));
         await cdSleep(900);
         if (token !== this.token) return;
@@ -249,12 +270,12 @@
         // Prototype: automatic checks never find the record, so the third one fails the step;
         // Check now finds it at once, except the first time a wrong record was seen (it's still wrong)
         if (auto) {
-          dns.logs.push(L(cdClock(), r.foundWrong ? `Checked again: still ${r.foundWrong}` : 'Checked again: no CNAME record found', 'warn'));
+          dns.logs.push(L(cdClock(), r.foundWrong ? `Checked again: still ${r.foundWrong}` : `Checked again: no ${rec.type} record found`, 'warn'));
           if ((r.autoChecks = (r.autoChecks || 0) + 1) >= CD_DNS_RETRIES) this.failDns(r);
           return;
         }
-        if (r.foundWrong && !r.recordAdded) { dns.logs.push(L(cdClock(), r.foundWrong ? `Found ${r.foundWrong}, expected ${CD_CURRENT}` : 'No CNAME record found', 'warn')); r.recordAdded = true; return; }
-        dns.logs.push(L(cdClock(), `Found ${r.domain} → ${CD_CURRENT}`, 'ok'), L(cdClock(), 'DNS verified', 'ok'));
+        if (r.foundWrong && !r.recordAdded) { dns.logs.push(L(cdClock(), r.foundWrong ? `Found ${r.foundWrong}, expected ${rec.value}` : `No ${rec.type} record found`, 'warn')); r.recordAdded = true; return; }
+        dns.logs.push(L(cdClock(), `Found ${r.domain} → ${rec.value}`, 'ok'), L(cdClock(), 'DNS verified', 'ok'));
         dns.status = 'done'; dns.time = cdFmt((Date.now() - r.startTs) / 1000);
         await cdSleep(600);
         dns.open = false;
@@ -270,7 +291,7 @@
 
       failDns(r) {
         const dns = r.steps[1];
-        dns.logs.push(L(cdClock(), 'Stopped after 15 minutes: the CNAME record wasn’t found', 'error'));
+        dns.logs.push(L(cdClock(), `Stopped after 15 minutes: the ${cdRecord(r.domain).type} record wasn’t found`, 'error'));
         Object.assign(dns, { status: 'failed', time: '15m', open: true });
         r.steps.slice(2).forEach((s) => { s.status = 'skipped'; });
         r.status = 'failed'; r.duration = cdFmt((this.now - r.startTs) / 1000);
@@ -376,11 +397,11 @@
         if (label) this.toast(label + ' copied', '');
       },
       shareText() {
-        const s = this.split, domain = this.view === 'setup' ? this.pendingDomain : this.run.domain;
+        const s = this.split, r = this.record, domain = this.view === 'setup' ? this.pendingDomain : this.run.domain;
         return [
           `Please add this DNS record for ${s.zone}:`, '',
-          `Type: CNAME`, `Name: ${s.host}`, `Value: ${CD_CURRENT}`, `TTL: default`, '',
-          `If ${s.host}.${s.zone} already has an A or CNAME record, delete it first.`,
+          `Type: ${r.type}`, `Name: ${r.name}`, `Value: ${r.value}`, `TTL: default`, '',
+          r.type === 'A' ? `If ${s.zone} already has an A record, change it to this value. ${s.zone} will then open our Testpress site instead of the current website.` : `If ${s.host}.${s.zone} already has an A or CNAME record, delete it first.`,
           this.provider === 'cloudflare' ? 'Cloudflare: set Proxy status to "DNS only" (grey cloud).' : '',
           `This connects ${domain} to our Testpress site.`,
         ].filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n');
@@ -414,7 +435,8 @@
           case 'first_time': this.runs = []; break;
           case 'setup': this.latest.dismissed = true; break;
           case 'setup_dns': this.latest.dismissed = true; this.domain = this.pendingDomain = 'learn.example.com'; this.setupStep = 'dns'; break;
-          case 'setup_error': this.latest.dismissed = true; this.domain = 'example.com'; this.validate && ([, this.domainError] = this.validate('example.com')); break;
+          case 'setup_error': this.latest.dismissed = true; this.domain = 'learn_site.yourschool.com'; [, this.domainError] = this.validate(this.domain); break;
+          case 'setup_root': this.latest.dismissed = true; this.domain = this.pendingDomain = 'yourschool.com'; this.setupStep = 'dns'; break;
           case 'dns_none': x = make('waiting', { check: 'done', dns: 'waiting' }); x.dns.logs = CD_LOGS.dnsWaiting(d); x.dns.open = true; x.r.autoChecks = 2; this.nextCheckAt = Date.now() + 60 * 1000; break;
           case 'dns_wrong': x = make('waiting', { check: 'done', dns: 'waiting' }); x.r.foundWrong = 'example.wixdns.net'; x.dns.logs = CD_LOGS.dnsWaiting(d, 'example.wixdns.net'); x.dns.open = true; x.r.autoChecks = 2; this.nextCheckAt = Date.now() + 60 * 1000; break;
           case 'ssl': x = make('running', { check: 'done', dns: 'done', ssl: 'running' }); x.ssl.logs = CD_LOGS.sslDone(d).slice(0, 3); x.ssl.open = true;
@@ -448,7 +470,7 @@
       seen() { this.opened = true; try { localStorage.setItem('cd-prototype-opened', '1'); } catch (e) {} },
       state: 'first_time',
       groups: [
-        { name: 'Set up', states: [['first_time', 'First time'], ['setup', 'Set up, with earlier runs'], ['setup_error', 'Main domain entered'], ['setup_dns', 'Add the DNS record']] },
+        { name: 'Set up', states: [['first_time', 'First time'], ['setup', 'Set up, with earlier runs'], ['setup_error', 'Invalid domain entered'], ['setup_dns', 'Add the DNS record'], ['setup_root', 'Root domain: A record']] },
         { name: 'Run in progress', states: [['dns_none', 'Waiting: no DNS record'], ['dns_wrong', 'Waiting: record points elsewhere'], ['ssl', 'Getting SSL certificate (plays)'], ['ready', 'Ready to switch']] },
         { name: 'Run ended', states: [['failed_ssl', 'Failed: SSL certificate'], ['failed_verify', 'Failed: HTTPS test'], ['failed_dns', 'Failed: DNS record not found'], ['cancelled', 'Cancelled']] },
         { name: 'Live on custom domain', states: [['live', 'Live'], ['changing', 'Change domain: setup'], ['change_ready', 'Change: ready to switch'], ['change_cleanup', 'Change: removing old domain (plays)'], ['changed', 'Change: done']] },
