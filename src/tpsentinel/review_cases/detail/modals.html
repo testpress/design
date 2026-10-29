@@ -13,14 +13,49 @@
       <template x-if="viewer.media === 'image'">
         <img :src="viewer.src" alt="" class="w-full rounded-lg bg-surface">
       </template>
+      <!-- Video player with its own controls, so anomalies can be marked in red on its progress bar -->
       <template x-if="viewer.media === 'video'">
-        <video :src="viewer.src" :poster="viewer.poster" controls class="w-full rounded-lg bg-black aspect-video"></video>
+        <div class="group relative rounded-lg overflow-hidden bg-black aspect-video" x-ref="player">
+          <video data-viewer-media :src="viewer.src" :poster="viewer.poster" class="size-full object-contain" playsinline
+                 @click="$el.paused ? $el.play() : $el.pause()" @play="viewerPlaying = true" @pause="viewerPlaying = false"
+                 @timeupdate="viewerPos = $el.duration ? $el.currentTime / $el.duration : 0"></video>
+          <div class="absolute inset-x-0 bottom-0 px-3 pt-8 pb-2 bg-gradient-to-t from-black/70 to-transparent text-white">
+            <!-- Progress: white is what's played, red is where the anomaly is. Click anywhere to jump there. -->
+            <div class="relative h-1.5 rounded-full bg-white/30 cursor-pointer" role="slider" aria-label="Seek"
+                 :aria-valuenow="Math.round(viewerPos * 100)" aria-valuemin="0" aria-valuemax="100"
+                 @click="seekTo(($event.clientX - $el.getBoundingClientRect().left) / $el.offsetWidth)">
+              <span class="absolute inset-y-0 start-0 rounded-full bg-white/70" :style="`width:${viewerPos * 100}%`"></span>
+              <!-- Each anomaly: hover for what it is and when. Clicks pass through to the bar, so they seek to the exact point. -->
+              <template x-for="m in viewer.marks || []">
+                <span class="group/mark absolute -inset-y-1.5" :style="markStyle(viewer, m)">
+                  <span class="absolute inset-x-0 top-1.5 bottom-1.5 rounded-full bg-red-500 group-hover/mark:bg-red-400"></span>
+                  <span class="pointer-events-none absolute bottom-full start-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap py-1 px-2 rounded-md bg-black/90 text-xs text-white opacity-0 transition-opacity group-hover/mark:opacity-100"
+                        x-text="`${indicatorLabel(m.key)} · ${m.to > m.from ? `${mmss(m.from)}–${mmss(m.to)}` : mmss(m.from)}`"></span>
+                </span>
+              </template>
+              <span class="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow" :style="`left:${viewerPos * 100}%`"></span>
+            </div>
+            <div class="mt-1.5 flex items-center gap-x-3 text-xs tabular-nums">
+              <button type="button" @click="const v = document.querySelector('[data-viewer-media]'); v.paused ? v.play() : v.pause()"
+                      class="flex items-center justify-center size-7 -ms-1 rounded-full hover:bg-white/15 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white"
+                      :aria-label="viewerPlaying ? 'Pause' : 'Play'"
+                      x-html="viewerPlaying ? ic('pause', 'size-4 fill-current') : ic('play', 'size-4 ms-0.5 fill-current')"></button>
+              <span x-text="`${mmss(viewerPos * (viewer.span || viewer.length || 0))} / ${mmss(viewer.span || viewer.length || 0)}`"></span>
+              <button type="button" @click="$refs.player.requestFullscreen?.()" aria-label="Full screen"
+                      class="ms-auto flex items-center justify-center size-7 rounded-full hover:bg-white/15 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-white">
+                <svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </template>
       <template x-if="viewer.media === 'audio'">
-        <audio :src="viewer.src" controls class="w-full"></audio>
+        <audio data-viewer-media :src="viewer.src" controls class="w-full"></audio>
       </template>
-      <p class="mt-3 text-sm font-medium text-foreground" x-text="viewer.anomaly ? indicatorLabel(viewer.anomaly) : artifactLabel(viewer)"></p>
+
+      <p class="mt-4 text-sm font-medium text-foreground" x-text="viewer.anomaly ? indicatorLabel(viewer.anomaly) : artifactLabel(viewer)"></p>
       <p class="mt-0.5 text-sm text-muted-foreground-1" x-text="`${viewer.anomaly ? artifactLabel(viewer) + ' · ' : ''}Session ${viewer.session} · ${exact(viewer.at)}`"></p>
+
     </div>
   </template>
 {% endcall %}

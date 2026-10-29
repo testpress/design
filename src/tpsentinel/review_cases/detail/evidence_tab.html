@@ -1,0 +1,96 @@
+{% from "src/tpsentinel/components/filter_select.html" import filter_select %}
+{% from "src/tpsentinel/components/chip_tabs.html" import chip_tabs %}
+
+<!-- Evidence: one view per kind of media, so periodic snapshots, recordings and anomaly media never mix -->
+<section class="bg-card border border-card-line shadow-2xs rounded-xl" aria-label="Evidence">
+  <!-- Chips pick the kind of media; filters for that kind sit on the same row -->
+  <div class="p-4 sm:px-5 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-card-line">
+    {{ chip_tabs(items=[
+      { key: "anomalies", label: "Anomalies", x_badge: "anomalyEvents.length" },
+      { key: "periodic", label: "Periodic snapshots", x_badge: "periodicSnapshots.length" },
+      { key: "recordings", label: "Session recordings", x_badge: "sessionRecordings.length" }
+    ], x_model="evidenceView", change="setEvidenceView", label="Evidence type") }}
+
+    <!-- Local filters: only the ones that apply to the open view -->
+    <div class="xl:ms-auto flex flex-wrap items-center gap-2">
+      {{ filter_select("evidenceFilter.session", "Session", "d.sessions.map(s => [String(s.n), `Session ${s.n}`]).reverse()", "All sessions") }}
+      <template x-if="evidenceFilterShown('anomaly')">
+        {{ filter_select("evidenceFilter.anomaly", "Anomaly", "evidenceAnomalies", "All anomalies") }}
+      </template>
+      <template x-if="evidenceFilterShown('source')">
+        {{ filter_select("evidenceFilter.source", "Source", "evidenceSources", "All sources") }}
+      </template>
+      {{ filter_select("evidenceFilter.availability", "Availability", "[['available', 'Available'], ['processing', 'Processing'], ['upload_failed', 'Upload failed'], ['retention', 'Removed by retention']]", "Any availability") }}
+      <button type="button" x-show="evidenceFiltered" @click="resetEvidence()"
+              class="py-1.5 px-2 rounded-lg text-sm text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">Reset filters</button>
+    </div>
+  </div>
+
+  <div class="p-4 sm:p-5">
+    <!-- Every view is one flat grid, newest first; the Session is a label under each card, not a section,
+         so many Sessions don't turn into many sections. The Session filter narrows to one. -->
+
+    <!-- Anomalies: one card per anomaly. The clip leads (its bar marks the anomaly in red); the snapshot is one click away.
+         An anomaly with no media keeps its card, with an empty frame. -->
+    <template x-if="evidenceView === 'anomalies'">
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
+        <template x-for="e in filteredEvidence" :key="e.id">
+          <div x-data="{ get a() { return e.artifacts.find(m => m.kind === 'clip') || e.artifacts[0] }, get still() { return e.artifacts.find(m => m.kind === 'snapshot') } }">
+            <template x-if="a">
+              <div>{% include "./artifact_thumb.html" %}</div>
+            </template>
+            <div x-show="!a" class="aspect-video flex items-center justify-center p-3 rounded-lg border border-dashed border-card-line text-center text-xs text-muted-foreground-1">
+              No media was captured
+            </div>
+            <p class="mt-1.5 text-sm">
+              <span class="font-medium text-foreground" x-text="indicatorLabel(e.key)"></span>
+              <span class="text-muted-foreground-1" x-text="`· ${e.severity}`"></span>
+            </p>
+            <p class="text-xs text-muted-foreground-1" x-text="`Session ${e.session} · ${dayTime(e.at)}${e.length ? ` · ${dur(e.length)}` : ''}`"></p>
+            <button type="button" x-show="still && a !== still && still.state === 'available'" @click="openViewer(still)"
+                    class="mt-1 text-xs text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">View snapshot</button>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Periodic snapshots: the thumbnail names the kind, so the label is the Session and time -->
+    <template x-if="evidenceView === 'periodic'">
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
+        <template x-for="a in filteredEvidence" :key="a.id">
+          <div>
+            {% include "./artifact_thumb.html" %}
+            <p class="mt-1.5 text-sm text-foreground" x-text="`Session ${a.session}`"></p>
+            <p class="text-xs text-muted-foreground-1" x-text="dayTime(a.at)"></p>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- Session recordings: webcam and screen for each Session, latest Session first -->
+    <template x-if="evidenceView === 'recordings'">
+      <div>
+        <p x-show="recordingsOff" class="text-sm text-muted-foreground-1">Recording is off in this workspace’s policy. Periodic snapshots and anomaly media are still kept.</p>
+        <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-6">
+          <template x-for="a in filteredEvidence" :key="a.id">
+            <div>
+              {% include "./artifact_thumb.html" %}
+              <p class="mt-1.5 text-sm text-foreground" x-text="`Session ${a.session}`"></p>
+              <p class="text-xs text-muted-foreground-1">
+                <span x-text="`${day(a.at)} · ${dur(a.length)}`"></span><span x-show="a.marks.length" x-text="` · ${a.marks.length} ${a.marks.length === 1 ? 'anomaly' : 'anomalies'}`"></span>
+              </p>
+              <p x-show="a.partial" class="text-xs text-amber-700 dark:text-amber-500" x-text="`Incomplete, ${dur(a.span - a.length)} missing`"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+
+    <!-- Nothing to show -->
+    <div x-show="!filteredEvidence.length && !(evidenceView === 'recordings' && recordingsOff)" class="py-12 text-center">
+      <p class="font-medium text-foreground" x-text="evidenceFiltered ? 'Nothing matches' : `No ${evidenceViews.find(v => v[0] === evidenceView)[1].toLowerCase()}`"></p>
+      <p class="mt-1 text-sm text-muted-foreground-1" x-text="evidenceFiltered ? 'The current filters found nothing for this candidate.' : 'Nothing of this kind was collected for this candidate.'"></p>
+      <button type="button" x-show="evidenceFiltered" @click="resetEvidence()" class="mt-3 text-sm font-medium text-primary hover:underline underline-offset-2 focus:outline-hidden focus-visible:underline">Reset filters</button>
+    </div>
+  </div>
+</section>
