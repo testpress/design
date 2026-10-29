@@ -114,6 +114,7 @@
       provider: 'godaddy',
       domain: '',
       domainError: '',
+      suggestion: '',      // "Did you mean …?" for a likely typo
       setupStep: 'domain', // 'domain' → 'dns' (the record to add), then the run starts
       pendingDomain: '',
       starting: false,
@@ -193,16 +194,32 @@
       },
 
       // ---- setup ----
-      // Cleans what people type or paste (spaces, https://, paths, ports, a trailing dot), then says exactly what's wrong
+      // Cleans what people type or paste, then says exactly what's wrong. Returns [domain, error, suggestion].
+      // Removed silently: invisible characters, spaces (or the words around a pasted domain), quotes, brackets and punctuation at either end,
+      // http(s):// (even mistyped), path, query, port, a trailing dot or backslash.
       validate(value) {
-        const raw = value.trim().toLowerCase();
-        if (!raw) return ['', 'Enter the domain you want to use, like learn.yourschool.com.'];
-        if (/^[^/\s]+@/.test(raw.replace(/^[a-z]+:\/\//, ''))) return [raw, 'Enter a domain, not an email address. For example learn.yourschool.com.'];
-        const d = raw.replace(/\s+/g, '').replace(/^[a-z]+:\/\//, '').replace(/[/?#].*$/, '').replace(/:\d*$/, '').replace(/^\.+|\.+$/g, '');
+        const edges = /^[\s"'`“”‘’()<>\[\]{},;:!?.\\]+|[\s"'`“”‘’()<>\[\]{},;:!?.\\]+$/g;
+        let d = value.replace(/[​-‍⁠﻿]/g, '').toLowerCase().replace(edges, '');
+        if (!d) return ['', 'Enter the domain you want to use, like learn.yourschool.com.'];
+        // A pasted sentence ("Our site: https://learn.yourschool.com/,"): keep the one word that looks like a domain.
+        // Otherwise spaces are typos inside the domain ("learn. yourschool.com"), so join the parts.
+        const words = d.split(/\s+/).filter((w) => w.includes('.')).map((w) => w.replace(edges, ''));
+        const url = words.find((w) => w.includes('://'));
+        d = words.length === 1 ? words[0] : url || d.replace(/\s+/g, '');
+        d = d.replace(/^[a-z]+:\/\//, '').replace(/^https?(:\/*|\/+)/, '');
+        if (/^[^/\\]+@/.test(d)) return [d, 'Enter a domain, not an email address. For example learn.yourschool.com.'];
+        d = d.replace(/[/\\?#].*$/, '').replace(/:\d*$/, '').replace(edges, '');
+        if (!d) return ['', 'Enter the domain you want to use, like learn.yourschool.com.'];
         if (d.includes('*')) return [d, 'Wildcards can’t be used. Enter one domain, like learn.yourschool.com.'];
         if (d.includes('_')) return [d, 'Domains can’t contain _. Use - instead.'];
-        if (d.includes('..')) return [d, 'There are two dots in a row. Check the domain.'];
+        if (d.includes(',')) return [d, 'Domains use dots, not commas.', d.replace(/,+/g, '.')];
+        if (d.includes('..')) return [d, 'There are two dots in a row. Check the domain.', d.replace(/\.{2,}/g, '.')];
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(d)) return [d, 'Enter a domain, not an IP address. For example learn.yourschool.com.'];
         if (!d.includes('.')) return [d, `Add the ending, like ${d}.com or ${d}.in.`];
+        // Common slips in the ending: suggest, don't change it silently
+        const typo = { con: 'com', cmo: 'com', ocm: 'com', vom: 'com', xom: 'com', comm: 'com', coom: 'com', cpm: 'com', nte: 'net', nett: 'net', ogr: 'org', orgg: 'org', ni: 'in', inn: 'in' };
+        const ending = d.split('.').pop();
+        if (typo[ending] && !(ending === 'ni' && !d.endsWith('.co.ni'))) return [d, 'The ending looks mistyped.', d.replace(/[^.]+$/, typo[ending])];
         if (d === 'testpress.in' || d.endsWith('.testpress.in')) return [d, 'testpress.in addresses can’t be used. Enter a domain you own.'];
         if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(d)) return [d, 'That doesn’t look like a domain. Use letters, numbers, - and dots, like learn.yourschool.com.'];
         if (d === this.liveDomain) return [d, 'This is already your site’s address.'];
@@ -210,14 +227,16 @@
         return [d, ''];
       },
       next() {
-        const [d, err] = this.validate(this.domain);
+        const [d, err, suggestion] = this.validate(this.domain);
         this.domainError = err;
+        this.suggestion = suggestion || '';
         if (d) this.domain = d;   // show the cleaned value
         if (err) return;
         this.pendingDomain = d;
         this.setupStep = 'dns';
         this.icons();
       },
+      useSuggestion() { this.domain = this.suggestion; this.suggestion = ''; this.next(); },
       useWww() { this.domain = this.pendingDomain = 'www.' + this.pendingDomain; this.icons(); },
       start() {
         this.starting = true;
@@ -414,7 +433,7 @@
       // ---- prototype only ----
       applyState(id) {
         this.token++;
-        Object.assign(this, { runs: cdHistory(), changing: false, setupStep: 'domain', pendingDomain: '', viewingId: null, liveDomain: '', domain: '', domainError: '', starting: false, checking: false, rerunning: false, manualAt: 0, ack: false, nextCheckAt: Date.now() + CD_DNS_EVERY });
+        Object.assign(this, { runs: cdHistory(), changing: false, setupStep: 'domain', pendingDomain: '', viewingId: null, liveDomain: '', domain: '', domainError: '', suggestion: '', starting: false, checking: false, rerunning: false, manualAt: 0, ack: false, nextCheckAt: Date.now() + CD_DNS_EVERY });
         ['cd-cancel', 'cd-switch', 'cd-share', 'cd-dns', 'cd-revert'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
         const d = 'learn.example.com';
         const all = { check: 'done', dns: 'done', ssl: 'done', verify: 'done', switch: 'done', ssl_remove: 'done', cleanup: 'done' };
@@ -436,6 +455,7 @@
           case 'setup': this.latest.dismissed = true; break;
           case 'setup_dns': this.latest.dismissed = true; this.domain = this.pendingDomain = 'learn.example.com'; this.setupStep = 'dns'; break;
           case 'setup_error': this.latest.dismissed = true; this.domain = 'learn_site.yourschool.com'; [, this.domainError] = this.validate(this.domain); break;
+          case 'setup_typo': this.latest.dismissed = true; this.domain = 'learn.yourschool.con'; this.next(); break;
           case 'setup_root': this.latest.dismissed = true; this.domain = this.pendingDomain = 'yourschool.com'; this.setupStep = 'dns'; break;
           case 'dns_none': x = make('waiting', { check: 'done', dns: 'waiting' }); x.dns.logs = CD_LOGS.dnsWaiting(d); x.dns.open = true; x.r.autoChecks = 2; this.nextCheckAt = Date.now() + 60 * 1000; break;
           case 'dns_wrong': x = make('waiting', { check: 'done', dns: 'waiting' }); x.r.foundWrong = 'example.wixdns.net'; x.dns.logs = CD_LOGS.dnsWaiting(d, 'example.wixdns.net'); x.dns.open = true; x.r.autoChecks = 2; this.nextCheckAt = Date.now() + 60 * 1000; break;
@@ -470,7 +490,7 @@
       seen() { this.opened = true; try { localStorage.setItem('cd-prototype-opened', '1'); } catch (e) {} },
       state: 'first_time',
       groups: [
-        { name: 'Set up', states: [['first_time', 'First time'], ['setup', 'Set up, with earlier runs'], ['setup_error', 'Invalid domain entered'], ['setup_dns', 'Add the DNS record'], ['setup_root', 'Root domain: A record']] },
+        { name: 'Set up', states: [['first_time', 'First time'], ['setup', 'Set up, with earlier runs'], ['setup_error', 'Invalid domain entered'], ['setup_typo', 'Typo: did you mean'], ['setup_dns', 'Add the DNS record'], ['setup_root', 'Root domain: A record']] },
         { name: 'Run in progress', states: [['dns_none', 'Waiting: no DNS record'], ['dns_wrong', 'Waiting: record points elsewhere'], ['ssl', 'Getting SSL certificate (plays)'], ['ready', 'Ready to switch']] },
         { name: 'Run ended', states: [['failed_ssl', 'Failed: SSL certificate'], ['failed_verify', 'Failed: HTTPS test'], ['failed_dns', 'Failed: DNS record not found'], ['cancelled', 'Cancelled']] },
         { name: 'Live on custom domain', states: [['live', 'Live'], ['changing', 'Change domain: setup'], ['change_ready', 'Change: ready to switch'], ['change_cleanup', 'Change: removing old domain (plays)'], ['changed', 'Change: done']] },
