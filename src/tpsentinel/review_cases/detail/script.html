@@ -29,6 +29,13 @@
     // ---------- Vocabulary ----------
     const SEVERITY = ['High', 'Medium', 'Low'];
     const EVIDENCE_VIEWS = ['anomalies', 'periodic', 'recordings'];
+    // Evidence was one tab (?tab=evidence&view=…), and before that ?tab=snapshots / ?tab=recordings; old links still land right
+    const tabFromUrl = params => {
+      const t = params.get('tab');
+      if (t === 'evidence') return EVIDENCE_VIEWS.includes(params.get('view')) ? params.get('view') : 'anomalies';
+      if (t === 'snapshots') return 'periodic';
+      return ['overview', ...EVIDENCE_VIEWS, 'activity', 'history'].includes(t) ? t : 'overview';
+    };
     const CONTINUOUS = ['no_face', 'looking_away', 'browser_focus_lost', 'multi_face'];
     const ARTIFACT_STATE = {
       available: { label: 'Available' },
@@ -252,8 +259,7 @@
         c, d, all,
         missing: !found,
         // ?tab=snapshots and ?tab=recordings were briefly top-level tabs; they land on the matching Evidence view
-        tab: ['snapshots', 'recordings'].includes(params.get('tab')) ? 'evidence' : ['overview', 'evidence', 'activity', 'history'].includes(params.get('tab')) ? params.get('tab') : 'overview',
-        evidenceView: params.get('tab') === 'recordings' ? 'recordings' : params.get('tab') === 'snapshots' ? 'periodic' : EVIDENCE_VIEWS.includes(params.get('view')) ? params.get('view') : 'anomalies',
+        tab: tabFromUrl(params),
         sessionIdx: d.sessions.length - 1,
         menu: null,
         viewer: null,
@@ -263,6 +269,7 @@
         decision: { choice: '', reason: '', notes: '', confirming: false, error: '', submitting: false },
         justSubmitted: false,
         evidenceFilter: { session: '', source: '', anomaly: '', availability: '' },
+        keepEvidenceFilter: false, // set by openEvidence so its filter survives the tab change
         activityFilter: { session: '', type: '', q: '' },
         historyFilter: { type: '', actor: '' },
         flagReasons: FLAG_REASONS,
@@ -272,16 +279,21 @@
 
         init() {
           document.title = `${c.name} · Review cases`;
+          // An old link (?tab=evidence&view=…) is rewritten to the tab it opened
+          if (params.get('tab') && params.get('tab') !== this.tab || params.has('view')) {
+            const u = new URL(location.href);
+            u.searchParams.set('tab', this.tab);
+            u.searchParams.delete('view');
+            history.replaceState(null, '', u);
+          }
           this.$watch('tab', t => {
             const u = new URL(location.href);
             u.searchParams.set('tab', t);
-            if (t === 'evidence') u.searchParams.set('view', this.evidenceView); else u.searchParams.delete('view');
+            u.searchParams.delete('view');
             history.replaceState(null, '', u);
-          });
-          this.$watch('evidenceView', v => {
-            const u = new URL(location.href);
-            u.searchParams.set('view', v);
-            history.replaceState(null, '', u);
+            // Session and availability carry over between evidence tabs; source and anomaly belong to one tab each
+            if (this.keepEvidenceFilter) this.keepEvidenceFilter = false;
+            else Object.assign(this.evidenceFilter, { source: '', anomaly: '' });
           });
           // Warn before leaving with a chosen decision or notes that weren't submitted
           window.addEventListener('beforeunload', e => {
@@ -501,7 +513,9 @@
             ['recordings', 'Session recordings', this.sessionRecordings],
           ];
         },
-        viewItems(v) { return this.evidenceViews.find(x => x[0] === v)[2]; },
+        // The open evidence tab, or null on Overview, Activity and Review History
+        get evidenceView() { return EVIDENCE_VIEWS.includes(this.tab) ? this.tab : null; },
+        viewItems(v) { return (this.evidenceViews.find(x => x[0] === v) || [])[2] || []; },
         // Filters that mean something for the open view; the others are hidden and ignored
         evidenceFilterShown(f) {
           const v = this.evidenceView;
@@ -524,15 +538,10 @@
         },
         get evidenceFiltered() { const f = this.evidenceFilter, shown = k => this.evidenceFilterShown(k); return !!(f.session || f.availability || (shown('source') && f.source) || (shown('anomaly') && f.anomaly)); },
         resetEvidence() { this.evidenceFilter = { session: '', source: '', anomaly: '', availability: '' }; },
-        // Session and availability carry over between views; source and anomaly belong to one view each
-        setEvidenceView(v) {
-          Object.assign(this.evidenceFilter, { source: '', anomaly: '' });
-          this.evidenceView = v;
-        },
         openEvidence(view, filter = {}) {
-          this.evidenceView = view;
           this.evidenceFilter = { session: '', source: '', anomaly: '', availability: '', ...filter };
-          this.tab = 'evidence';
+          this.keepEvidenceFilter = this.tab !== view;
+          this.tab = view;
           this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
         },
         get recordingsOff() { return d.sessions.every(s => s.coverage.webcam.status === 'not_required' && s.coverage.screen.status === 'not_required'); },
