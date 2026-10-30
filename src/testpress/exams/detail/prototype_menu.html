@@ -1,0 +1,131 @@
+{# Prototype states and modal tester switcher #}
+{% from "src/ui-system/components/dropdown.html" import dropdown %}
+
+{% set state_trigger %}
+  <button type="button" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 cursor-pointer" aria-label="Prototype states" @click="setTimeout(() => updatePosition(), 150)">
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 text-gray-500 dark:text-neutral-400">
+      <line x1="21" x2="14" y1="4" y2="4"/>
+      <line x1="10" x2="3" y1="4" y2="4"/>
+      <line x1="21" x2="12" y1="12" y2="12"/>
+      <line x1="8" x2="3" y1="12" y2="12"/>
+      <line x1="21" x2="16" y1="20" y2="20"/>
+      <line x1="12" x2="3" y1="20" y2="20"/>
+      <line x1="14" x2="14" y1="2" y2="6"/>
+      <line x1="8" x2="8" y1="10" y2="14"/>
+      <line x1="16" x2="16" y1="18" y2="22"/>
+    </svg>
+    <span>Prototype States</span>
+    <svg class="size-3.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+  </button>
+{% endset %}
+
+<div class="fixed bottom-20 lg:bottom-4 right-4 z-40" x-data="{
+  isActive(state, cert = '') {
+    const params = new URLSearchParams(window.location.search);
+    const curState = params.get('state') || 'available';
+    const curCert = params.get('certificate') || '';
+    if (state === 'start') {
+      return (curState === 'start' || curState === 'available') && !curCert;
+    }
+    return curState === state && curCert === cert;
+  },
+  goToState(state, cert = '') {
+    const url = new URL(window.location.href);
+    url.searchParams.set('state', state);
+    if (cert) {
+      url.searchParams.set('certificate', cert);
+    } else {
+      url.searchParams.delete('certificate');
+    }
+    window.location.href = url.toString();
+  }
+}">
+  {% call dropdown(trigger=state_trigger, placement="top-end", width="w-60") %}
+    {# 1. Modals & Notifications #}
+    <p class="px-2 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-neutral-500">Test Modals & Toast</p>
+    
+    <button type="button" @click="certificateGeneratedAt = null; startGeneration(); open = false" class="w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Certificate (1st Click - 1m)</span>
+    </button>
+
+    <button type="button" @click="certificateGeneratedAt = Date.now() - 32000; startGeneration(); open = false" class="w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Certificate (Live Countdown)</span>
+    </button>
+
+    <button type="button" @click="showFailedAttempt(true); open = false" class="w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Failed Modal (Retake)</span>
+    </button>
+
+    <button type="button" @click="showFailedAttempt(false); open = false" class="w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Failed Modal (No Retake)</span>
+    </button>
+
+    <button type="button" @click="showCertificateToast(); open = false" class="w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Trigger Congrats Toast</span>
+    </button>
+
+    {# 2. Page States (URL) #}
+    <div class="my-1.5 border-t border-gray-200 dark:border-neutral-800"></div>
+    <p class="px-2 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-neutral-500">Active & Upcoming States</p>
+    
+    <button type="button" @click="goToState('start'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Start Exam</span>
+      <span x-show="isActive('start', '')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+    <button type="button" @click="goToState('resume'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Resume Exam</span>
+      <span x-show="isActive('resume', '')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+    <button type="button" @click="goToState('upcoming'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Upcoming</span>
+      <span x-show="isActive('upcoming', '')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+    <button type="button" @click="goToState('ended'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Missed</span>
+      <span x-show="isActive('ended', '')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+
+    {# 3. Completed & Ineligible #}
+    <div class="my-1.5 border-t border-gray-200 dark:border-neutral-800"></div>
+    <p class="px-2 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-neutral-500">Completed States</p>
+    
+    <button type="button" @click="goToState('retake', 'true'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Retake Allowed (Passed)</span>
+      <span x-show="isActive('retake', 'true')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+    <button type="button" @click="goToState('retake_disabled', 'true'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Retake Disabled (Passed)</span>
+      <span x-show="isActive('retake_disabled', 'true')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+    <button type="button" @click="goToState('retake', 'ineligible'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Failed + Retake Allowed</span>
+      <span x-show="isActive('retake', 'ineligible')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+    <button type="button" @click="goToState('retake_disabled', 'ineligible'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Failed (No Retake)</span>
+      <span x-show="isActive('retake_disabled', 'ineligible')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+    <button type="button" @click="goToState('max_attempts'); open = false" class="w-full flex items-center justify-between gap-x-2 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 text-left">
+      <span>Max Attempts Reached</span>
+      <span x-show="isActive('max_attempts', '')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="size-3.5 text-emerald-600 dark:text-emerald-400"><path d="M20 6 9 17l-5-5"/></svg>
+      </span>
+    </button>
+  {% endcall %}
+</div>
