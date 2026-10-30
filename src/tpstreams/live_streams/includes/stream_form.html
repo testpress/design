@@ -1,0 +1,296 @@
+{#
+  Create / schedule live stream form, shared by create.html and schedule.html.
+  Set `form_mode` to "create" or "schedule" before including.
+
+  Option rules match the streams app:
+  - Interactive needs Fermion enabled for the organization; otherwise its card is disabled.
+  - Live DRM isn't available with low latency.
+  - MP4 downloads aren't available when either DRM option is on.
+#}
+{% from "../../../ui-system/components/option-card.html" import option_card %}
+{% from "../../../ui-system/components/switch-list.html" import switch_list, switch_list_item %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/switch.html" import switch %}
+{% from "../../../ui-system/components/date-picker.html" import date_picker %}
+
+{% set is_schedule = form_mode == "schedule" %}
+{# Focused fields get a 2px border to match the selected cards. Padding drops by 1px on focus so the
+   text doesn't move (inputs are px-3 py-2 sm:py-2.5). #}
+{% set focus_border_2px = "focus:ring-0 focus:border-2 focus:px-[11px] focus:py-[7px] sm:focus:py-[9px]" %}
+
+<script>
+  function liveStreamForm() {
+    return {
+      // Prototype only: add ?fermion=off to the URL to see an organization without interactive live.
+      fermionEnabled: new URLSearchParams(window.location.search).get('fermion') !== 'off',
+      streamType: 'broadcast',
+      latency: '0',
+      drmForRecording: true,
+      drmForLive: false,
+      mp4Downloads: false,
+      interactiveDrm: true,
+      everyoneOnStage: true,
+      skipJoinScreen: true,
+
+      init() {
+        this.$watch('fermionEnabled', (enabled) => {
+          if (!enabled) this.streamType = 'broadcast';
+        });
+        this.$watch('latency', (value) => {
+          if (value === '1') this.drmForLive = false;
+        });
+        this.$watch('drmForRecording', (on) => { if (on) this.mp4Downloads = false; });
+        this.$watch('drmForLive', (on) => { if (on) this.mp4Downloads = false; });
+      },
+
+      get isInteractive() {
+        return this.streamType === 'interactive';
+      },
+      get isLowLatency() {
+        return this.latency === '1';
+      },
+      get hasBroadcastDrm() {
+        return this.drmForRecording || this.drmForLive;
+      },
+    };
+  }
+</script>
+
+<div class="px-4 sm:px-6 lg:px-0 pt-6 pb-10" x-data="liveStreamForm()">
+  <div>
+
+    <!-- Prototype control -->
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3 py-2.5 px-4 rounded-xl border border-dashed border-amber-300 bg-amber-50/60 dark:border-amber-700 dark:bg-amber-900/20">
+      <span class="inline-flex items-center gap-x-2 text-xs font-medium text-amber-800 dark:text-amber-300">
+        <i data-lucide="flask-conical" class="shrink-0 size-4"></i>
+        Prototype only: organization has interactive live enabled
+      </span>
+      {{ switch(id="prototype-fermion", size="sm", x_model="fermionEnabled", checked=true) }}
+    </div>
+
+    <form
+      class="divide-y divide-gray-200 dark:divide-neutral-700"
+      :action="isInteractive ? '{{ '/tpstreams/live_streams/detail/?type=interactive'|url }}' : '{{ '/tpstreams/live_streams/detail/'|url }}'">
+
+      <!-- Stream type -->
+      <section class="grid gap-y-4 lg:grid-cols-4 lg:gap-x-8 pb-6">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">Stream type</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Choose how you'll go live.</p>
+        </div>
+        <fieldset class="lg:col-span-3">
+          <legend class="sr-only">Stream type</legend>
+          <div class="grid sm:grid-cols-2 gap-3 sm:gap-4">
+            {{ option_card(
+              name="type",
+              value="broadcast",
+              id="stream-type-broadcast",
+              title="Broadcast",
+              description="Go live from OBS or any RTMP encoder to a large audience.",
+              icon="radio-tower",
+              features=["Stream from OBS, vMix or a hardware encoder", "Normal or low latency", "DRM for the live stream and recording"],
+              tag="RTMP · HLS",
+              checked=true,
+              x_model="streamType"
+            ) }}
+            {{ option_card(
+              name="type",
+              value="interactive",
+              id="stream-type-interactive",
+              title="Interactive",
+              description="Teach live from the browser with camera, mic and screen sharing.",
+              icon="users",
+              features=["No encoder or extra software", "Students can join you on stage", "DRM for the live stream and recording"],
+              tag="WebRTC · Real-time",
+              x_model="streamType",
+              x_disabled="!fermionEnabled",
+              disabled_note="Not enabled for your organization.",
+              disabled_action_label="Contact us to enable",
+              disabled_action_href="#"
+            ) }}
+          </div>
+        </fieldset>
+      </section>
+
+      <!-- Details -->
+      <section class="grid gap-y-4 lg:grid-cols-4 lg:gap-x-8 py-6">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">Details</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">
+            {% if is_schedule %}Viewers see the title and start time before the stream begins.{% else %}Viewers see this title on the player and in your stream list.{% endif %}
+          </p>
+        </div>
+        <div class="lg:col-span-3 space-y-5 max-w-md">
+          {{ input(
+            name="title",
+            id="id_title",
+            label="Title",
+            placeholder="Add a title that describes your stream",
+            required=true,
+            extra_attrs='maxlength="254"',
+            extra_classes=focus_border_2px
+          ) }}
+          {% if is_schedule %}
+            {{ date_picker(
+              name="start",
+              id="id_start",
+              label="Start date & time",
+              placeholder="Select date and time",
+              required=true,
+              datetime=true,
+              min_date="today",
+              input_classes=focus_border_2px
+            ) }}
+          {% endif %}
+        </div>
+      </section>
+
+      <!-- Broadcast: latency -->
+      <section x-show="!isInteractive" class="grid gap-y-4 lg:grid-cols-4 lg:gap-x-8 py-6">
+        <div>
+          <h2 class="inline-flex items-center gap-x-2 text-sm font-semibold text-gray-800 dark:text-neutral-200">
+            Latency
+            <span class="inline-flex items-center py-0.5 px-1.5 rounded-md text-[11px] font-medium leading-none bg-primary-50 text-primary-700 dark:bg-primary-900/40 dark:text-primary-400">Beta</span>
+          </h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">The delay between your encoder and what viewers see.</p>
+        </div>
+        <fieldset class="lg:col-span-3">
+          <legend class="sr-only">Latency</legend>
+          <div class="grid sm:grid-cols-2 gap-3">
+            {{ radio(
+              name="latency",
+              id="latency-normal",
+              value="0",
+              label="Normal latency",
+              description="Smoothest playback. Supports DRM on the live stream.",
+              checked=true,
+              x_model="latency",
+              variant="card"
+            ) }}
+            {{ radio(
+              name="latency",
+              id="latency-low",
+              value="1",
+              label="Low latency",
+              description="Shorter delay for live Q&A. No DRM on the live stream.",
+              x_model="latency",
+              variant="card"
+            ) }}
+          </div>
+        </fieldset>
+      </section>
+
+      <!-- Broadcast: protection and downloads -->
+      <section x-show="!isInteractive" class="grid gap-y-4 lg:grid-cols-4 lg:gap-x-8 py-6">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">Protection & downloads</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Control how the live stream and its recording can be watched.</p>
+        </div>
+        <div class="lg:col-span-3">
+          {% call switch_list() %}
+            {{ switch_list_item(
+              id="id_enable_drm_for_recording",
+              name="enable_drm_for_recording",
+              label="DRM for recording",
+              description="Encrypt the recording with DRM.",
+              icon="film",
+              checked=true,
+              x_model="drmForRecording"
+            ) }}
+            {{ switch_list_item(
+              id="id_enable_drm",
+              name="enable_drm",
+              label="DRM for live stream",
+              badge="Beta",
+              description="Encrypt the stream while it's live.",
+              icon="shield-check",
+              x_model="drmForLive",
+              x_disabled="isLowLatency",
+              x_reason="'Not available with low latency. Switch to normal latency to turn this on.'"
+            ) }}
+            {{ switch_list_item(
+              id="id_enable_static_mp4_renditions",
+              name="enable_static_mp4_renditions",
+              label="MP4 downloads",
+              badge="Beta",
+              description="Create an MP4 file for each resolution of the recording for offline download. Uses more storage.",
+              icon="download",
+              x_model="mp4Downloads",
+              x_disabled="hasBroadcastDrm",
+              x_reason="'Not available with DRM. Turn off both DRM options to create MP4 files.'"
+            ) }}
+          {% endcall %}
+        </div>
+      </section>
+
+      <!-- Interactive: protection -->
+      <section x-show="isInteractive" x-cloak class="grid gap-y-4 lg:grid-cols-4 lg:gap-x-8 py-6">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">Protection</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">Interactive streams don't create MP4 downloads.</p>
+        </div>
+        <div class="lg:col-span-3">
+          {% call switch_list() %}
+            {{ switch_list_item(
+              id="id_interactive_enable_drm",
+              name="enable_drm",
+              label="DRM",
+              description="Encrypt the live stream and its recording.",
+              icon="shield-check",
+              checked=true,
+              x_model="interactiveDrm"
+            ) }}
+          {% endcall %}
+        </div>
+      </section>
+
+      <!-- Interactive: classroom -->
+      <section x-show="isInteractive" x-cloak class="grid gap-y-4 lg:grid-cols-4 lg:gap-x-8 py-6">
+        <div>
+          <h2 class="text-sm font-semibold text-gray-800 dark:text-neutral-200">Classroom</h2>
+          <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">How students join the session.</p>
+        </div>
+        <div class="lg:col-span-3">
+          {% call switch_list() %}
+            {{ switch_list_item(
+              id="id_add_everyone_on_stage",
+              name="add_everyone_on_stage",
+              label="Add everyone on stage",
+              description="Students can share audio and video as soon as they join.",
+              icon="mic",
+              checked=true,
+              x_model="everyoneOnStage"
+            ) }}
+            {{ switch_list_item(
+              id="id_skip_join_screen",
+              name="skip_join_screen",
+              label="Skip join screen",
+              description="Students go straight into the session without the camera and mic check.",
+              icon="log-in",
+              checked=true,
+              x_model="skipJoinScreen"
+            ) }}
+          {% endcall %}
+        </div>
+      </section>
+
+      <!-- Actions -->
+      <div class="flex justify-end gap-x-2 pt-6">
+        <a href="{{ '/tpstreams/live_streams/live/'|url }}" class="py-2 px-3 inline-flex items-center text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700">
+          Cancel
+        </a>
+        <button type="submit" class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-primary-600 text-white shadow-sm hover:bg-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2">
+          {% if is_schedule %}
+            <i data-lucide="calendar-plus" class="shrink-0 size-4"></i>
+            Schedule live stream
+          {% else %}
+            <i data-lucide="plus" class="shrink-0 size-4"></i>
+            Create live stream
+          {% endif %}
+        </button>
+      </div>
+      <input type="hidden" name="csrfmiddlewaretoken" value="">
+    </form>
+  </div>
+</div>
