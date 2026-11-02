@@ -377,6 +377,34 @@ Used for showing a share of a total, such as a breakdown bar or a completion lev
 
 ---
 
+## clipboard
+
+### Purpose
+
+Used for values people copy, such as links, IDs and embed code. The copy button confirms with a check and "Copied".
+
+### Allowed Variants
+
+* copy_input (a read-only field with a Copy button, for links)
+* copy_code (a monospace block with a Copy button in its corner, for snippets)
+* copy_text (an inline value with an icon button, for IDs in a description list)
+
+### Supported Parameters
+
+* value
+* label (accessible name; shown above `copy_input` when `label_visible` is true)
+* id (copy_input only)
+* label_visible (copy_input only)
+* extra_classes
+
+### Usage Rules
+
+* Always pass `label` so the value and button have an accessible name.
+* Use `copy_code` for multi-line snippets; it caps its height and scrolls.
+
+
+---
+
 # Navigation
 
 ## breadcrumbs

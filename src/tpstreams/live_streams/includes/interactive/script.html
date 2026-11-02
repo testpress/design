@@ -1,0 +1,81 @@
+<script>
+  function interactiveLiveStream() {
+    const params = new URLSearchParams(window.location.search);
+    const STAGES = ['scheduled', 'ready', 'live', 'completed'];
+
+    return {
+      stage: STAGES.includes(params.get('state')) ? params.get('state') : 'scheduled',
+
+      // Join link: one per live stream. Name is always asked; email and phone are the host's choice.
+      hasJoinLink: params.get('link') !== 'none',
+      collectEmail: false,
+      collectPhone: false,
+      draftEmail: false,
+      draftPhone: false,
+
+      // Prototype clocks: the stream is scheduled 2h 14m from page load, and has been live 42 minutes.
+      startsAt: Date.now() + (2 * 60 + 14) * 60 * 1000,
+      liveSince: Date.now() - 42 * 60 * 1000 - 13 * 1000,
+      now: Date.now(),
+
+      init() {
+        setInterval(() => { this.now = Date.now(); }, 1000);
+      },
+
+      // Activity steps reached so far, used to show the timeline up to the current stage.
+      get stageIndex() {
+        return STAGES.indexOf(this.stage);
+      },
+      get isBeforeLive() {
+        return this.stage === 'scheduled' || this.stage === 'ready';
+      },
+      // "in 2 hours 14 minutes", to the minute
+      get startsIn() {
+        const minutes = Math.max(0, Math.round((this.startsAt - this.now) / 60000));
+        if (minutes === 0) return 'now';
+        const h = Math.floor(minutes / 60);
+        const m = minutes % 60;
+        const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+        return 'in ' + [h && plural(h, 'hour'), m && plural(m, 'minute')].filter(Boolean).join(' ');
+      },
+      get liveFor() {
+        const d = this.splitDuration(this.now - this.liveSince);
+        return `${d.hours}:${d.minutes}:${d.seconds}`;
+      },
+      get guestFields() {
+        return ['Name', this.collectEmail && 'Email', this.collectPhone && 'Phone number'].filter(Boolean);
+      },
+
+      splitDuration(ms) {
+        const total = Math.max(0, Math.floor(ms / 1000));
+        const pad = (n) => String(n).padStart(2, '0');
+        return {
+          hours: pad(Math.floor(total / 3600)),
+          minutes: pad(Math.floor((total % 3600) / 60)),
+          seconds: pad(total % 60),
+        };
+      },
+
+      // In the product, Go Live starts the session and opens the live room in a new tab in one
+      // request, and Stop live completes it straight away, so neither has a waiting state.
+      goLive() {
+        this.liveSince = Date.now();
+        this.stage = 'live';
+      },
+      stopLive() {
+        this.stage = 'completed';
+      },
+
+      openJoinLinkModal() {
+        this.draftEmail = this.hasJoinLink ? this.collectEmail : false;
+        this.draftPhone = this.hasJoinLink ? this.collectPhone : false;
+        this.$dispatch('open-modal-join-link');
+      },
+      saveJoinLink() {
+        this.collectEmail = this.draftEmail;
+        this.collectPhone = this.draftPhone;
+        this.hasJoinLink = true;
+      },
+    };
+  }
+</script>
