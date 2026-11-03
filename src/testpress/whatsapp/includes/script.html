@@ -1,0 +1,369 @@
+{% include "./data.html" %}
+<script>
+  // WhatsApp settings: who sends (Testpress's number or the institute's own, connected through Meta),
+  // and the three message types with their template status.
+  // Rules from the PRD: once the institute's number is connected it is the only sender. If it breaks, or a template
+  // isn't approved, nothing is sent; we never fall back to Testpress's number. Only an explicit disconnect switches back.
+  const waSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const WA_NOW = '2 Nov, 10:14 AM';
+  const WA_META_STEPS = ['login', 'business', 'waba', 'phone', 'verify', 'allow'];
+
+  // Template status per message type: not_submitted, submitting, pending, approved, rejected, paused, disabled, unknown
+  const waTpl = (status, extra = {}) => ({ status, submittedAt: status === 'not_submitted' ? '' : '1 Nov, 3:40 PM', decidedAt: ['approved', 'rejected', 'paused', 'disabled', 'unknown'].includes(status) ? '1 Nov, 5:02 PM' : '', reason: '', checkedAt: '', checking: false, ...extra });
+
+  const WA_PRESETS = {
+    tp_default: { mode: 'testpress', on: { otp: true, creds: false, cart: true } },
+    // First visit: WhatsApp was never set up. A choice screen replaces the page until something is turned on or connected.
+    first_visit: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose' },
+    first_pick: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', modal: 'wa-pick' },
+    first_own_how: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', modal: 'wa-how-own' },
+    first_connecting: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', meta: 'login' },
+    first_verify: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', meta: 'verify' },
+    first_allow: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', meta: 'allow' },
+    first_finishing: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', play: 'finish' },
+    first_cancelled: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', note: 'cancelled' },
+    first_failed: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', note: 'failed' },
+    tp_first: { mode: 'testpress', on: { otp: false, creds: false, cart: false } },
+    connecting: { mode: 'testpress', on: { otp: true, creds: false, cart: true }, meta: 'login' },
+    connect_cancelled: { mode: 'testpress', on: { otp: true, creds: false, cart: true }, note: 'cancelled' },
+    connect_failed: { mode: 'testpress', on: { otp: true, creds: false, cart: true }, note: 'failed' },
+    connected_new: { mode: 'institute', on: { otp: true, creds: false, cart: true }, tpl: { otp: 'submitting', creds: 'submitting', cart: 'submitting' }, play: 'templates' },
+    pending: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'pending', creds: 'pending', cart: 'pending' } },
+    mixed: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'pending', cart: 'rejected' } },
+    all_ready: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' } },
+    paused: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'paused' } },
+    meta_disabled: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'disabled' } },
+    status_unknown: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'unknown', creds: 'approved', cart: 'approved' } },
+    account_error: { mode: 'institute', status: 'error', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' } },
+    disconnect_confirm: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, modal: 'wa-disconnect' },
+    disconnecting: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, play: 'disconnect' },
+    disconnect_failed: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, flow: 'disconnect_failed' },
+    disconnect_checking: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, flow: 'disconnect_checking' },
+    disconnected: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', toast: ['Number disconnected', 'WhatsApp messages have stopped. Choose a number to start again.', 'neutral'] },
+    switch_confirm: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, modal: 'wa-switch-tp' },
+    switching: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, play: 'switch' },
+    turn_off_confirm: { mode: 'testpress', on: { otp: true, creds: false, cart: true }, modal: 'wa-turn-off' },
+    turned_off: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', toast: ['WhatsApp is off', 'Students no longer get messages on WhatsApp.', 'neutral'] },
+    view_only: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'pending', cart: 'approved' }, readOnly: true },
+    loading: { mode: 'testpress', on: { otp: true, creds: false, cart: true }, loading: true },
+  };
+
+  window.WA_STATES = {
+    initial: 'first_visit',
+    groups: [
+      { name: 'First visit (never set up)', states: [['first_visit', 'Choose a number'], ['first_pick', 'Start now: pick messages'], ['first_own_how', 'Own number: how it works'], ['first_connecting', 'Own number: Meta window (click through)'], ['first_verify', 'Meta window: verify number'], ['first_allow', 'Meta window: allow Testpress'], ['first_finishing', 'Finishing on Testpress (plays)'], ['first_cancelled', 'Own number: cancelled'], ['first_failed', 'Own number: failed']] },
+      { name: 'Testpress’s number', states: [['tp_default', 'Sending from Testpress'], ['tp_first', 'All messages turned off'], ['connecting', 'Connecting: Meta window open'], ['connect_cancelled', 'Connect cancelled'], ['connect_failed', 'Connect failed']] },
+      { name: 'Your own number', states: [['connected_new', 'Just connected: templates to Meta (plays)'], ['pending', 'Waiting for Meta approval'], ['mixed', 'Approved, waiting, rejected'], ['all_ready', 'All sending'], ['paused', 'Template paused by Meta'], ['meta_disabled', 'Template disabled by Meta'], ['status_unknown', 'Couldn’t check status']] },
+      { name: 'Problem with your number', states: [['account_error', 'Meta access stopped']] },
+      { name: 'Change or stop', states: [['switch_confirm', 'Your number → Testpress: confirm'], ['switching', 'Switching to Testpress (plays)'], ['turn_off_confirm', 'Turn off WhatsApp: confirm'], ['turned_off', 'Turned off'], ['disconnect_confirm', 'Disconnect your number: confirm'], ['disconnecting', 'Disconnecting (plays)'], ['disconnect_failed', 'Failed'], ['disconnect_checking', 'Outcome not confirmed'], ['disconnected', 'Disconnected: back to setup']] },
+      { name: 'Other', states: [['view_only', 'View only (no permission)'], ['loading', 'Loading']] },
+    ],
+  };
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('waSettings', () => ({
+      categories: WA_CATEGORIES,
+      testpressNumber: WA_TESTPRESS_NUMBER,
+      institute: WA_INSTITUTE,
+      mode: 'testpress',
+      status: 'connected',
+      flow: '',
+      readOnly: false,
+      loading: false,
+      cats: {},
+      drawerKey: 'otp',
+      setup: '',
+      metaOpen: false,
+      metaStep: 'login',
+      metaCode: '',
+      finishing: '',
+      picks: { otp: true, creds: true, cart: true },
+      hasUsage: true,
+      run: 0,
+
+      init() {
+        this.apply('first_visit');
+        window.addEventListener('wa-state', (e) => this.apply(e.detail));
+      },
+      icons() { this.$nextTick(() => window.lucide && lucide.createIcons()); },
+      toast(title, description, variant = 'success') {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { variant, title, description, position: 'bottom-right' } }));
+      },
+
+      apply(id) {
+        const p = WA_PRESETS[id];
+        this.run++;
+        this.mode = p.mode;
+        this.status = p.status || 'connected';
+        this.flow = p.flow || '';
+        this.readOnly = !!p.readOnly;
+        this.loading = !!p.loading;
+        this.setup = p.setup || '';
+        this.metaOpen = !!p.meta;
+        this.metaStep = p.meta || 'login';
+        this.metaCode = '';
+        this.finishing = '';
+        this.picks = { otp: true, creds: true, cart: true };
+        this.hasUsage = !p.setup && id !== 'tp_first';
+        const cats = {};
+        WA_CATEGORIES.forEach((c) => {
+          const s = p.tpl ? p.tpl[c.key] : 'not_submitted';
+          const extra = {};
+          if (s === 'rejected') extra.reason = 'The message is promotional but was submitted as Utility. Meta re-checked it as Marketing and it didn’t meet the marketing rules.';
+          if (s === 'paused') extra.reason = 'Too many people blocked or reported this message in the last 7 days. Meta pauses it for 3 hours the first time, 6 hours the second time.';
+          if (s === 'disabled') extra.reason = 'Meta paused this template three times for low ratings, so it can’t be used again.';
+          if (s === 'unknown') extra.checkedAt = '1 Nov, 9:00 AM';
+          // On your own number a message can only be on once its template is approved; until then `want` remembers the choice
+          const ok = p.mode !== 'institute' || ['approved', 'unknown'].includes(s);
+          cats[c.key] = { enabled: p.on[c.key] && ok, want: p.on[c.key], pending: false, tpl: waTpl(s, extra) };
+        });
+        this.cats = cats;
+        window.dispatchEvent(new CustomEvent('close-drawer-wa-template'));
+        ['wa-disconnect', 'wa-switch-tp', 'wa-turn-off', 'wa-pick', 'wa-how-own', 'wa-how-feature'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
+        if (p.modal) this.$nextTick(() => window.dispatchEvent(new CustomEvent('open-modal-' + p.modal)));
+        if (p.play === 'disconnect') this.disconnect();
+        if (p.play === 'switch') this.switchToTestpress();
+        if (p.play === 'finish') this.finish();
+        if (p.play === 'templates') this.sendTemplates();
+        if (p.toast) this.toast(...p.toast);
+        if (p.note === 'cancelled') this.toast('Meta window closed', 'Nothing was changed.', 'neutral');
+        if (p.note === 'failed') this.toast('Couldn’t connect your number', 'Meta said this number is already registered with another WhatsApp Business account. Nothing was changed.', 'error');
+        this.icons();
+      },
+
+      // ----- First visit -----
+      get pickedCount() { return WA_CATEGORIES.filter((c) => this.picks[c.key]).length; },
+      // Testpress's number: turn on the picked messages; they send straight away (Testpress's templates are approved)
+      // Picker modal confirm: Testpress's number turns messages on now; your own number turns them on once Meta approves
+      confirmPick() { return this.own ? this.saveWanted() : this.startTestpress(); },
+      saveWanted() {
+        WA_CATEGORIES.forEach((c) => { this.cats[c.key].want = !!this.picks[c.key]; if (this.ready(c.key)) this.cats[c.key].enabled = !!this.picks[c.key]; });
+        this.toast('Saved', `${this.pickedCount} ${this.pickedCount === 1 ? 'message turns' : 'messages turn'} on as soon as Meta approves ${this.pickedCount === 1 ? 'it' : 'them'}.`);
+        this.icons();
+      },
+      startTestpress() {
+        if (!this.pickedCount) return;
+        WA_CATEGORIES.forEach((c) => { this.cats[c.key].enabled = !!this.picks[c.key]; });
+        this.mode = 'testpress';
+        this.setup = '';
+        this.flow = '';
+        this.toast('WhatsApp is on', `${this.pickedCount} ${this.pickedCount === 1 ? 'message goes' : 'messages go'} out on WhatsApp from now on.`);
+        this.icons();
+      },
+      // Own number: the Meta window opens from the setup screen; on success the page opens with templates to set up
+      // Meta's window opens over the current screen; the screen behind stays as it is until the number is connected
+      startOwn() { this.flow = ''; this.openMeta(); },
+
+      // ----- Sender -----
+      get own() { return this.mode === 'institute'; },
+      get broken() { return this.own && this.status === 'error'; },
+      connect() { this.flow = ''; this.openMeta(); },
+
+      // ----- Meta's window (Embedded Signup) -----
+      // In the product this is Meta's own pop-up. The admin signs in, picks the business and WhatsApp account,
+      // adds and verifies the number, and allows Testpress. When it closes, Testpress finishes on its side:
+      // it exchanges Meta's code for access, registers the number for sending, and subscribes to delivery updates.
+      openMeta() { this.metaOpen = true; this.metaStep = 'login'; this.metaCode = ''; this.finishing = ''; this.icons(); },
+      get metaIndex() { return WA_META_STEPS.indexOf(this.metaStep); },
+      metaNext() { this.metaStep = WA_META_STEPS[this.metaIndex + 1]; this.icons(); },
+      metaBack() { if (this.metaIndex > 0) this.metaStep = WA_META_STEPS[this.metaIndex - 1]; this.icons(); },
+      // Closing Meta's window before allowing = nothing changes
+      metaClose() {
+        this.metaOpen = false;
+        this.toast('Meta window closed', 'Nothing was changed.', 'neutral');
+      },
+      metaAllow() { this.metaOpen = false; this.finish(); },
+      async finish() {
+        const run = this.run;
+        this.finishing = 'access';
+        this.icons();
+        await waSleep(1200);
+        if (run !== this.run) return;
+        this.finishing = 'register';
+        await waSleep(1400);
+        if (run !== this.run) return;
+        this.finishing = '';
+        const fromSetup = !!this.setup;
+        this.mode = 'institute';
+        this.status = 'connected';
+        this.setup = '';
+        this.flow = '';
+        // Every message needs a Meta-approved template on the new number, so all three go to Meta now.
+        // Messages that were on stay wanted and switch back on when approved.
+        WA_CATEGORIES.forEach((c) => { const k = this.cats[c.key]; k.want = fromSetup ? false : k.enabled; k.enabled = false; });
+        this.toast('WhatsApp number connected', `${WA_INSTITUTE.number} is connected. Its message templates are on their way to Meta.`);
+        this.sendTemplates();
+        if (fromSetup) { this.picks = { otp: true, creds: true, cart: true }; this.$nextTick(() => window.dispatchEvent(new CustomEvent('open-modal-wa-pick'))); }
+        this.icons();
+      },
+      // All three templates to Meta at once. Prototype: Meta approves them a few seconds later.
+      async sendTemplates(approveAfter = 9000) {
+        const run = this.run;
+        WA_CATEGORIES.forEach((c) => { this.cats[c.key].tpl = waTpl('submitting'); });
+        this.icons();
+        await waSleep(1400);
+        if (run !== this.run) return;
+        WA_CATEGORIES.forEach((c) => { const t = this.cats[c.key].tpl; t.status = 'pending'; t.submittedAt = WA_NOW; });
+        this.icons();
+        await waSleep(approveAfter);
+        if (run !== this.run) return;
+        let on = 0;
+        WA_CATEGORIES.forEach((c) => {
+          const k = this.cats[c.key];
+          if (k.tpl.status !== 'pending') return;
+          k.tpl.status = 'approved'; k.tpl.decidedAt = WA_NOW;
+          if (k.want) { k.enabled = true; on++; }
+        });
+        this.toast('Meta approved your messages', on ? `${on} ${on === 1 ? 'message is' : 'messages are'} now going out from your number.` : 'Turn on the messages you want to send.');
+        this.icons();
+      },
+      async disconnect() {
+        const run = this.run;
+        this.flow = 'disconnecting';
+        await waSleep(1800);
+        if (run !== this.run) return;
+        this.stopWhatsApp('Number disconnected', 'WhatsApp messages have stopped. Choose a number to start again.');
+      },
+      async recheckDisconnect() {
+        const run = this.run;
+        this.flow = 'disconnect_rechecking';
+        await waSleep(1500);
+        if (run !== this.run) return;
+        this.stopWhatsApp('Number disconnected', 'WhatsApp messages have stopped. Choose a number to start again.');
+      },
+      // Nothing is ever moved to Testpress's number on its own: disconnecting or turning off stops WhatsApp and goes
+      // back to the setup screen, where the admin chooses again.
+      stopWhatsApp(title, text) {
+        this.mode = 'testpress';
+        this.status = 'connected';
+        this.flow = '';
+        this.setup = 'choose';
+        WA_CATEGORIES.forEach((c) => { this.cats[c.key].enabled = false; this.cats[c.key].want = false; });
+        this.toast(title, text, 'neutral');
+        this.icons();
+      },
+      // Your number → Testpress's number, only when asked. Messages that were on stay on; Testpress's templates are approved.
+      async switchToTestpress() {
+        const run = this.run;
+        this.flow = 'switching';
+        await waSleep(1500);
+        if (run !== this.run) return;
+        WA_CATEGORIES.forEach((c) => { const k = this.cats[c.key]; k.enabled = k.enabled || k.want; k.want = k.enabled; });
+        this.mode = 'testpress';
+        this.status = 'connected';
+        this.flow = '';
+        this.toast('Now sending from Testpress’s number', `${WA_INSTITUTE.number} is disconnected. Testpress charges for each delivered message.`);
+        this.icons();
+      },
+      async turnOff() {
+        const run = this.run;
+        this.flow = 'turning_off';
+        await waSleep(1000);
+        if (run !== this.run) return;
+        this.stopWhatsApp('WhatsApp is off', 'Students no longer get messages on WhatsApp.');
+      },
+
+      // ----- Message types -----
+      toggle(key) {
+        const c = this.cats[key];
+        const cat = waCategory(key);
+        if (c.enabled) {
+          this.toast(`${cat.name} turned on`, this.sending(key) ? 'Students get it on WhatsApp from now on.' : 'It starts sending once the template is approved by Meta.');
+        } else {
+          this.toast(`${cat.name} turned off`, 'Students get it by SMS or email as before.', 'neutral');
+        }
+        this.icons();
+      },
+      async submit(key) {
+        const run = this.run;
+        const t = this.cats[key].tpl;
+        if (t.status === 'submitting') return;
+        t.status = 'submitting';
+        t.reason = '';
+        this.icons();
+        await waSleep(1400);
+        if (run !== this.run) return;
+        t.status = 'pending';
+        t.submittedAt = WA_NOW;
+        t.decidedAt = '';
+        this.toast('Sent to Meta for approval', `${waCategory(key).name}: Meta usually replies within a day. We update this page when it does.`);
+        this.icons();
+      },
+      async check(key) {
+        const run = this.run;
+        const t = this.cats[key].tpl;
+        t.checking = true;
+        await waSleep(1200);
+        if (run !== this.run) return;
+        t.checking = false;
+        t.status = 'approved';
+        t.checkedAt = '';
+        this.toast('Status checked', 'Meta still has the template as approved.');
+        this.icons();
+      },
+      openTemplate(key) {
+        this.drawerKey = key;
+        window.dispatchEvent(new CustomEvent('open-drawer-wa-template'));
+        this.icons();
+      },
+
+      // One line per message type, beside its switch. The switch already says on/off, so the line only says what the
+      // switch can't: the price (Testpress's number) or the template state (your number), and the one thing to do.
+      // tone: gray (fine), amber (waiting on Meta), red (switched on but can't send). Off is never coloured.
+      row(key) {
+        const c = this.cats[key];
+        if (!c) return {};
+        const t = c.tpl;
+        const cat = waCategory(key);
+        const warn = (tone) => (c.enabled || c.want ? tone : 'gray');
+        if (!this.own) return { tone: 'gray', text: `${waRupees(cat.price)} per delivered message`, action: 'See message' };
+        if (this.broken) return { tone: warn('red'), text: 'Can’t send: your number isn’t connected' };
+        switch (t.status) {
+          case 'not_submitted':
+          case 'submitting': return { tone: 'amber', text: 'Sending to Meta…' };
+          case 'pending': return { tone: 'amber', text: 'Pending approval' };
+          case 'approved': return { tone: 'gray', text: '' }; // normal: the switch says it all
+          case 'rejected': return { tone: warn('red'), text: 'Meta rejected the template', action: 'See why' };
+          case 'paused': return { tone: warn('red'), text: 'Meta paused the template', action: 'See why' };
+          case 'disabled': return { tone: warn('red'), text: 'Meta disabled the template', action: 'See why' };
+          case 'unknown': return { tone: 'gray', text: 'Approved when last checked; couldn’t reach Meta since', action: 'Check again' };
+        }
+        return {};
+      },
+      act(key) {
+        const s = this.cats[key].tpl.status;
+        if (s === 'unknown') return this.check(key);
+        this.openTemplate(key);
+      },
+      ready(key) {
+        const c = this.cats[key];
+        return !!c && (!this.own || (!this.broken && ['approved', 'unknown'].includes(c.tpl.status)));
+      },
+      sending(key) {
+        const c = this.cats[key];
+        return !!c && c.enabled && (!this.own || (!this.broken && ['approved', 'unknown'].includes(c.tpl.status)));
+      },
+      get pendingCount() { return WA_CATEGORIES.filter((c) => this.cats[c.key] && ['submitting', 'pending'].includes(this.cats[c.key].tpl.status)).length; },
+      get sendingCount() { return WA_CATEGORIES.filter((c) => this.sending(c.key)).length; },
+      get blockedCount() { return WA_CATEGORIES.filter((c) => this.row(c.key).tone === 'red').length; },
+      dot(tone) { return { green: 'bg-green-500', amber: 'bg-amber-500', red: 'bg-red-500', gray: 'bg-gray-300 dark:bg-neutral-600' }[tone]; },
+      text(tone) { return { green: 'text-green-700 dark:text-green-400', amber: 'text-amber-700 dark:text-amber-400', red: 'text-red-700 dark:text-red-400', gray: 'text-gray-500 dark:text-neutral-400' }[tone]; },
+
+      // ----- Template drawer -----
+      get dc() { return waCategory(this.drawerKey); },
+      get dt() { return this.cats[this.drawerKey] ? this.cats[this.drawerKey].tpl : {}; },
+      tplBadge(s) {
+        return {
+          not_submitted: ['Not set up', 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300'],
+          submitting: ['Sending to Meta…', 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-400'],
+          pending: ['Waiting for approval', 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-400'],
+          approved: ['Approved', 'bg-green-100 text-green-800 dark:bg-green-500/10 dark:text-green-400'],
+          unknown: ['Approved when last checked', 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300'],
+          rejected: ['Rejected', 'bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400'],
+          paused: ['Paused', 'bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400'],
+          disabled: ['Disabled', 'bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400'],
+        }[s] || ['', ''];
+      },
+    }));
+  });
+</script>

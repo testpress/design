@@ -1,0 +1,61 @@
+{#
+  The message types that can go out on WhatsApp. One row each: what it is, one status line, and the on/off switch.
+  On your own number the switch is locked until Meta approves that message's template (templates go to Meta automatically).
+  Rows are separated by spacing, not lines.
+#}
+{% from "../../../ui-system/components/switch.html" import switch %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% set categories = [
+  {key: "otp", name: "Login OTP", icon: "key-round", about: "Sign-in code for students who log in with their phone"},
+  {key: "creds", name: "Account credentials", icon: "user-round-plus", about: "Username and password when an account is created"},
+  {key: "cart", name: "Abandoned cart", icon: "shopping-cart", about: "Reminder when a purchase is left unfinished"}
+] %}
+
+<section class="p-5 sm:p-6 bg-white rounded-2xl shadow-sm dark:bg-neutral-800" aria-labelledby="wa-types-title">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 id="wa-types-title" class="text-base font-semibold text-gray-800 dark:text-neutral-100">Messages on WhatsApp</h2>
+      <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400">
+        <span x-text="sendingCount + ' of 3 sending'"></span><span x-show="blockedCount"> · <span class="text-red-700 dark:text-red-400" x-text="blockedCount + (blockedCount === 1 ? ' needs attention' : ' need attention')"></span></span>
+      </p>
+    </div>
+  </div>
+
+  <!-- While Meta reviews: said once here, so each row only needs a short "Pending approval" -->
+  <div x-show="own && !broken && pendingCount" class="mt-4 py-2.5 px-3 flex gap-x-2 rounded-lg bg-amber-50 text-[13px] text-amber-800 dark:bg-amber-500/10 dark:text-amber-300" role="status">
+    <i data-lucide="clock" class="shrink-0 size-4 mt-px"></i>
+    <p>Meta is reviewing your messages, usually within a day. The ones you picked turn on when approved.</p>
+  </div>
+
+  <ul class="mt-3 space-y-1">
+    {% for c in categories %}
+    <li class="py-3 flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-2">
+      <span class="shrink-0 size-9 inline-flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300">
+        <i data-lucide="{{ c.icon }}" class="size-4"></i>
+      </span>
+      <!-- Name and description open the message's template panel (message preview, Meta status and reason, actions) -->
+      <button type="button" @click="openTemplate('{{ c.key }}')" class="group flex-1 min-w-0 text-start rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" :aria-label="'Open {{ c.name }} message'">
+        <span id="wa-{{ c.key }}-label" class="flex items-center gap-x-1 text-sm font-semibold text-gray-800 group-hover:text-primary-700 dark:text-neutral-100 dark:group-hover:text-primary-400">
+          {{ c.name }}
+          <i data-lucide="chevron-right" class="size-3.5 text-gray-400 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-transform"></i>
+        </span>
+        <span class="block text-[13px] text-gray-500 dark:text-neutral-400">{{ c.about }}</span>
+      </button>
+
+      <!-- Status: price or template state only. Dot only when something needs attention. -->
+      <p x-show="row('{{ c.key }}').text || cats.{{ c.key }}.tpl.checking" class="w-full sm:w-auto shrink-0 order-last sm:order-none ps-[3.25rem] sm:ps-0 flex items-center gap-x-1.5 text-[13px]" :class="text(row('{{ c.key }}').tone)" aria-live="polite">
+        <span x-show="row('{{ c.key }}').tone !== 'gray' && cats.{{ c.key }}.tpl.status !== 'submitting' && !cats.{{ c.key }}.tpl.checking" class="shrink-0 size-1.5 rounded-full" :class="dot(row('{{ c.key }}').tone)"></span>
+        <span x-show="cats.{{ c.key }}.tpl.status === 'submitting' || cats.{{ c.key }}.tpl.checking" class="animate-spin shrink-0 size-3 border-2 border-current border-t-transparent rounded-full" aria-hidden="true"></span>
+        <span x-text="cats.{{ c.key }}.tpl.checking ? 'Checking with Meta…' : row('{{ c.key }}').text"></span>
+      </p>
+
+      <div class="shrink-0 flex items-center gap-x-3">
+        <!-- Locked until Meta approves the template: a message can't be switched on before it can actually send -->
+        <div @change="toggle('{{ c.key }}')" :class="(readOnly || !ready('{{ c.key }}')) && 'pointer-events-none opacity-40'" :title="ready('{{ c.key }}') ? '' : 'Available once Meta approves the template'" aria-labelledby="wa-{{ c.key }}-label">
+          {{ switch(id="wa-switch-" ~ c.key, size="sm", x_model="cats." ~ c.key ~ ".enabled") }}
+        </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>

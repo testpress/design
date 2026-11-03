@@ -1,0 +1,104 @@
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+{% from "../../../ui-system/components/modal.html" import modal %}
+
+<div @modal-confirmed-wa-disconnect.window="disconnect()"
+     @modal-confirmed-wa-switch-tp.window="switchToTestpress()"
+     @modal-confirmed-wa-turn-off.window="turnOff()">
+  {# Disconnecting stops WhatsApp. It never moves sending to Testpress's number on its own. #}
+  {% call modal(id="wa-disconnect", title="Disconnect your WhatsApp number?", variant="danger", confirm_text="Disconnect", cancel_text="Keep my number") %}
+    <div class="space-y-3">
+      <p><span class="font-medium text-gray-800 dark:text-neutral-200" x-text="institute.number"></span> stops sending your messages, and students stop getting them on WhatsApp.</p>
+      <p>You can then send from Testpress’s number or connect another number. Past messages and charges don’t change.</p>
+    </div>
+  {% endcall %}
+
+  {# Your number → Testpress's number, only when asked: charged, so the prices come first #}
+  {% call modal(id="wa-switch-tp", title="Send from Testpress’s number instead?", confirm_text="Switch to Testpress’s number", cancel_text="Keep my number") %}
+    <div class="space-y-4">
+      <p>Your messages go out from <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="testpressNumber"></span>, and <span x-text="institute.number"></span> is disconnected. Testpress charges for each delivered message:</p>
+      <dl class="p-3 space-y-2 rounded-lg bg-gray-50 dark:bg-neutral-900/60">
+        <template x-for="c in categories" :key="c.key">
+          <div class="flex justify-between gap-x-4">
+            <dt x-text="c.name"></dt>
+            <dd class="font-medium text-gray-800 tabular-nums dark:text-neutral-200" x-text="waRupees(c.price)"></dd>
+          </div>
+        </template>
+      </dl>
+      <p>Messages you have on stay on. Past messages and charges don’t change.</p>
+    </div>
+  {% endcall %}
+
+  {# Stop using Testpress's number: WhatsApp off, back to choosing a number #}
+  {% call modal(id="wa-turn-off", title="Turn off WhatsApp?", variant="danger", confirm_text="Turn off", cancel_text="Keep it on") %}
+    <div class="space-y-3">
+      <p>Students stop getting messages on WhatsApp, and Testpress stops charging for them.</p>
+      <p>You can set WhatsApp up again any time, from Testpress’s number or your own. Past messages and charges don’t change.</p>
+    </div>
+  {% endcall %}
+</div>
+
+{# First visit, Testpress's number: "Start now" opens this picker; "Turn on WhatsApp" turns the picked messages on.
+   Own number: a short "how it works" before Meta's window opens. #}
+<div @modal-confirmed-wa-pick.window="confirmPick()"
+     @modal-confirmed-wa-how-own.window="startOwn()">
+  {% call modal(id="wa-pick", title="Which messages go on WhatsApp?", confirm_text="Turn on WhatsApp", cancel_text="Cancel", confirm_attrs=':disabled="!pickedCount"') %}
+    <p class="text-sm text-gray-500 dark:text-neutral-400" x-show="!own">Sent from Testpress’s number. You pay only for delivered messages.</p>
+    <p class="text-sm text-gray-500 dark:text-neutral-400" x-show="own">Sent from your number. Each one turns on as soon as Meta approves it, usually within a day.</p>
+    <ul class="mt-5 space-y-4">
+      <li class="flex items-start justify-between gap-x-4">
+        {{ checkbox(name="wa-pick-otp", id="wa-pick-otp", label="Login OTP", description="Sign-in code for students who log in with their phone", x_model="picks.otp") }}
+        <span x-show="!own" class="shrink-0 text-[13px] leading-6 text-gray-500 tabular-nums dark:text-neutral-400">₹0.15 each</span>
+      </li>
+      <li class="flex items-start justify-between gap-x-4">
+        {{ checkbox(name="wa-pick-creds", id="wa-pick-creds", label="Account credentials", description="Username and password when an account is created", x_model="picks.creds") }}
+        <span x-show="!own" class="shrink-0 text-[13px] leading-6 text-gray-500 tabular-nums dark:text-neutral-400">₹0.15 each</span>
+      </li>
+      <li class="flex items-start justify-between gap-x-4">
+        {{ checkbox(name="wa-pick-cart", id="wa-pick-cart", label="Abandoned cart", description="Reminder when a purchase is left unfinished", x_model="picks.cart") }}
+        <span x-show="!own" class="shrink-0 text-[13px] leading-6 text-gray-500 tabular-nums dark:text-neutral-400">₹0.95 each</span>
+      </li>
+    </ul>
+  {% endcall %}
+  {% call modal(id="wa-how-own", title="Connect your WhatsApp Business number", confirm_text="Continue to Meta", cancel_text="Back") %}
+    <ol class="space-y-4">
+      <li class="flex gap-x-3">
+        <span class="shrink-0 size-6 inline-flex items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">1</span>
+        <div><p class="font-medium text-gray-800 dark:text-neutral-200">Sign in to Meta</p><p class="text-[13px] text-gray-500 dark:text-neutral-400">A Meta window opens. Sign in with the Facebook account that manages your business.</p></div>
+      </li>
+      <li class="flex gap-x-3">
+        <span class="shrink-0 size-6 inline-flex items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">2</span>
+        <div><p class="font-medium text-gray-800 dark:text-neutral-200">Add and verify your number</p><p class="text-[13px] text-gray-500 dark:text-neutral-400">Pick your business, add the number, and enter the code Meta sends to it.</p></div>
+      </li>
+      <li class="flex gap-x-3">
+        <span class="shrink-0 size-6 inline-flex items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">3</span>
+        <div><p class="font-medium text-gray-800 dark:text-neutral-200">Get the messages approved</p><p class="text-[13px] text-gray-500 dark:text-neutral-400">Testpress sends your messages to Meta for approval right away. Usually approved within a day.</p></div>
+      </li>
+    </ol>
+    <p class="mt-4 text-[13px] text-gray-500 dark:text-neutral-400">Takes about 5 minutes. You need a Meta Business account and a number that isn’t on the WhatsApp app. Meta bills you for these messages.</p>
+  {% endcall %}
+</div>
+
+{# First visit: what the feature does (opened from "How it works" next to the title) #}
+{% call modal(id="wa-how-feature", title="How WhatsApp messages work", confirm_text="", cancel_text="Got it") %}
+  <div class="space-y-5">
+    <p>Testpress sends these messages to students on WhatsApp automatically:</p>
+    <ul class="space-y-4">
+      <li class="flex gap-x-3">
+        <span class="shrink-0 size-8 inline-flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300"><i data-lucide="key-round" class="size-4"></i></span>
+        <div><p class="font-medium text-gray-800 dark:text-neutral-200">Login OTP</p><p class="text-[13px] text-gray-500 dark:text-neutral-400">Students who sign in with their phone number get their login code on WhatsApp.</p></div>
+      </li>
+      <li class="flex gap-x-3">
+        <span class="shrink-0 size-8 inline-flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300"><i data-lucide="user-round-plus" class="size-4"></i></span>
+        <div><p class="font-medium text-gray-800 dark:text-neutral-200">Account credentials</p><p class="text-[13px] text-gray-500 dark:text-neutral-400">When you create a student account, the username and password go to the student on WhatsApp.</p></div>
+      </li>
+      <li class="flex gap-x-3">
+        <span class="shrink-0 size-8 inline-flex items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-neutral-700 dark:text-neutral-300"><i data-lucide="shopping-cart" class="size-4"></i></span>
+        <div><p class="font-medium text-gray-800 dark:text-neutral-200">Abandoned cart</p><p class="text-[13px] text-gray-500 dark:text-neutral-400">If a student leaves a course purchase unfinished, they get a reminder to complete it.</p></div>
+      </li>
+    </ul>
+    <ul class="space-y-2 text-[13px] text-gray-600 dark:text-neutral-400">
+      <li class="flex gap-x-2"><i data-lucide="toggle-right" class="shrink-0 size-4 mt-px text-gray-400"></i>You choose which of these go out, and can turn each one off any time.</li>
+      <li class="flex gap-x-2"><i data-lucide="chart-column" class="shrink-0 size-4 mt-px text-gray-400"></i>Delivery and charges for every message show on WhatsApp usage.</li>
+    </ul>
+  </div>
+{% endcall %}
