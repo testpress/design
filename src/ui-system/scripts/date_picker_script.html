@@ -16,6 +16,9 @@
             showToday: config.showToday || false,
             showFooterActions: config.showFooterActions || false,
             dropdownAlign: config.dropdownAlign || 'left',
+            presets: config.presets || false,
+            // "Today" for the quick ranges (a fixed date in prototypes; the real today otherwise)
+            today: config.today ? new Date(config.today) : new Date(),
 
             // Values
             selectedDate: null,
@@ -215,6 +218,29 @@
                 const d = new Date(date);
                 d.setHours(0, 0, 0, 0);
                 return d;
+            },
+
+            // Quick ranges under the calendar (range mode): today, yesterday, last 7 days, this month, last month
+            get presetList() {
+                const t = this.normalizeDate(this.today), y = t.getFullYear(), m = t.getMonth(), d = t.getDate();
+                return [
+                    { key: 'today', label: 'Today', start: t, end: t },
+                    { key: 'yesterday', label: 'Yesterday', start: new Date(y, m, d - 1), end: new Date(y, m, d - 1) },
+                    { key: 'last7', label: 'Last 7 days', start: new Date(y, m, d - 6), end: t },
+                    { key: 'month', label: 'This month', start: new Date(y, m, 1), end: t },
+                    { key: 'lastMonth', label: 'Last month', start: new Date(y, m - 1, 1), end: new Date(y, m, 0) },
+                ];
+            },
+            isPreset(p) {
+                return !!(this.selectedDate && this.selectedEndDate && this.selectedDate.getTime() === p.start.getTime() && this.selectedEndDate.getTime() === p.end.getTime());
+            },
+            applyPreset(p) {
+                this.selectedDate = p.start;
+                this.selectedEndDate = p.end;
+                this.currentMonth = p.start.getMonth();
+                this.currentYear = p.start.getFullYear();
+                this.updateInput();
+                if (!this.inline) this.open = false;
             },
 
             formatDateString(date) {

@@ -1,0 +1,106 @@
+{# GitHub-style list (same shape as the TPSentinel review cases list): a bar of status views with counts, then one row per
+   message: status icon, what went to whom, number and time (and why, if it didn't arrive), and the charge at the end. #}
+{% from "../../../../ui-system/components/pagination.html" import pagination %}
+{% from "../../../../ui-system/components/dropdown.html" import dropdown %}
+
+<!-- Views: status, with counts for the current dates and filters -->
+<div class="py-2 ps-4 pe-3 flex flex-wrap items-center gap-x-2 gap-y-1 bg-gray-50 border-b rounded-t-2xl border-gray-200 dark:bg-neutral-900/50 dark:border-neutral-700">
+<nav class="flex items-center gap-x-1 min-w-0 overflow-x-auto [scrollbar-width:none]" aria-label="Status">
+  <template x-for="v in views" :key="v.key">
+    <button type="button" @click="status = v.key"
+            :aria-current="status === v.key ? 'page' : null"
+            :class="status === v.key ? 'text-gray-800 font-semibold dark:text-neutral-100' : 'text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
+            class="shrink-0 py-1.5 px-2 inline-flex items-center gap-x-1.5 rounded-lg text-sm whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+      <span x-text="v.label"></span>
+      <!-- Counts stay quiet; only the selected view's count is stronger -->
+      <span class="py-0.5 px-1.5 rounded-full text-xs font-medium leading-4 tabular-nums"
+            :class="status === v.key ? 'bg-gray-200 text-gray-800 dark:bg-neutral-600 dark:text-neutral-100' : 'bg-gray-200/50 text-gray-500 dark:bg-neutral-700/60 dark:text-neutral-400'"
+            x-text="waCount(counts[v.key])"></span>
+    </button>
+  </template>
+</nav>
+<!-- Filters at the end of the bar, one menu each (as on the review cases list): pick one, tick at the end, Clear filter -->
+<div class="shrink-0 ms-auto flex items-center gap-x-0.5">
+  <!-- Student: searchable by name or phone (as the candidate filter on the review cases list) -->
+  {% set strig %}<button type="button" @click="studentQ = ''; setTimeout(() => $refs.studentSearch && $refs.studentSearch.focus(), 50)" :class="student ? 'text-gray-800 dark:text-neutral-100' : 'text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200'" class="py-1.5 px-2 inline-flex items-center gap-x-1 rounded-lg text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-neutral-700" aria-haspopup="menu" :aria-expanded="open.toString()">Student<span x-show="student" class="size-1.5 rounded-full bg-primary-600" aria-label="active"></span><svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>{% endset %}
+  {% call dropdown(trigger=strig, placement="bottom-end", width="w-72") %}
+    <p class="px-2 pt-1.5 pb-2 text-[13px] font-semibold text-gray-800 dark:text-neutral-200">Filter by student</p>
+    <div class="px-1 pb-1">
+      <div class="relative">
+        <svg class="absolute start-2.5 top-1/2 -translate-y-1/2 size-3.5 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input x-ref="studentSearch" x-model="studentQ" type="text" placeholder="Name or phone" aria-label="Find a student by name or phone"
+               class="py-1.5 ps-8 pe-3 block w-full border-gray-200 rounded-lg text-sm placeholder:text-gray-400 focus:border-primary-500 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200">
+      </div>
+    </div>
+    <div class="max-h-64 overflow-y-auto">
+      <template x-for="st in studentOptions" :key="st.phone">
+        <button type="button" role="menuitemradio" :aria-checked="(student === st.phone).toString()" @click="student = st.phone; open = false"
+                class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-start text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+          <span class="min-w-0">
+            <span class="block truncate" :class="student === st.phone && 'font-medium'" x-text="st.name"></span>
+            <span class="block text-xs text-gray-500 tabular-nums dark:text-neutral-400" x-text="st.phone"></span>
+          </span>
+          <svg x-show="student === st.phone" class="ms-auto shrink-0 size-4 text-primary-600 dark:text-primary-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        </button>
+      </template>
+      <p x-show="!studentOptions.length" class="py-3 px-2 text-sm text-gray-500 dark:text-neutral-400">No matches</p>
+    </div>
+    <div x-show="student" class="mt-1 pt-1 border-t border-gray-200 dark:border-neutral-800">
+      <button type="button" @click="student = ''; open = false" class="w-full py-2 px-2 rounded-lg text-sm text-start text-gray-500 hover:text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800">Clear filter</button>
+    </div>
+  {% endcall %}
+  {% for f in [
+    {key: "type", label: "Message", options: [{value: "otp", label: "Login OTP"}, {value: "creds", label: "Account credentials"}, {value: "cart", label: "Abandoned cart"}]},
+    {key: "from", label: "Sent from", options: [{value: "testpress", label: "Testpress’s number"}, {value: "own", label: "Your number"}]}
+  ] %}
+    {% set trig %}<button type="button" :class="{{ f.key }} ? 'text-gray-800 dark:text-neutral-100' : 'text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200'" class="py-1.5 px-2 inline-flex items-center gap-x-1 rounded-lg text-sm hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:hover:bg-neutral-700" aria-haspopup="menu" :aria-expanded="open.toString()">{{ f.label }}<span x-show="{{ f.key }}" class="size-1.5 rounded-full bg-primary-600" aria-label="active"></span><svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button>{% endset %}
+    {% call dropdown(trigger=trig, placement="bottom-end", width="w-56") %}
+      <p class="px-2 pt-1.5 pb-2 text-[13px] font-semibold text-gray-800 dark:text-neutral-200">Filter by {{ f.label | lower }}</p>
+      {% for o in f.options %}
+      <button type="button" role="menuitemradio" :aria-checked="({{ f.key }} === '{{ o.value }}').toString()" @click="{{ f.key }} = '{{ o.value }}'; open = false"
+              class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-start text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+        <span :class="{{ f.key }} === '{{ o.value }}' && 'font-medium'">{{ o.label }}</span>
+        <svg x-show="{{ f.key }} === '{{ o.value }}'" class="ms-auto shrink-0 size-4 text-primary-600 dark:text-primary-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+      {% endfor %}
+      <div x-show="{{ f.key }}" class="mt-1 pt-1 border-t border-gray-200 dark:border-neutral-800">
+        <button type="button" @click="{{ f.key }} = ''; open = false" class="w-full py-2 px-2 rounded-lg text-sm text-start text-gray-500 hover:text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800">Clear filter</button>
+      </div>
+    {% endcall %}
+  {% endfor %}
+</div>
+</div>
+
+<ul x-show="rows.length" role="list">
+  <template x-for="r in shown" :key="r.id">
+    <li @click="show(r)" class="group py-3 px-6 flex items-start gap-x-3 cursor-pointer border-t border-gray-200 first-of-type:border-t-0 hover:bg-gray-50 dark:border-neutral-700 dark:hover:bg-neutral-700/40">
+      <!-- Status: colour lives on the icon only, so the list stays calm; the label is in the tooltip and for screen readers -->
+      <span class="shrink-0 h-6 flex items-center" :class="state(r).cls" :title="state(r).label" role="img" :aria-label="state(r).label" x-html="state(r).svg"></span>
+
+      <div class="min-w-0 flex-1">
+        <button type="button" @click.stop="show(r)" class="text-start text-sm text-gray-800 focus:outline-none focus-visible:underline dark:text-neutral-200">
+          <span class="font-semibold" x-text="cat(r.key).name"></span> to <span x-text="r.name"></span>
+        </button>
+        <p class="mt-0.5 text-[13px] text-gray-500 dark:text-neutral-400">
+          <span class="tabular-nums" x-text="r.phone + ' · ' + when(r.date) + ', ' + time(r.date)"></span>
+          <!-- Words only when it didn't simply arrive -->
+          <template x-if="r.status !== 'delivered'">
+            <span> · <span :class="r.status === 'failed' && 'text-red-700 dark:text-red-400'" x-text="r.fail ? fails[r.fail].short : state(r).label"></span></span>
+          </template>
+        </p>
+      </div>
+
+      <div class="self-center shrink-0 text-end">
+        <span x-show="charge(r).amount" class="text-sm text-gray-800 tabular-nums dark:text-neutral-200" x-text="charge(r).amount"></span>
+        <span x-show="charge(r).note" class="text-xs text-gray-500 dark:text-neutral-400" x-text="charge(r).note"></span>
+      </div>
+      <!-- The row opens its details, as on the review cases list -->
+      <svg class="self-center shrink-0 size-4 text-gray-400 group-hover:text-gray-800 transition-colors dark:text-neutral-500 dark:group-hover:text-neutral-200" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </li>
+  </template>
+</ul>
+
+<!-- ui-system pagination: count and Go to on the left, pages on the right. Only when there is more than one page. -->
+<div x-show="pages > 1" class="px-6 py-4 border-t border-gray-200 dark:border-neutral-700">
+  {{ pagination(show_go_to=true, x_results="waCount(rows.length)", x_items="pageItems", x_current="page", x_last="pages", x_go="goTo") }}
+</div>

@@ -1,0 +1,229 @@
+{% include "../../../whatsapp/includes/data.html" %}
+<script>
+  // Message logs: one row per WhatsApp message, newest first, with status views (All / Delivered / Not confirmed / Failed). Filters come from the URL (?start, ?end, ?type, ?status,
+  // ?from; ?month=YYYY-MM opens that whole month), so the usage page can link straight to "failed Login OTPs in November".
+  // Codes and passwords are never stored. Prototype "today" is 28 Nov 2026.
+  const WL_PER_PAGE = 12;
+  const WL_NAMES = ['Ananya Rao', 'Rohan Mehta', 'Sneha Kulkarni', 'Arjun Nair', 'Priya Shah', 'Kabir Joshi', 'Meera Iyer', 'Vihaan Desai', 'Ishita Patil', 'Aditya Menon', 'Diya Gupta', 'Karan Malhotra', 'Riya Sawant', 'Neel Bhatt'];
+  // Failure reasons, in plain words, with Meta's error code and what the admin can do
+  const WL_FAILS = {
+    not_on_wa: { short: 'Number isn’t on WhatsApp', code: 131026, help: 'The number may not have WhatsApp, or the student hasn’t accepted WhatsApp’s latest terms. SMS and email still go out as usual; for sign-in codes, the student can pick SMS.' },
+    opted_out: { short: 'Student stopped these messages', code: 131050, help: 'The student chose to stop marketing messages from this number on WhatsApp. Testpress doesn’t retry.' },
+    meta_limit: { short: 'Meta limited marketing messages', code: 131049, help: 'Meta holds back some marketing messages to people who get many of them. It isn’t charged. Nothing to fix.' },
+    paused: { short: 'Template was paused by Meta', code: 132015, help: 'Meta paused this template for low ratings. See its status in WhatsApp settings.' },
+    account: { short: 'Your number wasn’t connected', code: 190, help: 'Meta stopped accepting Testpress’s access to your number. Reconnect it in WhatsApp settings.' },
+  };
+  // One phone per student, so the Student filter can match on it
+  const WL_STUDENTS = WL_NAMES.map((name, i) => ({ name, phone: '+91 9' + String(Math.floor(Math.abs(Math.sin(i + 1) * 1e9))).padStart(9, '0').slice(0, 9).replace(/(\d{4})(\d{5})/, '$1 $2') }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const WL_TODAY = new Date(2026, 10, 28);
+  const wlDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const wlIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const wlParse = (v) => { const [y, m, d] = (v || '').split('-').map(Number); return y && m ? new Date(y, m - 1, d || 1) : null; };
+  // A month's range, ending today for the current month
+  const wlMonthRange = (y, m) => { const end = new Date(y, m + 1, 0); return [new Date(y, m, 1), end > WL_TODAY ? WL_TODAY : end]; };
+  // The ui-system picker reads and shows dates as "Nov 1, 2026"
+  const wlPickerText = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  // Sample rows, newest first. September only had Abandoned cart on WhatsApp.
+  function wlRows() {
+    const rows = [];
+    const rand = (s) => { const x = Math.sin(s) * 10000; return x - Math.floor(x); };
+    const months = [[2026, 10, 28], [2026, 9, 31], [2026, 8, 30]];
+    let id = 1;
+    months.forEach(([y, mo, lastDay], mi) => {
+      const count = mi === 2 ? 14 : 46;
+      for (let i = 0; i < count; i++) {
+        const r = rand(id * 13.7);
+        const day = Math.max(1, lastDay - Math.floor(i * (lastDay / count)));
+        const d = new Date(y, mo, day, 8 + Math.floor(rand(id) * 12), Math.floor(rand(id * 3) * 60));
+        const key = mi === 2 ? 'cart' : r < 0.6 ? 'otp' : r < 0.8 ? 'creds' : 'cart';
+        const name = WL_NAMES[id % WL_NAMES.length];
+        const phone = WL_STUDENTS.find((st) => st.name === name).phone;
+        const legacy = false;
+        const recent = mi === 0 && i < 3;
+        const fromTestpress = legacy || mi === 1 || day < 26;
+        let status = legacy ? 'unknown' : recent ? (i === 0 ? 'pending' : 'sent') : 'delivered';
+        let fail = null;
+        if (!legacy && !recent && rand(id * 7) < 0.14) {
+          status = 'failed';
+          fail = key === 'cart' ? (rand(id) < 0.5 ? 'opted_out' : 'meta_limit') : i % 9 === 4 && !fromTestpress ? 'account' : 'not_on_wa';
+        }
+        const cat = waCategory(key);
+        const price = key === 'cart' && (mi === 1 || day < 10) ? 0.9 : cat.price;
+        rows.push({
+          id: id, month: `${y}-${String(mo + 1).padStart(2, '0')}`, date: d, key, name, phone, status, fail, legacy,
+          fromTestpress, sender: legacy ? null : fromTestpress ? WA_TESTPRESS_NUMBER : WA_INSTITUTE.number,
+          price, charged: !legacy && fromTestpress && status === 'delivered' ? price : 0,
+          wamid: 'wamid.HBgM' + Math.floor(rand(id * 11) * 1e12).toString(36).toUpperCase(),
+        });
+        id++;
+      }
+    });
+    return rows;
+  }
+
+  const WL_PRESETS = {
+    results: {},
+    failed: { status: 'failed' },
+    no_match: { month: '2026-09', type: 'otp' },
+    nothing: { nothing: true },
+    older: { month: '2026-09' },
+    error: { error: true },
+  };
+  window.WA_STATES = {
+    initial: 'results',
+    groups: [
+      { name: 'Logs', states: [['results', 'All messages'], ['failed', 'Failed only'], ['older', 'September (Abandoned cart only)']] },
+      { name: 'Empty and errors', states: [['no_match', 'No match for filters'], ['nothing', 'No messages yet'], ['error', 'Couldn’t load']] },
+    ],
+  };
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('waLogs', () => ({
+      all: wlRows(),
+      categories: WA_CATEGORIES,
+      fails: WL_FAILS,
+      student: '', type: '', status: '', from: '',
+      students: WL_STUDENTS,
+      studentQ: '',
+      start: wlMonthRange(2026, 10)[0], end: WL_TODAY,
+      page: 1,
+      nothing: false,
+      error: false,
+      retrying: false,
+      openId: null,
+
+      init() {
+        const u = new URLSearchParams(location.search);
+        ['student', 'type', 'status', 'from'].forEach((k) => { if (u.get(k)) this[k] = u.get(k); });
+        if (u.get('month')) this.setMonth(u.get('month'));
+        if (wlParse(u.get('start')) && wlParse(u.get('end'))) { this.start = wlParse(u.get('start')); this.end = wlParse(u.get('end')); }
+        ['student', 'start', 'end', 'type', 'status', 'from'].forEach((k) => this.$watch(k, () => { this.page = 1; this.sync(); this.icons(); }));
+        window.addEventListener('wa-state', (e) => this.apply(e.detail));
+        this.$nextTick(() => this.bindControls());
+        this.icons();
+      },
+      setMonth(v) { const d = wlParse(v); if (d) [this.start, this.end] = wlMonthRange(d.getFullYear(), d.getMonth()); },
+      // The ui-system date picker keeps its own state: read from them, and push ours back when it changes
+      // (Clear filters, prototype states). Their Alpine data is reactive, so an effect sees each pick.
+      bindControls() {
+        const data = (sel) => { const el = document.querySelector(sel); return el && el._x_dataStack && el._x_dataStack[0]; };
+        const dp = data('#wl-range [x-data]');
+        if (dp) {
+          // Each side only reacts to its own changes: `last` is the range both agree on
+          let last = '';
+          const key = (s, e) => +wlDay(s) + '-' + +wlDay(e);
+          Alpine.effect(() => {
+            if (!dp.selectedDate || !dp.selectedEndDate) return;
+            const k = key(dp.selectedDate, dp.selectedEndDate);
+            if (k !== last) { last = k; this.start = wlDay(dp.selectedDate); this.end = wlDay(dp.selectedEndDate); }
+          });
+          Alpine.effect(() => {
+            const k = key(this.start, this.end);
+            if (k !== last) { last = k; dp.parseAndSetValue(wlPickerText(this.start) + ' → ' + wlPickerText(this.end)); }
+          });
+        }
+      },
+      icons() { this.$nextTick(() => window.lucide && lucide.createIcons()); },
+      sync() {
+        const url = new URL(location.href);
+        url.searchParams.delete('month');
+        url.searchParams.set('start', wlIso(this.start)); url.searchParams.set('end', wlIso(this.end));
+        ['student', 'type', 'status', 'from'].forEach((k) => (this[k] ? url.searchParams.set(k, this[k]) : url.searchParams.delete(k)));
+        history.replaceState(null, '', url);
+      },
+      apply(id) {
+        const p = WL_PRESETS[id];
+        this.student = ''; this.setMonth(p.month || '2026-11'); this.type = p.type || ''; this.status = p.status || ''; this.from = '';
+        this.nothing = !!p.nothing; this.error = !!p.error; this.page = 1;
+        this.icons();
+      },
+      clear() { this.student = ''; this.type = ''; this.status = ''; this.from = ''; },
+      // Student menu: type a name or phone to narrow the list
+      get studentOptions() {
+        const q = this.studentQ.trim().toLowerCase().replace(/\s/g, '');
+        return this.students.filter((st) => !q || st.name.toLowerCase().replace(/\s/g, '').includes(q) || st.phone.replace(/\s/g, '').includes(q));
+      },
+      async retry() { this.retrying = true; await new Promise((r) => setTimeout(r, 1000)); this.retrying = false; this.error = false; this.icons(); },
+
+      statusMatch(r, k) { return !k || r.status === k || (k === 'sent' && r.status === 'pending'); },
+      get rows() { return this.base.filter((r) => this.statusMatch(r, this.status)); },
+      // Everything but the status view, so each view can show its count
+      get base() {
+        if (this.nothing || this.error) return [];
+        const until = new Date(this.end.getFullYear(), this.end.getMonth(), this.end.getDate() + 1);
+        return this.all.filter((r) => r.date >= this.start && r.date < until
+          && (!this.type || r.key === this.type)
+          && (!this.from || (this.from === 'testpress' ? r.fromTestpress : !r.fromTestpress))
+          && (!this.student || r.phone === this.student));
+      },
+      get pages() { return Math.max(1, Math.ceil(this.rows.length / WL_PER_PAGE)); },
+      get shown() { return this.rows.slice((this.page - 1) * WL_PER_PAGE, this.page * WL_PER_PAGE); },
+      // Pages for the ui-system pagination: first, last, current ±1, with gaps
+      get pageItems() {
+        const n = this.pages, c = this.page, out = [];
+        for (let i = 1; i <= n; i++) if (i === 1 || i === n || Math.abs(i - c) <= 1) out.push(i); else if (out[out.length - 1] !== '...') out.push('...');
+        return out;
+      },
+      goTo(n) { if (n === '...' ) return; this.page = Math.min(Math.max(1, n), this.pages); this.icons(); },
+      // Status views over the list, each with its count for the current dates and drawer filters
+      views: [{ key: '', label: 'All' }, { key: 'delivered', label: 'Delivered' }, { key: 'sent', label: 'Not confirmed' }, { key: 'failed', label: 'Failed' }],
+      get counts() {
+        const b = this.base, by = (k) => b.filter((r) => this.statusMatch(r, k)).length;
+        return { '': b.length, delivered: by('delivered'), sent: by('sent'), failed: by('failed') };
+      },
+      // Row status icon (colour only here), with its label for the tooltip and screen readers
+      state(r) {
+        const svg = (d) => `<svg class="size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+        return {
+          delivered: { label: 'Delivered', cls: 'text-green-600 dark:text-green-500', svg: svg('<path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/>') },
+          sent: { label: 'Sent, not confirmed', cls: 'text-gray-400 dark:text-neutral-500', svg: svg('<path d="M20 6 9 17l-5-5"/>') },
+          pending: { label: 'Sending', cls: 'text-amber-500', svg: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>') },
+          failed: { label: 'Failed', cls: 'text-red-600 dark:text-red-500', svg: svg('<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>') },
+        }[r.status];
+      },
+      // Charge column: an amount means Testpress charged for it; no amount means it didn't (your own number, failed,
+      // or not delivered yet). Why is in the message details.
+      charge(r) {
+        if (r.legacy) return { amount: '—', note: '' };
+        return { amount: r.charged ? waRupees(r.charged) : '', note: '' };
+      },
+      get msg() { return this.all.find((r) => r.id === this.openId) || this.all[0]; },
+      show(r) { this.openId = r.id; window.dispatchEvent(new CustomEvent('open-drawer-wl-message')); this.icons(); },
+
+      when(d) { return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); },
+      time(d) { return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }); },
+      cat(key) { return waCategory(key); },
+      // Status words never say "delivered" until WhatsApp confirms it
+      badge(r) {
+        return {
+          delivered: ['Delivered', 'check-check', 'bg-green-100 text-green-800 dark:bg-green-500/10 dark:text-green-400'],
+          sent: ['Sent, not confirmed', 'check', 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300'],
+          pending: ['Sending', 'clock', 'bg-amber-100 text-amber-800 dark:bg-amber-500/10 dark:text-amber-400'],
+          failed: ['Failed', 'circle-x', 'bg-red-100 text-red-800 dark:bg-red-500/10 dark:text-red-400'],
+          unknown: ['Not recorded', 'minus', 'bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-400'],
+        }[r.status];
+      },
+      chargeNote(r) {
+        if (r.legacy) return 'Not recorded';
+        if (!r.fromTestpress) return 'Not billed by Testpress · sent from your number';
+        if (r.status === 'failed') return 'Not billed · not delivered';
+        if (r.status !== 'delivered') return 'Billed only if delivered';
+        return 'Price on the day it was sent';
+      },
+      // Steps for the detail panel: what happened to this message, with times
+      steps(r) {
+        const t = (s) => new Date(r.date.getTime() + s * 1000).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+        if (r.legacy) return [{ label: 'Sent', time: t(0), tone: 'done' }];
+        const s = [{ label: 'Queued by Testpress', time: t(0), tone: 'done' }];
+        if (r.status === 'pending') return [...s, { label: 'Waiting for WhatsApp to accept it', time: '', tone: 'wait' }];
+        if (r.status === 'failed' && r.fail === 'account') return [...s, { label: 'WhatsApp refused it', time: t(1), tone: 'fail' }];
+        s.push({ label: 'Accepted by WhatsApp', time: t(1), tone: 'done' });
+        if (r.status === 'sent') return [...s, { label: 'Waiting for delivery confirmation', time: '', tone: 'wait' }];
+        if (r.status === 'failed') return [...s, { label: 'Couldn’t be delivered', time: t(4), tone: 'fail' }];
+        return [...s, { label: 'Delivered to the student’s phone', time: t(5), tone: 'done' }];
+      },
+    }));
+  });
+</script>
