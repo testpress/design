@@ -1,41 +1,31 @@
 {#
   Who sends. Two shapes:
-  - Testpress's number: what's sending now on the left, the offer to use the institute's own number beside it
-    (same two-column shape as the custom domain setup). Connecting happens in a Meta window; the panel waits for it.
-  - The institute's number: one status card. A broken connection stops sending and says so; it never moves to Testpress.
+  - Testpress's number and the institute's number use the same status card: who sends, the number, how it's billed,
+    and the actions (connect your number / turn off; use Testpress's number / disconnect).
+  - On the institute’s number, a broken connection stops sending and says so; it never moves to Testpress.
 #}
 {% from "../../../ui-system/components/button.html" import button %}
-{% from "./logo.html" import wa_logo, meta_logo %}
+{% from "./logo.html" import wa_logo %}
 {% set strip = "mt-4 py-3 px-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-gray-50 text-sm text-gray-700 dark:bg-neutral-900/60 dark:text-neutral-300" %}
 {% set strip_btn = "py-1.5 px-2.5 text-[13px] font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700" %}
 
-<!-- ===== Testpress's number ===== -->
-<section x-show="!own" class="grid lg:grid-cols-5 gap-5 p-5 bg-white rounded-2xl shadow-sm dark:bg-neutral-800" aria-labelledby="wa-sender-title">
-  <!-- Centred in its column, so the space beside the taller panel is shared above and below (as on custom domain) -->
-  <div class="lg:col-span-3 flex flex-col justify-center items-center py-4 text-center">
-    <span class="size-12 inline-flex items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">
-      {{ wa_logo("size-6") }}
+<!-- ===== Testpress's number: same status card as your own number ===== -->
+<section x-show="!own" class="p-5 sm:p-6 bg-white rounded-2xl shadow-sm dark:bg-neutral-800" aria-labelledby="wa-sender-title">
+  <div class="flex flex-wrap items-start gap-4">
+    <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400">
+      {{ wa_logo("size-5") }}
     </span>
-    <p class="mt-3 text-sm text-gray-500 dark:text-neutral-400">Messages go out from</p>
-    <h2 id="wa-sender-title" class="mt-0.5 text-base font-semibold text-gray-800 dark:text-neutral-100">Testpress’s WhatsApp number</h2>
-    <p class="text-sm text-gray-500 dark:text-neutral-400 tabular-nums" x-text="testpressNumber"></p>
-    <p class="mt-3 max-w-sm text-sm text-gray-600 dark:text-neutral-300">
-      Testpress charges for each message that reaches a student. Prices are next to each message below.
-    </p>
-  </div>
-
-  <!-- Offer: use your own number -->
-  <div class="lg:col-span-2 flex flex-col p-4 rounded-xl bg-gray-50 dark:bg-neutral-900/60">
-    <div class="flex flex-col h-full">
-        <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">Send from your own number</h3>
-        <ul class="mt-3 space-y-2.5 text-[13px] text-gray-600 dark:text-neutral-400">
-          <li class="flex gap-x-2"><i data-lucide="badge-check" class="shrink-0 size-4 mt-px text-gray-400"></i>Students see your institute’s name and number.</li>
-          <li class="flex gap-x-2"><i data-lucide="receipt-indian-rupee" class="shrink-0 size-4 mt-px text-gray-400"></i>Meta bills you directly. Testpress doesn’t charge for these messages.</li>
-          <li class="flex gap-x-2"><i data-lucide="clock" class="shrink-0 size-4 mt-px text-gray-400"></i>About 5 minutes. You need a Meta Business account and a number that isn’t on the WhatsApp app.</li>
-        </ul>
-        <div class="mt-4 lg:mt-auto lg:pt-4">
-          {{ button(text="Connect your number", full_width=true, extra_attrs='@click="connect()" :disabled="readOnly"') }}
-        </div>
+    <div class="flex-1 min-w-[14rem]">
+      <div class="flex items-center gap-x-2">
+        <span class="relative inline-flex size-2 rounded-full bg-green-500"></span>
+        <p class="text-sm text-gray-500 dark:text-neutral-400">Messages go out from Testpress’s number</p>
+      </div>
+      <h2 id="wa-sender-title" class="mt-1 text-xl font-semibold text-gray-800 tabular-nums dark:text-neutral-100" x-text="testpressNumber"></h2>
+      <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400">Testpress bills you per delivered message</p>
+    </div>
+    <div class="flex flex-wrap gap-2" x-show="!readOnly">
+      {{ button(text="Connect your number", variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-wa-how-own\')" :disabled="!!flow"') }}
+      {{ button(text='<span x-text="flow === \'turning_off\' ? \'Turning off…\' : \'Turn off WhatsApp\'"></span>', variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-wa-turn-off\')" :disabled="!!flow"') }}
     </div>
   </div>
 </section>
@@ -60,7 +50,8 @@
       </p>
     </div>
     <div class="flex flex-wrap gap-2" x-show="!readOnly">
-      {{ button(text='<span x-text="flow === \'disconnecting\' ? \'Disconnecting…\' : \'Disconnect\'"></span>', variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-wa-disconnect\')" :disabled="flow === \'disconnecting\' || flow === \'disconnect_checking\' || flow === \'disconnect_rechecking\'"') }}
+      {{ button(text='<span x-text="flow === \'switching\' ? \'Switching…\' : \'Use Testpress’s number\'"></span>', variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-wa-switch-tp\')" :disabled="!!flow"') }}
+      {{ button(text='<span x-text="flow === \'disconnecting\' ? \'Disconnecting…\' : \'Disconnect\'"></span>', variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-wa-disconnect\')" :disabled="!!flow"') }}
     </div>
   </div>
 

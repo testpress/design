@@ -39,7 +39,11 @@
     disconnecting: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, play: 'disconnect' },
     disconnect_failed: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, flow: 'disconnect_failed' },
     disconnect_checking: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, flow: 'disconnect_checking' },
-    disconnected: { mode: 'testpress', on: { otp: true, creds: true, cart: true }, toast: ['Disconnected', `Messages now go from Testpress’s number, ${WA_TESTPRESS_NUMBER}.`] },
+    disconnected: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', toast: ['Number disconnected', 'WhatsApp messages have stopped. Choose a number to start again.', 'neutral'] },
+    switch_confirm: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, modal: 'wa-switch-tp' },
+    switching: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'approved', cart: 'approved' }, play: 'switch' },
+    turn_off_confirm: { mode: 'testpress', on: { otp: true, creds: false, cart: true }, modal: 'wa-turn-off' },
+    turned_off: { mode: 'testpress', on: { otp: false, creds: false, cart: false }, setup: 'choose', toast: ['WhatsApp is off', 'Students no longer get messages on WhatsApp.', 'neutral'] },
     view_only: { mode: 'institute', on: { otp: true, creds: true, cart: true }, tpl: { otp: 'approved', creds: 'pending', cart: 'approved' }, readOnly: true },
     loading: { mode: 'testpress', on: { otp: true, creds: false, cart: true }, loading: true },
   };
@@ -51,7 +55,7 @@
       { name: 'Testpress’s number', states: [['tp_default', 'Sending from Testpress'], ['tp_first', 'All messages turned off'], ['connecting', 'Connecting: Meta window open'], ['connect_cancelled', 'Connect cancelled'], ['connect_failed', 'Connect failed']] },
       { name: 'Your own number', states: [['connected_new', 'Just connected: templates to Meta (plays)'], ['pending', 'Waiting for Meta approval'], ['mixed', 'Approved, waiting, rejected'], ['all_ready', 'All sending'], ['paused', 'Template paused by Meta'], ['meta_disabled', 'Template disabled by Meta'], ['status_unknown', 'Couldn’t check status']] },
       { name: 'Problem with your number', states: [['account_error', 'Meta access stopped']] },
-      { name: 'Disconnect', states: [['disconnect_confirm', 'Confirm'], ['disconnecting', 'Disconnecting (plays)'], ['disconnect_failed', 'Failed'], ['disconnect_checking', 'Outcome not confirmed'], ['disconnected', 'Done: back on Testpress']] },
+      { name: 'Change or stop', states: [['switch_confirm', 'Your number → Testpress: confirm'], ['switching', 'Switching to Testpress (plays)'], ['turn_off_confirm', 'Turn off WhatsApp: confirm'], ['turned_off', 'Turned off'], ['disconnect_confirm', 'Disconnect your number: confirm'], ['disconnecting', 'Disconnecting (plays)'], ['disconnect_failed', 'Failed'], ['disconnect_checking', 'Outcome not confirmed'], ['disconnected', 'Disconnected: back to setup']] },
       { name: 'Other', states: [['view_only', 'View only (no permission)'], ['loading', 'Loading']] },
     ],
   };
@@ -115,9 +119,10 @@
         });
         this.cats = cats;
         window.dispatchEvent(new CustomEvent('close-drawer-wa-template'));
-        ['wa-disconnect', 'wa-pick', 'wa-how-own', 'wa-how-feature'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
+        ['wa-disconnect', 'wa-switch-tp', 'wa-turn-off', 'wa-pick', 'wa-how-own', 'wa-how-feature'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
         if (p.modal) this.$nextTick(() => window.dispatchEvent(new CustomEvent('open-modal-' + p.modal)));
         if (p.play === 'disconnect') this.disconnect();
+        if (p.play === 'switch') this.switchToTestpress();
         if (p.play === 'finish') this.finish();
         if (p.play === 'templates') this.sendTemplates();
         if (p.toast) this.toast(...p.toast);
@@ -217,21 +222,45 @@
         this.flow = 'disconnecting';
         await waSleep(1800);
         if (run !== this.run) return;
-        this.mode = 'testpress';
-        this.status = 'connected';
-        this.flow = '';
-        this.toast('Disconnected', `Messages now go from Testpress’s number, ${WA_TESTPRESS_NUMBER}.`);
-        this.icons();
+        this.stopWhatsApp('Number disconnected', 'WhatsApp messages have stopped. Choose a number to start again.');
       },
       async recheckDisconnect() {
         const run = this.run;
         this.flow = 'disconnect_rechecking';
         await waSleep(1500);
         if (run !== this.run) return;
+        this.stopWhatsApp('Number disconnected', 'WhatsApp messages have stopped. Choose a number to start again.');
+      },
+      // Nothing is ever moved to Testpress's number on its own: disconnecting or turning off stops WhatsApp and goes
+      // back to the setup screen, where the admin chooses again.
+      stopWhatsApp(title, text) {
         this.mode = 'testpress';
+        this.status = 'connected';
         this.flow = '';
-        this.toast('Disconnected', `Messages now go from Testpress’s number, ${WA_TESTPRESS_NUMBER}.`);
+        this.setup = 'choose';
+        WA_CATEGORIES.forEach((c) => { this.cats[c.key].enabled = false; this.cats[c.key].want = false; });
+        this.toast(title, text, 'neutral');
         this.icons();
+      },
+      // Your number → Testpress's number, only when asked. Messages that were on stay on; Testpress's templates are approved.
+      async switchToTestpress() {
+        const run = this.run;
+        this.flow = 'switching';
+        await waSleep(1500);
+        if (run !== this.run) return;
+        WA_CATEGORIES.forEach((c) => { const k = this.cats[c.key]; k.enabled = k.enabled || k.want; k.want = k.enabled; });
+        this.mode = 'testpress';
+        this.status = 'connected';
+        this.flow = '';
+        this.toast('Now sending from Testpress’s number', `${WA_INSTITUTE.number} is disconnected. Testpress charges for each delivered message.`);
+        this.icons();
+      },
+      async turnOff() {
+        const run = this.run;
+        this.flow = 'turning_off';
+        await waSleep(1000);
+        if (run !== this.run) return;
+        this.stopWhatsApp('WhatsApp is off', 'Students no longer get messages on WhatsApp.');
       },
 
       // ----- Message types -----
