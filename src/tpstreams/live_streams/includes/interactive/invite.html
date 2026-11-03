@@ -1,0 +1,66 @@
+{% from "src/ui-system/components/card.html" import card %}
+{% from "src/ui-system/components/button.html" import button %}
+{% from "src/ui-system/components/tabs.html" import tabs %}
+{% from "src/ui-system/components/modal.html" import modal %}
+{% from "src/ui-system/components/switch-list.html" import switch_list, switch_list_item %}
+{% from "src/tpstreams/live_streams/includes/clipboard.html" import copy_block %}
+{#
+  Invite participants: the join link and the embed code in one card, one tab each.
+  Join link: one link per live stream. Guests open it and join from the browser after entering
+  their name, plus email and phone number if the host asks for them.
+#}
+{% call card(title="Invite participants") %}
+  {{ tabs(tabs=[
+    { "key": "link", "label": "Join link" },
+    { "key": "embed", "label": "Embed code" }
+  ], x_model="inviteTab", id="invite-tabs") }}
+
+  {# ── Join link ── #}
+  <div x-show="inviteTab === 'link'" class="mt-4">
+    <div x-show="hasJoinLink" class="space-y-4">
+      <p class="text-sm text-gray-500">Share this link with guests. They open it in their browser and join the live room.</p>
+      {{ copy_block(value="https://app.tpstreams.com/live/join/GnQezT8nGPU", label="Join link", button_text="Copy join link") }}
+      <div class="flex flex-wrap items-center gap-2 pt-4 text-sm border-t border-gray-100">
+        <span class="text-gray-500">Guests enter</span>
+        <template x-for="field in guestFields" :key="field">
+          <span class="inline-flex items-center py-0.5 px-2 rounded-md bg-gray-100 text-xs font-medium text-gray-700" x-text="field"></span>
+        </template>
+        <button type="button" @click="openJoinLinkModal()" class="text-sm font-medium ms-auto text-primary-600 hover:text-primary-800 focus:outline-none focus:underline">Edit</button>
+      </div>
+    </div>
+
+    {# Preline's compact empty state ("No events found" block): sized to its content, unlike the
+       ui-system empty_state's 200px minimum. Secondary button, so it doesn't compete with Go Live. #}
+    <div x-show="!hasJoinLink" x-cloak class="flex flex-col items-center justify-center p-5 text-center border border-dashed border-gray-200 rounded-lg">
+      <span class="inline-flex items-center justify-center text-gray-800 bg-gray-100 rounded-full size-8">
+        <i data-lucide="link" class="shrink-0 size-4"></i>
+      </span>
+      <p class="mt-3 text-sm font-medium text-gray-800">No join link yet</p>
+      <p class="mt-1 text-sm text-gray-500">Create a link and choose what guests enter before they join.</p>
+      <div class="mt-4">
+        {{ button(text="Create join link", variant="secondary", size="sm", icon="plus", extra_attrs='@click="openJoinLinkModal()"') }}
+      </div>
+    </div>
+  </div>
+
+  {# ── Embed code ── #}
+  <div x-show="inviteTab === 'embed'" x-cloak class="mt-4 space-y-4">
+    <p class="text-sm text-gray-500">Add this to your website to show the live stream to viewers, and the recording after it ends.</p>
+    {{ copy_block(value='<iframe src="https://app.tpstreams.com/embed/9mpasc/BKCKNXh4Q7x/?access_token=6e8a2f41-3c1d-4b8e-9f0a-2d7c5b1e9a34" style="border:0;width:100%;aspect-ratio:16/9;" allow="autoplay;fullscreen;picture-in-picture;encrypted-media" allowfullscreen></iframe>', label="Embed code", button_text="Copy embed code") }}
+  </div>
+{% endcall %}
+
+{# Create / edit modal: the switch list from the create live stream form (Preline's settings list
+   with switches). Name is always asked, so its switch is on and disabled. #}
+{% call modal(
+  id="join-link",
+  title="Join link",
+  description="Choose what guests enter before they join.",
+  confirm_attrs='x-text="hasJoinLink ? \'Save changes\' : \'Create link\'"'
+) %}
+  {% call switch_list() %}
+    {{ switch_list_item(id="collect-name", name="collect_name", label="Name", description="Always asked, so you know who joined.", icon="user", checked=true, disabled=true) }}
+    {{ switch_list_item(id="collect-email", name="collect_email", label="Email", description="Guests enter their email address.", icon="mail", x_model="draftEmail") }}
+    {{ switch_list_item(id="collect-phone", name="collect_phone", label="Phone number", description="Guests enter their phone number.", icon="phone", x_model="draftPhone") }}
+  {% endcall %}
+{% endcall %}
