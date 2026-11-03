@@ -1,47 +1,70 @@
 ---
 view: Whatsapp usage
 tags: testpress
-title: Whatsapp usage
+title: WhatsApp usage
 date: 2026-01-19
 ---
 
+{# WhatsApp messages for a date range (this month by default): what's owed to Testpress first, then delivery, then each message type, then over time.
+   Charges only cover delivered messages sent from Testpress's number, at the price stored on each message. #}
 {% extends "layouts/admin_base.html" %}
+{% from "../../../ui-system/components/alert.html" import alert %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/skeleton.html" import skeleton %}
 
-{% block extra_head %}
-<link rel="stylesheet" href="{{ '/node_modules/apexcharts/dist/apexcharts.css' | url }}">
-<style type="text/css">
-  .apexcharts-tooltip.apexcharts-theme-light {
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
-  /* Notifications Sent column dropdown: open at right edge */
-  #hs-wa-notif-sort-menu {
-    right: 0 !important;
-    left: auto !important;
-  }
-</style>
-{% endblock extra_head %}
-
-{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5" x-data="whatsappUsageComponent()">
+<div class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
+  {# Usage lives under WhatsApp, so WhatsApp stays highlighted #}
+  {% set sidebar_active = "whatsapp" %}
   {% include "partials/admin_sidebar.html" %}
-  <div class="space-y-6 px-2 sm:px-6 lg:px-0 lg:col-span-9">
-    <div class="flex flex-1 flex-col bg-gray-100">
-      <div class="flex-1 pb-8 pt-1 space-y-6">
-        {% include "./header.html" %}
-        {% include "./stats.html" %}
+  <div class="px-4 sm:px-6 lg:px-0 lg:col-span-9" x-data="waUsage" x-cloak>
+    {% include "./includes/header.html" %}
 
-        <!-- Graph View: Daily Notifications area chart -->
-        {% include "./daily_notifications.html" %}
+    <div class="mt-5 space-y-4">
+      <!-- Couldn't load: the dates stay selected -->
+      <div x-show="p.error">
+        <div class="p-5 sm:p-6 flex flex-wrap items-center gap-4 bg-white rounded-2xl shadow-sm dark:bg-neutral-800" role="alert">
+          <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400"><i data-lucide="cloud-off" class="size-5"></i></span>
+          <div class="flex-1 min-w-[12rem]">
+            <p class="font-semibold text-gray-800 dark:text-neutral-100" x-text="'Couldn’t load usage for ' + period"></p>
+            <p class="text-sm text-gray-500 dark:text-neutral-400">Your messages aren’t affected. Try again in a moment.</p>
+          </div>
+          {{ button(text='<span x-text="retrying ? \'Trying…\' : \'Try again\'"></span>', variant="secondary", extra_attrs='@click="retry()" :disabled="retrying"') }}
+        </div>
       </div>
+
+      <!-- Loading -->
+      <div x-show="p.loading" class="space-y-4" aria-busy="true">
+        <div class="p-6 bg-white rounded-2xl shadow-sm dark:bg-neutral-800 grid sm:grid-cols-2 gap-6">
+          <div class="space-y-3">{{ skeleton(width="w-32", height="h-3") }}{{ skeleton(width="w-40", height="h-8", rounded="rounded-lg") }}</div>
+          <div class="space-y-3">{{ skeleton(width="w-32", height="h-3") }}{{ skeleton(width="w-24", height="h-8", rounded="rounded-lg") }}</div>
+        </div>
+        <div class="p-6 bg-white rounded-2xl shadow-sm dark:bg-neutral-800 space-y-3">{% for i in range(4) %}{{ skeleton(height="h-8", rounded="rounded-lg") }}{% endfor %}</div>
+      </div>
+
+      <!-- No messages in these dates -->
+      <div x-show="noData">
+        {{ empty_state(title="No WhatsApp messages in these dates", description="Nothing was sent, so nothing is owed. Messages show up here as soon as they go out.", icon="message-circle", primary_action_text="WhatsApp settings", primary_action_href="/testpress/whatsapp/" | url, extra_classes="!rounded-2xl !border-0 shadow-sm") }}
+      </div>
+
+      <template x-if="!p.error && !p.loading && !noData">
+        <div class="space-y-4">
+          {% include "./includes/billing.html" %}
+          {% include "./includes/delivery.html" %}
+          {% include "./includes/by_type.html" %}
+          {% include "./includes/daily.html" %}
+        </div>
+      </template>
     </div>
   </div>
 </div>
+{% include "../../whatsapp/includes/prototype.html" %}
 {% endblock %}
 
 {% block script %}
-{% include "./whatsapp_usage_component.html" %}
+{% include "../../../ui-system/scripts/date_picker_script.html" %}
+{% include "./includes/script.html" %}
 {% endblock %}

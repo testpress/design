@@ -1,0 +1,210 @@
+{% include "../../../whatsapp/includes/data.html" %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script>
+  // WhatsApp usage for a date range (this month by default): what Testpress charges (delivered messages from Testpress's number, at the price stored
+  // on each message), delivery, and a breakdown by message type. Sample data stands in for the API.
+  // Prototype "today" is 28 Nov 2026. Before 1 Oct 2026 only Abandoned cart went out on WhatsApp, so those months list only that.
+  const WU_TODAY = new Date(2026, 10, 28);
+  const WU_ALL_TYPES_FROM = new Date(2026, 9, 1);
+  const wuDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const wuIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const wuParse = (v) => { const [y, m, d] = (v || '').split('-').map(Number); return y && m ? new Date(y, m - 1, d || 1) : null; };
+  // "1 Sep", with the year when it isn't this year
+  const WU_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const wuShort = (d) => `${d.getDate()} ${WU_MON[d.getMonth()]}` + (d.getFullYear() === WU_TODAY.getFullYear() ? '' : ` ${d.getFullYear()}`);
+  // The ui-system picker reads and shows dates as "Nov 1, 2026"
+  const wuPickerText = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // Mid-month events in the sample states
+  const WU_SWITCHED_ON = new Date(2026, 10, 14);
+  const WU_PRICE_FROM = new Date(2026, 10, 10);
+  // Category colours: fixed order, from the validated categorical palette (light / dark)
+  const WU_COLORS = { otp: ['#2a78d6', '#3987e5'], creds: ['#eb6834', '#d95926'], cart: ['#1baf7a', '#199e70'] };
+
+  // Deterministic sample numbers per day, so a month always shows the same data
+  function wuRand(seed) { let x = Math.sin(seed) * 10000; return x - Math.floor(x); }
+
+  const WU_PRESETS = {
+    testpress: { sender: 'testpress' },
+    switched: { sender: 'switched' },
+    own: { sender: 'own' },
+    price_change: { sender: 'testpress', priceChange: true },
+    none_billable: { sender: 'testpress', allWaiting: true },
+    empty: { empty: true },
+    error: { error: true },
+    loading: { loading: true },
+  };
+  window.WA_STATES = {
+    initial: 'testpress',
+    groups: [
+      { name: 'Who sent this month', states: [['testpress', 'All from Testpress’s number'], ['switched', 'Switched to own number on 14 Nov'], ['own', 'All from own number (nothing owed)']] },
+      { name: 'Billing', states: [['price_change', 'Price changed mid-month'], ['none_billable', 'Sent, none delivered yet']] },
+      { name: 'Other', states: [['empty', 'No messages this month'], ['error', 'Couldn’t load'], ['loading', 'Loading']] },
+    ],
+  };
+  // The ECharts instance lives outside Alpine: a reactive proxy around it breaks ECharts internals
+  let wuChart = null;
+  let wuResizeBound = false;
+  // Abandoned cart was ₹0.90 until 10 Nov (and in the price-change sample)
+  const wuPrices = (key, date) => (key === 'cart' && date < WU_PRICE_FROM ? 0.9 : waCategory(key).price);
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('waUsage', () => ({
+      start: new Date(WU_TODAY.getFullYear(), WU_TODAY.getMonth(), 1),
+      end: WU_TODAY,
+      categories: WA_CATEGORIES,
+      colors: WU_COLORS,
+      preset: 'testpress',
+      retrying: false,
+
+      init() {
+        const u = new URLSearchParams(location.search);
+        const mo = wuParse(u.get('month'));
+        if (mo) { this.start = mo; const e = new Date(mo.getFullYear(), mo.getMonth() + 1, 0); this.end = e > WU_TODAY ? WU_TODAY : e; }
+        if (wuParse(u.get('start')) && wuParse(u.get('end'))) { this.start = wuParse(u.get('start')); this.end = wuParse(u.get('end')); }
+        ['start', 'end'].forEach((k) => this.$watch(k, () => {
+          const url = new URL(location.href); url.searchParams.delete('month');
+          url.searchParams.set('start', wuIso(this.start)); url.searchParams.set('end', wuIso(this.end)); history.replaceState(null, '', url);
+          this.$nextTick(() => this.draw());
+        }));
+        this.$nextTick(() => this.bindRange());
+        window.addEventListener('wa-state', (e) => { this.preset = e.detail; this.$nextTick(() => this.draw()); });
+        this.$nextTick(() => this.draw());
+      },
+      icons() { this.$nextTick(() => window.lucide && lucide.createIcons()); },
+      get p() { return WU_PRESETS[this.preset]; },
+      // The ui-system date picker keeps its own state: read each pick, and push ours when it changes.
+      // `last` is the range both sides agree on, so neither undoes the other.
+      bindRange() {
+        const el = document.querySelector('#wu-range [x-data]');
+        const dp = el && el._x_dataStack && el._x_dataStack[0];
+        if (!dp) return;
+        let last = '';
+        const key = (s, e) => +wuDay(s) + '-' + +wuDay(e);
+        Alpine.effect(() => {
+          if (!dp.selectedDate || !dp.selectedEndDate) return;
+          const k = key(dp.selectedDate, dp.selectedEndDate);
+          if (k !== last) { last = k; this.start = wuDay(dp.selectedDate); this.end = wuDay(dp.selectedEndDate); }
+        });
+        Alpine.effect(() => {
+          const k = key(this.start, this.end);
+          if (k !== last) { last = k; dp.parseAndSetValue(wuPickerText(this.start) + ' → ' + wuPickerText(this.end)); }
+        });
+      },
+      get spanDays() { return Math.round((wuDay(this.end) - wuDay(this.start)) / 864e5) + 1; },
+      // A whole calendar month reads as its name; anything else as its dates
+      get period() {
+        const s = this.start, e = this.end;
+        const monthEnd = new Date(s.getFullYear(), s.getMonth() + 1, 0);
+        const wholeMonth = s.getDate() === 1 && e.getMonth() === s.getMonth() && e.getFullYear() === s.getFullYear() && (+e === +monthEnd || +e === +WU_TODAY);
+        if (wholeMonth) return s.toLocaleString('en-IN', { month: 'long', year: s.getFullYear() === WU_TODAY.getFullYear() ? undefined : 'numeric' });
+        if (+s === +e) return wuShort(s);
+        return wuShort(s) + ' – ' + wuShort(e);
+      },
+      get toToday() { return +wuDay(this.end) === +WU_TODAY; },
+      // Every month has the same layout; only message types that went out that month get a row, series and legend entry
+      get shown() { const s = WA_CATEGORIES.filter((c) => this.sum(c.key, 'sent') > 0); return s.length ? s : WA_CATEGORIES; },
+      async retry() { this.retrying = true; await new Promise((r) => setTimeout(r, 1200)); this.retrying = false; this.preset = 'testpress'; window.dispatchEvent(new CustomEvent('wa-state', { detail: 'testpress' })); },
+
+      // One row per day per category: sent, delivered, failed, waiting, and how much of it went from Testpress's number
+      get days() {
+        if (this.p.empty || this.p.error || this.p.loading) return [];
+        const out = [];
+        for (let d = wuDay(this.start); d <= this.end; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+          const seed = d.getFullYear() * 12 + d.getMonth(), day = d.getDate();
+          const row = { date: d, day, cats: {} };
+          const fromTestpress = this.p.sender === 'testpress' || (this.p.sender === 'switched' && d < WU_SWITCHED_ON);
+          const cartOnly = d < WU_ALL_TYPES_FROM;
+          const ago = Math.round((WU_TODAY - d) / 864e5);
+          WA_CATEGORIES.forEach((c, ci) => {
+            const r = wuRand(seed * 97 + day * 7 + ci);
+            let sent = c.key === 'otp' ? Math.round(55 + r * 70) : c.key === 'creds' ? (r > 0.7 ? Math.round(r * 60) : Math.round(r * 6)) : Math.round(8 + r * 18);
+            if (cartOnly && c.key !== 'cart') sent = 0;
+            const waiting = this.p.allWaiting ? sent : ago <= 1 ? Math.round(sent * (ago === 0 ? 0.35 : 0.08)) : 0;
+            const failed = this.p.allWaiting ? 0 : Math.round(sent * (0.02 + wuRand(seed + day + ci * 3) * 0.04));
+            const delivered = sent - waiting - failed;
+            const price = this.p.priceChange ? wuPrices(c.key, d) : waCategory(c.key).price;
+            row.cats[c.key] = { sent, delivered, failed, waiting, fromTestpress, price, billed: fromTestpress && delivered ? delivered : 0 };
+          });
+          out.push(row);
+        }
+        return out;
+      },
+      // Chart buckets follow the range: days up to a month, weeks (from Monday) up to about three months, months beyond
+      get unit() { return this.spanDays <= 31 ? 'day' : this.spanDays <= 92 ? 'week' : 'month'; },
+      get buckets() {
+        const out = [];
+        this.days.forEach((d) => {
+          const dt = d.date;
+          const k = this.unit === 'day' ? wuIso(dt)
+            : this.unit === 'week' ? wuIso(new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() - ((dt.getDay() + 6) % 7)))
+            : `${dt.getFullYear()}-${dt.getMonth()}`;
+          let b = out[out.length - 1];
+          if (!b || b.key !== k) {
+            b = { key: k, start: dt, end: dt, cats: {} };
+            WA_CATEGORIES.forEach((c) => { b.cats[c.key] = { delivered: 0 }; });
+            out.push(b);
+          }
+          b.end = dt;
+          WA_CATEGORIES.forEach((c) => { b.cats[c.key].delivered += d.cats[c.key].delivered; });
+        });
+        out.forEach((b) => {
+          b.label = this.unit === 'day' ? String(b.start.getDate()) : this.unit === 'week' ? wuShort(b.start) : WU_MON[b.start.getMonth()];
+          b.title = this.unit === 'day' ? wuShort(b.start) : this.unit === 'week' ? wuShort(b.start) + ' – ' + wuShort(b.end) : b.start.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+        });
+        return out;
+      },
+      sum(key, field) { return this.days.reduce((a, d) => a + (key ? d.cats[key][field] || 0 : WA_CATEGORIES.reduce((b, c) => b + (d.cats[c.key][field] || 0), 0)), 0); },
+      charges(key) { return this.days.reduce((a, d) => a + (key ? [key] : WA_CATEGORIES.map((c) => c.key)).reduce((b, k) => b + d.cats[k].billed * d.cats[k].price, 0), 0); },
+      ownSent() { return this.days.reduce((a, d) => a + WA_CATEGORIES.reduce((b, c) => b + (d.cats[c.key].fromTestpress ? 0 : d.cats[c.key].sent), 0), 0); },
+      rate(key) { const s = this.sum(key, 'sent') - this.sum(key, 'waiting'); return s ? Math.round((this.sum(key, 'delivered') / s) * 1000) / 10 + '%' : '—'; },
+      share(field) { const s = this.sum(null, 'sent'); return s ? (this.sum(null, field) / s) * 100 : 0; },
+      get noData() { return !this.p.loading && !this.p.error && this.sum(null, 'sent') === 0; },
+      // Logs for the same dates (or a bar's dates), plus any filter
+      logs(params = {}) {
+        const u = new URLSearchParams({ start: wuIso(this.start), end: wuIso(this.end), ...params });
+        return '{{ "/testpress/whatsapp_usage/whatsapp_logs_page/" | url }}?' + u.toString();
+      },
+
+      // Apache ECharts: delivered per day, week or month (by range length), stacked by message type. A bar opens the logs for its dates. One axis, thin bars, 2px gaps between segments,
+      // shared tooltip on hover. Colours follow the entity in a fixed order (light / dark steps).
+      draw() {
+        this.icons();
+        const el = document.getElementById('wu-chart');
+        if (!el || !window.echarts) return;
+        if (wuChart) { wuChart.dispose(); wuChart = null; }
+        if (!this.days.length || this.noData) return;
+        const dark = document.documentElement.classList.contains('dark');
+        const cats = this.shown;
+        const bk = this.buckets;
+        const muted = dark ? '#a3a3a3' : '#6b7280';
+        const surface = dark ? '#262626' : '#ffffff';
+        wuChart = echarts.init(el, null, { renderer: 'svg' });
+        wuChart.setOption({
+          animationDuration: 300,
+          grid: { left: 8, right: 8, top: 12, bottom: 8, containLabel: true },
+          tooltip: {
+            trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: dark ? 'rgba(255,255,255,0.04)' : 'rgba(17,24,39,0.04)' } },
+            backgroundColor: dark ? '#171717' : '#ffffff', borderColor: dark ? '#404040' : '#e5e7eb', textStyle: { color: dark ? '#e5e5e5' : '#1f2937', fontSize: 12 },
+            formatter: (items) => {
+              const total = items.reduce((a, i) => a + i.value, 0);
+              return `<div style="font-weight:600;margin-bottom:4px">${bk[items[0].dataIndex].title} · ${total.toLocaleString('en-IN')} delivered</div>` +
+                items.slice().reverse().map((i) => `<div style="display:flex;justify-content:space-between;gap:16px"><span>${i.marker}${i.seriesName}</span><span style="font-variant-numeric:tabular-nums">${i.value.toLocaleString('en-IN')}</span></div>`).join('') +
+                `<div style="margin-top:6px;color:${muted}">Click to see these messages</div>`;
+            },
+          },
+          xAxis: { type: 'category', data: bk.map((b) => b.label), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: muted, fontSize: 11, interval: this.unit === 'day' && bk.length > 16 ? 2 : 'auto' } },
+          yAxis: { type: 'value', splitLine: { lineStyle: { color: dark ? '#404040' : '#f3f4f6' } }, axisLabel: { color: muted, fontSize: 11, formatter: (v) => v.toLocaleString('en-IN') } },
+          series: cats.map((c, i) => ({
+            name: c.name, type: 'bar', stack: 'total', barMaxWidth: this.unit === 'day' ? 18 : 32, cursor: 'pointer',
+            itemStyle: { color: WU_COLORS[c.key][dark ? 1 : 0], borderColor: surface, borderWidth: 1, borderRadius: i === cats.length - 1 ? [3, 3, 0, 0] : 0 },
+            emphasis: { focus: 'series' },
+            data: bk.map((b) => b.cats[c.key].delivered),
+          })),
+        });
+        // A bar opens the logs for its dates
+        wuChart.on('click', (e) => { const b = bk[e.dataIndex]; if (b) location.href = this.logs({ start: wuIso(b.start), end: wuIso(b.end) }); });
+        if (!wuResizeBound) { wuResizeBound = true; window.addEventListener('resize', () => wuChart && wuChart.resize()); }
+      },
+    }));
+  });
+</script>
