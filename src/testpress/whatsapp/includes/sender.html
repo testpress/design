@@ -1,0 +1,90 @@
+{#
+  Who sends. Two shapes:
+  - Testpress's number: what's sending now on the left, the offer to use the institute's own number beside it
+    (same two-column shape as the custom domain setup). Connecting happens in a Meta window; the panel waits for it.
+  - The institute's number: one status card. A broken connection stops sending and says so; it never moves to Testpress.
+#}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "./logo.html" import wa_logo, meta_logo %}
+{% set strip = "mt-4 py-3 px-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-gray-50 text-sm text-gray-700 dark:bg-neutral-900/60 dark:text-neutral-300" %}
+{% set strip_btn = "py-1.5 px-2.5 text-[13px] font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-700" %}
+
+<!-- ===== Testpress's number ===== -->
+<section x-show="!own" class="grid lg:grid-cols-5 gap-5 p-5 bg-white rounded-2xl shadow-sm dark:bg-neutral-800" aria-labelledby="wa-sender-title">
+  <!-- Centred in its column, so the space beside the taller panel is shared above and below (as on custom domain) -->
+  <div class="lg:col-span-3 flex flex-col justify-center items-center py-4 text-center">
+    <span class="size-12 inline-flex items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-200">
+      {{ wa_logo("size-6") }}
+    </span>
+    <p class="mt-3 text-sm text-gray-500 dark:text-neutral-400">Messages go out from</p>
+    <h2 id="wa-sender-title" class="mt-0.5 text-base font-semibold text-gray-800 dark:text-neutral-100">Testpress’s WhatsApp number</h2>
+    <p class="text-sm text-gray-500 dark:text-neutral-400 tabular-nums" x-text="testpressNumber"></p>
+    <p class="mt-3 max-w-sm text-sm text-gray-600 dark:text-neutral-300">
+      Testpress charges for each message that reaches a student. Prices are next to each message below.
+    </p>
+  </div>
+
+  <!-- Offer: use your own number -->
+  <div class="lg:col-span-2 flex flex-col p-4 rounded-xl bg-gray-50 dark:bg-neutral-900/60">
+    <div class="flex flex-col h-full">
+        <h3 class="text-sm font-semibold text-gray-800 dark:text-neutral-100">Send from your own number</h3>
+        <ul class="mt-3 space-y-2.5 text-[13px] text-gray-600 dark:text-neutral-400">
+          <li class="flex gap-x-2"><i data-lucide="badge-check" class="shrink-0 size-4 mt-px text-gray-400"></i>Students see your institute’s name and number.</li>
+          <li class="flex gap-x-2"><i data-lucide="receipt-indian-rupee" class="shrink-0 size-4 mt-px text-gray-400"></i>Meta bills you directly. Testpress doesn’t charge for these messages.</li>
+          <li class="flex gap-x-2"><i data-lucide="clock" class="shrink-0 size-4 mt-px text-gray-400"></i>About 5 minutes. You need a Meta Business account and a number that isn’t on the WhatsApp app.</li>
+        </ul>
+        <div class="mt-4 lg:mt-auto lg:pt-4">
+          {{ button(text="Connect your number", full_width=true, extra_attrs='@click="connect()" :disabled="readOnly"') }}
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Institute's own number ===== -->
+<section x-show="own" class="p-5 sm:p-6 bg-white rounded-2xl shadow-sm dark:bg-neutral-800" aria-labelledby="wa-own-title">
+  <div class="flex flex-wrap items-start gap-4">
+    <span class="shrink-0 size-10 inline-flex items-center justify-center rounded-full"
+          :class="broken ? 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400' : 'bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400'">
+      {{ wa_logo("size-5") }}
+    </span>
+    <div class="flex-1 min-w-[14rem]">
+      <div class="flex items-center gap-x-2">
+        <span class="relative flex size-2">
+          <span class="relative inline-flex size-2 rounded-full" :class="broken ? 'bg-red-500' : 'bg-green-500'"></span>
+        </span>
+        <p class="text-sm text-gray-500 dark:text-neutral-400" x-text="broken ? 'Not sending' : 'Messages go out from your number'"></p>
+      </div>
+      <h2 id="wa-own-title" class="mt-1 text-xl font-semibold text-gray-800 tabular-nums dark:text-neutral-100" x-text="institute.number"></h2>
+      <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400">
+        <span x-text="institute.name"></span> · Connected 1 Nov 2026 · Meta bills you for these messages
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2" x-show="!readOnly">
+      {{ button(text='<span x-text="flow === \'disconnecting\' ? \'Disconnecting…\' : \'Disconnect\'"></span>', variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-wa-disconnect\')" :disabled="flow === \'disconnecting\' || flow === \'disconnect_checking\' || flow === \'disconnect_rechecking\'"') }}
+    </div>
+  </div>
+
+  <!-- Meta stopped accepting our access: nothing goes out, and we say we don't fall back -->
+  <div x-show="broken" class="{{ strip }}" role="alert">
+    <i data-lucide="triangle-alert" class="shrink-0 size-4 text-red-500"></i>
+    <div class="flex-1 min-w-[12rem]">
+      <p>Meta stopped accepting Testpress’s access to your number on 1 Nov, 4:12 PM. No WhatsApp messages are going out. We don’t switch to Testpress’s number on our own.</p>
+      <p class="mt-0.5 text-xs text-gray-500 dark:text-neutral-400">Usually the access was removed in Meta Business settings, or the account’s payment method failed.</p>
+    </div>
+    <button type="button" x-show="!readOnly" @click="connect()" class="{{ strip_btn }}">Reconnect</button>
+  </div>
+
+  <div x-show="flow === 'disconnect_failed'" class="{{ strip }}" role="alert">
+    <i data-lucide="triangle-alert" class="shrink-0 size-4 text-amber-500"></i>
+    <p class="flex-1 min-w-[12rem]">Couldn’t disconnect. Your number still sends your messages.</p>
+    <button type="button" @click="$dispatch('open-modal-wa-disconnect')" class="{{ strip_btn }}">Try again</button>
+  </div>
+
+  <!-- We asked Meta and haven't heard back: don't claim Testpress is sending yet -->
+  <div x-show="flow === 'disconnect_checking' || flow === 'disconnect_rechecking'" class="{{ strip }}" role="status">
+    <span x-show="flow === 'disconnect_rechecking'" class="animate-spin shrink-0 size-4 border-2 border-gray-400 border-t-transparent rounded-full" aria-hidden="true"></span>
+    <i x-show="flow === 'disconnect_checking'" data-lucide="clock" class="shrink-0 size-4 text-amber-500"></i>
+    <p class="flex-1 min-w-[12rem]">We asked Meta to disconnect your number but haven’t had an answer yet. Until we do, messages stay on your number.</p>
+    <button type="button" @click="recheckDisconnect()" :disabled="flow === 'disconnect_rechecking'" class="{{ strip_btn }}" x-text="flow === 'disconnect_rechecking' ? 'Checking…' : 'Check again'"></button>
+  </div>
+</section>

@@ -1,0 +1,106 @@
+{#
+  One message type's template: its status with Meta, what students see (read-only, sample values marked),
+  and the one action that fits the status. On Testpress's number the template is Testpress's own and already approved.
+#}
+{% from "../../../ui-system/components/drawer.html" import drawer %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "./logo.html" import wa_logo %}
+{# A part of the message that changes per student: dotted underline, and a tooltip (ui-system tooltip styling) naming it #}
+{% macro var(text, label, bold=false) -%}
+<span class="group relative cursor-help underline decoration-dotted decoration-gray-400 underline-offset-4 dark:decoration-neutral-500{{ ' font-semibold' if bold }}" tabindex="0">{{ text }}<span role="tooltip" class="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs font-medium text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus:opacity-100 dark:bg-white dark:text-neutral-800">{{ label }}</span></span>
+{%- endmacro %}
+
+{% set sec = "text-sm font-medium text-gray-800 dark:text-neutral-200" %}
+
+{% call drawer(id="wa-template", size="md") %}
+  <!-- Header: name, then where it sends from and its status as one quiet line (Preline transaction-details pattern) -->
+  <div class="py-4 px-6 flex justify-between items-start gap-x-3 border-b border-gray-200 dark:border-neutral-700 shrink-0">
+    <div class="min-w-0">
+      <h3 id="wa-template-title" class="font-semibold text-gray-800 dark:text-neutral-100" x-text="dc.name"></h3>
+      <p class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500 dark:text-neutral-400">
+        <span x-text="own ? 'Your number' : 'Testpress’s number'"></span>
+        <span class="inline-flex items-center gap-x-1.5 py-0.5 px-2 rounded-full text-xs font-medium" :class="own ? tplBadge(dt.status)[1] : tplBadge('approved')[1]">
+          <span x-show="dt.status !== 'submitting' || !own" class="size-1.5 rounded-full bg-current"></span>
+          <span x-show="own && dt.status === 'submitting'" class="animate-spin size-3 border-2 border-current border-t-transparent rounded-full" aria-hidden="true"></span>
+          <span x-text="own ? tplBadge(dt.status)[0] : 'Approved'"></span>
+        </span>
+      </p>
+    </div>
+    <button type="button" @click="open = false" class="size-8 inline-flex shrink-0 justify-center items-center rounded-full border border-gray-200 text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:border-neutral-700 dark:hover:bg-neutral-700 dark:text-neutral-200">
+      <span class="sr-only">Close</span>
+      <i data-lucide="x" class="size-4 shrink-0"></i>
+    </button>
+  </div>
+
+  <div class="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-6">
+    <!-- A note only when the status needs explaining. Approved and Testpress-managed need none. -->
+    <template x-if="own && ['not_submitted', 'pending', 'unknown'].includes(dt.status)">
+      <div class="py-2.5 px-3 flex gap-x-2 rounded-lg bg-gray-50 text-[13px] text-gray-700 dark:bg-neutral-900/60 dark:text-neutral-300" role="status">
+        <i data-lucide="info" class="shrink-0 size-4 mt-px text-gray-400"></i>
+        <p x-text="{
+          not_submitted: 'Meta approves every template before it can be sent from your number. It usually takes a few minutes, sometimes up to a day.',
+          pending: 'Nothing is sent until Meta approves it. This page updates as soon as Meta replies.',
+          unknown: 'Approved when we last checked, ' + dt.checkedAt + '. We couldn’t reach Meta since, so we keep sending and check every hour.'
+        }[dt.status]"></p>
+      </div>
+    </template>
+    <!-- Rejected / paused / disabled: Meta's reason, and what happens next -->
+    <template x-if="own && ['rejected', 'paused', 'disabled'].includes(dt.status)">
+      <div class="p-3 rounded-lg bg-red-50 text-[13px] text-red-800 dark:bg-red-500/10 dark:text-red-300" role="alert">
+        <p class="font-medium" x-text="{ rejected: 'Why Meta rejected it', paused: 'Why Meta paused it', disabled: 'Why Meta disabled it' }[dt.status]"></p>
+        <p class="mt-1" x-text="dt.reason"></p>
+        <p class="mt-2 text-red-700/80 dark:text-red-300/80" x-text="{ rejected: 'Nothing is sent from your number until a template is approved. Testpress’s number isn’t used instead.', paused: 'Sending starts again on its own once Meta lifts the pause.', disabled: 'Submit it again to get a new template approved.' }[dt.status]"></p>
+      </div>
+    </template>
+
+    <!-- Preview: what students see, in a WhatsApp-like chat -->
+    <section>
+      <h4 class="{{ sec }}">Preview</h4>
+      <div class="mt-3 p-4 rounded-xl bg-gray-100 dark:bg-neutral-900">
+        <div class="max-w-[88%] rounded-lg rounded-tl-none bg-white shadow-sm text-[13px] leading-5 text-gray-800 dark:bg-neutral-800 dark:text-neutral-200">
+          <div class="p-3 space-y-2">
+            <p class="text-xs font-semibold text-gray-500 dark:text-neutral-400" x-text="own ? institute.name : 'Testpress'"></p>
+            <template x-if="drawerKey === 'otp'">
+              <div class="space-y-2">
+                <p>{{ var("483920", "Login code", true) }} is your verification code. For your security, do not share this code.</p>
+                <p class="text-xs text-gray-500 dark:text-neutral-400">This code expires in 10 minutes.</p>
+              </div>
+            </template>
+            <template x-if="drawerKey === 'creds'">
+              <div class="space-y-2">
+                <p>Hi {{ var("Ananya", "Student’s first name") }}, your {{ var("JK Shah Classes", "Institute name") }} account is ready.</p>
+                <p>Username: {{ var("ananya.r", "Student’s username") }}<br>Password: {{ var("Kx7pQ2mT", "Student’s password") }}</p>
+                <p>Sign in at {{ var("learn.jkshah.com", "Your site’s address") }} and change your password after you sign in.</p>
+              </div>
+            </template>
+            <template x-if="drawerKey === 'cart'">
+              <div class="space-y-2">
+                <p>Hi {{ var("Ananya", "Student’s first name") }}, you left {{ var("CA Foundation Complete Course", "Course name") }} in your cart.</p>
+                <p>Finish your purchase whenever you’re ready. Reply STOP to stop these reminders.</p>
+              </div>
+            </template>
+            <p class="text-end text-[11px] text-gray-400">10:14 AM</p>
+          </div>
+          <div class="border-t border-gray-100 dark:border-neutral-700 py-2 flex items-center justify-center gap-x-1.5 text-[13px] font-medium text-sky-600 dark:text-sky-400">
+            <i data-lucide="copy" class="size-3.5" x-show="drawerKey === 'otp'"></i>
+            <i data-lucide="external-link" class="size-3.5" x-show="drawerKey !== 'otp'"></i>
+            <span x-text="{ otp: 'Copy code', creds: 'Sign in', cart: 'Complete purchase' }[drawerKey]"></span>
+          </div>
+        </div>
+      </div>
+      <p class="mt-2 text-xs text-gray-500 dark:text-neutral-400">Underlined parts change for each student. Hover to see what each one is.</p>
+    </section>
+
+  </div>
+
+  <!-- Footer: the one action that fits the status -->
+  <div x-show="own && !readOnly && ['rejected', 'disabled', 'unknown'].includes(dt.status)" class="p-4 flex justify-end gap-x-2 border-t border-gray-200 dark:border-neutral-700 shrink-0">
+    {{ button(text="Close", variant="secondary", extra_attrs='@click="open = false"') }}
+    <template x-if="['rejected', 'disabled'].includes(dt.status)">
+      {{ button(text="Submit again", extra_attrs='@click="submit(drawerKey)"') }}
+    </template>
+    <template x-if="dt.status === 'unknown'">
+      {{ button(text='<span x-text="dt.checking ? \'Checking…\' : \'Check again\'"></span>', extra_attrs='@click="check(drawerKey)" :disabled="dt.checking"') }}
+    </template>
+  </div>
+{% endcall %}
