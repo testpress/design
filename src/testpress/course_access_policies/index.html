@@ -1,0 +1,359 @@
+---
+title: Course Access Policies
+tags: testpress
+date: 2026-11-10
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../ui-system/components/modal.html" import modal %}
+{% from "../../ui-system/components/badge.html" import badge %}
+{% from "../../ui-system/components/card.html" import card %}
+{% from "../../ui-system/components/popover.html" import popover %}
+{% from "../../ui-system/components/skeleton.html" import skeleton_wrapper, skeleton_item %}
+{% from "../../ui-system/components/toast.html" import toast_provider %}
+{% from "./includes/avatar.html" import staff_avatar, staff_stack, perm_tags %}
+
+{# One toolbar filter: a text button that opens a menu (ui-system dropdown) with search and options. #}
+{% macro filter_menu(key, label, title, placeholder) %}
+  {% set trigger %}
+    <button type="button" aria-haspopup="menu" @click="filterSearch.{{ key }} = ''; setTimeout(() => { updatePosition(); const input = document.querySelector('[data-filter-search={{ key }}]'); if (input) input.focus(); }, 60)"
+            :class="filters.{{ key }} ? 'text-gray-800 dark:text-neutral-200' : 'text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200'"
+            class="inline-flex items-center gap-x-1 py-1.5 px-2 rounded-lg text-sm whitespace-nowrap hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 dark:hover:bg-neutral-700">
+      <span>{{ label }}<span x-show="filters.{{ key }}" x-cloak>:</span></span>
+      <span x-show="filters.{{ key }}" x-cloak class="max-w-40 truncate font-medium" x-text="filterLabel('{{ key }}')"></span>
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  {% endset %}
+  {% call dropdown(trigger=trigger, placement="bottom-end", width="w-72 !p-0 border-gray-200 dark:border-neutral-700 overflow-hidden") %}
+    <p class="px-3 py-2.5 text-[13px] font-semibold text-gray-800 border-b border-gray-200 dark:text-neutral-200 dark:border-neutral-700">{{ title }}</p>
+    <div class="p-2 border-b border-gray-200 dark:border-neutral-700">
+      <div class="relative">
+        <svg class="absolute start-2.5 top-1/2 -translate-y-1/2 shrink-0 size-3.5 text-gray-500 pointer-events-none dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" data-filter-search="{{ key }}" x-model="filterSearch.{{ key }}" placeholder="{{ placeholder }}" aria-label="{{ placeholder }}"
+               class="py-1.5 ps-8 pe-3 block w-full bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder:text-gray-500 focus:border-primary-600 focus:ring-1 focus:ring-primary-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200 dark:placeholder:text-neutral-400">
+      </div>
+    </div>
+    <ul class="p-1 max-h-72 overflow-y-auto">
+      <template x-for="o in filterOptions('{{ key }}')" :key="o.value">
+        <li>
+          <button type="button" role="menuitemradio" :aria-checked="filters.{{ key }} === o.value" @click="setFilter('{{ key }}', o.value); open = false"
+                  class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-start text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800 dark:focus:bg-neutral-800">
+            <template x-if="o.avatar">
+              <img class="shrink-0 size-6 rounded-full object-cover bg-gray-100 dark:bg-neutral-700" :src="o.avatar" alt="" loading="lazy">
+            </template>
+            <span class="truncate" :class="filters.{{ key }} === o.value && 'font-medium'" x-text="o.label"></span>
+            <svg x-show="filters.{{ key }} === o.value" class="ms-auto shrink-0 size-4 text-primary-600 dark:text-primary-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
+        </li>
+      </template>
+      <li x-show="!filterOptions('{{ key }}').length" class="py-3 px-2 text-sm text-gray-500 dark:text-neutral-400">No matches</li>
+    </ul>
+    <div x-show="filters.{{ key }}" class="p-1 border-t border-gray-200 dark:border-neutral-700">
+      <button type="button" @click="setFilter('{{ key }}', ''); open = false" class="w-full py-2 px-2 rounded-lg text-sm text-start text-gray-500 hover:text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-800">
+        Clear filter
+      </button>
+    </div>
+  {% endcall %}
+{% endmacro %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+{# A policy gives a group of staff the same permissions on all courses or on selected courses.
+   Row layout as on Live Classes: the name opens the policy, with View and a menu at the end. #}
+<div x-data="policyList()" @modal-confirmed-delete-policy.window="confirmDelete()" class="max-w-7xl mx-auto sm:px-6 lg:px-8 py-10 space-y-5">
+
+  <div class="px-4 sm:px-0 space-y-2">
+    {{ breadcrumb({ items: [ { label: "Memberships", href: '/membership/' | url }, { label: "Course Access Policies" } ] }) }}
+    {% set header_actions %}
+      <span x-show="policies.length && !listLoading" x-cloak class="flex items-center gap-2">
+        {{ button(text="How it works", variant="secondary", extra_attrs='@click="$dispatch(\'open-modal-about-policies\')"') }}
+        <span x-show="canManage" class="inline-flex">{{ button(text="Create policy", icon="plus", href='#') }}</span>
+      </span>
+    {% endset %}
+    {{ page_header(
+      title="Course Access Policies",
+      description="Give groups of staff access to all courses or selected courses.",
+      actions=header_actions
+    ) }}
+  </div>
+
+  {# Loading #}
+  <div x-show="listLoading" x-cloak>
+    {% call card(padding="p-5") %}
+      {% call skeleton_wrapper(extra_classes="space-y-5") %}
+        {% for n in range(0, 4) %}
+          <div class="flex items-center gap-6">
+            {{ skeleton_item(width="w-40") }}
+            {{ skeleton_item(width="w-24") }}
+            {{ skeleton_item(width="w-56") }}
+            {{ skeleton_item(width="w-10") }}
+          </div>
+        {% endfor %}
+      {% endcall %}
+    {% endcall %}
+  </div>
+
+  {# No policies yet #}
+  <div x-show="!listLoading && !policies.length" x-cloak>
+    <div x-show="canManage">
+      {{ empty_state(
+        title="No course access policies yet",
+        description="Create a policy to give staff access to all courses or a group of courses in one step.",
+        icon="shield",
+        primary_action_text="Create policy",
+        primary_action_icon="plus",
+        primary_action_href='#',
+        secondary_action_text="How it works",
+        secondary_action_attrs='@click="$dispatch(\'open-modal-about-policies\')"'
+      ) }}
+    </div>
+    <div x-show="!canManage">
+      {{ empty_state(
+        title="No course access policies yet",
+        description="A policy gives staff access to all courses or a group of courses in one step.",
+        icon="shield",
+        secondary_action_text="How it works",
+        secondary_action_attrs='@click="$dispatch(\'open-modal-about-policies\')"'
+      ) }}
+    </div>
+  </div>
+
+  {# Policies #}
+  <div x-show="!listLoading && policies.length" x-cloak>
+    {% set header %}
+      {{ table_th(text="Policy") }}
+      {{ table_th(text="Courses") }}
+      {{ table_th(text="Permissions") }}
+      {{ table_th(text="Staff") }}
+      {{ table_th(class="text-end") }}
+    {% endset %}
+
+    {# Filters sit in the toolbar, one menu per filter, as on TPSentinel › Review Cases (GitHub style):
+       a title, a search box, the options with a check on the chosen one, and "Clear filter". #}
+    {% set filters %}
+      {{ filter_menu("staff", label="Staff", title="Filter by staff", placeholder="Filter staff") }}
+      {{ filter_menu("course", label="Course", title="Filter by course", placeholder="Filter courses") }}
+      <button type="button" x-show="activeFilterCount" x-cloak @click="clearFilters()" class="py-1.5 px-2 rounded-lg text-sm text-gray-500 hover:text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:text-neutral-200 dark:hover:bg-neutral-700">
+        Clear
+      </button>
+    {% endset %}
+
+    {# Popover contents, filled by Alpine for each row. #}
+    {% set courses_trigger %}
+      <span class="cursor-default">{{ badge(x_text="p.courses.length + (p.courses.length === 1 ? ' course' : ' courses')", extra_classes="whitespace-nowrap") }}</span>
+    {% endset %}
+    {% set courses_list %}
+      <ul class="py-2.5 ps-7 pe-3 space-y-1.5 max-h-72 overflow-y-auto list-disc marker:text-gray-400 dark:marker:text-neutral-600">
+        <template x-for="c in p.courses" :key="c">
+          <li class="text-sm text-gray-800 dark:text-neutral-200" x-text="courseTitle(c)"></li>
+        </template>
+      </ul>
+    {% endset %}
+    {# Pages of 10. Markup of ui-system/components/pagination.html, with the pages driven by Alpine (as on Courses › Faculty). #}
+    {% set pager %}
+      <div class="flex flex-wrap justify-between items-center gap-3">
+        {# Left side of ui-system pagination: "Go to" page input. #}
+        <div class="flex items-center gap-x-4">
+          <input type="number" placeholder="Go to" min="1" :max="pageCount" aria-label="Go to page"
+            @keydown.enter.prevent="goToPage($event.target)" @change="goToPage($event.target)"
+            class="min-h-9 py-1.5 px-2 block w-16 bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-700 rounded-lg text-sm text-center text-gray-800 dark:text-neutral-200 placeholder:text-gray-400 dark:placeholder:text-neutral-500 focus:border-primary-500 focus:ring-primary-500 [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" style="-moz-appearance: textfield;">
+        </div>
+        <nav class="flex items-center -space-x-px" aria-label="Pagination">
+          <button type="button" @click="page--" :disabled="page === 1" class="min-h-9 min-w-9 py-2 px-2.5 inline-flex justify-center items-center gap-x-1.5 text-sm rounded-s-lg border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" aria-label="Previous">
+            <i data-lucide="chevron-left" class="shrink-0 size-3.5"></i>
+          </button>
+          <template x-for="n in pageCount" :key="n">
+            <button type="button" @click="page = n" :aria-current="n === page ? 'page' : null" x-text="n"
+              class="min-h-9 min-w-9 flex justify-center items-center border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 py-2 px-3 text-sm focus:outline-none"
+              :class="n === page ? 'bg-gray-50 dark:bg-neutral-700' : 'hover:bg-gray-50 dark:hover:bg-neutral-700 focus:bg-gray-50 dark:focus:bg-neutral-700'"></button>
+          </template>
+          <button type="button" @click="page++" :disabled="page === pageCount" class="min-h-9 min-w-9 py-2 px-2.5 inline-flex justify-center items-center gap-x-1.5 text-sm rounded-e-lg border border-gray-200 dark:border-neutral-700 text-gray-800 dark:text-neutral-200 hover:bg-gray-50 dark:hover:bg-neutral-700 focus:outline-none focus:bg-gray-50 dark:focus:bg-neutral-700 disabled:opacity-50 disabled:pointer-events-none" aria-label="Next">
+            <i data-lucide="chevron-right" class="shrink-0 size-3.5"></i>
+          </button>
+        </nav>
+      </div>
+    {% endset %}
+
+    {% call table(padded=true, search_enabled=true, search_placeholder="Search policies...", search_x_model="listSearch", filters=filters, table_header=header, pagination=pager, pagination_x_show="filteredPolicies.length > perPage", table_container_classes="sm:rounded-b-xl") %}
+      <template x-for="p in paged" :key="p.id">
+        <tr>
+          {% call table_td() %}
+            <a :href="detailUrl(p.id)" class="inline-block text-sm font-medium text-gray-800 dark:text-neutral-200 hover:text-primary-600 dark:hover:text-primary-500 hover:underline transition-colors" x-text="p.name"></a>
+          {% endcall %}
+          {% call table_td() %}
+            <span x-show="p.scope === 'all'">{{ badge(text="All courses", variant="success", extra_classes="whitespace-nowrap") }}</span>
+            <template x-if="p.scope === 'selected'">
+              {{ popover(trigger=courses_trigger, content=courses_list, trigger_type="hover", placement="bottom", width="w-64") }}
+            </template>
+          {% endcall %}
+          {% call table_td() %}
+            {{ perm_tags("p.perms") }}
+          {% endcall %}
+          {% call table_td() %}
+            <template x-if="p.staff.length">
+              {{ staff_stack("p.staff") }}
+            </template>
+            <span x-show="!p.staff.length" class="text-sm text-gray-400 dark:text-neutral-500">-</span>
+          {% endcall %}
+          {% call table_td(class="text-end") %}
+            <div class="flex justify-end items-center -space-x-px">
+              <a :href="detailUrl(p.id)" :class="canManage ? 'rounded-s-lg rounded-e-none' : 'rounded-lg'" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium border border-gray-200 bg-white text-gray-800 shadow-2xs hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+                View
+              </a>
+              {% set row_menu_trigger %}
+                <div class="relative inline-flex rounded-s-none rounded-e-lg border border-gray-200 bg-white shadow-2xs hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:hover:bg-neutral-700">
+                  <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-e-lg text-gray-800 focus:outline-hidden focus:bg-gray-50 dark:text-neutral-300 dark:focus:bg-neutral-700" aria-haspopup="menu" aria-label="More actions">
+                    <svg class="pointer-events-none shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+                  </button>
+                </div>
+              {% endset %}
+              <span x-show="canManage" class="inline-flex">
+                {{ dropdown(trigger=row_menu_trigger, placement="bottom-end", width="small", items=[
+                  { label: "Delete", icon: "trash-2", variant: "danger", x_on: '@click="askDelete(p); open = false"' }
+                ]) }}
+              </span>
+            </div>
+          {% endcall %}
+        </tr>
+      </template>
+      <tr x-show="!filteredPolicies.length">
+        <td colspan="5">
+          {{ empty_state(
+            title="No policies found",
+            description="No policy matches this search or these filters.",
+            icon="search-x",
+            compact=true,
+            wrap_card=false,
+            secondary_action_text="Clear search and filters",
+            secondary_action_attrs='@click="listSearch = \'\'; clearFilters()"'
+          ) }}
+        </td>
+      </tr>
+    {% endcall %}
+  </div>
+
+  {# Delete: names the staff who lose access, with the same photos and hover list as the table. #}
+  {% call modal(id="delete-policy", title="Delete policy?", size="sm", variant="danger", confirm_text="Delete", cancel_text="Cancel") %}
+    <template x-if="deleting">
+      <div class="space-y-3">
+        <p class="text-gray-800 dark:text-neutral-200"><span class="font-medium" x-text="deleting.name"></span> will be deleted.</p>
+        <template x-if="deleting.staff.length">
+          <div class="space-y-2">
+            <p class="text-gray-600 dark:text-neutral-400" x-text="(deleting.staff.length === 1 ? 'This person loses' : 'These ' + deleting.staff.length + ' staff lose') + ' the access it gives on ' + scopeText(deleting) + ':'"></p>
+            {{ staff_stack("deleting.staff") }}
+          </div>
+        </template>
+        <p x-show="!deleting.staff.length" class="text-gray-600 dark:text-neutral-400">No staff are in this policy, so no one loses access.</p>
+      </div>
+    </template>
+  {% endcall %}
+
+  {% include "./includes/about_modal.html" %}
+  {% include "./includes/prototype_menu.html" %}
+  {{ toast_provider() }}
+</div>
+{% endblock content %}
+
+{% block script %}
+  {% include "./includes/store_script.html" %}
+  <script>
+    function policyList() {
+      return accessMixin(accessBase(), {
+        listLoading: false,
+        listSearch: "",
+        deleting: null,
+        page: 1,
+        perPage: 10,
+        filters: { staff: "", course: "" },
+        filterSearch: { staff: "", course: "" },
+
+        init() {
+          this.loadData();
+          this.$watch("paged", () => this.refreshIcons());
+          this.$watch("listSearch", () => (this.page = 1));
+          this.applyState(this.state);
+        },
+
+        get filteredPolicies() {
+          const q = this.listSearch.trim().toLowerCase();
+          const { staff, course } = this.filters;
+          return this.policies
+            .filter((p) => p.name.toLowerCase().includes(q))
+            .filter((p) => !staff || p.staff.includes(staff))
+            .filter((p) => !course || this.covers(p, course));
+        },
+        get pageCount() {
+          return Math.max(1, Math.ceil(this.filteredPolicies.length / this.perPage));
+        },
+        get pageStart() {
+          return (Math.min(this.page, this.pageCount) - 1) * this.perPage;
+        },
+        get paged() {
+          return this.filteredPolicies.slice(this.pageStart, this.pageStart + this.perPage);
+        },
+        get activeFilterCount() {
+          return Object.values(this.filters).filter(Boolean).length;
+        },
+        // Options of a toolbar filter, narrowed by what is typed in its search box.
+        filterOptions(key) {
+          const q = this.filterSearch[key].trim().toLowerCase();
+          const all = key === "staff"
+            ? STAFF.map((s) => ({ value: s.id, label: s.name, avatar: s.avatar, text: s.name + " " + s.email }))
+            : COURSES.map((c) => ({ value: c.id, label: c.title, text: c.title }));
+          return all.filter((o) => o.text.toLowerCase().includes(q));
+        },
+        filterLabel(key) {
+          return key === "staff" ? this.person(this.filters.staff).name : this.courseTitle(this.filters.course);
+        },
+        setFilter(key, value) {
+          this.filters[key] = this.filters[key] === value ? "" : value;
+          this.page = 1;
+        },
+        clearFilters() {
+          this.filters = { staff: "", course: "" };
+          this.page = 1;
+        },
+        goToPage(input) {
+          const n = parseInt(input.value, 10);
+          if (n >= 1 && n <= this.pageCount) this.page = n;
+          input.value = "";
+        },
+        // The member page is outside this prototype.
+        memberUrl(sid) { return "#"; },
+
+        askDelete(p) {
+          this.deleting = p;
+          this.$dispatch("open-modal-delete-policy");
+        },
+        confirmDelete() {
+          if (!this.deleting) return;
+          const id = this.deleting.id;
+          this.policies = this.policies.filter((x) => x.id !== id);
+          this.deleting = null;
+          this.page = Math.min(this.page, this.pageCount);
+          this.persist();
+          this.toast("Policy deleted");
+        },
+
+        applyState(key) {
+          const later = (fn) => this.$nextTick(() => setTimeout(fn, 50));
+          switch (key) {
+            case "list-filtered": this.filters.staff = 5; break;
+            case "list-search-empty": this.listSearch = "Accounts team"; break;
+            case "list-empty": this.policies = []; break;
+            case "list-loading": this.listLoading = true; break;
+            case "confirm-delete": later(() => this.askDelete(this.policies[0])); break;
+          }
+        },
+      });
+    }
+  </script>
+{% endblock script %}

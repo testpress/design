@@ -1,0 +1,64 @@
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/popover.html" import popover %}
+{# A staff member's photo. `sid` is an Alpine expression for the person's id. #}
+{% macro staff_avatar(sid="sid", size="size-8", extra_classes="") %}
+<img :src="person({{ sid }}).avatar" :alt="person({{ sid }}).name" class="shrink-0 {{ size }} rounded-full object-cover bg-gray-100 dark:bg-neutral-700 {{ extra_classes }}">
+{% endmacro %}
+
+{# Permission names as tags: the first two, then "+N more" that shows the rest in a popover on hover.
+   `keys` is an Alpine expression for a list of permission keys. #}
+{% macro perm_tags(keys) %}
+{% set more_trigger %}
+  <button type="button" class="ps-1 text-xs font-medium text-gray-500 whitespace-nowrap cursor-default hover:text-gray-800 focus:outline-none focus:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200" x-text="'+' + ({{ keys }}.length - 2) + ' more'"></button>
+{% endset %}
+{% set more_content %}
+  <ul class="py-2.5 ps-7 pe-3 space-y-1.5 list-disc marker:text-gray-400 dark:marker:text-neutral-600">
+    <template x-for="key in {{ keys }}.slice(2)" :key="key">
+      <li class="text-sm text-gray-800 dark:text-neutral-200" x-text="permShort(key)"></li>
+    </template>
+  </ul>
+{% endset %}
+<div class="flex flex-wrap items-center gap-1">
+  <template x-for="key in {{ keys }}.slice(0, 2)" :key="key">
+    {{ badge(x_text="permShort(key)", pill=false, extra_classes="whitespace-nowrap") }}
+  </template>
+  <template x-if="{{ keys }}.length > 2">
+    {{ popover(trigger=more_trigger, content=more_content, trigger_type="hover", placement="bottom", width="w-52") }}
+  </template>
+  <span x-show="!{{ keys }}.length" class="text-sm text-gray-400 dark:text-neutral-500">View only</span>
+</div>
+{% endmacro %}
+
+{# Staff photos as on Doubts › Topics: the first three, then "+N more"; hovering lists everyone, and
+   each person opens their member page. `staff` is an Alpine expression for a list of staff ids.
+   The strips above and below the list keep the popover open while the pointer crosses the gap. #}
+{% macro staff_stack(staff) %}
+{% set trigger %}
+  <div class="flex items-center cursor-pointer">
+    <div class="flex items-center">
+      <template x-for="(sid, i) in {{ staff }}.slice(0, 3)" :key="sid">
+        <span class="shrink-0 rounded-full ring-2 ring-white dark:ring-neutral-900" :class="i && '-ms-2'">{{ staff_avatar("sid", size="size-7") }}</span>
+      </template>
+    </div>
+    <span x-show="{{ staff }}.length > 3" class="ps-2 text-xs font-medium text-gray-500 whitespace-nowrap dark:text-neutral-400" x-text="'+' + ({{ staff }}.length - 3) + ' more'"></span>
+  </div>
+{% endset %}
+{% set list %}
+  <div class="relative before:absolute before:inset-x-0 before:-top-3 before:h-3 after:absolute after:inset-x-0 after:-bottom-3 after:h-3">
+    <ul class="p-1.5 max-h-72 overflow-y-auto">
+      <template x-for="sid in {{ staff }}" :key="sid">
+        <li>
+          <a :href="memberUrl(sid)" class="flex items-center gap-x-2.5 py-1.5 px-2 rounded-lg hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:hover:bg-neutral-700 dark:focus:bg-neutral-700">
+            {{ staff_avatar("sid", size="size-7") }}
+            <span class="min-w-0">
+              <span class="block text-[13px] font-medium text-gray-800 truncate dark:text-neutral-200" x-text="person(sid).name"></span>
+              <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person(sid).email"></span>
+            </span>
+          </a>
+        </li>
+      </template>
+    </ul>
+  </div>
+{% endset %}
+{{ popover(trigger=trigger, content=list, trigger_type="hover", placement="bottom", width="w-60") }}
+{% endmacro %}
