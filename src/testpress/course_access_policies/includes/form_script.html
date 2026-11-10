@@ -1,0 +1,153 @@
+{# Behaviour of the policy page (policy_form.html). Needs store_script.html before it. #}
+<script>
+  function policyForm(mode) {
+    return accessMixin(accessBase(), {
+      mode,
+      currentId: 0,
+      savedName: "",
+      form: { name: "", scope: "all", courses: [], perms: [], staff: [] },
+      errors: { name: "", courses: "" },
+      add: { ids: [], q: "" },
+      saved: "",
+
+      init() {
+        const params = this.loadData();
+        if (mode === "edit") this.currentId = Number(params.get("id")) || 1;
+        this.applyState(this.state);
+        if (mode === "edit") {
+          const p = this.current;
+          this.savedName = p.name;
+          this.form = { name: p.name, scope: p.scope, courses: [...p.courses], perms: [...p.perms], staff: [...p.staff] };
+        }
+        this.saved = JSON.stringify(this.form);
+        this.applyFormState(this.state);
+        this.later(() => this.setCourseSelect());
+        this.$watch("form.staff", () => this.refreshIcons());
+      },
+
+      later(fn) {
+        this.$nextTick(() => setTimeout(fn, 50));
+      },
+      // The courses field keeps its own selection; this shows the form's courses in it.
+      setCourseSelect() {
+        const el = document.querySelector("[data-course-select] > div");
+        if (el) el.dispatchEvent(new CustomEvent("set-selected-values", { detail: this.form.courses }));
+      },
+
+      // The saved policy (an empty one while creating).
+      get current() {
+        return this.policies.find((p) => p.id === this.currentId) || { id: 0, name: "", scope: "all", courses: [], perms: [], staff: [], by: "", modified: "" };
+      },
+      // Something differs from what is saved (or, while creating, from the empty form).
+      get dirty() {
+        return JSON.stringify(this.form) !== this.saved;
+      },
+      discard() {
+        this.form = JSON.parse(this.saved);
+        this.errors = { name: "", courses: "" };
+        this.setCourseSelect();
+      },
+
+      get bcrError() {
+        return this.form.perms.includes("submit_bcr") && this.form.perms.includes("approve_bcr");
+      },
+      // One line on what saving gives, in place of asking on every change.
+      get summary() {
+        const f = this.form;
+        if (!f.staff.length) return "No staff added yet, so this policy gives no access.";
+        const perms = PERMS.filter((p) => f.perms.includes(p.key)).map((p) => p.key);
+        const where = f.scope === "all" ? "all courses" : `${f.courses.length} selected course${f.courses.length === 1 ? "" : "s"}`;
+        return `${this.staffCount(f.staff.length)} will get <span class="font-medium text-gray-800 dark:text-neutral-200">${perms.length > 3 ? perms.length + ' permissions' : this.permSummaryFull(perms)}</span> on <span class="font-medium text-gray-800 dark:text-neutral-200">${where}</span>.`;
+      },
+
+      save() {
+        const f = this.form;
+        const name = f.name.trim();
+        this.errors = { name: "", courses: "" };
+        if (!name) this.errors.name = "Enter a name.";
+        else if (this.policies.some((p) => p.id !== this.currentId && p.name.toLowerCase() === name.toLowerCase())) this.errors.name = "A policy with this name already exists.";
+        if (f.scope === "selected" && !f.courses.length) this.errors.courses = "Pick at least one course, or choose All courses.";
+        if (this.errors.name || this.errors.courses || this.bcrError) {
+          this.$nextTick(() => {
+            const first = document.querySelector('[aria-invalid="true"], [role="alert"]:not([style*="display: none"])');
+            if (this.errors.name) document.getElementById("policy_name").focus();
+            else if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
+          });
+          return;
+        }
+        const values = {
+          name,
+          scope: f.scope,
+          courses: f.scope === "selected" ? COURSES.map((c) => c.id).filter((id) => f.courses.includes(id)) : [],
+          perms: PERMS.map((p) => p.key).filter((k) => f.perms.includes(k)),
+          staff: [...f.staff],
+          by: "You",
+          modified: this.today(),
+        };
+        if (mode === "create") {
+          // Newest first, so it shows at the top of the list after saving.
+          this.policies.unshift({ id: Math.max(0, ...this.policies.map((p) => p.id)) + 1, ...values });
+        } else {
+          Object.assign(this.current, values);
+        }
+        this.persist();
+        accessStore.setFlash(mode === "create" ? "Policy created" : "Changes saved");
+        window.location = ACCESS_URLS.list;
+      },
+
+      askDelete() {
+        this.$dispatch("open-modal-delete-policy");
+      },
+      confirmDelete() {
+        const id = this.current.id;
+        this.policies = this.policies.filter((x) => x.id !== id);
+        this.persist();
+        accessStore.setFlash("Policy deleted");
+        window.location = ACCESS_URLS.list;
+      },
+
+      /* Staff */
+      openAddStaff() {
+        this.add = { ids: [], q: "" };
+        this.$dispatch("open-modal-add-staff");
+      },
+      get addOptions() {
+        const q = this.add.q.trim().toLowerCase();
+        return STAFF.filter((s) => !this.form.staff.includes(s.id) && (s.name + " " + s.email).toLowerCase().includes(q));
+      },
+      toggleAdd(id) {
+        this.add.ids = this.add.ids.includes(id) ? this.add.ids.filter((x) => x !== id) : [...this.add.ids, id];
+      },
+      submitAddStaff() {
+        if (!this.add.ids.length) return;
+        this.form.staff = [...this.form.staff, ...this.add.ids];
+        this.$dispatch("close-modal-add-staff");
+      },
+      removeStaff(sid) {
+        this.form.staff = this.form.staff.filter((x) => x !== sid);
+      },
+
+      /* Prototype states: which policy to show, then changes to the form. */
+      applyState(key) {
+        if (key === "detail-selected") this.currentId = 2;
+      },
+      applyFormState(key) {
+        switch (key) {
+          case "create-error":
+            this.form.scope = "selected";
+            this.later(() => this.save());
+            break;
+          case "create-dup":
+            this.form.name = "Head Staff";
+            this.later(() => this.save());
+            break;
+          case "detail-bcr": this.form.perms.push("submit_bcr", "approve_bcr"); break;
+          case "detail-readonly": this.canManage = false; break;
+          case "add": this.later(() => { this.openAddStaff(); this.add.ids = [5]; }); break;
+          case "saved": this.later(() => this.toast("Changes saved")); break;
+          case "detail-delete": this.later(() => this.askDelete()); break;
+        }
+      },
+    });
+  }
+</script>

@@ -1,0 +1,210 @@
+{# The policy page, used to create a policy (create.html) and to open one (detail.html).
+   Set `form_mode` to "create" or "edit" before including. Everything is on one page and is
+   saved together with the button at the end; nothing asks for confirmation on the way. #}
+{% from "../../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../../ui-system/components/page-header.html" import page_header %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/card.html" import card %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/radio.html" import radio %}
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+{% from "../../../ui-system/components/select.html" import select %}
+{% from "../../../ui-system/components/alert.html" import alert %}
+{% from "../../../ui-system/components/badge.html" import badge %}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/toast.html" import toast_provider %}
+{% from "./avatar.html" import staff_avatar, staff_stack, other_policies %}
+
+{% set course_options = [] %}
+{% for course in course_access.courses %}
+  {% set _ = course_options.push({ value: course.id, label: course.title }) %}
+{% endfor %}
+
+<div x-data="policyForm('{{ form_mode }}')" @modal-confirmed-delete-policy.window="confirmDelete()" class="max-w-7xl mx-auto sm:px-6 lg:px-8 pt-10 pb-32 space-y-5">
+
+  <div class="px-4 sm:px-0 space-y-2">
+    {% if form_mode == "create" %}
+      {{ breadcrumb({ items: [
+        { label: "Memberships", href: '/membership/' | url },
+        { label: "Course Access Policies", href: '/testpress/course_access_policies/' | url },
+        { label: "Create policy" }
+      ] }) }}
+      {{ page_header(title="Create policy", description="Name the policy, choose its courses and permissions, and add the staff who get them.") }}
+    {% else %}
+      {# The policy's name is filled in from the data (the macro escapes markup in labels). #}
+      <div x-effect="const item = $el.querySelector('ol li:last-child span'); if (item) item.textContent = savedName">
+        {{ breadcrumb({ items: [
+          { label: "Memberships", href: '/membership/' | url },
+          { label: "Course Access Policies", href: '/testpress/course_access_policies/' | url },
+          { label: "Policy" }
+        ] }) }}
+      </div>
+      {% set header_actions %}
+        <span x-show="canManage" class="inline-flex">
+          {{ dropdown(trigger="⋮", placement="bottom-end", width="medium", items=[
+            { label: "Delete policy", icon: "trash-2", variant: "danger", x_on: '@click="askDelete(); open = false"' }
+          ]) }}
+        </span>
+      {% endset %}
+      {{ page_header(title='<span x-text="savedName"></span>', actions=header_actions) }}
+      <p class="!mt-0.5 text-sm text-gray-500 dark:text-neutral-400"><span x-text="current.by"></span> modified on <span x-text="current.modified"></span></p>
+    {% endif %}
+  </div>
+
+  <div x-show="!canManage" x-cloak class="px-4 sm:px-0">
+    {{ alert(variant="info", icon="lock", title="View only", description="Your role can view policies but can't change them. Ask an admin to give your role “Course Access Policy → Can Change”.") }}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-5 items-start">
+    <div class="space-y-5 min-w-0">
+
+      {# Name and courses #}
+      {% call card(extra_classes="rounded-none sm:rounded-xl") %}
+        <div class="space-y-6">
+          <div class="max-w-md">
+            {{ input(name="policy_name", label="Name", required=true, placeholder="e.g. Head Staff", x_model="form.name", x_error="errors.name",
+              extra_attrs=('autofocus ' if form_mode == "create" else '') ~ ':disabled="!canManage" @input="errors.name = \'\'"') }}
+          </div>
+
+          <fieldset>
+            <legend class="mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Courses</legend>
+            <div class="grid sm:grid-cols-2 gap-3">
+              {{ radio(name="scope", id="scope_all", value="all", variant="card", label="All courses", description="Includes courses created in the future.",
+                x_model="form.scope", extra_classes="has-[:disabled]:opacity-60 has-[:disabled]:cursor-not-allowed", extra_attrs=':disabled="!canManage"') }}
+              {{ radio(name="scope", id="scope_selected", value="selected", variant="card", label="Selected courses", description="Only the courses you pick.",
+                x_model="form.scope", extra_classes="has-[:disabled]:opacity-60 has-[:disabled]:cursor-not-allowed", extra_attrs=':disabled="!canManage"') }}
+            </div>
+
+            {# The picked courses show as chips in the field; opening it lists every course with search. #}
+            <div x-show="form.scope === 'selected'" x-cloak class="mt-3">
+              <div data-course-select :class="!canManage && 'pointer-events-none opacity-60'"
+                   @change="form.courses = [...$event.target.selectedOptions].map((o) => Number(o.value)).filter(Boolean); errors.courses = ''">
+                {{ select(label="", name="policy_courses", placeholder="Search and pick courses", options=course_options, search=true, multiple=true) }}
+              </div>
+              <p x-show="errors.courses" x-cloak class="mt-1.5 text-xs text-red-500" x-text="errors.courses"></p>
+            </div>
+          </fieldset>
+        </div>
+      {% endcall %}
+
+      {# Permissions: one plain checkbox per permission, labels only, in two columns. #}
+      {% call card(title="Permissions", description="What staff can do in these courses. Viewing the course is always included.", extra_classes="rounded-none sm:rounded-xl") %}
+        <div class="grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
+          {% for perm in course_access.perms %}
+            {{ checkbox(name="perms", id="perm_" ~ perm.key, value=perm.key, label=perm.label, x_model="form.perms", extra_attrs=':disabled="!canManage"') }}
+          {% endfor %}
+        </div>
+        <p x-show="bcrError" x-cloak class="mt-3 text-xs text-red-600 dark:text-red-500">The same staff can't both submit and approve batch change requests. Choose one.</p>
+      {% endcall %}
+    </div>
+
+    {# Staff. A person can be in several policies; their access adds up. #}
+    {% set staff_actions %}
+      <span x-show="canManage && form.staff.length" x-cloak>
+        {{ button(text="Add staff", icon="plus", variant="secondary", size="sm", extra_attrs='@click="openAddStaff()"') }}
+      </span>
+    {% endset %}
+    {% call card(title="Staff", actions=staff_actions, extra_classes="rounded-none sm:rounded-xl") %}
+      <div x-show="!form.staff.length" x-cloak>
+        <div x-show="canManage">
+          {{ empty_state(title="No staff yet", description="Add the staff who should get this access.", icon="users", compact=true, wrap_card=false,
+            primary_action_text="Add staff", primary_action_icon="plus", primary_action_attrs='@click="openAddStaff()"') }}
+        </div>
+        <div x-show="!canManage">
+          {{ empty_state(title="No staff yet", icon="users", compact=true, wrap_card=false) }}
+        </div>
+      </div>
+      <ul x-show="form.staff.length" x-cloak class="space-y-4">
+        <template x-for="sid in form.staff" :key="sid">
+          <li class="flex items-start gap-3">
+            {{ staff_avatar("sid", size="size-9") }}
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="person(sid).name"></p>
+              <p class="text-xs text-gray-500 truncate dark:text-neutral-400" x-text="person(sid).email"></p>
+              <template x-if="otherPolicies(sid, current.id).length">
+                <div class="mt-1">{{ other_policies("otherPolicies(sid, current.id)") }}</div>
+              </template>
+            </div>
+            <span x-show="canManage" class="shrink-0 -me-1.5">
+              {{ button(variant="ghost", size="sm", icon="x", hover_class="!rounded-full !p-0 size-7", extra_attrs='@click="removeStaff(sid)" :aria-label="\'Remove \' + person(sid).name"') }}
+            </span>
+          </li>
+        </template>
+      </ul>
+    {% endcall %}
+  </div>
+
+  {# Save bar, as on Product Benefits: floats at the bottom only once something has changed,
+     with a line on what saving will do. #}
+  <div x-show="canManage && dirty" x-cloak
+       x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4"
+       class="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 pointer-events-none">
+    <div class="pointer-events-auto w-full max-w-2xl flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-lg dark:bg-neutral-800 dark:border-neutral-700" role="region" aria-label="Unsaved changes">
+      <div class="min-w-0">
+        <p class="flex items-center gap-x-2 text-sm font-medium text-gray-800 dark:text-neutral-200">
+          <span class="size-2 rounded-full bg-amber-500" aria-hidden="true"></span>
+          {{ "New policy, not created yet" if form_mode == "create" else "Unsaved changes" }}
+        </p>
+        <p class="mt-0.5 text-xs text-gray-500 dark:text-neutral-400" x-html="summary"></p>
+      </div>
+      <div class="flex items-center gap-x-2 ms-auto">
+        {{ button(text="Discard", variant="ghost", extra_attrs='@click="discard()"') }}
+        {{ button(text="Create policy" if form_mode == "create" else "Save changes", extra_attrs='@click="save()"') }}
+      </div>
+    </div>
+  </div>
+
+  {# Add staff: tick people, then add them together. Shows the policies each person is already in. #}
+  {% call modal(id="add-staff", title="Add staff", confirm_text="", show_cancel=false) %}
+    <div class="space-y-3">
+      {{ input(name="add_q", placeholder="Search staff", icon="search", variant="solid", x_model="add.q", extra_attrs="autofocus") }}
+      <ul class="-mx-2 max-h-80 overflow-y-auto space-y-0.5">
+        <template x-for="s in addOptions" :key="s.id">
+          <li>
+            <button type="button" role="checkbox" :aria-checked="add.ids.includes(s.id)" @click="toggleAdd(s.id)"
+              class="w-full flex items-center gap-x-3 px-2 py-2 rounded-lg text-start hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
+              {{ staff_avatar("s.id", size="size-9") }}
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="s.name"></span>
+                <span class="block text-xs text-gray-500 truncate dark:text-neutral-400">
+                  <span x-text="s.email"></span>
+                </span>
+              </span>
+              <template x-if="otherPolicies(s.id, current.id).length">
+                <span class="shrink-0" @click.stop>{{ other_policies("otherPolicies(s.id, current.id)", other=false) }}</span>
+              </template>
+              <span class="shrink-0 size-5 inline-flex items-center justify-center rounded-full border"
+                    :class="add.ids.includes(s.id) ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 text-transparent dark:border-neutral-600'">
+                <svg class="size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              </span>
+            </button>
+          </li>
+        </template>
+        <li x-show="!addOptions.length" class="py-8 text-center text-sm text-gray-500 dark:text-neutral-400" x-text="add.q.trim() ? 'No staff match “' + add.q.trim() + '”' : 'Everyone is already in this policy'"></li>
+      </ul>
+      <div class="pt-2 flex justify-end gap-x-2">
+        {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}
+        {{ button(text='<span x-text="add.ids.length ? \'Add \' + add.ids.length + \' staff\' : \'Add staff\'"></span>', extra_attrs='@click="submitAddStaff()" :disabled="!add.ids.length"') }}
+      </div>
+    </div>
+  {% endcall %}
+
+  {# Delete: names the staff who lose access, as on the list page. #}
+  {% call modal(id="delete-policy", title="Delete policy?", size="sm", variant="danger", confirm_text="Delete", cancel_text="Cancel") %}
+    <div class="space-y-3">
+      <p class="text-gray-800 dark:text-neutral-200"><span class="font-medium" x-text="current.name"></span> will be deleted.</p>
+      <template x-if="current.staff.length">
+        <div class="space-y-2">
+          <p class="text-gray-600 dark:text-neutral-400" x-text="(current.staff.length === 1 ? 'This person loses' : 'These ' + current.staff.length + ' staff lose') + ' the access it gives on ' + scopeText(current) + ':'"></p>
+          {{ staff_stack("current.staff") }}
+        </div>
+      </template>
+      <p x-show="!current.staff.length" class="text-gray-600 dark:text-neutral-400">No staff are in this policy, so no one loses access.</p>
+    </div>
+  {% endcall %}
+  {% include "./prototype_menu.html" %}
+  {{ toast_provider() }}
+</div>
