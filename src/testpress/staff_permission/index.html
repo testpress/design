@@ -7,48 +7,349 @@ date: 2022-08-24
 permalink: "/staff_permission/"
 ---
 
-{% extends "layouts/admin_base.html" %} {% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %} 
+{% extends "layouts/admin_base.html" %}
 
-{% block extra_head %}
-<script type="text/javascript">
-  function app() {
-    return {
-      showDeleteModal: false,
-      showAssignStaffModal: false,
-      showMultiSelectOptions: false,
-      showSuggestions: false,
-      selectedStaffs: [],
-      toggleSelection(staff_name) {
-        if (this.selectedStaffs.includes(staff_name)) {
-          this.selectedStaffs = this.selectedStaffs.filter(
-            (p) => p !== staff_name
-          );
-        } else {
-          this.selectedStaffs.push(staff_name);
-        }
-      },
-    };
-  }
-</script>
-{% endblock extra_head %} 
+{% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/table.html" import table, table_th, table_td %}
+{% from "../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../ui-system/components/modal.html" import modal %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+{% from "../../ui-system/components/switch.html" import switch %}
+{% from "../../ui-system/components/tooltip.html" import tooltip %}
+{% from "../../ui-system/components/popover.html" import popover %}
+{% from "../../ui-system/components/toast.html" import toast_provider %}
+{% from "../course_access_policies/includes/avatar.html" import staff_avatar, staff_stack, perm_tags %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
 
 {% block content %}
-<div
-  x-data="app()"
-  class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5"
->
-  <div class="py-6 px-2 sm:px-6 lg:py-0 lg:px-0 lg:col-span-3">
-    {% include "partials/admin_course_sidebar.html" %}
-  </div>
-  <div class="lg:px-0 lg:col-span-9 px-4">
-    {% include "partials/course_breadcrumb.html" %}
-    <div>
-      {% include "./header.html" %}
-      {% include "./staff_list_table.html" %}
-    </div>
-  </div>
-  {% include "./delete_modal.html" %}
-  {% include "./assign_staff_modal.html" %}
-</div>
+{# Who can open this course: staff added to this course and staff who get it from a Course Access
+   Policy, in one table of switches. A switch changes this course only. #}
+<div x-data="courseStaff()" @modal-confirmed-remove-access.window="removeSelected()" class="max-w-7xl mx-auto sm:px-6 lg:px-8 py-10 space-y-5">
 
-{% endblock %}
+  <div class="px-4 sm:px-0 space-y-2">
+    {# The course's name is filled in from the data (the macro escapes markup in labels). #}
+    <div x-effect="const item = $el.querySelectorAll('ol li')[1]; if (item) item.querySelector('a, span').textContent = courseTitle(courseId)">
+      {{ breadcrumb({ items: [ { label: "Courses", href: "#" }, { label: "Course", href: "#" }, { label: "Staffs" } ] }) }}
+    </div>
+    {% set header_actions %}
+      {{ button(text="Manage access policies", variant="secondary", href='/testpress/course_access_policies/' | url) }}
+      {{ button(text="Assign Staffs", icon="plus", extra_attrs='@click="openAssign()"') }}
+    {% endset %}
+    {{ page_header(title="People who have access to this course", actions=header_actions) }}
+  </div>
+
+  {# Everyone who can open this course, with a switch per permission.
+     Switching changes this course only, never the policy. A dot marks a switch changed here from
+     what the person's policies give. Each row shows what the person can do, not how they got access.
+     The Staff column stays put while the switches scroll. #}
+  <div x-show="activeRows.length" x-cloak>
+    {# Under the name, one of two: "Assigned directly to the course", or "Access via" the policy (one by
+       name, several as "3 policies" listed on hover). Anyone in a policy shows the policy, even if they
+       were also assigned directly. #}
+    {% set policies_trigger %}
+      <span class="cursor-default underline decoration-dotted underline-offset-2 hover:text-gray-800 dark:hover:text-neutral-200" x-text="r.pols.length + ' policies'"></span>
+    {% endset %}
+    {% set policies_list %}
+      <div class="relative before:absolute before:inset-x-0 before:-top-3 before:h-3 after:absolute after:inset-x-0 after:-bottom-3 after:h-3">
+        <ul class="py-2.5 ps-7 pe-3 space-y-1.5 list-disc marker:text-gray-400 dark:marker:text-neutral-600">
+          <template x-for="pol in r.pols" :key="pol.id">
+            <li class="text-sm"><a :href="detailUrl(pol.id)" class="text-gray-800 hover:underline dark:text-neutral-200" x-text="pol.name"></a></li>
+          </template>
+        </ul>
+      </div>
+    {% endset %}
+    {% set header %}
+      <th scope="col" class="sticky start-0 z-[1] bg-white px-5 py-2.5 text-start text-sm font-normal text-gray-500 dark:bg-neutral-800 dark:text-neutral-400">
+        <div class="flex items-center gap-x-4">
+          <input type="checkbox" aria-label="Select everyone" :checked="removable.length && selected.length === removable.length" x-effect="$el.indeterminate = selected.length > 0 && selected.length < removable.length" :disabled="!removable.length" @change="selected = $event.target.checked ? removable.map((r) => r.sid) : []" class="shrink-0 size-4 bg-transparent border-gray-300 rounded-sm shadow-2xs text-primary-600 focus:ring-0 focus:ring-offset-0 checked:bg-primary-600 checked:border-primary-600 disabled:opacity-40 disabled:cursor-not-allowed dark:border-neutral-600 dark:checked:bg-primary-500 dark:checked:border-primary-500">
+          Staff
+        </div>
+      </th>
+      {% for perm in course_access.perms %}
+        <th scope="col" class="px-3 py-2.5 text-center text-xs font-normal leading-tight text-gray-500 dark:text-neutral-400 min-w-[5.5rem]">{{ perm.short }}</th>
+      {% endfor %}
+      <th scope="col" class="sticky end-0 z-[1] bg-white px-5 py-2.5 dark:bg-neutral-800"><span class="sr-only">Actions</span></th>
+    {% endset %}
+    {# The amber dot on a switch, with the ui-system tooltip saying what it means. #}
+    {% set override_dot %}
+      <span class="block size-2 rounded-full bg-amber-500 ring-2 ring-white dark:ring-neutral-900"></span>
+    {% endset %}
+    {# Toolbar beside the search: Remove access for the people selected. #}
+    {% set dot_key %}
+      <span x-show="selected.length" x-cloak>
+        {{ button(variant="danger", size="sm", text='<span x-text="\'Remove access (\' + selected.length + \')\'"></span>', extra_attrs='@click="$dispatch(\'open-modal-remove-access\')"') }}
+      </span>
+    {% endset %}
+    {% call table(padded=true, search_enabled=true, search_placeholder="Search staff", search_x_model="search", filters=dot_key, table_header=header, table_container_classes="sm:rounded-b-xl") %}
+      <template x-for="r in shownRows" :key="r.sid">
+        <tr class="group" :class="r.removed && 'bg-gray-50 dark:bg-neutral-800/50'">
+          <td class="sticky start-0 z-[1] hover:z-20 focus-within:z-20 bg-white px-5 py-3 dark:bg-neutral-900" :class="r.removed && '!bg-gray-50 dark:!bg-neutral-800'">
+            <div class="flex items-center gap-x-3 min-w-72">
+              <input type="checkbox" :aria-label="'Select ' + person(r.sid).name" :value="r.sid" x-model.number="selected" :disabled="r.removed" class="shrink-0 size-4 bg-transparent border-gray-300 rounded-sm shadow-2xs text-primary-600 focus:ring-0 focus:ring-offset-0 checked:bg-primary-600 checked:border-primary-600 disabled:opacity-40 disabled:cursor-not-allowed dark:border-neutral-600 dark:checked:bg-primary-500 dark:checked:border-primary-500">
+              <span class="contents" :class="r.removed && '[&>img]:opacity-50 [&>img]:grayscale'">{{ staff_avatar("r.sid", size="size-9") }}</span>
+              <div class="flex flex-col min-w-0" :class="r.removed && 'opacity-60'">
+                <span class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="person(r.sid).name"></span>
+                <span class="mt-0.5 flex items-center gap-x-1 text-xs text-gray-500 whitespace-nowrap dark:text-neutral-400">
+                  <span x-show="r.removed">Removed from this course</span>
+                  <span x-show="!r.removed && !r.pols.length">Assigned directly to the course</span>
+                  <span x-show="!r.removed && r.pols.length">Access via</span>
+                  <template x-if="!r.removed && r.pols.length === 1">
+                    <a :href="detailUrl(r.pols[0].id)" class="truncate max-w-48 hover:text-primary-600 hover:underline dark:hover:text-primary-500" :title="r.pols[0].name + ' policy'" x-text="r.pols[0].name + ' policy'"></a>
+                  </template>
+                  <template x-if="!r.removed && r.pols.length > 1">
+                    {{ popover(trigger=policies_trigger, content=policies_list, trigger_type="hover", placement="bottom", width="w-56") }}
+                  </template>
+                </span>
+              </div>
+            </div>
+          </td>
+          {% for perm in course_access.perms %}
+            <td class="px-3 py-3 text-center">
+              <div class="relative inline-flex">
+                <span class="inline-flex" :class="r.removed && 'opacity-40 pointer-events-none'">{{ switch(size="sm", name="perm_" ~ perm.key, extra_attrs=':disabled="r.removed" :checked="isOn(r.sid, \'' ~ perm.key ~ '\')" @change="setPerm(r.sid, \'' ~ perm.key ~ '\', $event.target.checked)" :aria-label="person(r.sid).name + \' – ' ~ perm.label ~ '\'"') }}</span>
+                <template x-if="changedHere(r.sid, '{{ perm.key }}')">
+                  <span class="absolute -top-1 -end-1 z-[1] flex">{{ tooltip(trigger=override_dot, content="Overrides the policy on this course", placement="top", width="w-max") }}</span>
+                </template>
+              </div>
+            </td>
+          {% endfor %}
+          <td class="sticky end-0 z-[1] hover:z-20 focus-within:z-20 bg-white px-5 py-3 text-end dark:bg-neutral-900" :class="r.removed && '!bg-gray-50 dark:!bg-neutral-800'">
+            {% call dropdown(trigger="⋮", placement="bottom-end", width="large") %}
+              <button type="button" x-show="!r.removed && r.changed" @click="restore(r.sid); open = false" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-start text-gray-800 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+                <svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                Reset to policy access
+              </button>
+              <button type="button" x-show="!r.removed" @click="selected = [r.sid]; $dispatch('open-modal-remove-access'); open = false" class="w-full flex items-center gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-start text-red-500 hover:bg-red-600/10 focus:outline-none focus:bg-red-600/10">
+                <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                Remove access
+              </button>
+            {% endcall %}
+          </td>
+        </tr>
+      </template>
+      <tr x-show="!shownRows.length">
+        <td colspan="{{ course_access.perms | length + 2 }}" class="py-10 text-center text-sm text-gray-500 dark:text-neutral-400">No staff match “<span x-text="search.trim()"></span>”</td>
+      </tr>
+    {% endcall %}
+  </div>
+
+  {# People in a policy who were removed from this course, collapsed under the table with Restore. #}
+  <div x-show="removedRows.length" x-cloak x-data="{ showRemoved: false }" class="px-4 sm:px-0">
+    <button type="button" @click="showRemoved = !showRemoved" :aria-expanded="showRemoved" class="inline-flex items-center gap-x-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 focus:outline-none focus-visible:underline dark:text-neutral-400 dark:hover:text-neutral-200">
+      <svg class="shrink-0 size-4 transition-transform" :class="showRemoved && 'rotate-90'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+      <span x-text="'Removed from this course (' + removedRows.length + ')'"></span>
+    </button>
+    <ul x-show="showRemoved" x-cloak class="mt-3 bg-white border border-gray-200 rounded-xl divide-y divide-gray-200 dark:bg-neutral-800 dark:border-neutral-700 dark:divide-neutral-700">
+      <template x-for="r in removedRows" :key="r.sid">
+        <li class="flex items-center gap-x-3 px-5 py-3">
+          {{ staff_avatar("r.sid", size="size-9") }}
+          <div class="min-w-0 grow">
+            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="person(r.sid).name"></p>
+            <p class="text-xs text-gray-500 truncate dark:text-neutral-400" x-text="'In ' + r.policies.join(', ') + '. Blocked on this course only.'"></p>
+          </div>
+          {{ button(text="Restore access", variant="secondary", size="sm", extra_attrs='@click="restore(r.sid)"') }}
+        </li>
+      </template>
+    </ul>
+  </div>
+
+  <div x-show="!activeRows.length && !removedRows.length" x-cloak class="px-4 sm:px-0">
+    {{ empty_state(
+      title="No one has access to this course yet",
+      description="Assign staff to this course, or add it to a course access policy.",
+      icon="users",
+      primary_action_text="Assign Staffs",
+      primary_action_icon="plus",
+      primary_action_attrs='@click="openAssign()"'
+    ) }}
+  </div>
+
+  {% include "./includes/assign_modal.html" %}
+
+
+  {# Remove access, for one person (⋮) or everyone selected. Staff assigned directly leave the list; staff
+     in a policy stay, greyed out, until their access is restored. #}
+  {% call modal(id="remove-access", title="Remove access?", size="sm", variant="danger", confirm_text="Remove", cancel_text="Cancel") %}
+    <p class="text-gray-800 dark:text-neutral-200" x-text="selected.length === 1 ? person(selected[0]).name + ' will lose access to this course.' : selected.length + ' staff will lose access to this course.'"></p>
+    <p x-show="selected.some((sid) => policiesFor(sid, courseId).length)" class="mt-2 text-gray-600 dark:text-neutral-400">Staff in a policy stay in it and keep their other courses. You can restore their access under "Removed from this course".</p>
+  {% endcall %}
+
+  {% set proto_page = "assign" %}
+  {% include "../course_access_policies/includes/prototype_menu.html" %}
+  {{ toast_provider() }}
+</div>
+{% endblock content %}
+
+{% block script %}
+  {% include "../course_access_policies/includes/store_script.html" %}
+  <script>
+    function courseStaff() {
+      return accessMixin(accessBase(), {
+        courseId: 8,
+        assign: { ids: [], q: "", perms: [] },
+        search: "",
+        selected: [],
+
+        init() {
+          const params = this.loadData();
+          if (params.get("course")) this.courseId = Number(params.get("course"));
+          this.applyState(this.state);
+        },
+
+        later(fn) {
+          this.$nextTick(() => setTimeout(fn, 50));
+        },
+
+        // People assigned on this course; "view_contents" in their list means they're assigned here.
+        get assigned() {
+          const forCourse = this.direct[this.courseId] || {};
+          return Object.keys(forCourse).map(Number)
+            .filter((sid) => forCourse[sid].allow.includes("view_contents"))
+            .sort((a, b) => this.person(a).name.localeCompare(this.person(b).name));
+        },
+        assignedPerms(sid) {
+          const allow = ((this.direct[this.courseId] || {})[sid] || { allow: [] }).allow;
+          return PERMS.map((p) => p.key).filter((k) => allow.includes(k));
+        },
+        get coursePolicies() {
+          return this.policies.filter((p) => this.covers(p, this.courseId));
+        },
+        // Permissions a person gets on this course from policies.
+        policyPerms(sid) {
+          const pols = this.policiesFor(sid, this.courseId);
+          return PERMS.map((p) => p.key).filter((k) => pols.some((pol) => pol.perms.includes(k)));
+        },
+        // One row per person: added to this course, in a policy that covers it, or both.
+        get rows() {
+          const ids = new Set(this.assigned);
+          this.coursePolicies.forEach((p) => p.staff.forEach((sid) => ids.add(sid)));
+          return [...ids].map((sid) => {
+            const pols = this.policiesFor(sid, this.courseId).map((p) => ({ id: p.id, name: p.name }));
+            const policies = pols.map((p) => p.name);
+            const assigned = this.assigned.includes(sid);
+            const removed = this.isRemoved(sid);
+            return { sid, assigned, removed, pols, policies, changed: !removed && PERMS.some((p) => this.changedHere(sid, p.key)) };
+          }).sort((a, b) => this.person(a.sid).name.localeCompare(this.person(b.sid).name));
+        },
+        // People with access, for the table; people blocked here go in the section below it.
+        get activeRows() { return this.rows.filter((r) => !r.removed); },
+        get removedRows() { return this.rows.filter((r) => r.removed); },
+        get shownRows() {
+          const q = this.search.trim().toLowerCase();
+          return this.activeRows.filter((r) => !q || (this.person(r.sid).name + " " + this.person(r.sid).email).toLowerCase().includes(q));
+        },
+        // Removed from this course: View is blocked here, so nothing else applies.
+        isRemoved(sid) {
+          const e = this.entry(sid, this.courseId);
+          return !!e && e.deny.includes("view_contents");
+        },
+        isOn(sid, key) {
+          if (this.isRemoved(sid)) return false;
+          return this.result(sid, this.courseId, key) === "allowed";
+        },
+        // A policy member switched differently from what their policies give.
+        changedHere(sid, key) {
+          if (!this.policiesFor(sid, this.courseId).length || this.isRemoved(sid)) return false;
+          const e = this.entry(sid, this.courseId);
+          const policyOn = this.policyGrants(sid, this.courseId, key).length > 0;
+          return !!e && ((e.deny.includes(key) && policyOn) || (e.allow.includes(key) && !policyOn));
+        },
+        // Stores the switch for this course only: on/off from a policy is the default; anything else
+        // is an Allow or Deny on this course.
+        setPerm(sid, key, on) {
+          const cid = this.courseId;
+          const e = { allow: [], deny: [], ...(this.entry(sid, cid) || {}) };
+          let allow = e.allow.filter((k) => k !== key);
+          let deny = e.deny.filter((k) => k !== key);
+          const policyOn = this.policyGrants(sid, cid, key).length > 0;
+          if (on && !policyOn) allow.push(key);
+          if (!on && policyOn) deny.push(key);
+          if (this.assigned.includes(sid) && !allow.includes("view_contents")) allow.unshift("view_contents");
+          const forCourse = { ...(this.direct[cid] || {}) };
+          if (!allow.length && !deny.length) delete forCourse[sid];
+          else forCourse[sid] = { allow, deny };
+          this.direct = { ...this.direct, [cid]: forCourse };
+          this.persist();
+          this.toast("Access updated");
+        },
+        clearSearch() {},
+        // Back to exactly what their policies give on this course.
+        restore(sid) {
+          const forCourse = { ...(this.direct[this.courseId] || {}) };
+          delete forCourse[sid];
+          this.direct = { ...this.direct, [this.courseId]: forCourse };
+          this.persist();
+          this.toast("Policy access restored");
+        },
+        // Everyone who still has access can be removed.
+        get removable() {
+          return this.activeRows;
+        },
+        // Assigned directly: taken off the course. In a policy: blocked on this course only.
+        removeSelected() {
+          const count = this.selected.length;
+          const forCourse = { ...(this.direct[this.courseId] || {}) };
+          this.selected.forEach((sid) => {
+            if (this.policiesFor(sid, this.courseId).length) forCourse[sid] = { allow: [], deny: ["view_contents"] };
+            else delete forCourse[sid];
+          });
+          this.direct = { ...this.direct, [this.courseId]: forCourse };
+          this.selected = [];
+          this.persist();
+          this.toast(count === 1 ? "Access removed" : "Access removed for " + count + " staff");
+        },
+        setAssigned(sid, perms) {
+          const forCourse = { ...(this.direct[this.courseId] || {}) };
+          if (perms === null) delete forCourse[sid];
+          else forCourse[sid] = { allow: ["view_contents", ...perms], deny: [] };
+          this.direct = { ...this.direct, [this.courseId]: forCourse };
+          this.persist();
+        },
+        bothBcr(perms) {
+          return perms.includes("submit_bcr") && perms.includes("approve_bcr");
+        },
+
+        /* Assign Staffs */
+        openAssign() {
+          this.assign = { ids: [], q: "", perms: [] };
+          this.$dispatch("open-modal-assign-staff");
+        },
+        get assignOptions() {
+          const q = this.assign.q.trim().toLowerCase();
+          return STAFF.filter((s) => !this.assigned.includes(s.id) && (s.name + " " + s.email).toLowerCase().includes(q));
+        },
+        toggleAssign(id) {
+          this.assign.ids = this.assign.ids.includes(id) ? this.assign.ids.filter((x) => x !== id) : [...this.assign.ids, id];
+        },
+        submitAssign() {
+          if (!this.assign.ids.length || this.bothBcr(this.assign.perms)) return;
+          const perms = PERMS.map((p) => p.key).filter((k) => this.assign.perms.includes(k));
+          const count = this.assign.ids.length;
+          this.assign.ids.forEach((sid) => this.setAssigned(sid, perms));
+          this.$dispatch("close-modal-assign-staff");
+          this.toast(count === 1 ? "Staff assigned" : count + " staff assigned");
+        },
+
+
+        /* Prototype states */
+        applyState(key) {
+          switch (key) {
+            case "assign-nopolicies": this.policies = []; break;
+            case "assign-empty":
+              // A course no policy covers and no one is assigned to.
+              this.courseId = 12;
+              this.policies = this.policies.filter((p) => !this.covers(p, 12));
+              this.direct = { ...this.direct, 12: {} };
+              break;
+            case "assign-modal": this.later(() => { this.openAssign(); this.assign.ids = [4]; this.assign.perms = ["edit_contents"]; }); break;
+            case "assign-selected": this.selected = [15, 6]; break;
+            case "assign-changed": this.direct[8][1] = { allow: [], deny: ["delete_course"] }; this.direct[8][2] = { allow: ["edit_pricing"], deny: [] }; break;
+          }
+        },
+      });
+    }
+  </script>
+{% endblock script %}

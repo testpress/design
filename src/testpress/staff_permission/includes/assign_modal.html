@@ -1,0 +1,49 @@
+{# Assign Staffs: tick people, tick what they can do, assign. Same picker as Add staff on a policy. #}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/checkbox.html" import checkbox %}
+{% from "../../course_access_policies/includes/avatar.html" import staff_avatar %}
+
+{% call modal(id="assign-staff", title="Assign Staffs", size="lg", confirm_text="", show_cancel=false) %}
+  <div class="space-y-5">
+    <div class="space-y-3">
+      <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">Staff</p>
+      {{ input(name="assign_q", placeholder="Search staff", icon="search", x_model="assign.q", padding_class="py-2", extra_attrs="autofocus") }}
+      <ul class="-mx-2 max-h-64 overflow-y-auto space-y-0.5">
+        <template x-for="s in assignOptions" :key="s.id">
+          <li>
+            <button type="button" role="checkbox" :aria-checked="assign.ids.includes(s.id)" @click="toggleAssign(s.id)"
+              class="w-full flex items-center gap-x-3 px-2 py-2 rounded-lg text-start hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
+              {{ staff_avatar("s.id", size="size-9") }}
+              <span class="min-w-0 flex-1">
+                <span class="block text-sm font-medium text-gray-800 truncate dark:text-neutral-200" x-text="s.name"></span>
+                <span class="block text-xs text-gray-500 truncate dark:text-neutral-400" x-text="s.email"></span>
+              </span>
+              <span class="shrink-0 size-5 inline-flex items-center justify-center rounded-full border"
+                    :class="assign.ids.includes(s.id) ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 text-transparent dark:border-neutral-600'">
+                <svg class="size-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+              </span>
+            </button>
+          </li>
+        </template>
+        <li x-show="!assignOptions.length" class="py-6 text-center text-sm text-gray-500 dark:text-neutral-400" x-text="assign.q.trim() ? 'No staff match “' + assign.q.trim() + '”' : 'Everyone is already assigned'"></li>
+      </ul>
+    </div>
+
+    <div class="space-y-3">
+      <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">Can do on this course</p>
+      <div class="grid sm:grid-cols-2 gap-x-6 gap-y-2.5">
+        {% for perm in course_access.perms %}
+          {{ checkbox(name="assign_perms", id="assign_" ~ perm.key, value=perm.key, label=perm.label, x_model="assign.perms") }}
+        {% endfor %}
+      </div>
+      <p x-show="assign.perms.includes('submit_bcr') && assign.perms.includes('approve_bcr')" x-cloak class="text-xs text-red-600 dark:text-red-500">The same person can't both submit and approve batch change requests. Choose one.</p>
+    </div>
+
+    <div class="pt-2 flex justify-end gap-x-2">
+      {{ button(text="Cancel", variant="secondary", extra_attrs='@click="open = false"') }}
+      {{ button(text='<span x-text="assign.ids.length ? \'Assign \' + assign.ids.length + \' staff\' : \'Assign\'"></span>', extra_attrs='@click="submitAssign()" :disabled="!assign.ids.length"') }}
+    </div>
+  </div>
+{% endcall %}
