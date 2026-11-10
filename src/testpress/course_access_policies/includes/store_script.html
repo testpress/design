@@ -1,0 +1,146 @@
+{# Data and helpers for the Course Access Policies pages.
+   Data comes from src/_data/course_access.json. Changes are kept in sessionStorage so they carry
+   between the pages; "?state=<key>" starts again from the sample data and shows that state. #}
+<script>
+  const ACCESS_SEED = {{ course_access | dump | safe }};
+  const ACCESS_KEY = "tp-course-access-v2";
+  const PERMS = ACCESS_SEED.perms;
+  const COURSE_PERMS = [ACCESS_SEED.view_perm, ...PERMS];
+  const PERM_BY_KEY = Object.fromEntries(COURSE_PERMS.map((p) => [p.key, p]));
+  const COURSES = ACCESS_SEED.courses;
+  const STAFF = ACCESS_SEED.staff;
+
+  const accessStore = {
+    seed() {
+      return JSON.parse(JSON.stringify({ policies: ACCESS_SEED.policies, direct: ACCESS_SEED.direct }));
+    },
+    load() {
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(ACCESS_KEY));
+        if (saved && saved.policies) return saved;
+      } catch (e) {}
+      return this.seed();
+    },
+    save(data) {
+      try { sessionStorage.setItem(ACCESS_KEY, JSON.stringify(data)); } catch (e) {}
+    },
+    reset() {
+      try { sessionStorage.removeItem(ACCESS_KEY); } catch (e) {}
+    },
+    // A message for the next page to show as a toast.
+    setFlash(message) {
+      try { sessionStorage.setItem(ACCESS_KEY + "-flash", message); } catch (e) {}
+    },
+    takeFlash() {
+      try {
+        const message = sessionStorage.getItem(ACCESS_KEY + "-flash");
+        sessionStorage.removeItem(ACCESS_KEY + "-flash");
+        return message;
+      } catch (e) { return null; }
+    },
+  };
+
+  // Joins objects and keeps their getters (a spread would read them once).
+  function accessMixin(...parts) {
+    const out = {};
+    parts.forEach((part) => Object.defineProperties(out, Object.getOwnPropertyDescriptors(part)));
+    return out;
+  }
+
+  // State and helpers every page uses.
+  function accessBase() {
+    return {
+      policies: [],
+      direct: {},
+      canManage: true,
+      state: "",
+      confirmBox: { message: "", action: null },
+
+      loadData(confirmKinds) {
+        const params = new URLSearchParams(window.location.search);
+        this.state = params.get("state") || "";
+        if (this.state) accessStore.reset();
+        const data = accessStore.load();
+        this.policies = data.policies;
+        this.direct = data.direct;
+        (confirmKinds || []).forEach((kind) =>
+          window.addEventListener("modal-confirmed-confirm-" + kind, () => this.runConfirm())
+        );
+        const message = accessStore.takeFlash();
+        if (message) this.$nextTick(() => this.toast(message));
+        this.refreshIcons();
+        return params;
+      },
+      persist() {
+        accessStore.save({ policies: this.policies, direct: this.direct });
+        this.refreshIcons();
+      },
+      refreshIcons() {
+        this.$nextTick(() => window.lucide && window.lucide.createIcons());
+      },
+      toast(message) {
+        this.$dispatch("toast", { title: message, variant: "success" });
+      },
+      resetDemo() {
+        accessStore.reset();
+        window.location = window.location.pathname;
+      },
+      // Used by the search inputs' clear button.
+      clearSearch() {},
+
+      /* Confirm pop-ups: one modal per kind (static title and button), the message is set here. */
+      askConfirm(kind, message, action) {
+        this.confirmBox = { message, action };
+        this.$dispatch("open-modal-confirm-" + kind);
+      },
+      runConfirm() {
+        const action = this.confirmBox.action;
+        this.confirmBox.action = null;
+        if (action) action();
+      },
+
+      /* Lookups and wording */
+      esc(text) {
+        return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+      },
+      person(id) { return STAFF.find((s) => s.id === id) || {}; },
+      // Other policies a person is in (a person can be in several; their access adds up).
+      otherPolicies(sid, exceptId) { return this.policies.filter((p) => p.id !== exceptId && p.staff.includes(sid)); },
+      initials(id) { return (this.person(id).name || "").replace(/^(Ms\.|Mr\.|Prof\.)\s*/, "").slice(0, 2).toUpperCase(); },
+      courseTitle(id) { return (COURSES.find((c) => c.id === id) || {}).title || ""; },
+      permShort(key) { return PERM_BY_KEY[key].short; },
+      permSummary(keys) {
+        if (!keys.length) return "View only";
+        const names = keys.map((k) => PERM_BY_KEY[k].short);
+        return names.slice(0, 2).join(", ") + (names.length > 2 ? ` +${names.length - 2}` : "");
+      },
+      permSummaryFull(keys) { return keys.length ? keys.map((k) => PERM_BY_KEY[k].short).join(", ") : "View course"; },
+      scopeText(p) {
+        return p.scope === "all" ? "all courses, including new ones" : `${p.courses.length} selected course${p.courses.length === 1 ? "" : "s"}`;
+      },
+      staffCount(n) { return `${n} staff`; },
+      names(ids) {
+        const n = ids.map((i) => this.person(i).name);
+        return n.length <= 2 ? n.join(" and ") : n.slice(0, -1).join(", ") + " and " + n.at(-1);
+      },
+      today() { return "Oct 29, 2026"; },
+      touch(p) { p.modified = this.today(); p.by = "You"; },
+      // The policy page is not built yet, so its links go nowhere for now.
+      detailUrl(id) { return "#"; },
+
+      /* What a person can do on a course: course-level Deny, then Allow, then their policies. */
+      covers(p, cid) { return p.scope === "all" || p.courses.includes(cid); },
+      policiesFor(sid, cid) { return this.policies.filter((p) => p.staff.includes(sid) && this.covers(p, cid)); },
+      policyGrants(sid, cid, key) {
+        return this.policiesFor(sid, cid).filter((p) => key === "view_contents" || p.perms.includes(key)).map((p) => p.name);
+      },
+      entry(sid, cid) { return (this.direct[cid] || {})[sid]; },
+      result(sid, cid, key, e) {
+        e = e === undefined ? this.entry(sid, cid) : e;
+        if (e && e.deny.includes(key)) return "denied";
+        if (e && e.allow.includes(key)) return "allowed";
+        return this.policyGrants(sid, cid, key).length ? "allowed" : "none";
+      },
+    };
+  }
+</script>
