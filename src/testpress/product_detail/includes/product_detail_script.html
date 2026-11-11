@@ -28,7 +28,7 @@
       {
         id: 1,
         name: "Standard Access",
-        description: "Foundation to advanced lectures with weekly tests.",
+        description: "For learners who want to test themselves every week.",
         courses: ["Prelims GS", "CSAT", "Test series"],
         benefits: [1, 2, 3],
         details: [
@@ -39,7 +39,7 @@
       {
         id: 2,
         name: "Premium Elite",
-        description: "Everything in Standard, plus a personal mentor, a weekly 1:1 call, priority support on WhatsApp and a study plan reviewed every month.",
+        description: "For serious aspirants who want a mentor to guide their preparation from the first day to the final attempt. Your mentor reviews your study plan every month, checks your answer writing and helps you decide what to revise before Prelims and Mains.",
         courses: ["Prelims GS", "CSAT", "Test series", "Mains GS", "Current affairs"],
         benefits: [1, 2, 3, 4, 5, 6, 7, 8],
         details: [
@@ -74,13 +74,14 @@
       // One duration for the whole page, picked in the dropdown at the right of the plans header.
       // Durations are set per plan, so a plan may not offer the chosen one.
       duration: PLANS[0].details[0].duration,
-      // Plan shown in the comparison on small screens.
-      activePlan: 0,
       // One selection across all plans. The first plan is preselected so the
       // purchase card always has a price and a Buy button.
       selectedPlan: PLANS[0],
-      // Plan ids whose description is cut off at 2 lines.
-      truncated: {},
+      // Per plan id: the description cut to fit 2 lines ("" when it fits), and whether the student expanded it.
+      shortText: {},
+      expanded: {},
+      // Plan shown in the plan details drawer.
+      detailPlan: null,
 
       init() {
         this.$watch("hasPlans", () => (this.selectedPlan = this.plans[0]));
@@ -180,8 +181,51 @@
         return "₹" + Number(amount).toLocaleString("en-IN");
       },
 
+      // el is a hidden copy of the description at the card's width. If the full text needs more than
+      // 2 lines (20px each), keep the most whole words that fit on 2 lines followed by "… More".
       measureDescription(el, plan) {
-        this.truncated[plan.id] = el.scrollHeight > el.clientHeight + 1;
+        const fits = (text) => { el.textContent = text; return el.offsetHeight <= 41; };
+        if (fits(plan.description)) { this.shortText[plan.id] = ""; return; }
+        const words = plan.description.split(/\s+/);
+        let lo = 1, hi = words.length - 1;
+        while (lo < hi) {
+          const mid = Math.ceil((lo + hi) / 2);
+          // "More" is bold in the card, so measure a little wider than the text itself.
+          if (fits(words.slice(0, mid).join(" ") + "… More ·")) lo = mid; else hi = mid - 1;
+        }
+        this.shortText[plan.id] = words.slice(0, lo).join(" ").replace(/[,;:.\-–]+$/, "");
+      },
+
+      // More on a plan card: drawer when cards sit side by side (sm and up, more than one plan),
+      // expand in place when they are stacked.
+      showMore(plan) {
+        const sideBySide = this.plans.length > 1 && window.matchMedia("(min-width: 640px)").matches;
+        if (sideBySide && !this.expanded[plan.id]) {
+          this.detailPlan = plan;
+          this.$dispatch("open-drawer-plan-details");
+          this.$nextTick(() => window.lucide && window.lucide.createIcons());
+        } else {
+          this.expanded[plan.id] = !this.expanded[plan.id];
+        }
+      },
+
+      // The plan before this one in the list; the card shows what this plan adds over it.
+      previousPlan(plan) {
+        const i = this.plans.findIndex((p) => p.id === plan.id);
+        return i > 0 ? this.plans[i - 1] : null;
+      },
+
+      planLead(plan) {
+        const prev = this.previousPlan(plan);
+        return prev ? "Everything in " + prev.name + ", plus" : "Includes";
+      },
+
+      // Courses first, then benefits. For every plan after the first, only what the previous plan lacks.
+      planHighlights(plan) {
+        const prev = this.previousPlan(plan);
+        const courses = plan.courses.filter((c) => !prev || !prev.courses.includes(c));
+        const benefits = this.benefits.filter((b) => this.includes(plan, b) && (!prev || !this.includes(prev, b)));
+        return [...courses, ...benefits.map((b) => b.name)];
       },
 
       percentOff(price, strike) {
@@ -191,7 +235,6 @@
       selectPlan(plan) {
         if (!this.detailFor(plan)) return;
         this.selectedPlan = plan;
-        this.activePlan = plan.id;
       },
     };
   }
