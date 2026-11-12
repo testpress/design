@@ -8,10 +8,50 @@ tags: limeread
 {% block main_content %}p-5 space-y-5 max-w-340 mx-auto {% endblock %}
 
 {% block content %}
-{% include "./includes/detail_header.html" %}
+<div x-show="$store.proto.state === 'hosted'">
+  {% include "./includes/detail_header.html" %}
+</div>
+<div x-show="$store.proto.state !== 'hosted'" x-cloak x-data="pearsonDetail">
+  {% include "./includes/pearson_detail_header.html" %}
+</div>
+
+{# Pearson books keep the same borrow tabs: the PRD says not to create or skip a borrow until Pearson confirms the rules. #}
 {% include "./includes/detail_content.html" %}
+
+{% set prototypeGroups = [
+  { "name": "Uploaded ebook", "states": [["hosted", "Published"]] },
+  { "name": "Pearson eLibrary book", "states": [["pearson", "Published"], ["pearson_draft", "Draft"], ["pearson_preview_failed", "Preview can't open"]] }
+] %}
+{% include "../includes/prototype_states.html" %}
 {% endblock content %}
 
 {% block extra_scripts %}
-
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('pearsonDetail', () => ({
+      // idle | opening | opened | failed
+      preview: 'idle',
+      book: {
+        title: 'Campbell Biology',
+        author: 'Lisa A. Urry, Michael L. Cain',
+        edition: '12th Edition',
+      },
+      get status() { return this.$store.proto.state === 'pearson_draft' ? 'draft' : 'published'; },
+      get previewFails() { return this.$store.proto.state === 'pearson_preview_failed'; },
+      init() {
+        this.$watch('$store.proto.state', () => { this.preview = 'idle'; });
+      },
+      startPreview() {
+        this.preview = 'opening';
+        // Open the tab inside the click so the browser doesn't block it.
+        const tab = this.previewFails ? null : window.open(window.previewPath + '/limeread/pearson_preview/', '_blank');
+        setTimeout(() => {
+          this.preview = this.previewFails ? 'failed' : 'opened';
+          if (tab) tab.focus();
+          this.$nextTick(() => lucide.createIcons());
+        }, 900);
+      },
+    }));
+  });
+</script>
 {% endblock %}
