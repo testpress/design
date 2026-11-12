@@ -6,12 +6,53 @@ tags: limeread
 ---
 
 {% extends "../layouts/member_base.html" %}
+{% from "../../ui-system/components/toast.html" import toast_provider %}
 {% block body_class %}bg-background text-foreground transition-colors duration-300 antialiased{% endblock %}
 {% block main_content %} max-w-[85rem]  space-y-16 mx-auto p-4 sm:p-6 lg:p-8 {% endblock %}
-{% block content %} 
-<div x-data="{ status: new URLSearchParams(window.location.search).get('status') || 'available' }" class="space-y-16">
+{% block content %}
+<div x-data="{ get status() { return $store.proto.state } }" class="space-y-16">
   {% include "./ebook_meta.html" %}
-  {% include "./table_of_content.html" %}
+  {% include "./pearson_meta.html" %}
+  {# Pearson gives no file, so there is no table of contents to show #}
+  <div x-show="!status.startsWith('pearson')">
+    {% include "./table_of_content.html" %}
+  </div>
   {% include "./related_books.html" %}
 </div>
+
+{% set prototypeParam = "status" %}
+{% set prototypeGroups = [
+  { "name": "Uploaded ebook", "states": [["available", "Available"], ["borrowed", "Borrowed"], ["waitlisted", "Waitlisted"], ["restricted", "Restricted"], ["unavailable", "Unavailable"]] },
+  { "name": "Pearson eLibrary book", "states": [["pearson_available", "Available"], ["pearson_borrowed", "Borrowed"], ["pearson_open_failed", "Borrowed, can't open"]] }
+] %}
+{% include "../includes/prototype_states.html" %}
+{{ toast_provider() }}
 {% endblock content %}
+
+{% block extra_scripts %}
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('pearsonRead', () => ({
+      opening: false,
+      read() {
+        const fails = this.$store.proto.state === 'pearson_open_failed';
+        this.opening = true;
+        // Open the tab inside the click so the browser doesn't block it.
+        const tab = fails ? null : window.open(window.previewPath + '/limeread/pearson_preview/', '_blank');
+        setTimeout(() => {
+          this.opening = false;
+          if (tab) tab.focus();
+          if (fails) {
+            window.dispatchEvent(new CustomEvent('toast', { detail: {
+              position: 'top-right', variant: 'error', autoDismiss: false,
+              title: "Couldn't open the book",
+              description: 'Try again. If it keeps happening, tell your library.',
+              actionLabel: 'Try again', actionHandler: () => this.read(),
+            } }));
+          }
+        }, 900);
+      },
+    }));
+  });
+</script>
+{% endblock %}
