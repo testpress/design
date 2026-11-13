@@ -1,14 +1,17 @@
 <script>
   // One business delivery: ?id=<webhook>&delivery=<delivery id>, from the shared data (as Review Cases reads ?case=).
+  // Also used for test deliveries: the test detail page sets window.DL_TEST = true (PR 19).
   function deliveryPage() {
+    const TEST = !!window.DL_TEST;
     const q = new URLSearchParams(location.search);
     const all = WH.load();
     const w = all.find(x => x.id === q.get('id')) || null;
-    const d = w ? WH.findDelivery(w, q.get('delivery')) : null;
+    const d = w ? (TEST ? WH.findTest(w, q.get('delivery')) : WH.findDelivery(w, q.get('delivery'))) : null;
     const body = w && d ? WH.payload(w, d) : '';
     const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return {
       view: d ? 'data' : 'missing',
+      isTest: TEST,
       w: w || { name: 'Webhook', url: '' },
       d: d || { id: '', event: '', attempts: 0 },
       body,
@@ -18,7 +21,10 @@
       copied: '',
 
       protoState: d ? d.state : 'missing',
-      protoGroups: [
+      protoGroups: TEST ? [
+        { name: 'Test delivery', states: [['t_ok', 'Delivered'], ['t_retry', 'Retrying'], ['t_failed', 'Failed after 4 attempts']] },
+        { name: 'Page', states: [['loading', 'Loading'], ['missing', 'Removed or not found']] },
+      ] : [
         { name: 'Delivered', states: [['ok', 'Delivered on attempt 1'], ['ok2', 'Delivered on attempt 2']] },
         { name: 'Not delivered', states: [['f500', 'Failed: server error'], ['fconn', "Failed: couldn't connect"], ['f410', 'Rejected (4xx, no retry)'],
                                           ['f301', 'Failed: redirect'], ['retry', 'Retry scheduled'], ['cancelled', 'Cancelled']] },
@@ -29,6 +35,12 @@
       pickState(s) {
         this.protoState = s;
         if (s === 'loading' || s === 'missing') { this.view = s; return; }
+        if (TEST) {
+          const tp = { t_ok: ['wh_01', x => x.state === 'succeeded'], t_retry: ['wh_02', x => x.state === 'retry'], t_failed: ['wh_02', x => x.state === 'failed'] }[s];
+          const hook = WH.seed().find(x => x.id === tp[0]), hit = WH.tests(hook).find(tp[1]);
+          if (hit) location.href = `/tpsentinel/webhooks/test/detail/?id=${hook.id}&delivery=${hit.id}`;
+          return;
+        }
         const pick = {
           ok: ['wh_01', x => x.state === 'succeeded' && x.attempts === 1], ok2: ['wh_01', x => x.state === 'succeeded' && x.attempts === 2],
           f500: ['wh_02', x => x.state === 'failed' && x.status === 500], fconn: ['wh_02', x => x.state === 'failed' && !x.status],
@@ -40,7 +52,7 @@
         if (hit) location.href = `/tpsentinel/webhooks/deliveries/detail/?id=${hook.id}&delivery=${hit.id}`;
       },
 
-      listHref() { return w ? `/tpsentinel/webhooks/deliveries/?id=${w.id}` : '/tpsentinel/webhooks/'; },
+      listHref() { return w ? `/tpsentinel/webhooks/${TEST ? 'test' : 'deliveries'}/?id=${w.id}` : '/tpsentinel/webhooks/'; },
       detailHref() { return w ? `/tpsentinel/webhooks/detail/?id=${w.id}` : '/tpsentinel/webhooks/'; },
       copy(key, text) { try { navigator.clipboard.writeText(text); } catch (_) {} this.copied = key; setTimeout(() => { if (this.copied === key) this.copied = ''; }, 1500); },
 
@@ -48,6 +60,8 @@
       status() {
         const d = this.d, ft = WH.failureType(d), at = this.ago(d.lastAttemptAt || d.at);
         const openHook = { label: 'Open webhook', href: this.detailHref() };
+        if (TEST && d.state === 'succeeded') return { title: 'Delivered',
+          text: `Your endpoint replied ${d.status} ${at}. It's receiving and accepting requests.` };
         if (d.state === 'succeeded') return { title: 'Delivered',
           text: d.attempts > 1 ? `Your endpoint replied ${d.status} on attempt ${d.attempts}, ${at}, after the earlier attempt failed.` : `Your endpoint replied ${d.status} ${at}.` };
         if (d.state === 'pending') return { title: 'Waiting to send', text: "It's queued and goes out in a moment." };
