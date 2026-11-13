@@ -724,7 +724,7 @@
   
 
   
-    <a href="#" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:bg-layer-focus"   >
+    <a href="#" class="inline-flex items-center justify-center gap-x-1.5 font-medium rounded-lg disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden transition-colors py-2 px-3 text-sm bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:bg-layer-focus"   :href="`/tpsentinel/webhooks/edit/?id=${w.id}`">
   
 
     
@@ -1114,7 +1114,7 @@
 <section class="p-5 bg-card border border-card-line shadow-2xs rounded-xl" aria-labelledby="wh-config">
   <div class="flex items-center justify-between gap-3">
     <h2 id="wh-config" class="text-base font-semibold text-foreground">Settings</h2>
-    <a x-show="!readOnly" href="#" class="text-sm font-medium text-primary hover:text-primary-hover hover:underline focus:outline-hidden focus-visible:underline">Edit</a>
+    <a x-show="!readOnly" :href="`/tpsentinel/webhooks/edit/?id=${w.id}`" class="text-sm font-medium text-primary hover:text-primary-hover hover:underline focus:outline-hidden focus-visible:underline">Edit</a>
   </div>
 
   <dl class="mt-4 flex flex-col gap-4 text-sm">
@@ -2241,6 +2241,16 @@
         if (s === 'loading' || s === 'missing') { this.simulate = s; return; }
         const match = WH.seed().find(x => WH.kind(x) === s);
         if (match) location.href = `/tpsentinel/webhooks/detail/?id=${match.id}`;
+      },
+      // Back from Edit with ?saved=1: confirm, and remind what's still needed if it isn't sending
+      init() {
+        const q = new URLSearchParams(location.search);
+        if (!q.has('saved') || !this.w.id) return;
+        const k = this.kind;
+        const note = k === 'stopped' ? "It's still stopped. Send a test, then reactivate."
+          : k === 'disabled' ? "It's still disabled. Reactivate it to start sending." : 'New events follow the new settings.';
+        setTimeout(() => this.toast('Changes saved', note), 300);
+        q.delete('saved'); history.replaceState(null, '', `${location.pathname}?${q}`);
       },
       // Keep the list in step with changes made here
       persist() {
