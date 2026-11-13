@@ -1,0 +1,212 @@
+<!doctype html>
+<html class="h-full">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pearson reader</title>
+
+  <!-- Dynamic Path Detection -->
+  <script>
+    window.previewPath = window.location.pathname.match(/(\/pr-preview\/pr-\d+)?/)[0] || '';
+    document.write('<link rel="stylesheet" href="' + window.previewPath + '/css/limeread.css">');
+  </script>
+  <noscript>
+    <link rel="stylesheet" href="/css/limeread.css" />
+  </noscript>
+
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/clipboard@2.0.11/dist/clipboard.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+
+  <style>
+    [x-cloak] {
+      display: none !important;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+  </style>
+  <script>
+    (function () {
+      const html = document.querySelector('html');
+      const isLightOrAuto = localStorage.getItem('hs_theme') === 'light' || (localStorage.getItem('hs_theme') === 'auto' && !window.matchMedia('(prefers-color-scheme: dark)').matches);
+      const isDarkOrAuto = localStorage.getItem('hs_theme') === 'dark' || (localStorage.getItem('hs_theme') === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+      if (isLightOrAuto && html.classList.contains('dark')) html.classList.remove('dark');
+      else if (isDarkOrAuto && html.classList.contains('light')) html.classList.remove('light');
+      else if (isDarkOrAuto && !html.classList.contains('dark')) html.classList.add('dark');
+      else if (isLightOrAuto && !html.classList.contains('light')) html.classList.add('light');
+    })();
+  </script>
+  
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      lucide.createIcons();
+    });
+  </script>
+</head>
+
+
+<body x-data="pearsonReader" class="h-dvh flex flex-col bg-background-1 text-foreground antialiased">
+
+  <!-- Top bar -->
+  <header class="shrink-0 h-14 px-2 sm:px-4 flex items-center gap-2 bg-card border-b border-card-line">
+    <button type="button" @click="back()" :aria-label="admin ? 'Back to book' : 'Back to library'"
+      class="size-10 shrink-0 inline-flex justify-center items-center rounded-full text-foreground hover:bg-muted-hover focus:outline-hidden focus:bg-muted-focus">
+      <i class="shrink-0 size-5" data-lucide="arrow-left"></i>
+    </button>
+    <div class="min-w-0">
+      <h1 class="text-base font-semibold text-foreground truncate">Campbell Biology</h1>
+      <p x-show="admin" x-cloak class="text-xs text-muted-foreground-1 truncate">Preview · Pearson reader</p>
+    </div>
+  </header>
+
+  <main class="relative flex-1 min-h-0">
+    <!-- Opening -->
+    <div x-show="step === 'opening'" class="absolute inset-0 flex items-center justify-center p-6">
+      <div class="w-full max-w-sm space-y-6">
+        <div class="flex items-center justify-center gap-x-3">
+          <span class="shrink-0 animate-spin size-5 border-2 border-primary border-t-transparent rounded-full" role="status" aria-label="Loading"></span>
+          <p class="text-base font-semibold text-foreground" x-text="admin ? 'Opening in Pearson reader…' : 'Opening book…'"></p>
+        </div>
+        <div class="p-4 flex items-center gap-4 bg-card border border-card-line rounded-xl shadow-2xs">
+          <div class="h-20 aspect-[2/3] shrink-0 p-1.5 flex flex-col justify-end rounded-md bg-teal-800 text-white">
+            <span class="text-[8px] font-semibold leading-tight">Campbell Biology</span>
+          </div>
+          <div class="min-w-0 space-y-1">
+            <p class="font-semibold text-foreground truncate">Campbell Biology</p>
+            <p class="text-sm text-muted-foreground-1 truncate">Lisa A. Urry, Michael L. Cain</p>
+            <p class="text-sm text-muted-foreground-1">12th Edition · 978-0135188743</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Reading: Pearson's own page loads here (placeholder) -->
+    <div x-show="step === 'reading'" x-cloak class="absolute inset-0 p-4 sm:p-6 flex">
+      <div class="grow flex items-center justify-center rounded-xl border-2 border-dashed border-line-3 text-center">
+        <div class="space-y-2">
+          <i class="mx-auto block shrink-0 size-8 text-muted-foreground" data-lucide="book-open-text"></i>
+          <p class="font-medium text-foreground">Pearson reader</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Can't open -->
+    <div x-show="step === 'failed'" x-cloak class="absolute inset-0 flex items-center justify-center p-6">
+      <div class="max-w-sm flex flex-col items-center text-center">
+        <span class="size-12 inline-flex justify-center items-center rounded-full bg-red-100 text-red-600 dark:bg-red-500/10 dark:text-red-500">
+          <i class="shrink-0 size-6" data-lucide="circle-alert"></i>
+        </span>
+        <h2 class="mt-4 text-lg font-semibold text-foreground">Couldn't open this book</h2>
+        <p class="mt-1 text-sm text-muted-foreground-1" x-show="!admin">Check your internet connection and try again. If it keeps happening, tell your library.</p>
+        <p class="mt-1 text-sm text-muted-foreground-1" x-show="admin" x-cloak>Pearson didn't open the book. Check the ISBN, or try again. If it keeps failing, contact support.</p>
+        <div class="mt-6 flex flex-col sm:flex-row items-center gap-3">
+          <button type="button" @click="retry()"
+            class="py-2.5 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg bg-primary border border-primary-line text-primary-foreground hover:bg-primary-hover focus:outline-hidden focus:bg-primary-focus">
+            <i class="shrink-0 size-4" data-lucide="rotate-cw"></i>
+            Try again
+          </button>
+          <button type="button" @click="back()"
+            class="py-2.5 px-4 inline-flex justify-center items-center gap-x-2 text-sm font-medium rounded-lg bg-layer border border-layer-line text-layer-foreground shadow-2xs hover:bg-layer-hover focus:outline-hidden focus:bg-layer-focus"
+            x-text="admin ? 'Back to book' : 'Back to library'"></button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  
+  
+<script>
+  document.addEventListener('alpine:init', () => {
+    const groups = [{"name":"Student","states":[["student_opening","Opening"],["student_reading","Reading"],["student_failed","Can't open"]]},{"name":"Admin preview","states":[["admin_opening","Opening"],["admin_reading","Reading"],["admin_failed","Can't open"]]}];
+    const ids = groups.flatMap((g) => g.states.map((s) => s[0]));
+    const param = "state";
+    const fromUrl = new URLSearchParams(window.location.search).get(param);
+    Alpine.store('proto', {
+      groups,
+      state: ids.includes(fromUrl) ? fromUrl : ids[0],
+      pick(id) {
+        this.state = id;
+        const url = new URL(window.location.href);
+        if (id === ids[0]) url.searchParams.delete(param); else url.searchParams.set(param, id);
+        history.replaceState(null, '', url);
+        window.scrollTo({ top: 0 });
+        // Views rendered by x-if need their Lucide icons drawn again
+        setTimeout(() => window.lucide && window.lucide.createIcons(), 0);
+      },
+    });
+  });
+</script>
+
+<div x-data="{ open: false, opened: (() => { try { return localStorage.getItem('lr-prototype-opened') === '1'; } catch (e) { return false; } })(), seen() { this.opened = true; try { localStorage.setItem('lr-prototype-opened', '1'); } catch (e) {} } }"
+     class="fixed bottom-3 end-3 md:bottom-4 md:end-4 z-[60]" @click.outside="open = false" @keydown.escape="open = false">
+  <div x-show="open" x-transition.opacity x-cloak
+       class="absolute bottom-full end-0 mb-2 w-64 max-h-[70vh] overflow-y-auto p-1 bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700">
+    <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Prototype state</p>
+    <template x-for="g in $store.proto.groups" :key="g.name">
+      <div class="pb-1">
+        <p class="px-2 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-neutral-400" x-text="g.name"></p>
+        <template x-for="s in g.states" :key="s[0]">
+          <button type="button" @click="$store.proto.pick(s[0])"
+                  class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-start hover:bg-gray-100 dark:hover:bg-neutral-800"
+                  :class="$store.proto.state === s[0] ? 'text-primary font-medium' : 'text-gray-800 dark:text-neutral-200'">
+            <span x-text="s[1]"></span>
+            <svg x-show="$store.proto.state === s[0]" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
+        </template>
+      </div>
+    </template>
+  </div>
+  <!-- Labelled and dark so reviewers spot it and can't mistake it for product UI; pulses until first opened -->
+  <button type="button" @click="open = !open; seen()" :aria-expanded="open"
+          class="relative inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-full bg-gray-900 text-white text-xs font-medium shadow-lg opacity-90 hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900 transition dark:bg-white dark:text-gray-900">
+    <span x-show="!opened" class="absolute -top-0.5 -end-0.5 flex size-2.5"><span class="absolute inline-flex size-full rounded-full bg-amber-400 opacity-75 animate-ping"></span><span class="relative inline-flex size-2.5 rounded-full bg-amber-400"></span></span>
+    <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg>
+    Prototype states
+  </button>
+</div>
+
+
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('pearsonReader', () => ({
+        get admin() { return this.$store.proto.state.startsWith('admin'); },
+        get step() { return this.$store.proto.state.split('_')[1]; },
+        init() {
+          const params = new URLSearchParams(window.location.search);
+          const who = this.admin ? 'admin' : 'student';
+          if (this.step !== 'opening') return;
+          if (params.get('auto') === '1') {
+            // Read / Preview: Opening, then Pearson's page
+            setTimeout(() => this.$store.proto.pick(who + '_reading'), 2000);
+          } else if (!params.get('state')) {
+            // Plain link, for reviewers: Opening → Can't open → (Try again) → Opening → Pearson's page
+            setTimeout(() => this.$store.proto.state === who + '_opening' && this.$store.proto.pick(who + '_failed'), 2000);
+          }
+        },
+        retry() {
+          const who = this.admin ? 'admin' : 'student';
+          this.$store.proto.pick(who + '_opening');
+          setTimeout(() => this.$store.proto.pick(who + '_reading'), 1800);
+        },
+        back() {
+          // In the app this closes the reader. On the web the reader is its own tab, so close it.
+          window.close();
+          window.location.href = window.previewPath + (this.admin ? '/limeread/detail/?state=pearson' : '/limeread/member_ebook_detail/?status=pearson_borrowed');
+        },
+      }));
+    });
+  </script>
+</body>
+
+
+</html>
