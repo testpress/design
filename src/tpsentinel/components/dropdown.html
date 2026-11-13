@@ -1,0 +1,169 @@
+{# TPSentinel copy of src/ui-system/components/dropdown.html: same markup and API, Preline theme tokens for neutral colours. #}
+{% macro dropdown(
+  trigger="Menu",
+  items=[],
+  placement="bottom-end",
+  width="small",
+  id="",
+  extra_classes="",
+  trigger_classes="",
+  adaptive=true
+) %}
+
+{% set width_classes = {
+  'auto': 'w-auto',
+  'small': 'w-40',
+  'medium': 'w-48',
+  'large': 'w-56'
+} %}
+{% set final_width = width_classes[width] if width_classes[width] is defined else width %}
+
+<div x-data="{ 
+       open: false,
+       top: 0,
+       left: 'auto',
+       right: 'auto',
+       _triggerEl: null,
+       _menuEl: null,
+       _scrollHandler: null,
+       init() {
+         this.$watch('open', value => {
+           if (value) {
+             this.$dispatch('dropdown-opened');
+             this._triggerEl = this.$refs.trigger;
+             this._menuEl = this.$refs.menu;
+             this._scrollHandler = this._scrollHandler || this.updatePosition.bind(this);
+             setTimeout(() => { 
+               this.updatePosition(); 
+             }, 0);
+             window.addEventListener('scroll', this._scrollHandler, true);
+             window.addEventListener('resize', this._scrollHandler, true);
+           } else {
+             if (this._scrollHandler) {
+               window.removeEventListener('scroll', this._scrollHandler, true);
+               window.removeEventListener('resize', this._scrollHandler, true);
+             }
+           }
+         });
+       },
+       updatePosition() {
+         const trigger = this._triggerEl;
+         if (!trigger) {
+           return;
+         }
+         const rect = trigger.getBoundingClientRect();
+         this.top = rect.bottom + 4;
+         const placement = '{{ placement }}';
+         const adaptive = {{ 'true' if adaptive else 'false' }};
+          const menuWidth = this._menuEl ? this._menuEl.offsetWidth : 224;
+          const menuHeight = this._menuEl ? this._menuEl.offsetHeight : 160;
+          
+          if (placement === 'bottom-end' || placement === 'top-end') {
+            if (adaptive && rect.right < menuWidth) {
+              this.left = rect.left;
+              this.right = 'auto';
+            } else {
+              this.left = 'auto';
+              this.right = window.innerWidth - rect.right;
+            }
+            this.top = placement === 'bottom-end' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          } else if (placement === 'bottom-start' || placement === 'top-start') {
+            let leftPos = rect.left;
+            if (adaptive && (window.innerWidth - leftPos < menuWidth)) {
+              this.left = 'auto';
+              this.right = window.innerWidth - rect.right;
+            } else {
+              this.left = leftPos;
+              this.right = 'auto';
+            }
+            this.top = placement === 'bottom-start' ? rect.bottom + 4 : rect.top - menuHeight - 4;
+          }
+       }
+     }" 
+     @keydown.escape.window="open = false"
+     @dropdown-opened.window="if ($event.target !== $el) open = false"
+     class="inline-flex {{ extra_classes }}">
+  
+  <!-- Trigger -->
+  <div @click="open = !open" class="cursor-pointer" x-ref="trigger">
+    {% if trigger == "⋮" or trigger == "ellipsis-vertical" %}
+      <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-muted-focus {{ trigger_classes }}" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+      </button>
+    {% elif trigger == "ellipsis-horizontal" %}
+      <button type="button" class="size-8 inline-flex justify-center items-center gap-x-2 rounded-full border border-transparent text-muted-foreground-1 hover:bg-muted-hover hover:text-foreground disabled:opacity-50 disabled:pointer-events-none focus:outline-hidden focus:bg-muted-focus {{ trigger_classes }}" aria-haspopup="menu" :aria-expanded="open.toString()">
+        <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></svg>
+      </button>
+    {% elif trigger == "Actions" %}
+      <button type="button" class="py-1.5 px-3 inline-flex items-center gap-x-1.5 text-sm font-medium rounded-lg border border-layer-line bg-layer text-layer-foreground shadow-2xs hover:bg-layer-hover focus:outline-hidden focus:bg-layer-focus disabled:opacity-50 disabled:pointer-events-none {{ trigger_classes }}" aria-haspopup="menu" :aria-expanded="open.toString()">
+        Actions
+        <i data-lucide="chevron-down" class="shrink-0 size-4 transition-transform duration-200" :class="open ? 'rotate-180' : ''"></i>
+      </button>
+    {% else %}
+      {{ trigger | safe }}
+    {% endif %}
+  </div>
+
+  <!-- Dropdown Menu -->
+  <div x-show="open" 
+       x-ref="menu"
+       x-cloak
+       @click.outside="open = false"
+       x-transition:enter="transition ease-out duration-100"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100"
+       x-transition:leave="transition ease-in duration-75"
+       x-transition:leave-start="opacity-100 scale-100"
+       x-transition:leave-end="opacity-0 scale-95"
+       class="fixed z-[9999] {{ final_width }} bg-dropdown border border-dropdown-line rounded-xl shadow-xl p-1"
+       x-bind:style="{ top: top + 'px', left: left === 'auto' ? 'auto' : left + 'px', right: right === 'auto' ? 'auto' : right + 'px' }"
+       role="menu"
+       aria-orientation="vertical">
+    
+      {% if items and items | length > 0 %}
+        {% for item in items %}
+          {% if item.divider %}
+            <div class="my-1 border-t border-dropdown-divider"></div>
+          {% else %}
+            {% set tag_name = 'a' if item.url else 'button' %}
+            {% set tag_attrs = 'href=' ~ item.url if item.url else 'type=button' %}
+            
+            {% if item.variant == 'danger' %}
+              {% set text_classes = 'text-red-600 hover:bg-red-600/10 focus:bg-red-600/10 dark:text-red-500' %}
+              {% set icon_color = 'text-red-500 dark:text-red-500' %}
+            {% else %}
+              {% set text_classes = 'text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:bg-dropdown-item-focus' %}
+              {% set icon_color = 'text-muted-foreground-1' %}
+            {% endif %}
+            
+            {% set disabled_classes = 'opacity-50 pointer-events-none' if item.disabled else '' %}
+            
+            <{{ tag_name }} {{ tag_attrs }} 
+               class="w-full flex {% if item.description %}items-start py-2{% else %}items-center py-1.5{% endif %} gap-x-3 px-2 rounded-lg text-[13px] font-normal text-start focus:outline-hidden {{ text_classes }} {{ disabled_classes }}"
+               {% if item.disabled %}disabled{% endif %}
+               {{ item.attrs | safe if item.attrs }}
+               {{ item.x_on | safe if item.x_on }}>
+              {% if item.icon %}
+                {% if item.icon.indexOf('<svg') > -1 %}
+                  {{ item.icon | safe }}
+                {% else %}
+                  <i data-lucide="{{ item.icon }}" class="shrink-0 size-4 {% if item.description %}mt-0.5{% endif %} {{ icon_color }}"></i>
+                {% endif %}
+              {% endif %}
+              {% if item.description %}
+                <span class="flex flex-col">
+                  <span class="font-medium text-foreground">{{ item.label }}</span>
+                  <span class="text-xs text-muted-foreground-1 mt-0.5">{{ item.description }}</span>
+                </span>
+              {% else %}
+                {{ item.label }}
+              {% endif %}
+            </{{ tag_name }}>
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        {{ caller() if caller }}
+      {% endif %}
+  </div>
+</div>
+{% endmacro %}

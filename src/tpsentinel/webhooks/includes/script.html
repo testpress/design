@@ -5,38 +5,15 @@
   const MIN = 60e3, HR = 36e5, DAY = 864e5;
   const WH_THRESHOLD = 10; // consecutive failed business deliveries before a webhook stops
 
+  // Data lives in includes/data.html (shared with the details page). Prototype variants are built from the seed.
   function whSample(kind) {
-    const base = [
-      { id: 'wh_01', name: 'Testpress exam attempts', url: 'https://icai.testpress.in/api/webhooks/tpsentinel/', state: 'active',
-        events: 'all', workspaces: 'all', failures: 0, lastSuccess: WH_NOW - 4 * MIN, lastFailure: WH_NOW - 6 * DAY },
-      { id: 'wh_02', name: 'Certificate service', url: 'https://certs.icai.org/hooks/proctoring', state: 'unhealthy',
-        events: ['candidate.integrity_updated'], workspaces: ['CA Final · Nov 2026', 'CA Intermediate · Nov 2026'],
-        failures: 10, lastSuccess: WH_NOW - 3 * DAY, lastFailure: WH_NOW - 2 * HR },
-      { id: 'wh_03', name: 'Exam operations alerts', url: 'https://hooks.zapier.com/hooks/catch/18273/abx9k2/', state: 'active',
-        events: ['review_case.completed', 'candidate.integrity_updated'], workspaces: 'all',
-        failures: 4, lastSuccess: WH_NOW - 5 * HR, lastFailure: WH_NOW - 12 * MIN },
-      { id: 'wh_04', name: 'Analytics warehouse', url: 'https://ingest.icai-analytics.in/v1/events/tpsentinel', state: 'active',
-        events: 'all', workspaces: ['CA Foundation · Dec 2026'], failures: 0, lastSuccess: WH_NOW - 26 * MIN, lastFailure: null },
-      { id: 'wh_05', name: 'Audit log forwarder', url: 'https://audit.icai.org/ingest/tpsentinel', state: 'active',
-        events: ['candidate.integrity_updated', 'review_case.completed', 'session.completed'], workspaces: 'all',
-        failures: 0, lastSuccess: null, lastFailure: null },
-      { id: 'wh_06', name: 'Testpress staging', url: 'https://staging.icai.testpress.in/api/webhooks/tpsentinel/', state: 'disabled',
-        events: 'all', workspaces: 'all', failures: 0, lastSuccess: WH_NOW - 9 * DAY, lastFailure: null, updatedAt: WH_NOW - 8 * DAY },
-      { id: 'wh_07', name: 'Old certificate service', url: 'https://legacy-certs.icai.org/hook', state: 'archived',
-        events: ['candidate.integrity_updated'], workspaces: 'all', failures: 0, lastSuccess: WH_NOW - 22 * DAY, lastFailure: null, archivedAt: WH_NOW - 20 * DAY },
-      { id: 'wh_08', name: 'Pilot test endpoint', url: 'https://webhook.site/7f1c2a9e-1b0d-4c55', state: 'archived',
-        events: 'all', workspaces: ['CA Foundation · Jun 2026'], failures: 0, lastSuccess: WH_NOW - 50 * DAY, lastFailure: null, archivedAt: WH_NOW - 48 * DAY },
-    ];
+    const base = kind === 'mixed' ? WH.load() : WH.seed();
     if (kind === 'healthy') {
       return base.map(w => w.state === 'archived' || w.state === 'disabled' ? w
         : Object.assign({}, w, { state: 'active', failures: 0, lastSuccess: w.lastSuccess || WH_NOW - 40 * MIN }));
     }
-    if (kind === 'allArchived') {
-      return base.filter(w => w.state === 'archived');
-    }
-    if (kind === 'noArchived') {
-      return base.filter(w => w.state !== 'archived');
-    }
+    if (kind === 'allArchived') return base.filter(w => w.state === 'archived');
+    if (kind === 'noArchived') return base.filter(w => w.state !== 'archived');
     return base;
   }
 
@@ -174,7 +151,8 @@
       },
 
       // Opens the webhook. Disable / reactivate / archive / test live on the details page (next round, PR 14).
-      openWebhook(w) {},
+      detailHref(w) { return `/tpsentinel/webhooks/detail/?id=${w.id}`; },
+      openWebhook(w) { location.href = this.detailHref(w); },
 
       // Formatting
       shortUrl(u) { return u.replace(/^https:\/\//, ''); },

@@ -1,0 +1,114 @@
+<script>
+  // The webhook comes from ?id= and the shared data in ../includes/data.html (as Review Cases reads ?case=).
+  const D_MIN = WH.MIN, D_HR = WH.HR, D_DAY = WH.DAY, D_THRESHOLD = WH.THRESHOLD, D_EVENTS = WH.EVENTS;
+
+  function webhookDetailPage() {
+    const all = WH.load();
+    const id = new URLSearchParams(location.search).get('id');
+    const found = all.find(x => x.id === id);
+    const w = Alpine.reactive(found ? Object.assign({}, found) : {});
+    w.recent = found ? WH.recent(found) : [];
+    return {
+      simulate: found ? 'data' : 'missing',   // data | loading | missing
+      protoState: found ? WH.kind(found) : 'missing',
+      w, all,
+      allEvents: D_EVENTS,
+
+      // Prototype states jump to the sample webhook in that state, so the page always shows a real row from the list
+      protoGroups: [
+        { name: 'Webhook', states: [
+          ['delivering', 'Delivering'], ['failing', 'Failing (4 in a row)'], ['stopped', 'Stopped after 10 failures'],
+          ['disabled', 'Disabled'], ['new', 'Just added, no deliveries'], ['archived', 'Archived'],
+        ] },
+        { name: 'Page', states: [['loading', 'Loading'], ['missing', 'Not found or removed']] },
+      ],
+      pickState(s) {
+        this.protoState = s;
+        if (s === 'loading' || s === 'missing') { this.simulate = s; return; }
+        const match = WH.seed().find(x => WH.kind(x) === s);
+        if (match) location.href = `/tpsentinel/webhooks/detail/?id=${match.id}`;
+      },
+      // Keep the list in step with changes made here
+      persist() {
+        const i = this.all.findIndex(x => x.id === this.w.id);
+        if (i > -1) { const { recent, ...rest } = this.w; this.all[i] = rest; WH.save(this.all); }
+        this.w.recent = WH.recent(this.w);
+      },
+
+      // ---- status: what's happening, what it means, what to do ----
+      get kind() { return this.w.state ? WH.kind(this.w) : 'new'; },
+      get status() {
+        const w = this.w;
+        return {
+          delivering: { title: 'Delivering', text: `Last delivered ${this.ago(w.lastSuccess)}.` },
+          new: { title: 'Waiting for the first event', text: 'Nothing has been sent yet. Send a test to check the endpoint now.' },
+          failing: { title: `${w.failures} deliveries failed in a row`,
+                     text: `It stops after ${D_THRESHOLD}. Last delivered ${this.ago(w.lastSuccess)}.` },
+          stopped: { title: `Stopped after ${D_THRESHOLD} failed deliveries`,
+                     text: `Nothing is being sent since ${this.ago(w.lastFailure)}. Fix the endpoint, send a test, then reactivate. Events from while it's stopped aren't sent later.` },
+          disabled: { title: 'Disabled', text: `Nothing is being sent since ${this.ago(w.updatedAt)}. Events from while it's disabled aren't sent later.` },
+          archived: { title: `Archived ${this.ago(w.archivedAt)}`, text: "It can't be changed or turned back on. Its delivery history stays until cleanup." },
+        }[this.kind];
+      },
+      get tone() {
+        return {
+          delivering: 'text-teal-600 dark:text-teal-500', new: 'text-muted-foreground-2',
+          failing: 'text-amber-500 dark:text-amber-400', stopped: 'text-red-600 dark:text-red-500',
+          disabled: 'text-muted-foreground-2', archived: 'text-muted-foreground-2',
+        }[this.kind];
+      },
+      get readOnly() { return this.w.state === 'archived'; },
+
+      // ---- recent deliveries ----
+      dWord(r) {
+        if (r.state === 'succeeded') return `Delivered · ${r.status}`;
+        if (r.state === 'retry') return `Retrying ${this.until(r.nextAt)} · ${r.failure}`;
+        if (r.state === 'cancelled') return r.failure;
+        if (r.state === 'pending') return 'Waiting to send';
+        return `Failed · ${r.status ? r.status : r.failure} after ${r.attempts} ${r.attempts === 1 ? 'attempt' : 'attempts'}`;
+      },
+      dTone(r) {
+        return { succeeded: 'text-teal-600 dark:text-teal-500', failed: 'text-red-600 dark:text-red-500',
+                 retry: 'text-amber-500 dark:text-amber-400' }[r.state] || 'text-muted-foreground-2';
+      },
+      dIcon(r) {
+        const s = p => `<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+        if (r.state === 'succeeded') return s('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>');
+        if (r.state === 'failed') return s('<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>');
+        if (r.state === 'retry') return s('<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>');
+        return s('<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>');
+      },
+
+      // ---- actions: reversible ones act straight away, archive asks ----
+      disable() {
+        this.w.state = 'disabled'; this.w.updatedAt = Date.now(); this.persist();
+        this.toast(`${this.w.name} disabled`, 'Events waiting to be sent were cancelled.');
+      },
+      reactivate() {
+        this.w.state = 'active'; this.w.failures = 0; this.w.updatedAt = Date.now(); this.persist();
+        this.toast(`${this.w.name} is active`, 'Only new events will be sent.');
+      },
+      archive() {
+        this.w.state = 'archived'; this.w.archivedAt = Date.now(); this.w.updatedAt = Date.now(); this.persist();
+        this.toast(`${this.w.name} archived`, '');
+      },
+      toast(title, description) { this.$dispatch('toast', { title, description, variant: 'success', size: 'compact', position: 'bottom-center' }); },
+      copyUrl() { try { navigator.clipboard.writeText(this.w.url); } catch (_) {} this.urlCopied = true; setTimeout(() => this.urlCopied = false, 1500); },
+      urlCopied: false,
+
+      // ---- formatting ----
+      ago(t) {
+        if (!t) return 'never';
+        const d = Date.now() - t;
+        if (d < D_MIN) return 'just now';
+        if (d < D_HR) return `${Math.round(d / D_MIN)} min ago`;
+        if (d < D_DAY) return `${Math.round(d / D_HR)} h ago`;
+        const days = Math.round(d / D_DAY);
+        return days === 1 ? 'yesterday' : days < 30 ? `${days} days ago` : this.date(t);
+      },
+      until(t) { const m = Math.max(1, Math.round((t - Date.now()) / D_MIN)); return `in ${m} min`; },
+      date(t) { return new Date(t).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); },
+      exact(t) { return t ? new Date(t).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : ''; },
+    };
+  }
+</script>
