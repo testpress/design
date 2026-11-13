@@ -1024,7 +1024,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-7638">
+         aria-describedby="tooltip-6008">
       <span tabindex="0" role="img" :aria-label="statusWord(w)" :class="tone(w)" class="flex rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-html="icon(w)"></span>
     </div>
 
@@ -1032,7 +1032,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-7638"
+         id="tooltip-6008"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1056,7 +1056,7 @@
 
         <div class="min-w-0 flex-1">
           <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-h-6">
-            <a href="#" @click.stop class="font-semibold text-foreground focus:outline-hidden focus-visible:underline" x-text="w.name"></a>
+            <a :href="detailHref(w)" @click.stop class="font-semibold text-foreground focus:outline-hidden focus-visible:underline" x-text="w.name"></a>
             <span class="hidden sm:inline min-w-0 truncate text-sm text-muted-foreground-1" :title="w.url" x-text="shortUrl(w.url)"></span>
           </div>
 
@@ -1162,7 +1162,7 @@
          class="inline-flex items-center justify-center "
          aria-haspopup="dialog"
          :aria-expanded="active"
-         aria-controls="popover-1668">
+         aria-controls="popover-5026">
       <button type="button" class="underline decoration-dotted underline-offset-2 hover:text-foreground focus:outline-hidden focus-visible:text-foreground" x-text="`${w.events.length} events`"></button>
     </div>
 
@@ -1171,7 +1171,7 @@
          @click.stop
          x-cloak
          x-ref="popover"
-         id="popover-1668"
+         id="popover-5026"
          role="dialog"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1298,7 +1298,7 @@
          class="inline-flex items-center justify-center "
          aria-haspopup="dialog"
          :aria-expanded="active"
-         aria-controls="popover-7671">
+         aria-controls="popover-5429">
       <button type="button" class="underline decoration-dotted underline-offset-2 hover:text-foreground focus:outline-hidden focus-visible:text-foreground" x-text="`${w.workspaces.length} workspaces`"></button>
     </div>
 
@@ -1307,7 +1307,7 @@
          @click.stop
          x-cloak
          x-ref="popover"
-         id="popover-7671"
+         id="popover-5429"
          role="dialog"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
@@ -2111,44 +2111,108 @@
 
   
 <script>
+  // Shared prototype data for the Webhooks pages (list, details, and later deliveries/test), as Review Cases does
+  // with review_cases/data.html. Changes made on a page (disable, reactivate, archive) are kept in sessionStorage,
+  // so the list and the details page agree. Field names follow the PRD's subscription representation.
+  window.WH = (function () {
+    const KEY = 'tpsentinel.webhooks';
+    const MIN = 60e3, HR = 36e5, DAY = 864e5;
+    const EVENTS = ['candidate.integrity_updated', 'review_case.completed', 'session.completed'];
+    const THRESHOLD = 10;
+
+    function seed() {
+      const now = Date.now();
+      const ok = (ago) => ({ ok: true, status: 200, at: now - ago });
+      return [
+        { id: 'wh_01', name: 'Testpress exam attempts', url: 'https://icai.testpress.in/api/webhooks/tpsentinel/', state: 'active',
+          events: 'all', workspaces: 'all', failures: 0, lastSuccess: now - 4 * MIN, lastFailure: now - 6 * DAY,
+          createdAt: now - 41 * DAY, createdBy: 'Hari', updatedAt: now - 41 * DAY, lastTest: ok(41 * DAY) },
+        { id: 'wh_02', name: 'Certificate service', url: 'https://certs.icai.org/hooks/proctoring', state: 'unhealthy',
+          events: ['candidate.integrity_updated'], workspaces: ['CA Final · Nov 2026', 'CA Intermediate · Nov 2026'],
+          failures: 10, lastSuccess: now - 3 * DAY, lastFailure: now - 2 * HR,
+          createdAt: now - 34 * DAY, createdBy: 'Hari', updatedAt: now - 3 * DAY, lastTest: ok(34 * DAY) },
+        { id: 'wh_03', name: 'Exam operations alerts', url: 'https://hooks.zapier.com/hooks/catch/18273/abx9k2/', state: 'active',
+          events: ['review_case.completed', 'candidate.integrity_updated'], workspaces: 'all',
+          failures: 4, lastSuccess: now - 5 * HR, lastFailure: now - 12 * MIN,
+          createdAt: now - 19 * DAY, createdBy: 'Priya Nair', updatedAt: now - 19 * DAY, lastTest: ok(19 * DAY) },
+        { id: 'wh_04', name: 'Analytics warehouse', url: 'https://ingest.icai-analytics.in/v1/events/tpsentinel', state: 'active',
+          events: 'all', workspaces: ['CA Foundation · Dec 2026'], failures: 0, lastSuccess: now - 26 * MIN, lastFailure: null,
+          createdAt: now - 12 * DAY, createdBy: 'Hari', updatedAt: now - 5 * DAY, lastTest: ok(12 * DAY) },
+        { id: 'wh_05', name: 'Audit log forwarder', url: 'https://audit.icai.org/ingest/tpsentinel', state: 'active',
+          events: ['candidate.integrity_updated', 'review_case.completed', 'session.completed'], workspaces: 'all',
+          failures: 0, lastSuccess: null, lastFailure: null,
+          createdAt: now - 2 * HR, createdBy: 'Priya Nair', updatedAt: now - 2 * HR, lastTest: null },
+        { id: 'wh_06', name: 'Testpress staging', url: 'https://staging.icai.testpress.in/api/webhooks/tpsentinel/', state: 'disabled',
+          events: 'all', workspaces: 'all', failures: 0, lastSuccess: now - 9 * DAY, lastFailure: null,
+          createdAt: now - 60 * DAY, createdBy: 'Hari', updatedAt: now - 8 * DAY, lastTest: ok(9 * DAY) },
+        { id: 'wh_07', name: 'Old certificate service', url: 'https://legacy-certs.icai.org/hook', state: 'archived',
+          events: ['candidate.integrity_updated'], workspaces: 'all', failures: 0, lastSuccess: now - 22 * DAY, lastFailure: null,
+          createdAt: now - 90 * DAY, createdBy: 'Hari', updatedAt: now - 20 * DAY, archivedAt: now - 20 * DAY, lastTest: ok(60 * DAY) },
+        { id: 'wh_08', name: 'Pilot test endpoint', url: 'https://webhook.site/7f1c2a9e-1b0d-4c55', state: 'archived',
+          events: 'all', workspaces: ['CA Foundation · Jun 2026'], failures: 0, lastSuccess: now - 50 * DAY, lastFailure: null,
+          createdAt: now - 120 * DAY, createdBy: 'Priya Nair', updatedAt: now - 48 * DAY, archivedAt: now - 48 * DAY, lastTest: ok(118 * DAY) },
+      ];
+    }
+
+    function load() {
+      try { const s = JSON.parse(sessionStorage.getItem(KEY)); if (Array.isArray(s) && s.length) return s; } catch (e) {}
+      return seed();
+    }
+    function save(list) { try { sessionStorage.setItem(KEY, JSON.stringify(list)); } catch (e) { /* not remembered */ } }
+    function reset() { try { sessionStorage.removeItem(KEY); } catch (e) {} }
+
+    // What the status words and icons follow
+    function kind(w) {
+      if (w.state === 'archived') return 'archived';
+      if (w.state === 'disabled') return 'disabled';
+      if (w.state === 'unhealthy') return 'stopped';
+      if (w.failures) return 'failing';
+      return w.lastSuccess ? 'delivering' : 'new';
+    }
+
+    // Latest business deliveries for a webhook, consistent with its health (prototype stand-in for the delivery API)
+    function recent(w) {
+      const now = Date.now();
+      const ev = w.events === 'all' ? EVENTS : w.events;
+      const n = parseInt(w.id.replace(/\D/g, ''), 10) || 1;
+      const id = (i) => `dlv_01JD${(n * 7 + i).toString(36).toUpperCase().padStart(2, '0')}Q${(n * 13 + i * 3).toString(36).toUpperCase()}M8K`;
+      const d = (i, state, status, attempts, at, extra = {}) => Object.assign({ id: id(i), event: ev[i % ev.length], state, status, attempts, at }, extra);
+      const k = kind(w), ls = w.lastSuccess, lf = w.lastFailure;
+      if (k === 'new') return [];
+      if (k === 'delivering') return [0, 1, 2, 3, 4].map(i => d(i, 'succeeded', 200, i === 3 ? 2 : 1, ls - i * 47 * MIN));
+      if (k === 'failing') return [
+        d(0, 'retry', null, 2, lf + 6 * MIN, { failure: 'Timed out after 10s', nextAt: now + 14 * MIN }),
+        d(1, 'failed', 500, 4, lf), d(2, 'failed', 503, 4, lf - 48 * MIN), d(3, 'failed', 500, 4, lf - 2 * HR), d(4, 'succeeded', 200, 1, ls)];
+      if (k === 'stopped') return [
+        d(0, 'cancelled', null, 0, lf, { failure: 'Cancelled when the webhook stopped' }),
+        d(1, 'cancelled', null, 1, lf, { failure: 'Cancelled when the webhook stopped' }),
+        d(2, 'failed', 500, 4, lf), d(3, 'failed', 500, 4, lf - 2 * HR), d(4, 'failed', null, 4, lf - 4 * HR, { failure: 'Connection refused' })];
+      if (k === 'disabled') return [
+        d(0, 'cancelled', null, 0, w.updatedAt, { failure: 'Cancelled when the webhook was disabled' }),
+        d(1, 'succeeded', 200, 1, ls), d(2, 'succeeded', 200, 1, ls - 5 * HR), d(3, 'succeeded', 200, 1, ls - DAY)];
+      return [d(0, 'succeeded', 200, 1, ls), d(1, 'succeeded', 200, 1, ls - DAY)];
+    }
+
+    return { load, save, reset, seed, kind, recent, EVENTS, THRESHOLD, MIN, HR, DAY };
+  })();
+</script>
+
+<script>
   // Prototype data. Fields follow the PRD's subscription representation:
   // name, endpoint, state, event scope, workspace scope, consecutive failures, last success, last failure.
   const WH_NOW = Date.now();
   const MIN = 60e3, HR = 36e5, DAY = 864e5;
   const WH_THRESHOLD = 10; // consecutive failed business deliveries before a webhook stops
 
+  // Data lives in includes/data.html (shared with the details page). Prototype variants are built from the seed.
   function whSample(kind) {
-    const base = [
-      { id: 'wh_01', name: 'Testpress exam attempts', url: 'https://icai.testpress.in/api/webhooks/tpsentinel/', state: 'active',
-        events: 'all', workspaces: 'all', failures: 0, lastSuccess: WH_NOW - 4 * MIN, lastFailure: WH_NOW - 6 * DAY },
-      { id: 'wh_02', name: 'Certificate service', url: 'https://certs.icai.org/hooks/proctoring', state: 'unhealthy',
-        events: ['candidate.integrity_updated'], workspaces: ['CA Final · Nov 2026', 'CA Intermediate · Nov 2026'],
-        failures: 10, lastSuccess: WH_NOW - 3 * DAY, lastFailure: WH_NOW - 2 * HR },
-      { id: 'wh_03', name: 'Exam operations alerts', url: 'https://hooks.zapier.com/hooks/catch/18273/abx9k2/', state: 'active',
-        events: ['review_case.completed', 'candidate.integrity_updated'], workspaces: 'all',
-        failures: 4, lastSuccess: WH_NOW - 5 * HR, lastFailure: WH_NOW - 12 * MIN },
-      { id: 'wh_04', name: 'Analytics warehouse', url: 'https://ingest.icai-analytics.in/v1/events/tpsentinel', state: 'active',
-        events: 'all', workspaces: ['CA Foundation · Dec 2026'], failures: 0, lastSuccess: WH_NOW - 26 * MIN, lastFailure: null },
-      { id: 'wh_05', name: 'Audit log forwarder', url: 'https://audit.icai.org/ingest/tpsentinel', state: 'active',
-        events: ['candidate.integrity_updated', 'review_case.completed', 'session.completed'], workspaces: 'all',
-        failures: 0, lastSuccess: null, lastFailure: null },
-      { id: 'wh_06', name: 'Testpress staging', url: 'https://staging.icai.testpress.in/api/webhooks/tpsentinel/', state: 'disabled',
-        events: 'all', workspaces: 'all', failures: 0, lastSuccess: WH_NOW - 9 * DAY, lastFailure: null, updatedAt: WH_NOW - 8 * DAY },
-      { id: 'wh_07', name: 'Old certificate service', url: 'https://legacy-certs.icai.org/hook', state: 'archived',
-        events: ['candidate.integrity_updated'], workspaces: 'all', failures: 0, lastSuccess: WH_NOW - 22 * DAY, lastFailure: null, archivedAt: WH_NOW - 20 * DAY },
-      { id: 'wh_08', name: 'Pilot test endpoint', url: 'https://webhook.site/7f1c2a9e-1b0d-4c55', state: 'archived',
-        events: 'all', workspaces: ['CA Foundation · Jun 2026'], failures: 0, lastSuccess: WH_NOW - 50 * DAY, lastFailure: null, archivedAt: WH_NOW - 48 * DAY },
-    ];
+    const base = kind === 'mixed' ? WH.load() : WH.seed();
     if (kind === 'healthy') {
       return base.map(w => w.state === 'archived' || w.state === 'disabled' ? w
         : Object.assign({}, w, { state: 'active', failures: 0, lastSuccess: w.lastSuccess || WH_NOW - 40 * MIN }));
     }
-    if (kind === 'allArchived') {
-      return base.filter(w => w.state === 'archived');
-    }
-    if (kind === 'noArchived') {
-      return base.filter(w => w.state !== 'archived');
-    }
+    if (kind === 'allArchived') return base.filter(w => w.state === 'archived');
+    if (kind === 'noArchived') return base.filter(w => w.state !== 'archived');
     return base;
   }
 
@@ -2286,7 +2350,8 @@
       },
 
       // Opens the webhook. Disable / reactivate / archive / test live on the details page (next round, PR 14).
-      openWebhook(w) {},
+      detailHref(w) { return `/tpsentinel/webhooks/detail/?id=${w.id}`; },
+      openWebhook(w) { location.href = this.detailHref(w); },
 
       // Formatting
       shortUrl(u) { return u.replace(/^https:\/\//, ''); },
