@@ -1,0 +1,138 @@
+<script>
+  // One business delivery: ?id=<webhook>&delivery=<delivery id>, from the shared data (as Review Cases reads ?case=).
+  function deliveryPage() {
+    const q = new URLSearchParams(location.search);
+    const all = WH.load();
+    const w = all.find(x => x.id === q.get('id')) || null;
+    const d = w ? WH.findDelivery(w, q.get('delivery')) : null;
+    const body = w && d ? WH.payload(w, d) : '';
+    const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return {
+      view: d ? 'data' : 'missing',
+      w: w || { name: 'Webhook', url: '' },
+      d: d || { id: '', event: '', attempts: 0 },
+      body,
+      // Keys muted, values in the text colour: readable without a syntax-colour palette
+      highlighted: esc(body).replace(/^(\s*)("[^"]+")(:)/gm, '$1<span class="text-muted-foreground-1">$2</span>$3'),
+      retention: WH.RETENTION_DAYS,
+      copied: '',
+
+      protoState: d ? d.state : 'missing',
+      protoGroups: [
+        { name: 'Delivered', states: [['ok', 'Delivered on attempt 1'], ['ok2', 'Delivered on attempt 2']] },
+        { name: 'Not delivered', states: [['f500', 'Failed: server error'], ['fconn', "Failed: couldn't connect"], ['f410', 'Rejected (4xx, no retry)'],
+                                          ['f301', 'Failed: redirect'], ['retry', 'Retry scheduled'], ['cancelled', 'Cancelled']] },
+        { name: 'In progress', states: [['pending', 'Waiting to send'], ['processing', 'Sending now']] },
+        { name: 'Page', states: [['loading', 'Loading'], ['missing', 'Removed or not found']] },
+      ],
+      // Jump to a real delivery of that kind, so the page always shows one from the lists
+      pickState(s) {
+        this.protoState = s;
+        if (s === 'loading' || s === 'missing') { this.view = s; return; }
+        const pick = {
+          ok: ['wh_01', x => x.state === 'succeeded' && x.attempts === 1], ok2: ['wh_01', x => x.state === 'succeeded' && x.attempts === 2],
+          f500: ['wh_02', x => x.state === 'failed' && x.status === 500], fconn: ['wh_02', x => x.state === 'failed' && !x.status],
+          f410: ['wh_03', x => x.status === 410], f301: ['wh_02', x => x.status === 301], retry: ['wh_03', x => x.state === 'retry'],
+          cancelled: ['wh_02', x => x.state === 'cancelled'], pending: ['wh_01', x => x.state === 'pending'], processing: ['wh_01', x => x.state === 'processing'],
+        }[s];
+        const hook = WH.seed().find(x => x.id === pick[0]);
+        const hit = WH.history(hook).find(pick[1]);
+        if (hit) location.href = `/tpsentinel/webhooks/deliveries/detail/?id=${hook.id}&delivery=${hit.id}`;
+      },
+
+      listHref() { return w ? `/tpsentinel/webhooks/deliveries/?id=${w.id}` : '/tpsentinel/webhooks/'; },
+      detailHref() { return w ? `/tpsentinel/webhooks/detail/?id=${w.id}` : '/tpsentinel/webhooks/'; },
+      copy(key, text) { try { navigator.clipboard.writeText(text); } catch (_) {} this.copied = key; setTimeout(() => { if (this.copied === key) this.copied = ''; }, 1500); },
+
+      // ---- what happened, why, what's next ----
+      status() {
+        const d = this.d, ft = WH.failureType(d), at = this.ago(d.lastAttemptAt || d.at);
+        const openHook = { label: 'Open webhook', href: this.detailHref() };
+        if (d.state === 'succeeded') return { title: 'Delivered',
+          text: d.attempts > 1 ? `Your endpoint replied ${d.status} on attempt ${d.attempts}, ${at}, after the earlier attempt failed.` : `Your endpoint replied ${d.status} ${at}.` };
+        if (d.state === 'pending') return { title: 'Waiting to send', text: "It's queued and goes out in a moment." };
+        if (d.state === 'processing') return { title: 'Sending now', text: 'The first attempt is under way. Refresh to see the result.' };
+        if (d.state === 'retry') return { title: `Retrying ${this.until(d.nextAt)}`,
+          text: `Attempt ${d.attempts} ${d.failure.toLowerCase()}. Attempt ${d.attempts + 1} of 4 is at ${this.time(d.nextAt)}.` };
+        if (d.state === 'cancelled') return { title: 'Cancelled',
+          text: /disabled/.test(d.failure) ? "It wasn't sent because the webhook was disabled. Cancelled deliveries aren't sent later."
+                                          : `It wasn't sent because the webhook stopped after ${WH.THRESHOLD} failed deliveries. Cancelled deliveries aren't sent later.`, action: openHook };
+        // failed
+        if (ft === 'client') return { title: 'Rejected by your endpoint',
+          text: `It replied ${d.status} ${at}. Replies like this aren't retried, so it won't be sent again.`, action: openHook };
+        if (ft === 'redirect') return { title: 'Your endpoint redirected',
+          text: `It replied ${d.status} ${at}. Redirects aren't followed, so it won't be sent again. If the address moved, update the webhook's endpoint.`,
+          action: { label: 'Edit webhook', href: w ? `/tpsentinel/webhooks/edit/?id=${w.id}` : '#' } };
+        if (ft === 'connection') return { title: `Failed after ${d.attempts} attempts`,
+          text: `TPSentinel couldn't connect to your endpoint, the last time ${at}. It won't be sent again.`, action: openHook };
+        if (ft === 'timeout') return { title: `Failed after ${d.attempts} attempts`,
+          text: `Your endpoint didn't reply within 10 seconds, the last time ${at}. It won't be sent again.`, action: openHook };
+        return { title: `Failed after ${d.attempts} attempts`,
+          text: `Your endpoint kept replying ${d.status}, the last time ${at}. It won't be sent again.`, action: openHook };
+      },
+      tone() {
+        return { succeeded: 'text-teal-600 dark:text-teal-500', failed: 'text-red-600 dark:text-red-500',
+                 retry: 'text-amber-500 dark:text-amber-400', processing: 'text-primary' }[this.d.state] || 'text-muted-foreground-2';
+      },
+      icon(px) {
+        const sz = px === 20 ? 'size-5' : 'size-4';
+        const s = p => `<svg class="shrink-0 ${sz}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+        const st = this.d.state;
+        if (st === 'succeeded') return s('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>');
+        if (st === 'failed') return s('<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>');
+        if (st === 'retry') return s('<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>');
+        if (st === 'processing') return s('<path d="M21 12a9 9 0 1 1-6.219-8.56"/>').replace('class="shrink-0', 'class="animate-spin shrink-0');
+        if (st === 'pending') return s('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>');
+        return s('<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>');
+      },
+
+      // ---- timeline: only stored timing ----
+      get steps() {
+        const d = this.d, out = [];
+        const add = (id, title, t, description = '', tone = '') => out.push({ id, title, description, meta: t ? this.exact(t) : '', tone });
+        add('created', 'Created', d.at);
+        if (d.attempts >= 1 && d.state !== 'processing') add('first', 'Attempt 1', d.at, d.attempts === 1 ? this.responseText() : '');
+        if (d.attempts > 1) add('latest', `Attempt ${d.attempts} (latest)`, d.lastAttemptAt, this.responseText());
+        if (d.state === 'succeeded') add('done', 'Delivered', d.lastAttemptAt, '', 'accent');
+        if (d.state === 'failed') add('done', 'Failed, no more attempts', d.lastAttemptAt, '', 'accent');
+        if (d.state === 'retry') add('next', `Attempt ${d.attempts + 1} scheduled`, d.nextAt, this.until(d.nextAt), 'accent');
+        if (d.state === 'cancelled') add('done', 'Cancelled', d.at, '', 'accent');
+        if (d.state === 'processing') add('now', 'Attempt 1 · sending', d.lastAttemptAt || d.at, '', 'accent');
+        if (d.state === 'pending') add('now', 'Queued to send', d.at, '', 'accent');
+        return out;
+      },
+
+      // ---- details ----
+      attemptsText() {
+        const d = this.d;
+        if (!d.attempts) return d.state === 'cancelled' ? 'None, cancelled before sending' : 'None yet';
+        if (d.state === 'retry') return `${d.attempts} of 4 so far`;
+        return `${d.attempts} of 4`;
+      },
+      responseText() {
+        const d = this.d;
+        const names = { 200: 'OK', 301: 'Moved Permanently', 410: 'Gone', 500: 'Internal Server Error', 502: 'Bad Gateway', 503: 'Service Unavailable' };
+        if (d.status) return `${d.status} ${names[d.status] || ''}`.trim();
+        return d.state === 'cancelled' ? '' : (d.failure || '');
+      },
+      failureLabel() {
+        return { server: 'Server error (5xx), retried', client: "Rejected (4xx), not retried", redirect: 'Redirect, not followed',
+                 timeout: 'Timed out (10 seconds), retried', connection: "Couldn't connect, retried", tls: 'TLS error, retried',
+                 blocked: 'Blocked address, not sent' }[WH.failureType(this.d)] || '';
+      },
+
+      // ---- formatting ----
+      ago(t) {
+        const s = Date.now() - t;
+        if (s < WH.MIN) return 'just now';
+        if (s < WH.HR) return `${Math.round(s / WH.MIN)} min ago`;
+        if (s < WH.DAY) return `${Math.round(s / WH.HR)} h ago`;
+        const days = Math.round(s / WH.DAY);
+        return days === 1 ? 'yesterday' : `${days} days ago`;
+      },
+      until(t) { return `in ${Math.max(1, Math.round((t - Date.now()) / WH.MIN))} min`; },
+      time(t) { return new Date(t).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' }); },
+      exact(t) { return new Date(t).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }); },
+    };
+  }
+</script>

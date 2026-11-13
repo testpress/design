@@ -83,17 +83,20 @@
       if (k === 'failing') {
         add('retry', null, 2, now - 4 * MIN, { failure: 'Timed out after 10s', nextAt: now + 11 * MIN });
         add('failed', 500, 4, lf); add('failed', 503, 4, lf - 48 * MIN); add('failed', 500, 4, lf - 2 * HR);
+        add('failed', 410, 1, lf - 3 * HR);
         t = ls;
       } else if (k === 'stopped') {
         add('cancelled', null, 0, lf, { failure: 'Cancelled when the webhook stopped' });
         add('cancelled', null, 1, lf - MIN, { failure: 'Cancelled when the webhook stopped' });
-        for (let i = 0; i < 10; i++) add('failed', i % 4 === 3 ? null : (i % 3 ? 500 : 502), 4, lf - (i * 37 + 3) * MIN, i % 4 === 3 ? { failure: 'Connection refused' } : {});
+        for (let i = 0; i < 9; i++) add('failed', i % 4 === 3 ? null : (i % 3 ? 500 : 502), 4, lf - (i * 37 + 3) * MIN, i % 4 === 3 ? { failure: 'Connection refused' } : {});
+        add('failed', 301, 1, lf - 6 * HR);
         t = ls;
       } else if (k === 'disabled') {
         add('cancelled', null, 0, w.updatedAt, { failure: 'Cancelled when the webhook was disabled' });
         add('cancelled', null, 0, w.updatedAt - 2 * MIN, { failure: 'Cancelled when the webhook was disabled' });
         t = ls;
       } else if (k === 'delivering') {
+        add('pending', null, 0, now - 4 * 1000);
         add('processing', null, 1, now - 20 * 1000);
         t = ls;
       } else { t = ls; }
@@ -109,7 +112,48 @@
       return out;
     }
     function recent(w) { return history(w).slice(0, 5); }
+    function findDelivery(w, id) { return history(w).find(d => d.id === id) || null; }
 
-    return { load, save, reset, seed, kind, recent, history, RETENTION_DAYS, EVENTS, THRESHOLD, MIN, HR, DAY };
+    // Generic failure type, from what the worker records (latest status or the connection error)
+    function failureType(d) {
+      if (d.state === 'cancelled') return null;
+      if (d.status >= 300 && d.status < 400) return 'redirect';
+      if (d.status === 408 || d.status === 429 || d.status >= 500) return 'server';
+      if (d.status >= 400) return 'client';
+      if (/timed out/i.test(d.failure || '')) return 'timeout';
+      if (/refused|connect/i.test(d.failure || '')) return 'connection';
+      if (/tls|certificate/i.test(d.failure || '')) return 'tls';
+      if (/private|blocked/i.test(d.failure || '')) return 'blocked';
+      return null;
+    }
+
+    // Frozen JSON body for a delivery (prototype sample; the real one comes from the event producer)
+    function payload(w, d) {
+      const ws = w.workspaces === 'all' ? 'CA Final · Nov 2026' : w.workspaces[0];
+      const n = d.id.slice(-4);
+      const data = {
+        'candidate.integrity_updated': {
+          workspace: { id: 'ws_7Q2K', name: ws },
+          candidate: { id: 'cand_' + n, external_id: 'ICAI-SRO04' + n.replace(/\D/g, '7').slice(0, 4) },
+          integrity: { result: 'flagged', review_required: true, anomalies: ['multiple_faces', 'looking_away'] },
+          review_url: 'https://app.tpsentinel.com/review/RC-2' + n.replace(/\D/g, '4').slice(0, 3),
+        },
+        'review_case.completed': {
+          workspace: { id: 'ws_7Q2K', name: ws },
+          review_case: { id: 'RC-2' + n.replace(/\D/g, '4').slice(0, 3), decision: 'clear', decided_by: 'Meera Sharma' },
+          candidate: { id: 'cand_' + n },
+        },
+        'session.completed': {
+          workspace: { id: 'ws_7Q2K', name: ws },
+          session: { id: 'ses_' + n, ended_reason: 'submitted', duration_seconds: 5420 },
+          candidate: { id: 'cand_' + n },
+        },
+      }[d.event];
+      return JSON.stringify({ id: d.id, type: d.event, created_at: new Date(d.at).toISOString(), data }, null, 2);
+    }
+
+
+
+    return { load, save, reset, seed, kind, recent, history, findDelivery, failureType, payload, RETENTION_DAYS, EVENTS, THRESHOLD, MIN, HR, DAY };
   })();
 </script>
