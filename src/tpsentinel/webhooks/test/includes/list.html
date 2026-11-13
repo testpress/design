@@ -1,0 +1,69 @@
+{% from "src/tpsentinel/components/button.html" import button %}
+
+<!-- Not found -->
+<div x-show="view === 'missing'" x-cloak class="bg-card border border-card-line shadow-2xs rounded-xl p-5 min-h-[320px] flex flex-col justify-center items-center text-center">
+  <p class="font-medium text-foreground">This webhook isn't available</p>
+  <p class="mt-1 max-w-sm text-sm text-muted-foreground-1">It may have been removed, or the link is wrong.</p>
+  <div class="mt-4">{{ button(text="Back to webhooks", variant="secondary", size="sm", href="/tpsentinel/webhooks/") }}</div>
+</div>
+
+<!-- Test deliveries only (business deliveries are on Deliveries). Same rows and fields as that list. -->
+<section x-show="view !== 'missing'" class="bg-card border border-card-line shadow-2xs rounded-xl" aria-labelledby="tw-list">
+  <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 min-h-14 py-2 ps-4 pe-4 bg-muted border-b border-card-line rounded-t-xl">
+    <h2 id="tw-list" class="text-base font-semibold text-foreground">Test deliveries</h2>
+    <p class="text-[13px] text-muted-foreground-1">
+      <span x-text="`Kept for ${retention} days`"></span>
+      <span aria-hidden="true">·</span>
+      <a :href="deliveriesHref()" class="hover:text-foreground hover:underline focus:outline-hidden focus-visible:underline">Real deliveries are on Deliveries</a>
+    </p>
+  </div>
+
+  <ul x-show="view === 'data' && rows.length" role="list">
+    <template x-for="(r, i) in rows" :key="r.id">
+      <li>
+        <a href="#" class="group flex items-start gap-x-3 py-3 ps-4 pe-3 hover:bg-muted-hover border-t border-card-line focus:outline-hidden focus-visible:bg-muted-hover transition-colors"
+           :class="[i === 0 && 'border-t-0', r.id === justSent && 'bg-primary-50 dark:bg-primary-500/10']">
+          <span class="shrink-0 flex items-center h-6" :class="dTone(r)" x-html="dIcon(r)" :title="stateLabel(r)"></span>
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-h-6">
+              <span class="font-semibold text-foreground" x-text="r.event"></span>
+              <span class="text-sm text-muted-foreground-1" x-text="r.id"></span>
+            </div>
+            <p class="mt-1 text-[13px] leading-5 text-muted-foreground-1">
+              <span class="font-medium text-foreground" x-text="dWord(r)"></span>
+              <span aria-hidden="true">·</span>
+              <span :title="exact(r.at)" x-text="`Sent ${ago(r.at)}`"></span>
+              <template x-if="r.lastAttemptAt && r.attempts > 1">
+                <span>&#32;<span aria-hidden="true">·</span> <span :title="exact(r.lastAttemptAt)" x-text="`Last attempt ${ago(r.lastAttemptAt)}`"></span></span>
+              </template>
+            </p>
+          </div>
+          <svg class="self-center shrink-0 size-4 text-muted-foreground-2 group-hover:text-foreground transition-colors" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </a>
+      </li>
+    </template>
+  </ul>
+
+  <!-- Empty -->
+  <div x-show="view === 'data' && !rows.length" class="p-5 min-h-[200px] flex flex-col justify-center items-center text-center">
+    <p class="font-medium text-foreground">No tests sent yet</p>
+    <p class="mt-1 max-w-sm text-sm text-muted-foreground-1" x-text="readOnly ? 'This webhook is archived.' : 'Send one to check that your endpoint receives and accepts requests.'"></p>
+  </div>
+
+  <!-- Loading -->
+  <ul x-show="view === 'loading'" x-cloak aria-busy="true" aria-label="Loading tests">
+    <template x-for="i in 3" :key="i">
+      <li class="flex items-start gap-x-3 py-3.5 ps-4 pe-3 border-t border-card-line first:border-t-0 animate-pulse">
+        <span class="shrink-0 mt-1 size-4 rounded-full bg-surface"></span>
+        <div class="flex-1 space-y-2.5"><div class="h-4 w-64 max-w-full rounded-full bg-surface"></div><div class="h-3 w-96 max-w-full rounded-full bg-surface"></div></div>
+      </li>
+    </template>
+  </ul>
+
+  <!-- Error -->
+  <div x-show="view === 'error'" x-cloak class="p-5 min-h-[200px] flex flex-col justify-center items-center text-center">
+    <p class="font-medium text-foreground">Couldn't load tests</p>
+    <p class="mt-1 max-w-sm text-sm text-muted-foreground-1">Something went wrong on our side. Try again in a moment.</p>
+    <div class="mt-4">{{ button(text="Try again", size="sm", extra_attrs='@click="retry()"') }}</div>
+  </div>
+</section>

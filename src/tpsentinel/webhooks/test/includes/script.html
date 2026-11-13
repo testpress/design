@@ -1,0 +1,93 @@
+<script>
+  // Test page for the webhook in ?id=. Lists only webhook.test deliveries; sending one goes through the normal path
+  // (so a broken endpoint shows a retry) and never touches the webhook's status or failure count.
+  function testPage() {
+    const q = new URLSearchParams(location.search);
+    const all = WH.load();
+    const w = all.find(x => x.id === q.get('id')) || null;
+    return {
+      view: w ? 'data' : 'missing',
+      w: w || { name: 'Webhook', url: '' },
+      rows: w ? WH.tests(w) : [],
+      retention: WH.RETENTION_DAYS,
+      sending: false,
+      justSent: '',
+      get readOnly() { return this.w.state === 'archived'; },
+
+      protoState: 'data',
+      protoGroups: [
+        { name: 'Webhook', states: [['ok', 'Delivering (wh_01)'], ['stopped', 'Stopped, test retrying (wh_02)'], ['disabled', 'Disabled (wh_06)'],
+                                     ['new', 'No tests yet (wh_05)'], ['archived', 'Archived (wh_07)']] },
+        { name: 'Page', states: [['loading', 'Loading'], ['error', "Couldn't load"], ['missing', 'Not found']] },
+      ],
+      pickState(s) {
+        this.protoState = s;
+        const go = (id) => { location.href = `/tpsentinel/webhooks/test/?id=${id}`; };
+        const map = { ok: 'wh_01', stopped: 'wh_02', disabled: 'wh_06', new: 'wh_05', archived: 'wh_07' };
+        if (map[s]) return go(map[s]);
+        this.view = s;
+      },
+      retry() { this.view = 'loading'; setTimeout(() => this.view = w ? 'data' : 'missing', 900); },
+      detailHref() { return w ? `/tpsentinel/webhooks/detail/?id=${w.id}` : '/tpsentinel/webhooks/'; },
+      deliveriesHref() { return w ? `/tpsentinel/webhooks/deliveries/?id=${w.id}` : '#'; },
+
+      // The one line the PRD requires, the same for every state
+      note() { return "A test doesn't change the webhook's status or reactivate it."; },
+
+      // Send: appears at the top as "Sending now", then shows the result this endpoint would give
+      send() {
+        if (!w || this.readOnly) return;
+        this.sending = true;
+        const now = Date.now();
+        const t = { id: 'dlv_01JT' + now.toString(36).toUpperCase().slice(-6), event: 'webhook.test', state: 'processing', status: null, attempts: 1, at: now, lastAttemptAt: now };
+        this.rows.unshift(t); this.justSent = t.id;
+        setTimeout(() => {
+          const k = WH.kind(w);
+          const r = this.rows.find(x => x.id === t.id);
+          if (k === 'stopped') Object.assign(r, { state: 'retry', status: 500, failure: '500 Internal Server Error', nextAt: Date.now() + 5 * WH.MIN });
+          else if (k === 'failing') Object.assign(r, { state: 'retry', status: null, failure: 'Timed out after 10s', nextAt: Date.now() + 5 * WH.MIN });
+          else Object.assign(r, { state: 'succeeded', status: 200 });
+          // Remember it, and the webhook's last test (shown on its page). Health is untouched.
+          WH.saveTest(w.id, { ...r });
+          const i = all.findIndex(x => x.id === w.id);
+          all[i].lastTest = { ok: r.state === 'succeeded', status: r.status || 0, at: r.at }; WH.save(all);
+          this.sending = false;
+          setTimeout(() => { if (this.justSent === t.id) this.justSent = ''; }, 2500);
+        }, 1800);
+      },
+
+      // ---- row words (same as Deliveries) ----
+      stateLabel(r) { return { succeeded: 'Delivered', failed: 'Failed', retry: 'Retry scheduled', cancelled: 'Cancelled', pending: 'Waiting to send', processing: 'Sending' }[r.state]; },
+      dWord(r) {
+        if (r.state === 'succeeded') return `Delivered · ${r.status}${r.attempts > 1 ? ` on attempt ${r.attempts}` : ''}`;
+        if (r.state === 'retry') return `Retrying ${this.until(r.nextAt)} · ${r.failure}`;
+        if (r.state === 'cancelled') return r.failure;
+        if (r.state === 'processing') return 'Sending now';
+        if (r.state === 'pending') return 'Waiting to send';
+        return `Failed · ${r.status ? r.status : r.failure} after ${r.attempts} ${r.attempts === 1 ? 'attempt' : 'attempts'}`;
+      },
+      dTone(r) {
+        return { succeeded: 'text-teal-600 dark:text-teal-500', failed: 'text-red-600 dark:text-red-500',
+                 retry: 'text-amber-500 dark:text-amber-400', processing: 'text-primary' }[r.state] || 'text-muted-foreground-2';
+      },
+      dIcon(r) {
+        const s = p => `<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+        if (r.state === 'succeeded') return s('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>');
+        if (r.state === 'failed') return s('<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>');
+        if (r.state === 'retry') return s('<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>');
+        if (r.state === 'processing') return s('<path d="M21 12a9 9 0 1 1-6.219-8.56"/>').replace('<svg class="', '<svg class="animate-spin ');
+        return s('<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>');
+      },
+      ago(t) {
+        const d = Date.now() - t;
+        if (d < WH.MIN) return 'just now';
+        if (d < WH.HR) return `${Math.round(d / WH.MIN)} min ago`;
+        if (d < WH.DAY) return `${Math.round(d / WH.HR)} h ago`;
+        const days = Math.round(d / WH.DAY);
+        return days === 1 ? 'yesterday' : `${days} days ago`;
+      },
+      until(t) { return `in ${Math.max(1, Math.round((t - Date.now()) / WH.MIN))} min`; },
+      exact(t) { return new Date(t).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }); },
+    };
+  }
+</script>
