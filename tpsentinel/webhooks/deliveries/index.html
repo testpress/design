@@ -663,7 +663,7 @@
     <p class="text-[13px] text-muted-foreground-1">
       <span x-text="`Kept for ${retention} days`"></span>
       <span aria-hidden="true">·</span>
-      <a href="#" class="hover:text-foreground hover:underline focus:outline-hidden focus-visible:underline">Test deliveries are on the Test page</a>
+      <a :href="`/tpsentinel/webhooks/test/?id=${w.id}`" class="hover:text-foreground hover:underline focus:outline-hidden focus-visible:underline">Test deliveries are on the Test page</a>
     </p>
   </div>
 </div>
@@ -1631,11 +1631,11 @@
       return [
         { id: 'wh_01', name: 'Testpress exam attempts', url: 'https://icai.testpress.in/api/webhooks/tpsentinel/', state: 'active',
           events: 'all', workspaces: 'all', failures: 0, lastSuccess: now - 4 * MIN, lastFailure: now - 6 * DAY,
-          createdAt: now - 41 * DAY, createdBy: 'Hari', updatedAt: now - 41 * DAY, lastTest: ok(41 * DAY) },
+          createdAt: now - 41 * DAY, createdBy: 'Hari', updatedAt: now - 41 * DAY, lastTest: ok(6 * DAY) },
         { id: 'wh_02', name: 'Certificate service', url: 'https://certs.icai.org/hooks/proctoring', state: 'unhealthy',
           events: ['candidate.integrity_updated'], workspaces: ['CA Final · Nov 2026', 'CA Intermediate · Nov 2026'],
           failures: 10, lastSuccess: now - 3 * DAY, lastFailure: now - 2 * HR,
-          createdAt: now - 34 * DAY, createdBy: 'Hari', updatedAt: now - 3 * DAY, lastTest: ok(34 * DAY) },
+          createdAt: now - 34 * DAY, createdBy: 'Hari', updatedAt: now - 3 * DAY, lastTest: { ok: false, status: 500, at: now - 5 * MIN } },
         { id: 'wh_03', name: 'Exam operations alerts', url: 'https://hooks.zapier.com/hooks/catch/18273/abx9k2/', state: 'active',
           events: ['review_case.completed', 'candidate.integrity_updated'], workspaces: 'all',
           failures: 4, lastSuccess: now - 5 * HR, lastFailure: now - 12 * MIN,
@@ -1729,6 +1729,32 @@
       return out;
     }
     function recent(w) { return history(w).slice(0, 5); }
+    // webhook.test deliveries for a webhook, newest first: a few seeded ones plus any sent in this session.
+    // Same fields and states as business deliveries (tests use the normal send and retry path).
+    const TKEY = 'tpsentinel.webhookTests';
+    function sentTests() { try { return JSON.parse(sessionStorage.getItem(TKEY)) || {}; } catch (e) { return {}; } }
+    function saveTest(wid, t) {
+      const all = sentTests(); all[wid] = (all[wid] || []).filter(x => x.id !== t.id); all[wid].unshift(t);
+      try { sessionStorage.setItem(TKEY, JSON.stringify(all)); } catch (e) {}
+    }
+    function tests(w) {
+      const now = Date.now(), n = parseInt(String(w.id).replace(/\D/g, ''), 10) || 7;
+      const id = (i) => 'dlv_01JT' + ((n * 31 + i * 7) * 7919).toString(36).toUpperCase().slice(-6).padStart(6, '0');
+      const T = (i, state, status, attempts, at, extra = {}) => Object.assign({ id: id(i), event: 'webhook.test', state, status, attempts,
+        at: at - ([0, 0, 5, 20, 60][attempts] || 0) * MIN, lastAttemptAt: attempts ? at : null }, extra);
+      const seeded = [];
+      const lt = w.lastTest;
+      if (lt && !lt.ok) {
+        seeded.push(Object.assign(T(0, 'retry', 500, 3, now - 5 * MIN), { failure: '500 Internal Server Error', nextAt: now + 35 * MIN }));
+        seeded.push(T(1, 'failed', 500, 4, now - 2 * HR));
+      } else if (lt) {
+        seeded.push(T(0, 'succeeded', 200, 1, lt.at));
+      }
+      if (lt && now - (w.createdAt || now) > 2 * DAY) seeded.push(T(2, 'succeeded', 200, 1, w.createdAt + 3 * MIN));
+      const oldest = now - RETENTION_DAYS * DAY;
+      return [...(sentTests()[w.id] || []), ...seeded.filter(t => t.at > oldest)].sort((a, b) => b.at - a.at);
+    }
+
     function findDelivery(w, id) { return history(w).find(d => d.id === id) || null; }
 
     // Generic failure type, from what the worker records (latest status or the connection error)
@@ -1771,7 +1797,7 @@
 
 
 
-    return { load, save, reset, seed, kind, recent, history, findDelivery, failureType, payload, RETENTION_DAYS, EVENTS, THRESHOLD, MIN, HR, DAY };
+    return { load, save, reset, seed, kind, recent, history, tests, saveTest, findDelivery, failureType, payload, RETENTION_DAYS, EVENTS, THRESHOLD, MIN, HR, DAY };
   })();
 </script>
 
