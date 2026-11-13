@@ -1,0 +1,75 @@
+<script>
+  // Edit = the Add webhook form and its checks, filled from the webhook in ?id=, saved back to the shared data.
+  function editWebhookPage() {
+    const page = createWebhookPage();
+    const all = WH.load();
+    const id = new URLSearchParams(location.search).get('id');
+    const found = all.find(x => x.id === id);
+    const toForm = (w) => ({
+      name: w.name, url: w.url,
+      eventScope: w.events === 'all' ? 'all' : 'selected', events: w.events === 'all' ? [...WH.EVENTS] : [...w.events],
+      wsScope: w.workspaces === 'all' ? 'all' : 'selected', workspaces: w.workspaces === 'all' ? [] : [...w.workspaces],
+    });
+    const snapshot = found ? toForm(found) : null;
+
+    return Object.assign(page, {
+      view: !found ? 'missing' : found.state === 'archived' ? 'archived' : 'form',
+      original: found || { name: 'Webhook' },
+      form: snapshot ? JSON.parse(JSON.stringify(snapshot)) : page.form,
+      leaving: false,
+
+      init() { this.syncWorkspaces(); },
+      detailHref() { return found ? `/tpsentinel/webhooks/detail/?id=${found.id}` : '/tpsentinel/webhooks/'; },
+      // Order-insensitive compare, so ticking and unticking the same box isn't a change
+      norm(f) { return JSON.stringify({ ...f, name: f.name.trim(), url: f.url.trim(), events: [...f.events].sort(), workspaces: [...f.workspaces].sort() }); },
+      isDirty() { return !!snapshot && this.view === 'form' && this.norm(this.form) !== this.norm(snapshot); },
+      discard() {
+        this.form = JSON.parse(JSON.stringify(snapshot));
+        this.touched = {}; this.tried = false; this.serverError = ''; this.urlServerError = ''; this.suggestion = '';
+        this.syncWorkspaces();
+      },
+
+      protoState: !found ? 'missing' : found.state === 'archived' ? 'archived' : 'clean',
+      protoGroups: [
+        { name: 'Edit webhook', states: [
+          ['clean', 'Opened, no changes'], ['dirty', 'Changed, not saved'], ['errors', 'Errors after Save'],
+          ['unsafe', 'Endpoint rejected on save'], ['failed', "Couldn't save"],
+        ] },
+        { name: 'Page', states: [['archived', 'Archived (read-only)'], ['missing', 'Not found or removed']] },
+      ],
+      pickState(s) {
+        this.protoState = s;
+        if (s === 'archived') { location.href = '/tpsentinel/webhooks/edit/?id=wh_07'; return; }
+        if (s === 'missing') { this.view = 'missing'; return; }
+        if (!found || found.state === 'archived') { location.href = '/tpsentinel/webhooks/edit/?id=wh_02'; return; }
+        this.view = 'form'; this.discard();
+        if (s === 'dirty') { this.form.url = 'https://certs.icai.org/hooks/v2/proctoring'; this.form.workspaces.push('CA Foundation · Dec 2026'); this.syncWorkspaces(); }
+        if (s === 'errors') { this.form.name = ''; this.form.url = 'http://certs.icai.org/hooks'; this.tried = true; this.cleanUrl(); }
+        if (s === 'unsafe') { this.form.url = 'https://hooks.icai-internal.org/proctoring'; this.urlServerError = 'hooks.icai-internal.org points to a private address (10.4.0.12). Use an address that can be reached from the internet.'; }
+        if (s === 'failed') { this.form.name = 'Certificate service v2'; this.serverError = 'Something went wrong on our side. Nothing was saved. Try again.'; }
+      },
+
+      submit() {
+        this.tried = true; this.serverError = '';
+        this.cleanUrl();
+        if (Object.keys(this.validate()).length) {
+          this.$nextTick(() => { const el = this.$root.querySelector('[aria-invalid="true"], .border-red-500'); el && el.scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+          return;
+        }
+        if (!this.isDirty()) { this.leaving = true; location.href = this.detailHref(); return; }
+        this.submitting = true;
+        setTimeout(() => {
+          const f = this.form, i = all.findIndex(x => x.id === found.id);
+          Object.assign(all[i], {
+            name: f.name.trim(), url: f.url.trim(),
+            events: f.eventScope === 'all' ? 'all' : [...f.events], workspaces: f.wsScope === 'all' ? 'all' : [...f.workspaces],
+            updatedAt: Date.now(),
+          });
+          WH.save(all);
+          this.leaving = true;
+          location.href = `${this.detailHref()}&saved=1`;
+        }, 800);
+      },
+    });
+  }
+</script>

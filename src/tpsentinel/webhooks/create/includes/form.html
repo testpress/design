@@ -32,18 +32,27 @@
 
 <div class="max-w-5xl mx-auto">
 <!-- Back to the list, then the title. A page, not a modal: the scope choices need room. -->
+{# Shared by Add webhook and Edit webhook. The including page sets wh_mode to "edit" for the edit page. #}
+{% if wh_mode == "edit" %}
+<a :href="detailHref()" class="inline-flex items-center gap-x-1 text-sm text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:underline">
+  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+  <span x-text="original.name"></span>
+</a>
+<h1 class="mt-2 text-lg md:text-xl font-semibold text-foreground">Edit webhook</h1>
+{% else %}
 <a href="/tpsentinel/webhooks/" class="inline-flex items-center gap-x-1 text-sm text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:underline">
   <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
   Webhooks
 </a>
 <h1 class="mt-2 text-lg md:text-xl font-semibold text-foreground">Add webhook</h1>
+{% endif %}
 
 <form id="wh-form" @submit.prevent="submit()" novalidate class="mt-6 grid lg:grid-cols-[minmax(0,1fr)_18rem] gap-6 xl:gap-8 items-start">
   <div class="min-w-0 flex flex-col gap-5">
 
     <!-- Server said no for a reason that isn't about one field -->
     <div x-show="serverError" x-cloak>
-      {% call alert(variant="danger", title="Couldn't add the webhook") %}<span x-text="serverError"></span>{% endcall %}
+      {% call alert(variant="danger", title=("Couldn't save changes" if wh_mode == "edit" else "Couldn't add the webhook")) %}<span x-text="serverError"></span>{% endcall %}
     </div>
 
     <!-- Destination -->
@@ -95,6 +104,38 @@
     </section>
   </div>
 
+{% if wh_mode == "edit" %}
+  <!-- Edit: what a save changes. Neutral, happy path. -->
+  <aside class="hidden lg:block sticky top-20 p-5 bg-card border border-card-line shadow-2xs rounded-xl" aria-labelledby="wh-how">
+    <p id="wh-how" class="text-sm font-semibold text-foreground">When you save</p>
+    <ol class="mt-4">
+      <li class="relative flex gap-x-3 pb-5">
+        <span class="absolute start-4 top-9 bottom-0 w-px bg-card-line" aria-hidden="true"></span>
+        <span class="relative shrink-0 inline-flex justify-center items-center size-8 rounded-lg bg-surface text-muted-foreground-1"><i data-lucide="send" class="size-4"></i></span>
+        <div class="pt-1 text-[13px] leading-5">
+          <p class="font-medium text-foreground">New events follow the new settings</p>
+          <p class="mt-0.5 text-muted-foreground-1">Events and workspaces you add or remove apply from the next event.</p>
+        </div>
+      </li>
+      <li class="relative flex gap-x-3 pb-5">
+        <span class="absolute start-4 top-9 bottom-0 w-px bg-card-line" aria-hidden="true"></span>
+        <span class="relative shrink-0 inline-flex justify-center items-center size-8 rounded-lg bg-surface text-muted-foreground-1"><i data-lucide="refresh-cw" class="size-4"></i></span>
+        <div class="pt-1 text-[13px] leading-5">
+          <p class="font-medium text-foreground">Waiting deliveries go to the new address</p>
+          <p class="mt-0.5 text-muted-foreground-1">If you change the endpoint, deliveries not yet sent go there, with the same content.</p>
+        </div>
+      </li>
+      <li class="relative flex gap-x-3 ">
+        
+        <span class="relative shrink-0 inline-flex justify-center items-center size-8 rounded-lg bg-surface text-muted-foreground-1"><i data-lucide="key-round" class="size-4"></i></span>
+        <div class="pt-1 text-[13px] leading-5">
+          <p class="font-medium text-foreground">The signing secret stays the same</p>
+          <p class="mt-0.5 text-muted-foreground-1">Your system keeps checking requests with the secret it already has.</p>
+        </div>
+      </li>
+    </ol>
+  </aside>
+{% else %}
   <!-- How it works: what a webhook does, the secret, and where the verification guide is. Happy path only. Neutral. -->
   <aside class="hidden lg:block sticky top-20 p-5 bg-card border border-card-line shadow-2xs rounded-xl" aria-labelledby="wh-how">
     <p id="wh-how" class="text-sm font-semibold text-foreground">How it works</p>
@@ -130,9 +171,28 @@
       <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
     </a>
   </aside>
+{% endif %}
 </form>
 </div>
 
+{% if wh_mode == "edit" %}
+<!-- Edit: unsaved-changes bar, exactly as on Product Benefits. Shows only once something changes. -->
+<div x-show="isDirty() || (tried && errorCount())" x-cloak
+     x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0"
+     x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 translate-y-4"
+     class="fixed inset-x-0 bottom-4 lg:ps-65 z-40 flex justify-center px-4 pointer-events-none">
+  <div class="pointer-events-auto w-full max-w-xl flex flex-wrap items-center justify-between gap-3 rounded-xl border border-layer-line bg-layer px-4 py-3 shadow-lg" role="region" aria-label="Unsaved changes">
+    <p class="flex items-center gap-x-2 text-sm min-w-0">
+      <span class="size-2 shrink-0 rounded-full" :class="tried && errorCount() ? 'bg-red-500' : 'bg-amber-500'" aria-hidden="true"></span>
+      <span class="font-medium text-foreground truncate" x-text="tried && errorCount() ? `${errorCount()} ${errorCount() === 1 ? 'thing' : 'things'} to fix` : 'Unsaved changes'"></span>
+    </p>
+    <div class="flex items-center gap-x-2">
+      {{ button(text="Discard", variant="ghost", extra_attrs='@click="discard()" :disabled="submitting"') }}
+      {{ button(text="<span x-text=\"submitting ? 'Saving…' : 'Save changes'\">Save changes</span>", type="submit", extra_attrs='form="wh-form" :disabled="submitting"') }}
+    </div>
+  </div>
+</div>
+{% else %}
 <!-- Floating action bar, as on Product Benefits: always in reach, says what's left to do -->
 <div class="fixed inset-x-0 bottom-4 lg:ps-65 z-40 flex justify-center px-4 pointer-events-none">
   <div class="pointer-events-auto w-full max-w-xl flex flex-wrap items-center justify-between gap-3 rounded-xl border border-layer-line bg-layer px-4 py-3 shadow-lg" role="region" aria-label="Add webhook">
@@ -146,3 +206,4 @@
     </div>
   </div>
 </div>
+{% endif %}
