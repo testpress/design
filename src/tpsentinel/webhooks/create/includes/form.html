@@ -1,0 +1,148 @@
+{# Supported events are a code-defined enum (PRD NFR-26). webhook.test is internal and never selectable.
+   Only candidate.integrity_updated is planned so far; the other two are placeholders to show a list. #}
+{% set wh_events = [
+  { key: "candidate.integrity_updated", desc: "A candidate's integrity result or review need changes" },
+  { key: "review_case.completed", desc: "A reviewer submits a decision on a case" },
+  { key: "session.completed", desc: "A proctored session ends" }
+] %}
+
+{% set wh_workspaces = [
+  { value: "CA Final · Nov 2026", label: "CA Final · Nov 2026" },
+  { value: "CA Final · May 2027", label: "CA Final · May 2027" },
+  { value: "CA Intermediate · Nov 2026", label: "CA Intermediate · Nov 2026" },
+  { value: "CA Intermediate · May 2027", label: "CA Intermediate · May 2027" },
+  { value: "CA Foundation · Dec 2026", label: "CA Foundation · Dec 2026" },
+  { value: "CA Foundation · Jun 2027", label: "CA Foundation · Jun 2027" },
+  { value: "CA Foundation Mock Test 3", label: "CA Foundation Mock Test 3" },
+  { value: "Advanced ICITSS · Batch 14", label: "Advanced ICITSS · Batch 14" },
+  { value: "Orientation Course · Batch 22", label: "Orientation Course · Batch 22" },
+  { value: "Post Qualification · DISA", label: "Post Qualification · DISA" },
+  { value: "Post Qualification · Forensic Audit", label: "Post Qualification · Forensic Audit" },
+  { value: "Self-paced Online Module · Set A", label: "Self-paced Online Module · Set A" },
+  { value: "Self-paced Online Module · Set B", label: "Self-paced Online Module · Set B" },
+  { value: "Members CPE · Ethics 2026", label: "Members CPE · Ethics 2026" }
+] %}
+
+{% from "src/tpsentinel/components/input.html" import input %}
+{% from "src/tpsentinel/components/option-card.html" import option_card %}
+{% from "src/tpsentinel/components/checkbox.html" import checkbox %}
+{% from "src/tpsentinel/components/select.html" import select %}
+{% from "src/tpsentinel/components/button.html" import button %}
+{% from "src/tpsentinel/components/alert.html" import alert %}
+
+<div class="max-w-5xl mx-auto">
+<!-- Back to the list, then the title. A page, not a modal: the scope choices need room. -->
+<a href="/tpsentinel/webhooks/" class="inline-flex items-center gap-x-1 text-sm text-muted-foreground-1 hover:text-foreground focus:outline-hidden focus-visible:underline">
+  <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+  Webhooks
+</a>
+<h1 class="mt-2 text-lg md:text-xl font-semibold text-foreground">Add webhook</h1>
+
+<form id="wh-form" @submit.prevent="submit()" novalidate class="mt-6 grid lg:grid-cols-[minmax(0,1fr)_18rem] gap-6 xl:gap-8 items-start">
+  <div class="min-w-0 flex flex-col gap-5">
+
+    <!-- Server said no for a reason that isn't about one field -->
+    <div x-show="serverError" x-cloak>
+      {% call alert(variant="danger", title="Couldn't add the webhook") %}<span x-text="serverError"></span>{% endcall %}
+    </div>
+
+    <!-- Destination -->
+    <section class="p-5 bg-card border border-card-line shadow-2xs rounded-xl flex flex-col gap-5" aria-labelledby="wh-dest">
+      <h2 id="wh-dest" class="text-base font-semibold text-foreground">Destination</h2>
+      {{ input(name="name", label="Name", placeholder="e.g. Testpress exam attempts", x_model="form.name",
+               x_error="errorFor('name')", extra_attrs='@blur="touch(\'name\')" maxlength="80" autocomplete="off"') }}
+      <div>
+        {{ input(name="url", label="Endpoint URL", type="text", placeholder="https://example.com/webhooks/tpsentinel", x_model="form.url",
+                 help_text="The address on your system that receives the events. Your developer will have it.",
+                 x_error="errorFor('url')", extra_attrs='@blur="cleanUrl(); touch(\'url\')" @input="urlServerError = \'\'; suggestion = \'\'" autocomplete="off" spellcheck="false" inputmode="url"') }}
+        <!-- A likely fix, offered instead of changed silently (as on Custom Domain) -->
+        <p x-show="suggestion && errorFor('url')" x-cloak class="mt-1.5 text-xs text-muted-foreground-1">
+          Did you mean
+          <button type="button" @click="useSuggestion()" class="font-medium text-primary hover:text-primary-hover hover:underline focus:outline-hidden focus-visible:underline" x-text="suggestion"></button>?
+        </p>
+      </div>
+    </section>
+
+    <!-- Events: every event is listed and ticked by default, so nothing is hidden behind a choice.
+         "All events" is the scope that also picks up events added later; unticking any event switches to a selection. -->
+    <section class="p-5 bg-card border border-card-line shadow-2xs rounded-xl flex flex-col gap-4" aria-labelledby="wh-events">
+      <h2 id="wh-events" class="text-base font-semibold text-foreground">Events</h2>
+      {{ checkbox(name="all_events", id="ev-all", label="All events", description="Includes events added later", extra_classes="indeterminate:bg-primary-checked indeterminate:border-primary-checked", extra_attrs=':checked="form.eventScope === \'all\'" x-effect="$el.indeterminate = form.eventScope === \'selected\' && form.events.length > 0 && form.events.length < allEvents.length" @change="toggleAllEvents($event.target.checked)"') }}
+      <div class="ps-7 flex flex-col gap-3.5" role="group" aria-label="Events">
+        {% for e in wh_events %}
+          {{ checkbox(name="events", id="ev-" ~ loop.index, label=e.key, description=e.desc, value=e.key, x_model="form.events", extra_attrs='@change="pickEvent(); touch(\'events\')"') }}
+        {% endfor %}
+      </div>
+      <p x-show="errorFor('events')" x-text="errorFor('events')" x-cloak class="text-xs text-red-500"></p>
+    </section>
+
+    <!-- Workspaces -->
+    <section class="p-5 bg-card border border-card-line shadow-2xs rounded-xl flex flex-col gap-4" aria-labelledby="wh-ws">
+      <h2 id="wh-ws" class="text-base font-semibold text-foreground">Workspaces</h2>
+      <fieldset class="grid sm:grid-cols-2 gap-3">
+        <legend class="sr-only">Which workspaces to send events from</legend>
+        {{ option_card(name="ws_scope", value="all", title="All workspaces", description="Includes workspaces added later", x_model="form.wsScope") }}
+        {{ option_card(name="ws_scope", value="selected", title="Selected workspaces", description="Events that aren't tied to a workspace aren't sent", x_model="form.wsScope") }}
+      </fieldset>
+
+      <!-- Multi-select with search: picks show as chips, the list stays out of the way -->
+      <div x-show="form.wsScope === 'selected'" x-cloak
+           @change="if ($event.target.name === 'workspaces') { form.workspaces = Array.from($event.target.selectedOptions).map(o => o.value).filter(Boolean); touch('workspaces'); }"
+           :class="errorFor('workspaces') && '[&_[x-ref=toggle]]:border-red-500'">
+        {{ select(name="workspaces", id="wh-workspaces", placeholder="Pick workspaces", options=wh_workspaces, multiple=true, search=true) }}
+        <p x-show="errorFor('workspaces')" x-text="errorFor('workspaces')" x-cloak class="mt-1.5 text-xs text-red-500"></p>
+      </div>
+    </section>
+  </div>
+
+  <!-- How it works: what a webhook does, the secret, and where the verification guide is. Happy path only. Neutral. -->
+  <aside class="hidden lg:block sticky top-20 p-5 bg-card border border-card-line shadow-2xs rounded-xl" aria-labelledby="wh-how">
+    <p id="wh-how" class="text-sm font-semibold text-foreground">How it works</p>
+    <ol class="mt-4">
+      <li class="relative flex gap-x-3 pb-5">
+        <span class="absolute start-4 top-9 bottom-0 w-px bg-card-line" aria-hidden="true"></span>
+        <span class="relative shrink-0 inline-flex justify-center items-center size-8 rounded-lg bg-surface text-muted-foreground-1"><i data-lucide="send" class="size-4"></i></span>
+        <div class="pt-1 text-[13px] leading-5">
+          <p class="font-medium text-foreground">Sends events as they happen</p>
+          <p class="mt-0.5 text-muted-foreground-1">When one of your chosen events happens, TPSentinel sends its details to your endpoint right away.</p>
+        </div>
+      </li>
+      <li class="relative flex gap-x-3 pb-5">
+        <span class="absolute start-4 top-9 bottom-0 w-px bg-card-line" aria-hidden="true"></span>
+        <span class="relative shrink-0 inline-flex justify-center items-center size-8 rounded-lg bg-surface text-muted-foreground-1"><i data-lucide="key-round" class="size-4"></i></span>
+        <div class="pt-1 text-[13px] leading-5">
+          <p class="font-medium text-foreground">Signs every request</p>
+          <p class="mt-0.5 text-muted-foreground-1">After you add the webhook, you get a signing secret. It's shown only once, so save it.</p>
+        </div>
+      </li>
+      <li class="relative flex gap-x-3 ">
+        
+        <span class="relative shrink-0 inline-flex justify-center items-center size-8 rounded-lg bg-surface text-muted-foreground-1"><i data-lucide="shield-check" class="size-4"></i></span>
+        <div class="pt-1 text-[13px] leading-5">
+          <p class="font-medium text-foreground">Your system checks it</p>
+          <p class="mt-0.5 text-muted-foreground-1">Your developer uses the secret to confirm each request came from TPSentinel.</p>
+        </div>
+      </li>
+    </ol>
+    <a href="/tpsentinel/docs/webhooks/verify/" target="_blank" rel="noopener"
+       class="mt-5 inline-flex items-center gap-x-1 text-[13px] font-medium text-primary hover:text-primary-hover hover:underline focus:outline-hidden focus-visible:underline">
+      How to verify requests
+      <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg>
+    </a>
+  </aside>
+</form>
+</div>
+
+<!-- Floating action bar, as on Product Benefits: always in reach, says what's left to do -->
+<div class="fixed inset-x-0 bottom-4 lg:ps-65 z-40 flex justify-center px-4 pointer-events-none">
+  <div class="pointer-events-auto w-full max-w-xl flex flex-wrap items-center justify-between gap-3 rounded-xl border border-layer-line bg-layer px-4 py-3 shadow-lg" role="region" aria-label="Add webhook">
+    <p class="flex items-center gap-x-2 text-sm min-w-0">
+      <span class="size-2 shrink-0 rounded-full" :class="tried && errorCount() ? 'bg-red-500' : 'bg-teal-500'" aria-hidden="true"></span>
+      <span class="font-medium text-foreground truncate" x-text="barText()"></span>
+    </p>
+    <div class="flex items-center gap-x-2">
+      {{ button(text="Cancel", variant="ghost", href="/tpsentinel/webhooks/") }}
+      {{ button(text="<span x-text=\"submitting ? 'Checking endpoint…' : 'Add webhook'\">Add webhook</span>", type="submit", extra_attrs='form="wh-form" :disabled="submitting"') }}
+    </div>
+  </div>
+</div>

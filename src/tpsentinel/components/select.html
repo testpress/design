@@ -1,0 +1,151 @@
+{# TPSentinel copy of src/ui-system/components/select.html: same markup and API (needs src/ui-system/scripts/select_script.html), Preline theme tokens for neutral and primary colours. #}
+{% from "./input.html" import input %}
+{% macro select(label="", name="", id="", placeholder="Select option...", options=[], selected_value="", required=false, disabled=false, multiple=false, search=false, help_text="", error_message="", label_action_text="", label_action_url="", label_action_attrs="", padding_class="", extra_classes="", icon="", search_padding_class="py-1.5 sm:py-2.5") %}
+{% set element_id = id if id else name %}
+
+<div class="space-y-2" 
+     x-data="uiSelect({ 
+        multiple: {{ 'true' if multiple else 'false' }}, 
+        searchable: {{ 'true' if search else 'false' }}, 
+        selectedValue: '{{ selected_value }}', 
+        options: {{ options | dump | escape | default('[]') }} 
+     })"
+     @click.outside="open = false"
+     @scroll.window.capture.passive="if(open) updatePosition()"
+     @resize.window.passive="if(open) updatePosition()">
+
+    {% if label %}
+    <div class="flex justify-between items-center">
+        <label for="{{ element_id }}" class="block text-sm font-medium text-foreground">
+            {{ label }}{% if required %}<span class="text-red-500 ml-1">*</span>{% endif %}
+        </label>
+        {% if label_action_text and label_action_url %}
+        <a href="{{ label_action_url }}" class="text-sm font-medium text-primary hover:underline" {{ label_action_attrs | safe }}>
+            {{ label_action_text }}
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="relative">
+        <!-- Hidden Native Select for Form Submission -->
+        <select name="{{ name }}" id="{{ element_id }}" {% if multiple %}multiple{% endif %} {% if required %}required{% endif %} {% if disabled %}disabled{% endif %} class="hidden" x-ref="select">
+            <option value=""></option>
+            {% for opt in options %}
+                <option value="{{ opt.value }}" :selected="isSelected('{{ opt.value }}')">{{ opt.label }}</option>
+            {% endfor %}
+        </select>
+
+        <!-- Custom Select Toggle -->
+        {% set pad_cls = padding_class if padding_class else ("ps-1 pe-9 min-h-[42px] flex-wrap" if multiple else "py-2 sm:py-2.5 px-3 pe-9") %}
+        <div x-ref="toggle"
+             @click="{% if not disabled %}open = !open; if(open && searchable) $nextTick(() => { if($refs.searchInput) $refs.searchInput.focus() }){% endif %}"
+             class="relative flex items-center w-full bg-layer border rounded-lg text-xs sm:text-sm text-foreground focus-within:ring-2 focus-within:outline-none transition-colors duration-200 cursor-pointer {% if disabled %}opacity-50 pointer-events-none bg-muted{% else %}hover:bg-layer-hover{% endif %}
+                    {% if error_message %}border-red-500 dark:border-red-500 focus-within:border-red-500 dark:focus-within:border-red-500 focus-within:ring-red-500 dark:focus-within:ring-red-500{% else %}border-layer-line focus-within:border-primary focus-within:ring-primary{% endif %}
+                    {{ pad_cls }} {{ extra_classes }}">
+             
+            <!-- Multi Select Tags -->
+            <template x-if="multiple">
+                <div class="flex flex-wrap items-center gap-1 w-full">
+                    <template x-for="tag in selectedLabels" :key="tag.value">
+                        <div class="flex items-center relative z-10 bg-layer border border-layer-line rounded-full p-1 m-0.5">
+                            <template x-if="tag.icon">
+                                <div class="size-5 ms-1 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="tag.icon"></div>
+                            </template>
+                            <div class="whitespace-nowrap text-foreground px-2 text-xs font-medium" x-text="tag.label"></div>
+                            <div @click.stop="removeSelected(tag.value)" class="inline-flex shrink-0 justify-center items-center size-5 rounded-full bg-surface text-foreground hover:bg-surface-hover focus:outline-none focus:bg-surface-hover cursor-pointer">
+                                <svg class="shrink-0 w-3 h-3" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                            </div>
+                        </div>
+                    </template>
+                    <!-- Placeholder (Multiple) -->
+                    <div x-show="selected.length === 0" class="text-muted-foreground-1 px-2 my-1" x-text="'{{ placeholder }}'"></div>
+                </div>
+            </template>
+
+            <!-- Single Select Text -->
+            <template x-if="!multiple">
+                <div class="w-full truncate text-start flex items-center" x-init="setTimeout(() => lucide.createIcons({root: $el}), 0)">
+                    {% if icon %}
+                    <i data-lucide="{{ icon }}" class="size-4 me-2 text-muted-foreground-1 shrink-0"></i>
+                    {% endif %}
+                    <template x-if="singleSelectedOption && singleSelectedOption.icon">
+                        <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="singleSelectedOption.icon"></div>
+                    </template>
+                    <span x-show="singleSelectedLabel" x-text="singleSelectedLabel"></span>
+                    <span x-show="!singleSelectedLabel" class="text-muted-foreground-1" x-text="'{{ placeholder }}'"></span>
+                </div>
+            </template>
+
+            <!-- Chevron/Caret Indicator -->
+            <div class="absolute top-1/2 end-3 -translate-y-1/2">
+                <svg class="w-4 h-4 text-muted-foreground-1 transition-transform duration-200" :class="open ? 'rotate-180' : ''" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+        </div>
+
+        <!-- Dropdown Menu -->
+        <div x-show="open" x-cloak 
+             x-ref="dropdown"
+             x-transition:enter="transition ease-out duration-100"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-75"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             :style="{ top: top === 'auto' ? 'auto' : top + 'px', bottom: bottom === 'auto' ? 'auto' : bottom + 'px', left: left + 'px', minWidth: width + 'px' }"
+             class="fixed z-[10000] mt-0 flex flex-col bg-dropdown border border-dropdown-line rounded-lg shadow-xl overflow-hidden min-w-max">
+             
+            <!-- Search Input -->
+            <template x-if="searchable">
+                <div class="p-2 bg-dropdown z-10 border-b border-dropdown-divider" x-init="setTimeout(() => lucide.createIcons({root: $el}), 0)">
+                    {{ input(
+                        name="select_search",
+                        placeholder="Search...",
+                        icon="search",
+                        x_model="searchQuery",
+                        x_ref="searchInput",
+                        padding_class=search_padding_class,
+                        extra_classes="!bg-transparent text-xs sm:text-sm",
+                        extra_attrs="@click.stop"
+                    ) }}
+                </div>
+            </template>
+
+            <div class="max-h-72 p-1 space-y-0.5 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb">
+                <template x-for="opt in filteredOptions" :key="opt.value">
+                    <div @click="toggleOption(opt.value)"
+                         class="flex items-center justify-between py-2 px-4 w-full text-xs sm:text-sm text-foreground cursor-pointer rounded-lg focus:outline-none"
+                         :class="isSelected(opt.value) ? 'bg-dropdown-item-active font-medium' : 'hover:bg-dropdown-item-hover'">
+                        <div class="flex items-center">
+                            <template x-if="opt.icon">
+                                <div class="me-2 size-5 flex-shrink-0 [&>img]:w-full [&>img]:h-full [&>img]:rounded-full [&>svg]:w-full [&>svg]:h-full [&>svg]:rounded-full" x-html="opt.icon"></div>
+                            </template>
+                            <div class="flex flex-col overflow-hidden">
+                                <span class="whitespace-nowrap truncate" x-text="opt.label"></span>
+                                <template x-if="opt.description">
+                                    <span class="text-xs text-muted-foreground-1 mt-0.5" x-text="opt.description"></span>
+                                </template>
+                            </div>
+                        </div>
+                        <svg x-show="isSelected(opt.value)" class="shrink-0 w-4 h-4 text-primary" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M12.736 3.97a.733.733 0 0 1 1.047 0c.286.289.29.756.01 1.05L7.88 12.01a.733.733 0 0 1-1.065.02L3.217 8.384a.757.757 0 0 1 0-1.06.733.733 0 0 1 1.047 0l3.052 3.093 5.4-6.425a.247.247 0 0 1 .02-.022Z"/></svg>
+                    </div>
+                </template>
+                
+                <div x-show="filteredOptions.length === 0" class="py-2 px-4 text-xs sm:text-sm text-muted-foreground-1 text-center">
+                    No options found
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Text -->
+    {% if help_text and not error_message %}
+    <p class="text-sm text-muted-foreground-1 mt-2">{{ help_text }}</p>
+    {% endif %}
+
+    <!-- Error Message -->
+    {% if error_message %}
+    <p class="text-sm text-red-500 mt-2">{{ error_message }}</p>
+    {% endif %}
+</div>
+{% endmacro %}

@@ -1,0 +1,162 @@
+{% include "src/ui-system/scripts/select_script.html" %}
+<script>
+  // Endpoint checks the admin can act on. The server repeats them (and checks DNS) on save and before every send.
+  const WH_PRIVATE = [/^localhost$/i, /\.local$/i, /\.internal$/i, /^127\./, /^10\./, /^192\.168\./, /^172\.(1[6-9]|2\d|3[01])\./, /^169\.254\./, /^0\./, /^\[?::1\]?$/];
+
+  function createWebhookPage() {
+    const ALL_EVENTS = ['candidate.integrity_updated', 'review_case.completed', 'session.completed'];
+    const blank = () => ({ name: '', url: '', eventScope: 'all', events: [...ALL_EVENTS], wsScope: 'all', workspaces: [] });
+    return {
+      secretOpen: false,
+      suggestion: '',
+      allEvents: ALL_EVENTS,
+      form: blank(),
+      touched: {},
+      tried: false,                 // after the first submit, every error shows
+      submitting: false,
+      serverError: '',
+      urlServerError: '',
+      wsQuery: '',
+      created: { name: '', secret: '' },
+      copied: false,
+      saved: false,
+
+      protoState: 'empty',
+      protoGroups: [
+        { name: 'Add webhook', states: [
+          ['empty', 'Blank form'],
+          ['filled', 'Filled in, selected scopes'],
+          ['errors', 'Errors after Add webhook'],
+          ['typo', 'Mistyped ending, with a fix'],
+          ['unsafe', 'Endpoint rejected on save'],
+          ['failed', "Couldn't save"],
+        ] },
+        { name: 'Signing secret', states: [
+          ['secret', 'Secret shown'],
+          ['saved', 'Copied and confirmed'],
+        ] },
+      ],
+      pickState(s) {
+        this.protoState = s;
+        this.$dispatch('close-modal-wh-secret'); this.secretOpen = false;
+        this.form = blank(); this.touched = {}; this.tried = false; this.suggestion = '';
+        this.serverError = ''; this.urlServerError = ''; this.copied = false; this.saved = false;
+        const filled = () => Object.assign(this.form, {
+          name: 'Certificate service', url: 'https://certs.icai.org/hooks/proctoring',
+          eventScope: 'selected', events: ['candidate.integrity_updated'],
+          wsScope: 'selected', workspaces: ['CA Final · Nov 2026', 'CA Intermediate · Nov 2026'],
+        });
+        if (s === 'filled') filled();
+        if (s === 'errors') {
+          Object.assign(this.form, { name: '', url: 'http://certs.icai.org/hooks', eventScope: 'selected', events: [], wsScope: 'selected', workspaces: [] });
+          this.tried = true; this.cleanUrl();
+        }
+        if (s === 'typo') { filled(); this.form.url = 'https://certs.icai.org.con/hooks'; this.tried = true; this.cleanUrl(); }
+        if (s === 'unsafe') { filled(); this.form.url = 'https://hooks.icai-internal.org/proctoring'; this.urlServerError = 'hooks.icai-internal.org points to a private address (10.4.0.12). Use an address that can be reached from the internet.'; }
+        if (s === 'failed') { filled(); this.serverError = 'Something went wrong on our side. Nothing was saved. Try again.'; }
+        this.syncWorkspaces();
+        if (s === 'secret' || s === 'saved') {
+          filled(); this.syncWorkspaces(); this.finish();
+          if (s === 'saved') { this.copied = true; this.saved = true; }
+        }
+      },
+      // Push form.workspaces into the multi-select component
+      syncWorkspaces() {
+        this.$nextTick(() => {
+          const root = document.getElementById('wh-workspaces')?.closest('[x-data]');
+          root && root.dispatchEvent(new CustomEvent('set-selected-values', { detail: this.form.workspaces }));
+        });
+      },
+      // All events ticked = the "all" scope (also gets future events). Unticking it keeps the current events ticked to pick from.
+      toggleAllEvents(on) {
+        this.form.eventScope = on ? 'all' : 'selected';
+        this.form.events = [...this.allEvents];
+        this.touch('events');
+      },
+      pickEvent() { if (this.form.eventScope === 'all') this.form.eventScope = 'selected'; },
+      summaryEvents() { return this.form.eventScope === 'all' ? this.allEvents : this.allEvents.filter(e => this.form.events.includes(e)); },
+      errorCount() { return Object.keys(this.validate()).length; },
+      barText() {
+        if (this.tried && this.errorCount()) return `${this.errorCount()} ${this.errorCount() === 1 ? 'thing' : 'things'} to fix`;
+        const ev = this.form.eventScope === 'all' ? 'All events' : `${this.form.events.length} ${this.form.events.length === 1 ? 'event' : 'events'}`;
+        const ws = this.form.wsScope === 'all' ? 'all workspaces' : `${this.form.workspaces.length} ${this.form.workspaces.length === 1 ? 'workspace' : 'workspaces'}`;
+        return `${ev} from ${ws}`;
+      },
+
+      touch(f) { this.touched[f] = true; },
+      // Cleans what people paste, as on Custom Domain: invisible characters, spaces, quotes and brackets at the
+      // ends, a pasted sentence around the URL. A missing https:// is added. Shows the cleaned value.
+      cleanUrl() {
+        const edges = /^[\s"'`“”‘’()<>\[\]{},;!?\\]+|[\s"'`“”‘’()<>\[\]{},;!?.\\]+$/g;
+        let v = this.form.url.replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').replace(edges, '');
+        const words = v.split(/\s+/).filter(Boolean);
+        if (words.length > 1) v = words.find(w => /^https?:\/\//i.test(w)) || words.find(w => w.includes('.')) || v;
+        v = v.replace(edges, '');
+        if (v && !/^[a-z]+:\/\//i.test(v) && /^[^\s/]+\.[^\s/]+/.test(v)) v = 'https://' + v;
+        this.form.url = v;
+        const [, , sugg] = this.checkUrl(v);
+        this.suggestion = sugg || '';
+      },
+      useSuggestion() { this.form.url = this.suggestion; this.suggestion = ''; this.urlServerError = ''; },
+      // Returns [cleaned, error, suggestion]
+      checkUrl(raw) {
+        if (!raw) return [raw, 'Enter the address TPSentinel should send to'];
+        if (/^http:\/\//i.test(raw)) return [raw, 'Use https://. TPSentinel only sends to secure addresses.', raw.replace(/^http:/i, 'https:')];
+        if (/^[^/]+@[^/]+$/.test(raw.replace(/^https:\/\//, ''))) return [raw, 'Enter a web address, not an email address'];
+        let u = null;
+        try { u = new URL(raw); } catch (_) {}
+        if (!u || u.protocol !== 'https:') return [raw, 'Enter a full address, like https://example.com/webhooks'];
+        if (u.username || u.password) return [raw, "Don't put a username or password in the address. Requests are signed instead."];
+        const host = u.hostname.toLowerCase();
+        if (WH_PRIVATE.some(r => r.test(host))) return [raw, `${host} is a private address. Use one that can be reached from the internet.`];
+        if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return [raw, 'Use a domain name, not an IP address. HTTPS needs a certificate for the name.'];
+        if (!host.includes('.')) return [raw, `Add the ending, like ${host}.com or ${host}.in`];
+        if (host.includes('..')) return [raw, 'There are two dots in a row. Check the address.', raw.replace(host, host.replace(/\.{2,}/g, '.'))];
+        if (host.includes('_')) return [raw, "Domain names can't contain _. Use - instead."];
+        const typo = { con: 'com', cmo: 'com', ocm: 'com', vom: 'com', xom: 'com', comm: 'com', cpm: 'com', nte: 'net', ogr: 'org', orgg: 'org', inn: 'in' };
+        const ending = host.split('.').pop();
+        if (typo[ending]) return [raw, 'The ending looks mistyped.', raw.replace(host, host.replace(/[^.]+$/, typo[ending]))];
+        return [raw, ''];
+      },
+      // Plain, specific messages: what's wrong and what to do
+      validate() {
+        const f = this.form, e = {};
+        if (!f.name.trim()) e.name = 'Give it a name you will recognise in the list';
+        const urlErr = this.checkUrl(f.url.trim())[1];
+        if (urlErr) e.url = urlErr;
+        if (!e.url && this.urlServerError) e.url = this.urlServerError;
+        if (f.eventScope === 'selected' && !f.events.length) e.events = 'Pick at least one event';
+        if (f.wsScope === 'selected' && !f.workspaces.length) e.workspaces = 'Pick at least one workspace, or choose All workspaces';
+        return e;
+      },
+      errorFor(field) {
+        if (!this.tried && !this.touched[field] && !(field === 'url' && this.urlServerError)) return '';
+        return this.validate()[field] || '';
+      },
+
+      submit() {
+        this.tried = true; this.serverError = '';
+        this.cleanUrl();
+        if (Object.keys(this.validate()).length) {
+          this.$nextTick(() => { const el = this.$root.querySelector('[aria-invalid="true"], .border-red-500'); el && el.scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+          return;
+        }
+        this.submitting = true;
+        setTimeout(() => { this.submitting = false; this.finish(); }, 900);
+      },
+      finish() {
+        this.created = { name: this.form.name.trim() || 'Certificate service', secret: 'whsec_' + this.randomSecret() };
+        this.secretOpen = true;
+        this.$nextTick(() => this.$dispatch('open-modal-wh-secret'));
+      },
+      randomSecret() {
+        const a = new Uint8Array(24); crypto.getRandomValues(a);
+        return btoa(String.fromCharCode(...a)).replace(/[+/=]/g, '').slice(0, 32);
+      },
+      copySecret() {
+        try { navigator.clipboard.writeText(this.created.secret); } catch (_) {}
+        this.copied = true;
+      },
+    };
+  }
+</script>
