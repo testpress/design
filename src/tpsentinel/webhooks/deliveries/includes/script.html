@@ -1,0 +1,130 @@
+<script>
+  // Business deliveries for the webhook in ?id= (tests excluded). ?state= opens a tab, e.g. from "See failed deliveries".
+  function deliveriesPage() {
+    const q0 = new URLSearchParams(location.search);
+    const all = WH.load();
+    const found = all.find(x => x.id === q0.get('id'));
+    const PER = 20;
+    return {
+      view: found ? 'data' : 'missing',     // data | loading | error | missing
+      w: found || { name: 'Webhook' },
+      rows: found ? WH.history(found) : [],
+      retention: WH.RETENTION_DAYS,
+      tab: ['failed', 'retry', 'progress', 'succeeded', 'cancelled'].includes(q0.get('state')) ? q0.get('state') : 'all',
+      filters: { event: '', created: '' },
+      q: '',
+      page: 1,
+
+      tabs: [['all', 'All'], ['failed', 'Failed'], ['retry', 'Retrying'], ['progress', 'In progress'], ['succeeded', 'Delivered'], ['cancelled', 'Cancelled']],
+      protoState: 'data',
+      protoGroups: [
+        { name: 'Deliveries', states: [['data', 'Stopped webhook (wh_02)'], ['failing', 'Failing webhook (wh_03)'], ['healthy', 'Delivering webhook (wh_01)']] },
+        { name: 'Page', states: [['new', 'No deliveries yet'], ['expired', 'All older than 30 days'], ['loading', 'Loading'], ['error', "Couldn't load"], ['missing', 'Not found']] },
+      ],
+      pickState(s) {
+        this.protoState = s;
+        const go = (id) => { location.href = `/tpsentinel/webhooks/deliveries/?id=${id}`; };
+        if (s === 'data') return go('wh_02');
+        if (s === 'failing') return go('wh_03');
+        if (s === 'healthy') return go('wh_01');
+        if (s === 'new') return go('wh_05');
+        if (s === 'expired') return go('wh_08');
+        this.view = s;
+      },
+      retry() { this.view = 'loading'; setTimeout(() => this.view = found ? 'data' : 'missing', 900); },
+      detailHref() { return found ? `/tpsentinel/webhooks/detail/?id=${found.id}` : '/tpsentinel/webhooks/'; },
+
+      // ---- filtering ----
+      inTab(r, t) {
+        if (t === 'all') return true;
+        if (t === 'progress') return r.state === 'pending' || r.state === 'processing';
+        return r.state === t;
+      },
+      matches(r) {
+        const f = this.filters;
+        if (f.event && r.event !== f.event) return false;
+        if (f.created && r.at < Date.now() - { day: WH.DAY, week: 7 * WH.DAY, month: 30 * WH.DAY }[f.created]) return false;
+        if (this.q && !r.id.toLowerCase().includes(this.q.trim().toLowerCase())) return false;
+        return true;
+      },
+      tabCount(t) { return this.rows.filter(r => this.inTab(r, t) && this.matches(r)).length; },
+      get filtered() { return this.rows.filter(r => this.inTab(r, this.tab) && this.matches(r)); },
+      filterOptions(key) {
+        if (key === 'event') return (this.w.events === 'all' ? WH.EVENTS : this.w.events || []).map(e => [e, e]);
+        return [['day', 'Last 24 hours'], ['week', 'Last 7 days'], ['month', 'Last 30 days']];
+      },
+      setTab(t) { this.tab = t; this.page = 1; },
+      setFilter(k, v) { this.filters[k] = v; this.page = 1; },
+      clearAll() { this.filters = { event: '', created: '' }; this.q = ''; this.tab = 'all'; this.page = 1; },
+
+      // ---- pagination ----
+      get pageCount() { return Math.max(1, Math.ceil(this.filtered.length / PER)); },
+      get pageRows() { return this.filtered.slice((this.page - 1) * PER, this.page * PER); },
+      get pageItems() {
+        const n = this.pageCount, p = this.page;
+        if (n <= 7) return Array.from({ length: n }, (_, i) => i + 1);
+        const set = [1, n, p - 1, p, p + 1].filter(x => x >= 1 && x <= n);
+        const u = [...new Set(set)].sort((a, b) => a - b), out = [];
+        u.forEach((x, i) => { if (i && x - u[i - 1] > 1) out.push('…'); out.push(x); });
+        return out;
+      },
+      goPage(n) { this.page = n; window.scrollTo({ top: 0, behavior: 'smooth' }); },
+
+      // ---- empty states ----
+      // A tab with nothing in it is just empty ("No failed deliveries"); only real filters get "match" + Clear filters
+      hasFilters() { return !!(this.q.trim() || this.filters.event || this.filters.created); },
+      tabWord() { return { failed: 'failed', retry: 'retrying', progress: 'in-progress', succeeded: 'delivered', cancelled: 'cancelled' }[this.tab] || ''; },
+      emptyTitle() {
+        if (this.q.trim()) return `No delivery with an ID like "${this.q.trim()}"`;
+        if (this.hasFilters()) return 'No deliveries match these filters';
+        if (this.tab !== 'all') return `No ${this.tabWord()} deliveries`;
+        if (found && found.lastSuccess && found.lastSuccess < Date.now() - this.retention * WH.DAY) return `No deliveries in the last ${this.retention} days`;
+        return 'No deliveries yet';
+      },
+      emptyText() {
+        if (this.q.trim()) return `Deliveries are kept for ${this.retention} days. Test deliveries are on the Test page.`;
+        if (this.hasFilters()) return '';
+        if (this.tab !== 'all') return { failed: 'Nothing has failed in the last 30 days.', retry: 'Nothing is waiting for a retry.', progress: 'Nothing is being sent right now.', cancelled: 'Nothing has been cancelled.', succeeded: '' }[this.tab] || '';
+        if (found && found.lastSuccess && found.lastSuccess < Date.now() - this.retention * WH.DAY) return `Older deliveries are removed after ${this.retention} days.`;
+        return 'They show here when one of its events happens.';
+      },
+
+      // ---- row words ----
+      stateLabel(r) {
+        return { succeeded: 'Delivered', failed: 'Failed', retry: 'Retry scheduled', cancelled: 'Cancelled', pending: 'Waiting to send', processing: 'Sending' }[r.state];
+      },
+      dWord(r) {
+        if (r.state === 'succeeded') return `Delivered · ${r.status}${r.attempts > 1 ? ` on attempt ${r.attempts}` : ''}`;
+        if (r.state === 'retry') return `Retrying ${this.until(r.nextAt)} · ${r.failure}`;
+        if (r.state === 'cancelled') return r.failure;
+        if (r.state === 'processing') return 'Sending now';
+        if (r.state === 'pending') return 'Waiting to send';
+        return `Failed · ${r.status ? r.status : r.failure} after ${r.attempts} ${r.attempts === 1 ? 'attempt' : 'attempts'}`;
+      },
+      dTone(r) {
+        return { succeeded: 'text-teal-600 dark:text-teal-500', failed: 'text-red-600 dark:text-red-500',
+                 retry: 'text-amber-500 dark:text-amber-400', processing: 'text-primary' }[r.state] || 'text-muted-foreground-2';
+      },
+      dIcon(r) {
+        const s = p => `<svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`;
+        if (r.state === 'succeeded') return s('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>');
+        if (r.state === 'failed') return s('<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>');
+        if (r.state === 'retry') return s('<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>');
+        if (r.state === 'processing') return s('<path d="M21 12a9 9 0 1 1-6.219-8.56"/>').replace('<svg class="', '<svg class="animate-spin ');
+        return s('<circle cx="12" cy="12" r="10"/><path d="M8 12h8"/>');
+      },
+
+      // ---- formatting ----
+      ago(t) {
+        const d = Date.now() - t;
+        if (d < WH.MIN) return 'just now';
+        if (d < WH.HR) return `${Math.round(d / WH.MIN)} min ago`;
+        if (d < WH.DAY) return `${Math.round(d / WH.HR)} h ago`;
+        const days = Math.round(d / WH.DAY);
+        return days === 1 ? 'yesterday' : `${days} days ago`;
+      },
+      until(t) { return `in ${Math.max(1, Math.round((t - Date.now()) / WH.MIN))} min`; },
+      exact(t) { return new Date(t).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' }); },
+    };
+  }
+</script>
