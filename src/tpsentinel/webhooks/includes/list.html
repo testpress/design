@@ -1,0 +1,180 @@
+{% from "src/tpsentinel/components/button.html" import button %}
+{% from "src/tpsentinel/components/tooltip.html" import tooltip %}
+{% from "src/tpsentinel/components/popover.html" import popover %}
+{% from "src/tpsentinel/components/badge.html" import badge %}
+{% from "src/tpsentinel/components/empty-state.html" import empty_state %}
+
+<!-- First use: nothing set up yet. Explain what a webhook does here, then one action. -->
+<template x-if="simulate === 'empty'">
+  <div>
+    {% include "./empty.html" %}
+  </div>
+</template>
+
+<!-- Same list pattern as Review Cases: status tabs on the left, filters on the right, two-line rows -->
+<div x-show="simulate !== 'empty'" class="bg-card border border-card-line shadow-2xs rounded-xl">
+
+  <!-- Toolbar -->
+  <div class="flex flex-wrap items-center gap-x-4 gap-y-2 min-h-14 py-2 ps-4 pe-2 bg-muted border-b border-card-line rounded-t-xl">
+    <!-- Views, same markup as Review Cases: one per state, so every tab name is exactly what it shows.
+         Stopped gets a red count when it has webhooks, so it isn't missed from the Active tab. -->
+    <nav class="flex items-center gap-x-1 -ms-1 overflow-x-auto [scrollbar-width:none]" aria-label="Webhook views">
+      <template x-for="v in views" :key="v.key">
+        <button type="button" @click="setView(v.key)"
+                :aria-current="view === v.key ? 'page' : null"
+                :class="view === v.key ? 'text-foreground font-semibold' : 'text-muted-foreground-1 hover:text-foreground'"
+                class="shrink-0 inline-flex items-center gap-x-1.5 py-1.5 px-2 rounded-lg text-sm whitespace-nowrap focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+          <span x-text="v.label"></span>
+          <span x-show="simulate === 'data' && !(v.key === 'unhealthy' && viewCount(v.key))" class="inline-flex">
+            {{ badge(x_text="viewCount(v.key).toLocaleString()", size="xs", extra_classes="leading-4 tabular-nums") }}
+          </span>
+          <span x-show="simulate === 'data' && v.key === 'unhealthy' && viewCount(v.key)" class="inline-flex">
+            {{ badge(x_text="viewCount(v.key).toLocaleString()", variant="danger", size="xs", extra_classes="leading-4 tabular-nums") }}
+          </span>
+        </button>
+      </template>
+    </nav>
+
+    <!-- Filters: GitHub-style menus, as on Review Cases -->
+    <div x-show="simulate === 'data'" class="flex items-center gap-x-0.5 ms-auto">
+      <template x-for="key in ['event', 'workspace']" :key="key">
+        <div class="relative" x-data="{ open: false, q: '' }" @click.outside="open = false" @keydown.escape.stop="open = false">
+          <button type="button" @click="open = !open; q = ''; if (open && key === 'workspace') $nextTick(() => $refs.q.focus())" :aria-expanded="open" aria-haspopup="menu"
+                  :class="filters[key] ? 'text-foreground' : 'text-muted-foreground-1 hover:text-foreground'"
+                  class="inline-flex items-center gap-x-1 py-1.5 px-2 rounded-lg text-sm hover:bg-muted-hover focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary">
+            <span x-text="filterLabel[key]"></span>
+            <span x-show="filters[key]" class="size-1.5 rounded-full bg-primary" aria-label="active"></span>
+            <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div x-show="open" x-cloak role="menu"
+               x-transition:enter="transition ease-out duration-100" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+               :class="key === 'status' ? 'w-48' : 'w-64'" class="absolute z-50 top-full end-0 mt-1 flex flex-col bg-dropdown border border-dropdown-line rounded-xl shadow-xl overflow-hidden">
+            <p class="px-3 py-2.5 text-[13px] font-semibold text-foreground border-b border-dropdown-divider" x-text="`Filter by ${filterLabel[key].toLowerCase()}`"></p>
+            <!-- Workspaces can run into dozens: search, as on Review Cases -->
+            <div x-show="key === 'workspace'" class="p-2 border-b border-dropdown-divider">
+              <div class="relative">
+                <svg class="absolute start-2.5 top-1/2 -translate-y-1/2 shrink-0 size-3.5 text-muted-foreground-1 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input x-ref="q" x-model="q" type="text" placeholder="Filter workspaces"
+                       class="py-1.5 ps-8 pe-3 block w-full bg-layer border border-layer-line rounded-lg text-sm text-foreground placeholder:text-muted-foreground-1 focus:border-primary focus:ring-1 focus:ring-primary">
+              </div>
+            </div>
+            <ul class="p-1 max-h-72 overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-scrollbar-track [&::-webkit-scrollbar-thumb]:bg-scrollbar-thumb">
+              <template x-for="o in filterOptions(key).filter(o => o.toLowerCase().includes(q.toLowerCase()))" :key="o">
+                <li>
+                  <button type="button" @click="setFilter(key, o); open = false" role="menuitemradio" :aria-checked="filters[key] === o"
+                          class="w-full flex items-center gap-x-2.5 py-2 px-2 rounded-lg text-sm text-start text-dropdown-item-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+                    <span class="truncate" :class="filters[key] === o && 'font-medium text-foreground'" x-text="optionLabel(key, o)"></span>
+                    <svg x-show="filters[key] === o" class="ms-auto shrink-0 size-4 text-primary" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                  </button>
+                </li>
+              </template>
+              <li x-show="!filterOptions(key).filter(o => o.toLowerCase().includes(q.toLowerCase())).length" class="py-3 px-2 text-sm text-muted-foreground-1">No matches</li>
+            </ul>
+            <div x-show="filters[key]" class="p-1 border-t border-dropdown-divider">
+              <button type="button" @click="setFilter(key, ''); open = false"
+                      class="w-full py-2 px-2 rounded-lg text-sm text-start text-muted-foreground-1 hover:text-foreground hover:bg-dropdown-item-hover focus:outline-hidden focus-visible:bg-dropdown-item-focus">
+                Clear filter
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Rows: same as Review Cases. Name + endpoint, then one meta line; whole row opens the webhook.
+       Colour stays on the status icon so the list stays calm. Disable / reactivate / archive live on the details page. -->
+  <ul x-show="simulate === 'data' && rows.length" role="list">
+    <template x-for="w in rows" :key="w.id">
+      <li @click="openWebhook(w)"
+          class="group flex items-start gap-x-3 py-3 ps-4 pe-3 cursor-pointer hover:bg-muted-hover border-t border-card-line first:border-t-0">
+
+        <!-- Status; hover, focus or tap shows the word -->
+        <span class="shrink-0 flex items-center h-6" @click.stop>
+          {{ tooltip(
+            content='<span x-text="statusWord(w)"></span>',
+            trigger='<span tabindex="0" role="img" :aria-label="statusWord(w)" :class="tone(w)" class="flex rounded-sm focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary" x-html="icon(w)"></span>',
+            width="w-max max-w-60"
+          ) }}
+        </span>
+
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-x-2 gap-y-1 min-h-6">
+            <a href="#" @click.stop class="font-semibold text-foreground focus:outline-hidden focus-visible:underline" x-text="w.name"></a>
+            <span class="hidden sm:inline min-w-0 truncate text-sm text-muted-foreground-1" :title="w.url" x-text="shortUrl(w.url)"></span>
+          </div>
+
+          <!-- What's happening first, then what it sends -->
+          <p class="mt-1 text-[13px] leading-5 text-muted-foreground-1">
+            <span class="font-medium text-foreground" :title="health(w).exact" x-text="health(w).title"></span>
+            <template x-for="part in health(w).more" :key="part">
+              <span>&#32;<span aria-hidden="true">·</span> <span x-text="part"></span></span>
+            </template>
+            <span aria-hidden="true">·</span>
+            <template x-if="w.events === 'all'"><span>All events</span></template>
+            <template x-if="w.events !== 'all' && w.events.length === 1"><span x-text="w.events[0]"></span></template>
+            <template x-if="w.events !== 'all' && w.events.length > 1">
+              <span @click.stop class="[&>div]:align-baseline">
+                {{ popover(
+                  content='<ul class="list-disc py-2.5 ps-7 pe-3.5 space-y-1 text-[13px] text-foreground"><template x-for="e in w.events" :key="e"><li x-text="e"></li></template></ul>',
+                  trigger='<button type="button" class="underline decoration-dotted underline-offset-2 hover:text-foreground focus:outline-hidden focus-visible:text-foreground" x-text="`${w.events.length} events`"></button>',
+                  trigger_type="hover", placement="bottom", width="w-max max-w-80"
+                ) }}
+              </span>
+            </template>
+            <span aria-hidden="true">·</span>
+            <template x-if="w.workspaces === 'all'"><span>All workspaces</span></template>
+            <template x-if="w.workspaces !== 'all' && w.workspaces.length === 1"><span x-text="w.workspaces[0]"></span></template>
+            <template x-if="w.workspaces !== 'all' && w.workspaces.length > 1">
+              <span @click.stop class="[&>div]:align-baseline">
+                {{ popover(
+                  content='<ul class="list-disc py-2.5 ps-7 pe-3.5 max-h-64 overflow-y-auto space-y-1 text-[13px] text-foreground"><template x-for="s in w.workspaces" :key="s"><li x-text="s"></li></template></ul>',
+                  trigger='<button type="button" class="underline decoration-dotted underline-offset-2 hover:text-foreground focus:outline-hidden focus-visible:text-foreground" x-text="`${w.workspaces.length} workspaces`"></button>',
+                  trigger_type="hover", placement="bottom", width="w-max max-w-80"
+                ) }}
+              </span>
+            </template>
+            <!-- Endpoint moves here on phones -->
+            <span class="sm:hidden block truncate" x-text="shortUrl(w.url)"></span>
+          </p>
+        </div>
+
+        <!-- Whole row opens the webhook -->
+        <svg class="self-center shrink-0 size-4 text-muted-foreground-2 group-hover:text-foreground transition-colors" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </li>
+    </template>
+  </ul>
+
+  <!-- Loading: skeleton rows in the same shape -->
+  <ul x-show="simulate === 'loading'" aria-busy="true" aria-label="Loading webhooks">
+    <template x-for="i in 4" :key="i">
+      <li class="flex items-start gap-x-3 py-3.5 ps-4 pe-3 border-t border-card-line first:border-t-0 animate-pulse">
+        <span class="shrink-0 mt-1 size-4 rounded-full bg-surface"></span>
+        <div class="flex-1 space-y-2.5"><div class="h-4 w-80 max-w-full rounded-full bg-surface"></div><div class="h-3 w-[28rem] max-w-full rounded-full bg-surface"></div></div>
+        
+      </li>
+    </template>
+  </ul>
+
+  <!-- Error -->
+  <div x-show="simulate === 'error'">
+    {{ empty_state(
+      title="Couldn't load webhooks",
+      description="Something went wrong on our side. Your webhooks keep sending while this page is down.",
+      icon="cloud-off",
+      primary_action_text="Try again",
+      primary_action_attrs='@click="retry()"',
+      compact=true,
+      wrap_card=false
+    ) }}
+  </div>
+
+  <!-- Nothing for these filters -->
+  <div x-show="simulate === 'data' && !rows.length" class="p-5 min-h-[200px] flex flex-col justify-center items-center text-center">
+    <p class="font-medium text-foreground" x-text="emptyTitle()"></p>
+    <p x-show="emptyText()" class="mt-1 max-w-sm text-sm text-muted-foreground-1" x-text="emptyText()"></p>
+    <div x-show="filters.event || filters.workspace" class="mt-4">
+      {{ button(text="Clear filters", variant="secondary", size="sm", extra_attrs='@click="clearFilters()"') }}
+    </div>
+  </div>
+</div>
