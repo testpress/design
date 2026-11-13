@@ -659,6 +659,7 @@
   
   
   
+  
 
   <nav class="flex " aria-label="Breadcrumb">
     <!-- Mobile: Back to the parent -->
@@ -716,6 +717,7 @@
     </ol>
   </nav>
 
+  
   <h1 class="mt-2 text-lg md:text-xl font-semibold text-foreground" x-text="d.event"></h1>
   <p class="mt-1 flex items-center gap-x-1.5 text-sm text-muted-foreground-1">
     <span x-text="d.id"></span>
@@ -868,6 +870,11 @@
       </div>
     </dl>
     <p class="mt-5 text-[13px] leading-5 text-muted-foreground-1">Response bodies and headers from your endpoint aren't stored.</p>
+    <!-- Tests only: same shield line as the Testing card -->
+    <p x-show="isTest" class="mt-3 flex items-center gap-x-2 text-[13px] text-muted-foreground-1">
+      <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+      Tests don't change its status
+    </p>
   </section>
 </div>
 
@@ -1650,6 +1657,7 @@
     }
 
     function findDelivery(w, id) { return history(w).find(d => d.id === id) || null; }
+    function findTest(w, id) { return tests(w).find(d => d.id === id) || null; }
 
     // Generic failure type, from what the worker records (latest status or the connection error)
     function failureType(d) {
@@ -1680,6 +1688,10 @@
           review_case: { id: 'RC-2' + n.replace(/\D/g, '4').slice(0, 3), decision: 'clear', decided_by: 'Meera Sharma' },
           candidate: { id: 'cand_' + n },
         },
+        'webhook.test': {
+          message: 'This is a test request from TPSentinel. No action is needed.',
+          webhook: { id: w.id, name: w.name },
+        },
         'session.completed': {
           workspace: { id: 'ws_7Q2K', name: ws },
           session: { id: 'ses_' + n, ended_reason: 'submitted', duration_seconds: 5420 },
@@ -1691,21 +1703,24 @@
 
 
 
-    return { load, save, reset, seed, kind, recent, history, tests, saveTest, findDelivery, failureType, payload, RETENTION_DAYS, EVENTS, THRESHOLD, MIN, HR, DAY };
+    return { load, save, reset, seed, kind, recent, history, tests, saveTest, findDelivery, findTest, failureType, payload, RETENTION_DAYS, EVENTS, THRESHOLD, MIN, HR, DAY };
   })();
 </script>
 
 <script>
   // One business delivery: ?id=<webhook>&delivery=<delivery id>, from the shared data (as Review Cases reads ?case=).
+  // Also used for test deliveries: the test detail page sets window.DL_TEST = true (PR 19).
   function deliveryPage() {
+    const TEST = !!window.DL_TEST;
     const q = new URLSearchParams(location.search);
     const all = WH.load();
     const w = all.find(x => x.id === q.get('id')) || null;
-    const d = w ? WH.findDelivery(w, q.get('delivery')) : null;
+    const d = w ? (TEST ? WH.findTest(w, q.get('delivery')) : WH.findDelivery(w, q.get('delivery'))) : null;
     const body = w && d ? WH.payload(w, d) : '';
     const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return {
       view: d ? 'data' : 'missing',
+      isTest: TEST,
       w: w || { name: 'Webhook', url: '' },
       d: d || { id: '', event: '', attempts: 0 },
       body,
@@ -1715,7 +1730,10 @@
       copied: '',
 
       protoState: d ? d.state : 'missing',
-      protoGroups: [
+      protoGroups: TEST ? [
+        { name: 'Test delivery', states: [['t_ok', 'Delivered'], ['t_retry', 'Retrying'], ['t_failed', 'Failed after 4 attempts']] },
+        { name: 'Page', states: [['loading', 'Loading'], ['missing', 'Removed or not found']] },
+      ] : [
         { name: 'Delivered', states: [['ok', 'Delivered on attempt 1'], ['ok2', 'Delivered on attempt 2']] },
         { name: 'Not delivered', states: [['f500', 'Failed: server error'], ['fconn', "Failed: couldn't connect"], ['f410', 'Rejected (4xx, no retry)'],
                                           ['f301', 'Failed: redirect'], ['retry', 'Retry scheduled'], ['cancelled', 'Cancelled']] },
@@ -1726,6 +1744,12 @@
       pickState(s) {
         this.protoState = s;
         if (s === 'loading' || s === 'missing') { this.view = s; return; }
+        if (TEST) {
+          const tp = { t_ok: ['wh_01', x => x.state === 'succeeded'], t_retry: ['wh_02', x => x.state === 'retry'], t_failed: ['wh_02', x => x.state === 'failed'] }[s];
+          const hook = WH.seed().find(x => x.id === tp[0]), hit = WH.tests(hook).find(tp[1]);
+          if (hit) location.href = `/tpsentinel/webhooks/test/detail/?id=${hook.id}&delivery=${hit.id}`;
+          return;
+        }
         const pick = {
           ok: ['wh_01', x => x.state === 'succeeded' && x.attempts === 1], ok2: ['wh_01', x => x.state === 'succeeded' && x.attempts === 2],
           f500: ['wh_02', x => x.state === 'failed' && x.status === 500], fconn: ['wh_02', x => x.state === 'failed' && !x.status],
@@ -1737,7 +1761,7 @@
         if (hit) location.href = `/tpsentinel/webhooks/deliveries/detail/?id=${hook.id}&delivery=${hit.id}`;
       },
 
-      listHref() { return w ? `/tpsentinel/webhooks/deliveries/?id=${w.id}` : '/tpsentinel/webhooks/'; },
+      listHref() { return w ? `/tpsentinel/webhooks/${TEST ? 'test' : 'deliveries'}/?id=${w.id}` : '/tpsentinel/webhooks/'; },
       detailHref() { return w ? `/tpsentinel/webhooks/detail/?id=${w.id}` : '/tpsentinel/webhooks/'; },
       copy(key, text) { try { navigator.clipboard.writeText(text); } catch (_) {} this.copied = key; setTimeout(() => { if (this.copied === key) this.copied = ''; }, 1500); },
 
@@ -1745,6 +1769,8 @@
       status() {
         const d = this.d, ft = WH.failureType(d), at = this.ago(d.lastAttemptAt || d.at);
         const openHook = { label: 'Open webhook', href: this.detailHref() };
+        if (TEST && d.state === 'succeeded') return { title: 'Delivered',
+          text: `Your endpoint replied ${d.status} ${at}. It's receiving and accepting requests.` };
         if (d.state === 'succeeded') return { title: 'Delivered',
           text: d.attempts > 1 ? `Your endpoint replied ${d.status} on attempt ${d.attempts}, ${at}, after the earlier attempt failed.` : `Your endpoint replied ${d.status} ${at}.` };
         if (d.state === 'pending') return { title: 'Waiting to send', text: "It's queued and goes out in a moment." };
