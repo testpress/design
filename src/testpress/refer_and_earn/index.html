@@ -1,0 +1,333 @@
+---
+tags: testpress
+new_student_page: true
+student_view: Refer & Earn
+date: 2026-11-16
+permalink: testpress/refer_and_earn/
+---
+
+{% extends "src/testpress/layout/student_layout.html" %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/alert.html" import alert %}
+{% from "../../ui-system/components/progress.html" import progress %}
+{% from "../../ui-system/components/modal.html" import modal %}
+{% from "../../ui-system/components/toast.html" import toast_provider %}
+
+{% set institute = "Vanakkam DSA" %}
+{% set code = "RIYA42" %}
+{% set link = "vanakkamdsa.testpress.in/r/RIYA42" %}
+{% set friend_gets = "₹300" %}
+{% set you_get = "₹200" %}
+{% set share_text_short = "Join me on " ~ institute ~ " and get " ~ friend_gets ~ " off your first purchase." %}
+{% set share_text = "Join me on Vanakkam DSA and get ₹300 off your first purchase. Sign up with my link: https://" ~ link ~ " (or use code " ~ code ~ " when you sign up)" %}
+
+{# Friends, one list (same pattern as Credit history). badge on the avatar shows where each friend is:
+   clock (credits on the way) · hourglass (hasn't bought) · check (credits added) · x (didn't count) #}
+{% set friends = [
+  { name: "Arjun K.", photo: "https://images.unsplash.com/photo-1570654639102-bdd95efeca7a?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80",   badge: "clock",     line: "Bought 14 Nov · usable 21 Nov", amount: "₹200" },
+  { name: "Meena S.", photo: "https://images.unsplash.com/photo-1659482634023-2c4fda99ac0c?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80",   badge: "clock",     line: "Bought 12 Nov · usable 19 Nov", amount: "₹200" },
+  { name: "Rahul V.",   badge: "hourglass", line: "Joined 8 Nov · offer ends 8 Dec", amount: "" },
+  { name: "Karthik R.", photo: "https://images.unsplash.com/photo-1568602471122-7832951cc4c5?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80", badge: "check",     line: "Bought 12 Sep · added", amount: "₹200" },
+  { name: "Divya P.", photo: "https://images.unsplash.com/photo-1601935111741-ae98b2b230b0?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80",   badge: "check",     line: "Bought 1 Sep · added", amount: "₹200" },
+  { name: "Sanjay M.", photo: "https://images.unsplash.com/photo-1679412330254-90cb240038c5?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80",  badge: "check",     line: "Bought 20 Aug · added", amount: "₹200" },
+  { name: "Lakshmi T.", badge: "x",         line: "Didn't buy within 30 days", amount: "" },
+  { name: "Priya N.", photo: "https://images.unsplash.com/photo-1548142813-c348350df52b?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80",   badge: "x",         line: "Order refunded", amount: "₹200", struck: true }
+] %}
+{% set friends_count = friends | length %}
+
+{# Credit movements by month, newest first (Preline Pro: payments › balances transactions).
+   kind: pending · added · used · cancelled #}
+{% set history_months = [
+  { month: "November", items: [
+    { kind: "pending", title: "From Arjun", date: "14 Nov · usable 21 Nov", amount: "+₹200" },
+    { kind: "pending", title: "From Meena", date: "12 Nov · usable 19 Nov", amount: "+₹200" }
+  ] },
+  { month: "October", items: [
+    { kind: "used", title: "NEET PG Crash Course", date: "20 Oct", amount: "−₹400" }
+  ] },
+  { month: "September", items: [
+    { kind: "added", title: "From Karthik", date: "19 Sep", amount: "+₹200" },
+    { kind: "added", title: "From Divya",   date: "8 Sep",  amount: "+₹200" }
+  ] },
+  { month: "August", items: [
+    { kind: "added",     title: "From Sanjay", date: "27 Aug", amount: "+₹200" },
+    { kind: "cancelled", title: "From Priya",  date: "10 Aug · order refunded", amount: "₹200" }
+  ] }
+] %}
+{% set history_icons = { pending: "clock", added: "arrow-down-left", used: "arrow-up-right", cancelled: "x" } %}
+{% set badge_classes = {
+  clock: "text-yellow-600 dark:text-yellow-500",
+  hourglass: "text-gray-500 dark:text-neutral-400",
+  check: "text-green-600 dark:text-green-500",
+  x: "text-gray-400 dark:text-neutral-500"
+} %}
+
+{% set steps = [
+  ["Share your invite link", "Friends who sign up with it get your offer."],
+  ["Your friend gets " ~ friend_gets ~ " off", "On their first purchase, if they buy within 30 days of signing up."],
+  ["You earn " ~ you_get ~ " in credits", "They show up as soon as your friend buys, ready to use 7 days later. Spend them on any of our products."]
+] %}
+
+{% block main_content %}
+<div x-data="{
+       state: window.REFER_STATES.initial,
+       shareUrl: 'https://{{ link }}',
+       shareText: '{{ share_text_short }}',
+       get canShare() { return this.state === 'active' || this.state === 'new'; },
+       get hasActivity() { return this.state === 'active' || this.state === 'limit' || this.state === 'paused'; },
+       copy(text, title) {
+         try { navigator.clipboard.writeText(text); } catch (e) {}
+         window.dispatchEvent(new CustomEvent('toast', { detail: { variant: 'success', title: title, position: 'bottom-right' } }));
+       }
+     }"
+     @refer-state.window="state = $event.detail"
+     class="space-y-5 max-w-[85rem] mx-auto">
+
+  {% set header_actions %}
+    <span x-show="hasActivity" x-cloak>{{ button(text="How it works", variant="secondary", size="sm", icon="circle-help", extra_attrs="@click=\"$dispatch('open-modal-refer-how')\"") }}</span>
+  {% endset %}
+  {{ page_header(title="Refer &amp; Earn", actions=header_actions) }}
+
+  <!-- ============ Hero (Preline block: Feature Steps Section) ============ -->
+  <div class="p-5 sm:p-8 bg-white border border-gray-200 rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 lg:items-center">
+
+      <!-- Left: the offer and what to do (centred, Preline illustrated empty state) -->
+      <div class="text-center">
+        <!-- Can refer -->
+        <div x-show="state !== 'not_eligible'">
+          {% include "./includes/friends_illustration.html" %}
+          <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-neutral-200">Give {{ friend_gets }}, get {{ you_get }}</h2>
+          <p class="mt-1 max-w-md mx-auto text-gray-500 dark:text-neutral-400">Your friends save {{ friend_gets }} on their first purchase. You earn {{ you_get }} in credits for every friend who buys, to spend on your next product.</p>
+
+          <!-- Share actions -->
+          <div x-show="canShare" class="mt-6">
+            {# Opens our own share modal on every device (same look in Chrome, Edge, Firefox and phones) #}
+            {{ button(text="Share invite link", variant="primary", icon="share-2", extra_attrs="@click=\"$dispatch('open-modal-refer-share')\"") }}
+          </div>
+
+          <p x-show="state === 'limit'" x-cloak class="mt-6 inline-flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400">
+            <i data-lucide="circle-check" class="shrink-0 size-4"></i>
+            You've used all 10 spots. Your credits still work.
+          </p>
+          <p x-show="state === 'paused'" x-cloak class="mt-6 inline-flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400">
+            <i data-lucide="circle-pause" class="shrink-0 size-4"></i>
+            We've paused Refer &amp; Earn for now. Your credits still work.
+          </p>
+        </div>
+
+        <!-- Hasn't bought a product -->
+        <div x-show="state === 'not_eligible'" x-cloak>
+          {% include "./includes/friends_illustration.html" %}
+          <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-neutral-200">Buy a product to start referring</h2>
+          <p class="mt-1 max-w-md mx-auto text-gray-500 dark:text-neutral-400">Once you've bought any product, you get a link to share. Friends save {{ friend_gets }}, and you earn {{ you_get }} in credits for each friend who buys.</p>
+          <div class="mt-6">
+            {{ button(text="Browse products", variant="primary", icon="arrow-right", icon_position="right", href="/testpress/store/") }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: how it works (first time) -->
+      <div x-show="!hasActivity">
+        <h3 class="mb-4 text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">How it works</h3>
+        {% for step in steps %}
+        <div class="flex gap-x-5 ms-1">
+          <div class="relative {% if not loop.last %}after:absolute after:top-8 after:bottom-0 after:start-4 after:-translate-x-[0.5px] after:border-s after:border-gray-200 dark:after:border-neutral-700{% endif %}">
+            <span class="relative z-10 flex shrink-0 justify-center items-center size-8 border border-gray-200 text-primary-600 font-semibold text-xs rounded-full bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-primary-500">{{ loop.index }}</span>
+          </div>
+          <div class="grow pt-0.5 {% if not loop.last %}pb-6{% endif %}">
+            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ step[0] }}</p>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400">{{ step[1] }}</p>
+          </div>
+        </div>
+        {% endfor %}
+        <p class="mt-6 text-sm text-gray-500 dark:text-neutral-400">
+          Up to 10 friends · Credits never expire ·
+          <button type="button" @click="$dispatch('open-modal-refer-how')" class="font-medium text-gray-800 underline underline-offset-4 decoration-gray-300 hover:decoration-gray-800 focus:outline-hidden dark:text-neutral-200 dark:decoration-neutral-600">See rules</button>
+        </p>
+      </div>
+
+      <!-- Right: your credits (once friends have joined) -->
+      <div x-show="hasActivity" x-cloak class="">
+        <p class="text-sm text-gray-500 dark:text-neutral-400">Available credits</p>
+        <p class="mt-1 text-xl sm:text-2xl font-semibold text-gray-800 dark:text-neutral-200">₹200</p>
+        <a href="/testpress/store/" class="mt-2 inline-flex items-center gap-x-1 text-sm font-medium text-primary-600 hover:underline underline-offset-4 focus:outline-hidden dark:text-primary-500">
+          Use on your next purchase <i data-lucide="arrow-right" class="size-3.5"></i>
+        </a>
+
+        <!-- Inline stats (Preline Pro › ecommerce › referrals: legend row under the main figure) -->
+        <div class="mt-5 flex flex-wrap items-center gap-y-2 gap-x-8">
+          <div class="inline-flex items-center gap-x-1.5 text-sm text-gray-500 dark:text-neutral-400">
+            <i data-lucide="clock" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500"></i>
+            <span class="font-semibold text-base text-gray-800 dark:text-neutral-200">₹400</span> on the way
+          </div>
+          <div class="inline-flex items-center gap-x-1.5 text-sm text-gray-500 dark:text-neutral-400">
+            <i data-lucide="shopping-bag" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500"></i>
+            <span class="font-semibold text-base text-gray-800 dark:text-neutral-200">₹400</span> used so far
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <div class="flex justify-between items-baseline text-sm">
+            {# PRD FR-57/63: a purchase uses a spot (even if refunded later); a friend who joined holds one while their offer lasts #}
+            <span class="font-medium text-gray-800 dark:text-neutral-200" x-text="state === 'limit' ? '10 of 10 friends bought' : '6 of 10 friends bought'"></span>
+            <span class="text-gray-500 dark:text-neutral-400" x-text="state === 'limit' ? 'No spots left' : '3 spots left'"></span>
+          </div>
+          <div class="mt-2" x-show="state !== 'limit'">{{ progress(value=6, max=10, size="sm") }}</div>
+          <div class="mt-2" x-show="state === 'limit'" x-cloak>{{ progress(value=10, max=10, size="sm") }}</div>        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Friends (people) + Credit history (money), side by side ============ -->
+  <div x-show="hasActivity" x-cloak class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+    <!-- Friends: one list. Row spacing, sizes and type from Preline Pro › payments › balances (transactions list) -->
+    <div class="p-5 sm:p-6 bg-white border border-gray-200 rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
+      <h2 class="font-semibold text-gray-800 dark:text-neutral-200">Friends <span class="ms-1 font-normal text-gray-500 dark:text-neutral-400">{{ friends_count }}</span></h2>
+      <div class="mt-3 -mx-3">
+        {% for f in friends %}
+        <div class="p-3 flex items-center gap-x-4">
+          <span class="shrink-0 relative size-11">
+            {% if f.photo %}
+            <img class="shrink-0 size-11 rounded-full object-cover" src="{{ f.photo }}" alt="{{ f.name }}" loading="lazy">
+            {% else %}
+            <span class="flex shrink-0 justify-center items-center size-11 font-medium uppercase text-gray-800 bg-white border border-gray-200 rounded-full dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200">{{ f.name | first }}</span>
+            {% endif %}
+            <span class="absolute flex shrink-0 justify-center items-center size-5 bottom-0 -end-1 bg-white rounded-full dark:bg-neutral-800">
+              <i data-lucide="{{ f.badge }}" class="size-3.5 {{ badge_classes[f.badge] }}" stroke-width="2.5"></i>
+            </span>
+          </span>
+          <div class="grow min-w-0">
+            <p class="font-medium text-gray-800 dark:text-neutral-200 truncate">{{ f.name }}</p>
+            <p class="text-sm text-gray-500 dark:text-neutral-400 truncate">{{ f.line }}</p>
+          </div>
+          {% if f.amount %}<p class="shrink-0 whitespace-nowrap font-medium sm:text-lg {% if f.struck %}text-gray-400 line-through dark:text-neutral-500{% else %}text-gray-800 dark:text-neutral-200{% endif %}">{{ f.amount }}</p>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Credit history: same row pattern -->
+    <div class="p-5 sm:p-6 bg-white border border-gray-200 rounded-xl shadow-2xs dark:bg-neutral-800 dark:border-neutral-700">
+      <h2 class="font-semibold text-gray-800 dark:text-neutral-200">Credit history</h2>
+      <div class="mt-3 -mx-3">
+        {% for m in history_months %}{% for h in m.items %}
+        <div class="p-3 flex items-center gap-x-4">
+          <span class="flex shrink-0 justify-center items-center size-11 border border-gray-200 rounded-full dark:border-neutral-700">
+            <i data-lucide="{{ history_icons[h.kind] }}" class="size-5 {% if h.kind == 'added' %}text-green-600 dark:text-green-500{% elif h.kind == 'pending' %}text-yellow-600 dark:text-yellow-500{% else %}text-gray-500 dark:text-neutral-400{% endif %}"></i>
+          </span>
+          <div class="grow min-w-0">
+            <p class="font-medium text-gray-800 dark:text-neutral-200 truncate">{{ h.title }}</p>
+            <p class="text-sm text-gray-500 dark:text-neutral-400 truncate">{{ h.date }}</p>
+          </div>
+          <p class="shrink-0 whitespace-nowrap font-medium sm:text-lg {% if h.kind == 'cancelled' %}text-gray-400 line-through dark:text-neutral-500{% elif h.kind == 'added' %}text-green-600 dark:text-green-500{% else %}text-gray-800 dark:text-neutral-200{% endif %}">{{ h.amount }}</p>
+        </div>
+        {% endfor %}{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Share invite link (modal) ============
+       Link field + Copy: Preline Pro › payments › request-share. App row: share URLs, brand logos from Simple Icons.
+       "More" hands over to the device's own share sheet and only shows where the browser supports it. -->
+  {% set share_apps = [
+    { label: "WhatsApp", logo: "https://cdn.simpleicons.org/whatsapp/25D366", url: "https://wa.me/?text=" ~ (share_text | urlencode) },
+    { label: "Telegram", logo: "https://cdn.simpleicons.org/telegram/26A5E4", url: "https://t.me/share/url?url=" ~ (("https://" ~ link) | urlencode) ~ "&text=" ~ (share_text_short | urlencode) },
+    { label: "Gmail",    logo: "https://cdn.simpleicons.org/gmail/EA4335",    url: "https://mail.google.com/mail/?view=cm&su=" ~ (("Get " ~ friend_gets ~ " off at " ~ institute) | urlencode) ~ "&body=" ~ (share_text | urlencode) },
+    { label: "Email",    icon: "mail",                                        url: "mailto:?subject=" ~ (("Get " ~ friend_gets ~ " off at " ~ institute) | urlencode) ~ "&body=" ~ (share_text | urlencode) }
+  ] %}
+  {% call modal(id="refer-share", title="Share invite link", size="md", show_cancel=false, confirm_text="") %}
+    <div x-data="{ canNativeShare: !!navigator.share, isPhone: /Android|iPhone|iPad/i.test(navigator.userAgent) }">
+      <label for="refer-share-link" class="block mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Your invite link</label>
+      <div class="relative">
+        <input id="refer-share-link" type="text" readonly value="{{ link }}"
+               class="py-3 ps-4 pe-24 block w-full bg-white border border-gray-200 rounded-xl text-sm text-gray-800 shadow-2xs focus:outline-hidden focus:border-primary-500 focus:ring-primary-500 dark:bg-neutral-900 dark:border-neutral-700 dark:text-neutral-200">
+        <div class="absolute inset-y-0 end-0 flex items-center pe-2">
+          {# Plain text action; turns into "Copied" in place for 2 seconds (no toast) #}
+          <button type="button"
+                  x-data="{ copied: false, copyLink() { try { navigator.clipboard.writeText(this.shareUrl).catch(() => {}); } catch (e) {} this.copied = true; setTimeout(() => this.copied = false, 2000); } }"
+                  @click="copyLink()"
+                  class="py-1 px-2 inline-flex items-center gap-x-1.5 rounded-lg text-sm font-medium text-gray-600 hover:text-gray-800 focus:outline-hidden focus:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200"
+                  :class="copied && 'text-green-600 hover:text-green-600 dark:text-green-500 dark:hover:text-green-500'">
+            <svg x-show="!copied" class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+            <svg x-show="copied" x-cloak class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            <span x-text="copied ? 'Copied' : 'Copy'">Copy</span>
+          </button>
+        </div>
+      </div>
+      <p class="mt-2 text-xs text-gray-500 dark:text-neutral-400">Friends who sign up with this link get {{ friend_gets }} off their first purchase.</p>
+
+      <p class="mt-6 mb-3 text-sm font-medium text-gray-800 dark:text-neutral-200">Share via</p>
+      <div class="grid grid-cols-5 gap-1">
+        {% for app in share_apps %}
+        <a href="{{ app.url }}" target="_blank" rel="noopener"
+           class="group flex flex-col items-center gap-y-2 py-2 rounded-xl hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
+          <span class="flex justify-center items-center size-12 bg-white border border-gray-200 rounded-full shadow-2xs dark:bg-neutral-900 dark:border-neutral-700">
+            {% if app.logo %}
+              <img src="{{ app.logo }}" alt="" class="size-6" loading="lazy">
+            {% else %}
+              <i data-lucide="{{ app.icon }}" class="size-5 text-gray-600 dark:text-neutral-300"></i>
+            {% endif %}
+          </span>
+          <span class="text-xs text-gray-700 dark:text-neutral-300">{{ app.label }}</span>
+        </a>
+        {% endfor %}
+        <a x-show="isPhone" x-cloak href="sms:?&body={{ share_text | urlencode }}"
+           class="flex flex-col items-center gap-y-2 py-2 rounded-xl hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:hover:bg-neutral-700/50">
+          <span class="flex justify-center items-center size-12 bg-white border border-gray-200 rounded-full shadow-2xs dark:bg-neutral-900 dark:border-neutral-700">
+            <i data-lucide="message-square" class="size-5 text-gray-600 dark:text-neutral-300"></i>
+          </span>
+          <span class="text-xs text-gray-700 dark:text-neutral-300">SMS</span>
+        </a>
+        <button type="button" x-show="canNativeShare" x-cloak
+                @click="navigator.share({ title: 'Join me on {{ institute }}', text: shareText, url: shareUrl }).catch(() => {})"
+                class="flex flex-col items-center gap-y-2 py-2 rounded-xl hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:hover:bg-neutral-700/50">
+          <span class="flex justify-center items-center size-12 bg-white border border-gray-200 rounded-full shadow-2xs dark:bg-neutral-900 dark:border-neutral-700">
+            <i data-lucide="ellipsis" class="size-5 text-gray-600 dark:text-neutral-300"></i>
+          </span>
+          <span class="text-xs text-gray-700 dark:text-neutral-300">More</span>
+        </button>
+      </div>
+    </div>
+  {% endcall %}
+
+  <!-- ============ How it works + rules (modal) ============ -->
+  {% call modal(id="refer-how", title="How Refer & Earn works", size="md", show_cancel=false, confirm_text="Got it") %}
+    <ol class="space-y-4">
+      {% for step in steps %}
+      <li class="flex gap-x-3">
+        <span class="shrink-0 flex justify-center items-center size-7 text-xs font-semibold text-primary-600 border border-gray-200 rounded-full dark:border-neutral-700 dark:text-primary-500">{{ loop.index }}</span>
+        <div>
+          <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">{{ step[0] }}</p>
+          <p class="text-sm text-gray-500 dark:text-neutral-400">{{ step[1] }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+    <div class="mt-5 pt-4 border-t border-gray-200 dark:border-neutral-700">
+      <p class="text-sm font-medium text-gray-800 dark:text-neutral-200">Rules</p>
+      <ul class="mt-2 ps-5 list-disc space-y-1 text-sm text-gray-600 dark:text-neutral-400">
+        <li>Your friend must be new to us, with no purchase before.</li>
+        <li>The {{ friend_gets }} off adds to any offer running when they buy.</li>
+        <li>Up to 10 friends can buy with your link.</li>
+        <li>If a friend's order is refunded, those credits are cancelled.</li>
+        <li>Credits never expire, and can't be withdrawn or given to someone else.</li>
+      </ul>
+    </div>
+  {% endcall %}
+</div>
+
+<script>
+  window.REFER_STATES = {
+    initial: 'new',
+    groups: [
+      { name: 'Can refer', states: [['new', 'No referrals yet'], ['active', 'Has referrals and credits'], ['limit', 'All spots used']] },
+      { name: 'Can\'t refer', states: [['not_eligible', 'Hasn\'t bought a product'], ['paused', 'Institute paused the program']] }
+    ]
+  };
+</script>
+{{ toast_provider() }}
+{% include "./includes/prototype.html" %}
+{% endblock main_content %}
