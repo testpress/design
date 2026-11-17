@@ -1,0 +1,101 @@
+{#
+  Once set up: status with the on/off switch, then the offer and the rules as quiet tiles (each edited in a modal),
+  then a way into performance. Who can invite friends is one of the rules. Same pattern as the AI Chat settings page.
+#}
+{% set link_btn = "text-sm font-medium text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:underline disabled:opacity-50" %}
+{% macro switch(on, click, label_id, disabled="readOnly") %}
+  <button type="button" role="switch" :aria-checked="{{ on }}" aria-labelledby="{{ label_id }}" @click="{{ click }}" :disabled="{{ disabled }}"
+          class="relative shrink-0 inline-flex w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          :class="{{ on }} ? 'bg-primary-600' : 'bg-gray-200'">
+    <span class="absolute top-0.5 start-0.5 size-5 bg-white rounded-full shadow-sm transition-transform duration-200" :class="{{ on }} && 'translate-x-5'"></span>
+  </button>
+{% endmacro %}
+
+<div class="space-y-4">
+  <!-- ===== Status ===== -->
+  <section class="p-5 sm:p-6 bg-white rounded-2xl shadow-sm">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-4">
+      <div class="flex-1 min-w-[12rem]">
+        <div class="flex items-center gap-x-2">
+          <span class="relative flex size-2">
+            <span x-show="saved.enabled" class="absolute inline-flex size-full rounded-full bg-green-400 opacity-60 animate-ping"></span>
+            <span class="relative inline-flex size-2 rounded-full" :class="saved.enabled ? 'bg-green-500' : 'bg-gray-300'"></span>
+          </span>
+          <h2 class="text-base font-semibold text-gray-800" x-text="saved.enabled ? 'Refer & Earn is on' : 'Refer & Earn is off'"></h2>
+        </div>
+        <p class="mt-0.5 text-sm text-gray-500" x-show="saved.enabled" x-text="saved.rules.whoCanInvite === 'all' ? 'All your students can invite their friends.' : 'Students who have bought a product can invite their friends.'"></p>
+        <p class="mt-0.5 text-sm text-gray-500" x-show="!saved.enabled">Students can't invite new friends. They keep their credits, and friends who already joined still get their discount.</p>
+      </div>
+      <div class="flex items-center gap-x-3">
+        <span id="refer-enabled-label" class="text-sm text-gray-600">Enable Refer &amp; Earn</span>
+        {{ switch("saved.enabled", "toggleEnabled()", "refer-enabled-label") }}
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Offer ===== -->
+  <section class="p-5 sm:p-6 bg-white rounded-2xl shadow-sm" aria-labelledby="refer-offer-title">
+    <div class="flex items-center justify-between gap-x-4">
+      <h2 id="refer-offer-title" class="text-base font-semibold text-gray-800">Offer</h2>
+      <button type="button" x-show="!readOnly" @click="startOffer()" class="{{ link_btn }}">Edit</button>
+    </div>
+    <dl class="mt-5 grid sm:grid-cols-2 gap-x-6 gap-y-5">
+      <div class="flex flex-col-reverse">
+        <dd class="mt-1">
+          <span class="block text-2xl font-semibold tracking-tight text-gray-800 tabular-nums" x-text="benefit('friend')"></span>
+          <span class="block mt-0.5 text-sm text-gray-500" x-text="benefitNote('friend')"></span>
+        </dd>
+        <dt class="text-sm text-gray-500">Friend gets</dt>
+      </div>
+      <div class="flex flex-col-reverse">
+        <dd class="mt-1">
+          <span class="block text-2xl font-semibold tracking-tight text-gray-800 tabular-nums" x-text="benefit('student')"></span>
+          <span class="block mt-0.5 text-sm text-gray-500" x-text="benefitNote('student')"></span>
+        </dd>
+        <dt class="text-sm text-gray-500">Student earns</dt>
+      </div>
+    </dl>
+  </section>
+
+  <!-- ===== Rules ===== -->
+  <section class="p-5 sm:p-6 bg-white rounded-2xl shadow-sm" aria-labelledby="refer-rules-title">
+    <div class="flex items-center justify-between gap-x-4">
+      <h2 id="refer-rules-title" class="text-base font-semibold text-gray-800">Rules</h2>
+      <button type="button" x-show="!readOnly" @click="startRules()" class="{{ link_btn }}">Edit</button>
+    </div>
+    {# Label above value, all tiles aligned from the top #}
+    <dl class="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
+      <div>
+        <dt class="text-sm text-gray-500">Who can invite friends</dt>
+        <dd class="mt-1 h-8 flex items-center text-base font-semibold text-gray-800" x-text="saved.rules.whoCanInvite === 'all' ? 'All students' : 'Students who bought'"></dd>
+      </div>
+      <div>
+        <dt class="text-sm text-gray-500">Friends per student</dt>
+        <dd class="mt-1 h-8 flex items-baseline">
+          <span x-show="saved.rules.perStudent" class="text-2xl font-semibold tracking-tight text-gray-800 tabular-nums" x-text="saved.rules.perStudent"></span>
+          <span x-show="!saved.rules.perStudent" class="self-center text-base font-semibold text-gray-800">No limit</span>
+        </dd>
+      </div>
+      <div>
+        <dt class="text-sm text-gray-500">Time for a friend to buy</dt>
+        <dd class="mt-1 h-8 text-2xl font-semibold tracking-tight text-gray-800 tabular-nums"><span x-text="saved.rules.buyDays"></span> <span class="text-base font-medium text-gray-500">days</span></dd>
+      </div>
+      <div>
+        <dt class="text-sm text-gray-500">Credits usable after</dt>
+        <dd class="mt-1 h-8 text-2xl font-semibold tracking-tight text-gray-800 tabular-nums"><span x-text="saved.rules.waitDays"></span> <span class="text-base font-medium text-gray-500">days</span></dd>
+      </div>
+    </dl>
+  </section>
+
+    <!-- ===== Performance (next page) ===== -->
+  <section class="group relative p-5 sm:p-6 flex items-center gap-x-4 bg-white rounded-2xl shadow-sm">
+      <div class="flex-1 min-w-0">
+        <h2 class="text-sm font-semibold text-gray-800">Performance</h2>
+        <p class="mt-0.5 text-sm text-gray-500">66 friends bought this month · ₹1,87,500 in sales</p>
+      </div>
+      <a href="{{ '/testpress/referral_performance/' | url }}" aria-label="See referral performance"
+         class="shrink-0 text-gray-400 group-hover:text-gray-800 transition-colors focus:outline-none after:absolute after:inset-0 after:rounded-2xl focus-visible:after:ring-2 focus-visible:after:ring-primary-500">
+        <svg class="size-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+  </section>
+</div>

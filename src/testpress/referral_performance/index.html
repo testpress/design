@@ -1,0 +1,162 @@
+---
+tags: testpress
+title: Refer & Earn performance
+permalink: testpress/referral_performance/
+---
+
+{# Refer & Earn performance (PRD US-18, FR-169 to FR-188), laid out like WhatsApp usage: for a date range (this month by
+   default), what referrals brought in and the discounts and credits given first, then how many friends who joined went on to buy
+   (so sign-ups are never read as sales), then per day, then credits, then the students who brought the most. #}
+{% extends "layouts/admin_base.html" %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../ui-system/components/empty-state.html" import empty_state %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100{% endblock %}
+
+{% block content %}
+{% set card = "p-5 sm:p-6 bg-white rounded-2xl shadow-sm" %}
+{% set fig = "mt-1 text-2xl font-semibold tracking-tight text-gray-800 tabular-nums" %}
+<div class="max-w-7xl mx-auto xl:px-8 py-8 lg:grid lg:grid-cols-12 lg:gap-x-5">
+  {# Performance lives under Refer & Earn, so it stays highlighted #}
+  {% set sidebar_active = "refer_earn" %}
+  {% include "partials/admin_sidebar.html" %}
+  <div class="px-4 sm:px-6 lg:px-0 lg:col-span-9" x-data="referPerformance" x-cloak>
+
+    <!-- Header: breadcrumb and title; dates and settings on the right (as on WhatsApp usage) -->
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <nav aria-label="Breadcrumb">
+          <ol role="list" class="flex items-center gap-x-2 text-sm font-medium text-gray-500">
+            <li><a href="#" class="hover:text-gray-700">Settings</a></li>
+            <li aria-hidden="true"><svg class="size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></li>
+            <li><a href="{{ '/testpress/referral_settings/?state=on' | url }}" class="hover:text-gray-700">Refer &amp; Earn</a></li>
+            <li aria-hidden="true"><svg class="size-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></li>
+            <li aria-current="page">Performance</li>
+          </ol>
+        </nav>
+        <div class="mt-1">{{ page_header(title="Refer &amp; Earn performance") }}</div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="shrink-0 [&>div]:space-y-0" id="rp-range">
+          {{ date_picker(name="rp-range", range=true, button_trigger=true, dropdown_align="right", max_date="2026-11-28", today="2026-11-28", presets=true, placeholder="Pick dates", padding_class="py-2 px-3") }}
+        </div>
+        {{ button(text="Settings", variant="secondary", icon="settings", href=('/testpress/referral_settings/?state=on' | url)) }}
+      </div>
+    </div>
+
+    <div class="mt-5 space-y-4">
+      <!-- No referrals in these dates -->
+      <div x-show="empty">
+        {{ empty_state(title="No referrals in these dates", description="When friends join with a student's invite link and buy, their sales show up here.", icon="gift", primary_action_text="Refer & Earn settings", primary_action_href=('/testpress/referral_settings/?state=on' | url), extra_classes="!rounded-2xl !border-0 shadow-sm") }}
+      </div>
+
+      <div x-show="!empty" class="space-y-4">
+        <!-- ===== What it brought in and what it cost ===== -->
+        <section class="{{ card }}" aria-labelledby="rp-top-title">
+          <h2 id="rp-top-title" class="sr-only">Summary</h2>
+          <dl class="grid sm:grid-cols-3 gap-6">
+            <div>
+              <dt class="text-sm text-gray-500" >Sales from referrals</dt>
+              <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-800 tabular-nums" x-text="rupees(m.sales)"></dd>
+            </div>
+            <div>
+              <dt class="text-sm text-gray-500">Friends who bought</dt>
+              <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-800 tabular-nums" x-text="count(m.bought)"></dd>
+            </div>
+            <div>
+              <dt class="text-sm text-gray-500">Discounts and credits given</dt>
+              <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-800 tabular-nums" x-text="rupees(given)"></dd>
+            </div>
+          </dl>
+          <div class="mt-5 py-3 px-4 rounded-xl bg-gray-50 text-[13px] text-gray-600">
+            <p class="flex gap-x-2"><i data-lucide="info" class="shrink-0 size-4 mt-px text-gray-400"></i>
+              <span>Sales are what friends paid after their discount. <span x-text="m.refunded"></span> refunded orders aren't counted.</span>
+            </p>
+          </div>
+        </section>
+
+        <!-- ===== From joining to buying (PRD FR-183: sign-ups are not sales) ===== -->
+        <section class="{{ card }}" aria-labelledby="rp-funnel-title">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="rp-funnel-title" class="text-base font-semibold text-gray-800">Friends who joined with a link</h2>
+            <p class="text-sm text-gray-500"><span class="font-medium text-gray-800" x-text="boughtRate + '%'"></span> bought</p>
+          </div>
+          <div class="mt-4 flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-gray-100" aria-hidden="true">
+            <div class="bg-green-500 rounded-s-full" :style="'width:' + share(m.bought) + '%'"></div>
+            <div class="bg-amber-400" :style="'width:' + share(m.waiting) + '%'"></div>
+            <div class="bg-gray-300 rounded-e-full" :style="'width:' + share(m.ended) + '%'"></div>
+          </div>
+          <dl class="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-5">
+            <div class="flex flex-col-reverse">
+              <dd class="{{ fig }}" x-text="count(m.joined)"></dd>
+              <dt class="text-sm text-gray-500">Joined</dt>
+            </div>
+            <div class="flex flex-col-reverse">
+              <dd class="{{ fig }}" x-text="count(m.bought)"></dd>
+              <dt class="flex items-center gap-x-1.5 text-sm text-gray-500"><span class="size-2 rounded-full bg-green-500"></span>Bought</dt>
+            </div>
+            <div class="flex flex-col-reverse">
+              <dd class="{{ fig }}" x-text="count(m.waiting)"></dd>
+              <dt class="flex items-center gap-x-1.5 text-sm text-gray-500"><span class="size-2 rounded-full bg-amber-400"></span>Still have time to buy</dt>
+            </div>
+            <div class="flex flex-col-reverse">
+              <dd class="{{ fig }}" x-text="count(m.ended)"></dd>
+              <dt class="flex items-center gap-x-1.5 text-sm text-gray-500"><span class="size-2 rounded-full bg-gray-300"></span>Offer ended</dt>
+            </div>
+          </dl>
+        </section>
+
+        <!-- ===== Per day ===== -->
+        <section class="{{ card }}" aria-labelledby="rp-daily-title">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="rp-daily-title" class="text-base font-semibold text-gray-800" x-text="'Sales from referrals per ' + unit"></h2>
+          </div>
+          <div id="rp-chart" class="mt-3 -mx-2 min-h-[240px]" role="img" :aria-label="'Sales from referrals per ' + unit + '. The totals are in the cards above.'"></div>
+        </section>
+
+        <div class="grid lg:grid-cols-2 gap-4">
+          <!-- ===== Credits (PRD FR-173, FR-174) ===== -->
+          <section class="{{ card }}" aria-labelledby="rp-credits-title">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="rp-credits-title" class="text-base font-semibold text-gray-800">Credits</h2>
+              <p class="text-sm text-gray-500"><span class="font-medium text-gray-800" x-text="rupees(m.credits)"></span> earned</p>
+            </div>
+            <dl class="mt-5 grid grid-cols-2 gap-x-6 gap-y-5">
+              <div class="flex flex-col-reverse"><dd class="{{ fig }}" x-text="rupees(m.creditPending)"></dd><dt class="text-sm text-gray-500">Waiting to be usable</dt></div>
+              <div class="flex flex-col-reverse"><dd class="{{ fig }}" x-text="rupees(m.creditAvailable)"></dd><dt class="text-sm text-gray-500">Usable, not spent yet</dt></div>
+              <div class="flex flex-col-reverse"><dd class="{{ fig }}" x-text="rupees(creditUsed)"></dd><dt class="text-sm text-gray-500">Spent on purchases</dt></div>
+              <div class="flex flex-col-reverse"><dd class="{{ fig }}" x-text="rupees(m.creditCancelled)"></dd><dt class="text-sm text-gray-500">Cancelled after refunds</dt></div>
+            </dl>
+          </section>
+
+          <!-- ===== Students who brought the most (PRD FR-175) ===== -->
+          <section class="{{ card }}" aria-labelledby="rp-top-students-title">
+            <h2 id="rp-top-students-title" class="text-base font-semibold text-gray-800">Top students</h2>
+            <div class="mt-3 -mx-3">
+              <template x-for="s in top" :key="s.name">
+                <div class="p-3 flex items-center gap-x-3">
+                  <template x-if="s.photo"><img class="shrink-0 size-9 rounded-full object-cover" :src="photo(s.photo)" alt=""></template>
+                  <template x-if="!s.photo"><span class="shrink-0 flex justify-center items-center size-9 text-sm font-medium text-gray-800 bg-white border border-gray-200 rounded-full" x-text="s.name[0]"></span></template>
+                  <div class="grow min-w-0">
+                    <p class="text-sm font-medium text-gray-800 truncate" x-text="s.name"></p>
+                    <p class="text-sm text-gray-500" x-text="s.bought + ' friends bought · ' + rupees(s.credits) + ' credits'"></p>
+                  </div>
+                  <p class="shrink-0 text-sm font-medium text-gray-800 tabular-nums" x-text="rupees(s.sales)"></p>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% include "../refer_and_earn/includes/prototype.html" %}
+{% endblock %}
+
+{% block script %}
+{% include "../../ui-system/scripts/date_picker_script.html" %}
+{% include "./includes/script.html" %}
+{% endblock %}

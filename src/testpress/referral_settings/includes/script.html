@@ -1,0 +1,160 @@
+<script>
+  // Prototype states (bottom-right switcher, and shareable as ?state=)
+  window.REFER_STATES = {
+    initial: 'setup',
+    groups: [
+      { name: 'Program', states: [['setup', 'Not set up yet'], ['setup_modal', 'Setting up (modal)'], ['on', 'On'], ['off', 'Turned off']] },
+      { name: 'Editing', states: [['edit_error', 'Offer with field errors'], ['readonly', 'View only (no permission)']] }
+    ]
+  };
+  (function () {
+    const v = new URLSearchParams(location.search).get('state');
+    if (window.REFER_STATES.groups.flatMap(g => g.states.map(s => s[0])).includes(v)) window.REFER_STATES.initial = v;
+  })();
+
+  document.addEventListener('alpine:init', () => {
+    // Fixed amounts only: the friend's discount and the student's credits, in rupees (percentages dropped for v1)
+    const DEFAULTS = () => ({
+      setupDone: true, enabled: true,
+      friendAmount: 300, studentAmount: 200,
+      rules: { whoCanInvite: 'buyers', perStudent: 10, buyDays: 30, waitDays: 7 },
+    });
+
+    Alpine.data('referralAdmin', () => ({
+      saved: DEFAULTS(),
+      readOnly: false,
+      draft: null,
+      errors: {},
+
+      init() {
+        this.apply(window.REFER_STATES.initial);
+        window.addEventListener('refer-state', (e) => this.apply(e.detail));
+      },
+
+      apply(state) {
+        this.saved = DEFAULTS();
+        this.readOnly = false;
+        this.errors = {};
+        ['refer-setup', 'refer-offer', 'refer-rules'].forEach((id) => window.dispatchEvent(new CustomEvent('close-modal-' + id)));
+        if (state === 'setup' || state === 'setup_modal') { this.saved.setupDone = false; this.saved.enabled = false; }
+        if (state === 'setup_modal') setTimeout(() => this.startSetup(), 300);
+        if (state === 'off') this.saved.enabled = false;
+        if (state === 'readonly') this.readOnly = true;
+        if (state === 'edit_error') {
+          // Wait for the modal component to be ready before opening it
+          setTimeout(() => {
+            this.startOffer();
+            this.draft.friendAmount = 0;
+            this.draft.studentAmount = '';
+            this.validateOffer();
+          }, 300);
+        }
+      },
+
+      money(n) { return '₹' + Number(n).toLocaleString('en-IN'); },
+
+      // "₹300 off" / "₹200 credits" and the line under it (overview cards)
+      benefit(side) {
+        return side === 'friend' ? this.money(this.saved.friendAmount) + ' off' : this.money(this.saved.studentAmount) + ' credits';
+      },
+      benefitNote(side) {
+        return side === 'friend' ? 'On their first purchase' : 'For each friend who buys';
+      },
+
+      // ----- Program on / off -----
+      toggleEnabled() {
+        if (this.readOnly) return;
+        if (this.saved.enabled) { this.$dispatch('open-modal-refer-turn-off'); return; }
+        this.saved.enabled = true;
+        this.toast('Refer & Earn is on', 'Your students can now invite their friends.');
+      },
+      turnOn() {
+        this.saved.setupDone = true;
+        this.saved.enabled = true;
+        this.toast('Refer & Earn is on', 'Your students can now invite their friends.');
+      },
+      turnOff() {
+        this.saved.enabled = false;
+        this.$dispatch('close-modal-refer-turn-off');
+        this.toast('Refer & Earn is off', 'Students keep their credits.');
+      },
+
+      // ----- Offer -----
+      startOffer() {
+        this.draft = { friendAmount: this.saved.friendAmount, studentAmount: this.saved.studentAmount };
+        this.errors = {};
+        this.$dispatch('open-modal-refer-offer');
+      },
+      // Adds offer errors to this.errors; true when valid
+      validateOffer() {
+        let ok = true;
+        for (const k of ['friendAmount', 'studentAmount']) {
+          if (!(Number(this.draft[k]) > 0)) { this.errors[k] = 'Enter an amount more than ₹0.'; ok = false; }
+        }
+        this.errors = { ...this.errors };
+        return ok;
+      },
+      saveOffer() {
+        this.errors = {};
+        if (!this.validateOffer()) return;
+        this.saved.friendAmount = Number(this.draft.friendAmount);
+        this.saved.studentAmount = Number(this.draft.studentAmount);
+        this.$dispatch('close-modal-refer-offer');
+        this.toast('Offer saved', 'New referrals get this offer.');
+      },
+
+      // ----- Rules -----
+      startRules() {
+        this.draft = { ...this.saved.rules };
+        this.errors = {};
+        this.$dispatch('open-modal-refer-rules');
+      },
+      // Adds rule errors to this.errors; true when valid
+      validateRules() {
+        let ok = true;
+        for (const k of ['perStudent', 'buyDays', 'waitDays']) {
+          const empty = this.draft[k] === '' || this.draft[k] === null;
+          if (k === 'perStudent' && empty) continue; // empty = no limit
+          if (!(Number(this.draft[k]) >= 1)) { this.errors[k] = 'Enter a whole number of 1 or more.'; ok = false; }
+        }
+        this.errors = { ...this.errors };
+        return ok;
+      },
+      readRules() {
+        const r = {};
+        for (const k of ['perStudent', 'buyDays', 'waitDays']) r[k] = (k === 'perStudent' && (this.draft[k] === '' || this.draft[k] === null)) ? null : Number(this.draft[k]);
+        r.whoCanInvite = this.draft.whoCanInvite === 'all' ? 'all' : 'buyers';
+        return r;
+      },
+      saveRules() {
+        this.errors = {};
+        if (!this.validateRules()) return;
+        this.saved.rules = this.readRules();
+        this.$dispatch('close-modal-refer-rules');
+        this.toast('Rules saved', 'New referrals follow these rules.');
+      },
+
+      // ----- First-time setup: suggested values in one modal, then turn on -----
+      startSetup() {
+        this.draft = { friendAmount: this.saved.friendAmount, studentAmount: this.saved.studentAmount, ...this.saved.rules };
+        this.errors = {};
+        this.$dispatch('open-modal-refer-setup');
+      },
+      saveSetup() {
+        this.errors = {};
+        const offerOk = this.validateOffer();
+        const rulesOk = this.validateRules();
+        if (!offerOk || !rulesOk) return;
+        this.saved.friendAmount = Number(this.draft.friendAmount);
+        this.saved.studentAmount = Number(this.draft.studentAmount);
+        this.saved.rules = this.readRules();
+        this.$dispatch('close-modal-refer-setup');
+        this.turnOn();
+      },
+
+      toast(title, description) {
+        window.dispatchEvent(new CustomEvent('toast', { detail: { variant: 'success', title, description, position: 'bottom-right' } }));
+      },
+    }));
+  });
+</script>

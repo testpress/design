@@ -1,0 +1,157 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/echarts/5.5.0/echarts.min.js"></script>
+<script>
+  // Prototype states (bottom-right switcher, and shareable as ?state=)
+  window.REFER_STATES = {
+    initial: 'data',
+    groups: [{ name: 'Performance', states: [['data', 'With referrals'], ['empty', 'No referrals in these dates']] }]
+  };
+  (function () {
+    const v = new URLSearchParams(location.search).get('state');
+    if (['data', 'empty'].includes(v)) window.REFER_STATES.initial = v;
+  })();
+
+  // ----- Sample data: one row per day from 1 Aug to 28 Nov 2026 (today), seeded so it's the same on every load -----
+  const RP_TODAY = new Date(2026, 10, 28);
+  const RP_FIRST = new Date(2026, 7, 1);
+  const RP_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const rpDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const rpShort = (d) => d.getDate() + ' ' + RP_MON[d.getMonth()];
+  const rpPickerText = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const RP_FRIEND_OFF = 300, RP_STUDENT_CREDIT = 200;
+  const RP_DATA = (() => {
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    const rows = [];
+    for (let d = new Date(RP_FIRST); d <= RP_TODAY; d.setDate(d.getDate() + 1)) {
+      const bought = Math.floor(rnd() * 5);                       // 0–4 friends bought
+      const joined = bought + Math.floor(rnd() * 5);              // friends who signed up with a link that day
+      const sales = bought * (1800 + Math.round(rnd() * 18) * 100); // what they paid after their ₹300 off
+      const refunded = rnd() < 0.04 ? 1 : 0;
+      rows.push({ date: rpDay(d), bought, joined, sales, refunded });
+    }
+    return rows;
+  })();
+  const RP_STUDENTS = [
+    { name: 'Riya Sharma', photo: '1659482634023-2c4fda99ac0c', share: 0.13 },
+    { name: 'Arjun Kumar', photo: '1570654639102-bdd95efeca7a', share: 0.11 },
+    { name: 'Divya Prakash', photo: '1601935111741-ae98b2b230b0', share: 0.09 },
+    { name: 'Sanjay Mehta', photo: '1679412330254-90cb240038c5', share: 0.08 },
+    { name: 'Meena Suresh', photo: '', share: 0.06 },
+  ];
+  let rpChart = null, rpResizeBound = false;
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('referPerformance', () => ({
+      state: window.REFER_STATES.initial,
+      start: new Date(2026, 10, 1),   // this month by default
+      end: RP_TODAY,
+
+      init() {
+        window.addEventListener('refer-state', (e) => { this.state = e.detail; this.$nextTick(() => this.draw()); });
+        this.$watch('start', () => this.$nextTick(() => this.draw()));
+        this.$watch('end', () => this.$nextTick(() => this.draw()));
+        this.$nextTick(() => { this.bindRange(); this.draw(); });
+      },
+
+      // The ui-system date picker keeps its own state (same approach as WhatsApp usage): read each pick, and push ours
+      // into it once. `last` is the range both sides agree on, so neither undoes the other.
+      bindRange() {
+        const el = document.querySelector('#rp-range [x-data]');
+        const dp = el && el._x_dataStack && el._x_dataStack[0];
+        if (!dp) { setTimeout(() => this.bindRange(), 100); return; }
+        let last = '';
+        const key = (s, e) => +rpDay(s) + '-' + +rpDay(e);
+        Alpine.effect(() => {
+          if (!dp.selectedDate || !dp.selectedEndDate) return;
+          const k = key(dp.selectedDate, dp.selectedEndDate);
+          if (k !== last) { last = k; this.start = rpDay(dp.selectedDate); this.end = rpDay(dp.selectedEndDate); }
+        });
+        Alpine.effect(() => {
+          const k = key(this.start, this.end);
+          if (k !== last) { last = k; dp.parseAndSetValue(rpPickerText(this.start) + ' → ' + rpPickerText(this.end)); }
+        });
+      },
+
+      // ----- Figures for the picked range (PRD US-18) -----
+      get rows() { return this.state === 'empty' ? [] : RP_DATA.filter((r) => r.date >= rpDay(this.start) && r.date <= rpDay(this.end)); },
+      sum(f) { return this.rows.reduce((a, r) => a + r[f], 0); },
+      get m() {
+        const bought = this.sum('bought');
+        const joined = this.sum('joined');
+        const credits = bought * RP_STUDENT_CREDIT;
+        // Friends who joined but didn't buy: the most recent ones still have time (30 days), older ones' offer ended
+        const recent = this.rows.filter((r) => (RP_TODAY - r.date) / 864e5 < 30).reduce((a, r) => a + r.joined - r.bought, 0);
+        const notBought = joined - bought;
+        return {
+          sales: this.sum('sales'), bought, joined, refunded: this.sum('refunded'),
+          discounts: bought * RP_FRIEND_OFF, credits,
+          waiting: Math.min(recent, notBought), ended: notBought - Math.min(recent, notBought),
+          creditPending: Math.round(credits * 0.26 / 200) * 200,
+          creditAvailable: Math.round(credits * 0.39 / 200) * 200,
+          creditCancelled: this.sum('refunded') * RP_STUDENT_CREDIT,
+        };
+      },
+      get creditUsed() { const m = this.m; return Math.max(0, m.credits - m.creditPending - m.creditAvailable); },
+      get top() {
+        const m = this.m;
+        return RP_STUDENTS.map((s) => {
+          const bought = Math.max(1, Math.round(m.bought * s.share));
+          return { ...s, bought, credits: bought * RP_STUDENT_CREDIT, sales: Math.round((m.sales / Math.max(1, m.bought)) * bought / 100) * 100 };
+        }).filter(() => m.bought > 0);
+      },
+      get empty() { return this.m.bought === 0 && this.m.joined === 0; },
+      get given() { return this.m.discounts + this.m.credits; },
+      get boughtRate() { return this.m.joined ? Math.round((this.m.bought / this.m.joined) * 100) : 0; },
+      share(n) { return this.m.joined ? (n / this.m.joined) * 100 : 0; },
+      rupees(n) { return '₹' + Number(n).toLocaleString('en-IN'); },
+      count(n) { return Number(n).toLocaleString('en-IN'); },
+      photo(id) { return 'https://images.unsplash.com/photo-' + id + '?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=2.5&w=96&h=96&q=80'; },
+
+      // ----- Chart: sales per day (per week when the range is longer than 31 days) -----
+      get unit() { return this.rows.length > 31 ? 'week' : 'day'; },
+      get buckets() {
+        if (this.unit === 'day') return this.rows.map((r) => ({ label: String(r.date.getDate()), title: rpShort(r.date), sales: r.sales, bought: r.bought }));
+        const out = [];
+        for (let i = 0; i < this.rows.length; i += 7) {
+          const w = this.rows.slice(i, i + 7);
+          out.push({ label: rpShort(w[0].date), title: rpShort(w[0].date) + ' – ' + rpShort(w[w.length - 1].date), sales: w.reduce((a, r) => a + r.sales, 0), bought: w.reduce((a, r) => a + r.bought, 0) });
+        }
+        return out;
+      },
+
+      draw() {
+        if (window.lucide) window.lucide.createIcons();
+        const el = document.getElementById('rp-chart');
+        if (!el || !window.echarts) return;
+        if (rpChart) { rpChart.dispose(); rpChart = null; }
+        if (this.empty) return;
+        const dark = document.documentElement.classList.contains('dark');
+        const muted = dark ? '#a3a3a3' : '#6b7280';
+        const bk = this.buckets;
+        rpChart = echarts.init(el, null, { renderer: 'svg' });
+        rpChart.setOption({
+          animationDuration: 300,
+          grid: { left: 8, right: 8, top: 12, bottom: 8, containLabel: true },
+          tooltip: {
+            trigger: 'axis', axisPointer: { type: 'shadow', shadowStyle: { color: dark ? 'rgba(255,255,255,0.04)' : 'rgba(17,24,39,0.04)' } },
+            backgroundColor: dark ? '#171717' : '#ffffff', borderColor: dark ? '#404040' : '#e5e7eb', textStyle: { color: dark ? '#e5e5e5' : '#1f2937', fontSize: 12 },
+            formatter: (items) => {
+              const b = bk[items[0].dataIndex];
+              return `<div style="font-weight:600;margin-bottom:4px">${b.title}</div>` +
+                `<div style="display:flex;justify-content:space-between;gap:16px"><span>Sales</span><span style="font-variant-numeric:tabular-nums">₹${b.sales.toLocaleString('en-IN')}</span></div>` +
+                `<div style="display:flex;justify-content:space-between;gap:16px;color:${muted}"><span>Friends who bought</span><span style="font-variant-numeric:tabular-nums">${b.bought}</span></div>`;
+            },
+          },
+          xAxis: { type: 'category', data: bk.map((b) => b.label), axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: muted, fontSize: 11, interval: this.unit === 'day' && bk.length > 16 ? 2 : 'auto' } },
+          yAxis: { type: 'value', splitLine: { lineStyle: { color: dark ? '#404040' : '#f3f4f6' } }, axisLabel: { color: muted, fontSize: 11, formatter: (v) => v >= 1000 ? '₹' + (v / 1000).toLocaleString('en-IN') + 'k' : '₹' + v } },
+          series: [{
+            name: 'Sales', type: 'bar', barMaxWidth: this.unit === 'day' ? 18 : 32,
+            itemStyle: { color: dark ? '#10b981' : '#059669', borderRadius: [3, 3, 0, 0] },
+            data: bk.map((b) => b.sales),
+          }],
+        });
+        if (!rpResizeBound) { rpResizeBound = true; window.addEventListener('resize', () => rpChart && rpChart.resize()); }
+      },
+    }));
+  });
+</script>
