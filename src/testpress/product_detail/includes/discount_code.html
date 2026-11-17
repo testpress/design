@@ -3,14 +3,29 @@
 {% from "../../../ui-system/components/button.html" import button %}
     {# Discount code and installments #}
     <div x-data="{ open: false }" >
-      <div x-show="!open" class="flex flex-wrap justify-between gap-2 text-sm">
+      <div x-show="!open && !refCodeOpen" class="flex flex-wrap justify-between gap-2 text-sm">
         <button type="button" @click="open = true" class="font-medium text-primary-600 hover:text-primary-700">Have a discount code?</button>
-        <button x-show="!hasPlans" type="button" @click="showInstallments = true" class="font-medium text-primary-600 hover:text-primary-700">Pay in installments</button>
+        {# Refer & Earn: only on a first purchase with no referral applied yet (PRD US-05) #}
+        <button x-show="canEnterReferralCode" x-cloak type="button" @click="refCodeOpen = true; refCodeError = ''" class="font-medium text-primary-600 hover:text-primary-700">Have a referral code?</button>
+        <button x-show="!hasPlans && !canEnterReferralCode" type="button" @click="showInstallments = true" class="font-medium text-primary-600 hover:text-primary-700">Pay in installments</button>
       </div>
       <form x-show="open" x-cloak @submit.prevent class="flex gap-2">
         <label for="discount-code-{{ offers_id }}" class="sr-only">Discount code</label>
         <input id="discount-code-{{ offers_id }}" type="text" placeholder="Enter discount code"
           class="py-2 px-3 block w-full border-gray-200 rounded-lg text-sm focus:border-primary-500 focus:ring-primary-500 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300">
         {{ button(text="Apply", variant="secondary", type="submit") }}
+      </form>
+
+      {# Referral code entry with inline errors. Try RIYA42 (works) or KAVYA10 (no spots left). #}
+      <form x-show="refCodeOpen" x-cloak @submit.prevent="applyRefCode()">
+        <div class="flex gap-2">
+          <label for="referral-code-{{ offers_id }}" class="sr-only">Referral code</label>
+          <input id="referral-code-{{ offers_id }}" type="text" x-model="refCode" placeholder="Enter referral code" autocomplete="off"
+            :class="refCodeError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-200 focus:border-primary-500 focus:ring-primary-500 dark:border-neutral-700'"
+            class="py-2 px-3 block w-full uppercase placeholder:normal-case rounded-lg text-sm dark:bg-neutral-800 dark:text-neutral-300">
+          {{ button(text="Apply", variant="secondary", type="submit") }}
+        </div>
+        <p x-show="refCodeError" class="mt-1.5 text-xs text-red-600 dark:text-red-500" x-text="refCodeError"></p>
+        <button type="button" @click="refCodeOpen = false; refCodeError = ''" class="mt-2 text-xs text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200">Cancel</button>
       </form>
     </div>

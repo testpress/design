@@ -60,7 +60,8 @@ tags: testpress
 
     {# Purchase card #}
     <aside class="hidden lg:block lg:col-span-1 lg:col-start-3 lg:row-start-1 lg:row-span-2">
-      <div class="lg:sticky lg:top-20">
+      {# Always sticky. If the card fits it sticks 80px from the top. If it is taller than the window (zoomed in, short screen), the page scroll moves it up until its bottom (Chat) is in view, then it sticks there. #}
+      <div x-data="{ top: 80, place() { const h = this.$el.offsetHeight; this.top = h + 96 <= window.innerHeight ? 80 : window.innerHeight - h - 16; } }" x-init="place(); window.addEventListener('resize', () => place()); new ResizeObserver(() => place()).observe($el)" class="lg:sticky" :style="'top:' + top + 'px'">
         {% include "./includes/purchase_card.html" %}
       </div>
     </aside>
@@ -88,6 +89,8 @@ tags: testpress
         <div class="p-5">
           {% set offers_id = "mobile" %}
           {% include "./includes/discount_code.html" %}
+          {% set summary_id = "mobile" %}
+          {% include "./includes/referral_summary.html" %}
         </div>
         {% include "./includes/purchase_offers.html" %}
       </div>
@@ -105,14 +108,18 @@ tags: testpress
       <div class="min-w-0">
         <template x-if="!hasPlans">
           <p class="flex items-baseline gap-x-2">
-            <span class="text-lg font-semibold text-gray-900 dark:text-white" x-text="money(product.price)"></span>
-            <s class="text-xs text-gray-400" x-text="money(product.strike_through_price)"></s>
+            <span class="text-lg font-semibold text-gray-900 dark:text-white" x-text="money(payable)"></span>
+            <s class="text-xs text-gray-400" x-text="money(hasAdjustments ? product.price : product.strike_through_price)"></s>
           </p>
         </template>
         <template x-if="hasPlans && selectedPlan">
           <div class="min-w-0">
             <p class="text-xs text-gray-500 truncate dark:text-neutral-400" x-text="selectedPlan.name + ' · until ' + selectedDetail.ends_on"></p>
-            <p class="text-lg font-semibold text-gray-900 dark:text-white" x-text="money(selectedDetail.price)"></p>
+            <p class="flex items-baseline gap-x-2">
+              <span class="text-lg font-semibold text-gray-900 dark:text-white" x-text="money(payable)"></span>
+              {# Referral discount or credits applied: the plan price is struck through #}
+              <s x-show="hasAdjustments" class="text-xs text-gray-400" x-text="money(selectedDetail.price)"></s>
+            </p>
           </div>
         </template>
       </div>
@@ -161,6 +168,13 @@ tags: testpress
       <button type="button" @click="facultyMode = 'none'; open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
         No faculty<span x-show="facultyMode === 'none'"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
       </button>
+      <div class="my-1 border-t border-gray-200 dark:border-neutral-800"></div>
+      <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 dark:text-neutral-500">Refer &amp; Earn</p>
+      {% for r in [["none", "No referral"], ["friend", "Referred friend, first purchase"], ["code", "First purchase, has a code"], ["expired", "Referral offer expired"], ["credits", "Has credits to use"]] %}
+      <button type="button" @click="setReferral('{{ r[0] }}'); open = false" class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-800">
+        {{ r[1] }}<span x-show="referral === '{{ r[0] }}'"><i data-lucide="check" class="size-3.5 text-gray-500"></i></span>
+      </button>
+      {% endfor %}
     {% endcall %}
   </div>
 </div>

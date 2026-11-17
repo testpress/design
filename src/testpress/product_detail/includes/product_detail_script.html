@@ -60,6 +60,56 @@
       // Faculty in this product: "many" (all courses), "one" (a single-teacher product) or "none".
       facultyMode: "many",
 
+      // Refer & Earn at purchase. ?referral= none · friend · code · expired · credits (see referral_summary.html).
+      referral: (() => {
+        const v = new URLSearchParams(location.search).get("referral");
+        return ["friend", "code", "expired", "credits"].includes(v) ? v : "none";
+      })(),
+      creditsOn: true,
+      refCodeOpen: false,
+      refCode: "",
+      refCodeError: "",
+      refApplied: false,
+
+      setReferral(value) {
+        this.referral = value;
+        this.refApplied = false; this.refCodeOpen = false; this.refCode = ""; this.refCodeError = ""; this.creditsOn = true;
+        const url = new URL(location.href);
+        if (value === "none") url.searchParams.delete("referral"); else url.searchParams.set("referral", value);
+        history.replaceState(null, "", url);
+      },
+
+      get basePrice() {
+        return this.hasPlans ? (this.selectedDetail ? this.selectedDetail.price : 0) : this.product.price;
+      },
+      get referralOff() {
+        return this.referral === "friend" || this.refApplied ? Math.min(300, this.basePrice) : 0;
+      },
+      get creditsUsed() {
+        return this.referral === "credits" && this.creditsOn ? Math.min(200, this.basePrice - this.referralOff) : 0;
+      },
+      get creditsLeft() {
+        return this.referral === "credits" ? 200 - this.creditsUsed : 0;
+      },
+      get payable() {
+        return this.basePrice - this.referralOff - this.creditsUsed;
+      },
+      get hasAdjustments() {
+        return this.referralOff > 0 || this.creditsUsed > 0;
+      },
+      get canEnterReferralCode() {
+        return (this.referral === "code" || this.referral === "expired") && !this.refApplied;
+      },
+
+      // Prototype check of a typed referral code (the real rules are in PRD FR-35 to FR-39)
+      applyRefCode() {
+        const code = this.refCode.trim().toUpperCase();
+        if (!code) { this.refCodeError = "Enter a referral code."; return; }
+        if (code === "RIYA42") { this.refApplied = true; this.refCodeOpen = false; this.refCodeError = ""; return; }
+        if (code === "KAVYA10") { this.refCodeError = "This code can't be used any more. Ask your friend for a new one."; return; }
+        this.refCodeError = "We couldn't find this code. Check it and try again.";
+      },
+
       // Faculty section: first 4 cards, then "Show all". The profile drawer shows one person.
       showAllFaculty: false,
       profile: null,
