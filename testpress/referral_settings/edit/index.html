@@ -548,7 +548,7 @@
     <!-- Trigger -->
     <div x-ref="trigger"
          class="inline-flex items-center justify-center"
-         aria-describedby="tooltip-7674">
+         aria-describedby="tooltip-8329">
       
           <a href="/messages/admin/" class="relative shrink-0 h-8 w-8 inline-flex justify-center items-center border border-transparent text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:bg-gray-100 dark:focus:bg-neutral-700 rounded-full disabled:opacity-50 disabled:pointer-events-none focus:outline-none" aria-label="Messages">
             <i data-lucide="message-square" class="shrink-0 size-4"></i>
@@ -566,7 +566,7 @@
     <div x-show="active"
          x-cloak
          x-ref="tip"
-         id="tooltip-7674"
+         id="tooltip-8329"
          role="tooltip"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
@@ -1523,7 +1523,7 @@
     initial: 'setup',
     groups: [
       { name: 'First time', states: [['setup', 'Setting up']] },
-      { name: 'Editing', states: [['edit', 'Fixed amounts'], ['edit_percent', 'Percentages'], ['edit_error', 'Fields with errors']] }
+      { name: 'Editing', states: [['edit', 'Fixed amounts'], ['edit_percent', 'Percentages'], ['edit_mixed', '% off, fixed credits'], ['edit_error', 'Fields with errors']] }
     ]
   };
   (function () {
@@ -1536,6 +1536,7 @@
     // minPurchase: empty = any price (PRD default ₹0). Time to buy and wait default to 30 days (FR-5, FR-6).
     const FIXED = { friendType: 'amount', friendValue: 300, friendMax: '', studentType: 'amount', studentValue: 200, studentMax: '', minPurchase: '' };
     const PERCENT = { friendType: 'percent', friendValue: 10, friendMax: 500, studentType: 'percent', studentValue: 10, studentMax: 300, minPurchase: 999 };
+    const MIXED = { ...PERCENT, studentType: 'amount', studentValue: 200, studentMax: '', minPurchase: '' };
     const RULES = { whoCanInvite: 'buyers', perStudent: 10, buyDays: 30, waitDays: 30 };
     const SIDES = ['friend', 'student'];
     const empty = (v) => v === '' || v === null || v === undefined;
@@ -1552,7 +1553,7 @@
       },
       apply(state) {
         this.state = state;
-        this.draft = { ...(state === 'edit_percent' ? PERCENT : FIXED), ...RULES };
+        this.draft = { ...(state === 'edit_percent' ? PERCENT : state === 'edit_mixed' ? MIXED : FIXED), ...RULES };
         this.start = JSON.stringify(this.draft);
         this.errors = {};
         if (state === 'edit_error') {
@@ -1565,7 +1566,7 @@
       get dirty() { return JSON.stringify(this.draft) !== this.start; },
       get hasErrors() { return Object.keys(this.errors).length > 0; },
       // Back to the overview in the matching state
-      get backUrl() { return '/testpress/referral_settings/' + (this.isSetup ? '?state=setup' : (this.state === 'edit_percent' ? '?state=on_percent' : '?state=on')); },
+      get backUrl() { return '/testpress/referral_settings/' + (this.isSetup ? '?state=setup' : (this.state === 'edit_percent' ? '?state=on_percent' : this.state === 'edit_mixed' ? '?state=on_mixed' : '?state=on')); },
       // One line in the save bar: what friends and students will get
       get summary() {
         const d = this.draft, v = (s) => d[s + 'Type'] === 'percent' ? (d[s + 'Value'] || 0) + '%' : this.money(d[s + 'Value'] || 0);
@@ -1607,8 +1608,8 @@
           if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
-        const pct = this.draft.friendType === 'percent' || this.draft.studentType === 'percent';
-        location.href = '/testpress/referral_settings/?state=' + (pct ? 'on_percent' : 'on') + '&saved=' + (this.isSetup ? 'setup' : 'edit');
+        const f = this.draft.friendType === 'percent', st = this.draft.studentType === 'percent';
+        location.href = '/testpress/referral_settings/?state=' + (f && st ? 'on_percent' : f ? 'on_mixed' : st ? 'on_percent' : 'on') + '&saved=' + (this.isSetup ? 'setup' : 'edit');
       },
     }));
   });
