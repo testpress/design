@@ -20,7 +20,8 @@ permalink: testpress/refer_and_earn/
 {% set friend_gets = "₹300" %}
 {% set you_get = "₹200" %}
 {# Percentage offer (PRD FR-8, FR-9), shown with ?offer=percent: 10% off for the friend (up to ₹500), 10% of what the
-   friend pays as credits (up to ₹300). Every offer line has both versions; Alpine's `pct` picks one. #}
+   friend pays as credits (up to ₹300). Every offer line has both versions; Alpine's `fp` (friend side is a percentage) and `yp` (your side is) pick one.
+   ?offer= amount · percent · mixed (10% off for the friend, ₹200 credits for you): each side is set on its own (PRD US-01). #}
 {% set friend_gets_pct = "10%" %}
 {% set friend_cap = "₹500" %}
 {% set you_cap = "₹300" %}
@@ -85,9 +86,11 @@ permalink: testpress/refer_and_earn/
 {% block main_content %}
 <div x-data="{
        state: window.REFER_STATES.initial,
-       pct: window.REFER_STATES.groups.find(g => g.param === 'offer').initial === 'percent',
+       offer: window.REFER_STATES.groups.find(g => g.param === 'offer').initial,
+       get fp() { return this.offer !== 'amount'; },
+       get yp() { return this.offer === 'percent'; },
        shareUrl: 'https://{{ link }}',
-       get shareText() { return this.pct ? '{{ share_text_short_pct }}' : '{{ share_text_short }}'; },
+       get shareText() { return this.fp ? '{{ share_text_short_pct }}' : '{{ share_text_short }}'; },
        get canShare() { return this.state === 'active' || this.state === 'new'; },
        get hasActivity() { return this.state === 'active' || this.state === 'limit' || this.state === 'paused'; },
        copy(text, title) {
@@ -96,7 +99,7 @@ permalink: testpress/refer_and_earn/
        }
      }"
      @refer-state.window="state = $event.detail"
-     @refer-offer.window="pct = $event.detail === 'percent'"
+     @refer-offer.window="offer = $event.detail"
      class="space-y-5 max-w-[85rem] mx-auto">
 
   {% set header_actions %}
@@ -113,9 +116,8 @@ permalink: testpress/refer_and_earn/
         <!-- Can refer -->
         <div x-show="state !== 'not_eligible'">
           {% include "./includes/friends_illustration.html" %}
-          <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-neutral-200" x-text="pct ? 'Give {{ friend_gets_pct }} off, get 10% back' : 'Give {{ friend_gets }}, get {{ you_get }}'">Give {{ friend_gets }}, get {{ you_get }}</h2>
-          <p x-show="!pct" class="mt-1 max-w-md mx-auto text-gray-500 dark:text-neutral-400">Your friends save {{ friend_gets }} on their first purchase. You earn {{ you_get }} in credits for every friend who buys, to spend on your next product.</p>
-          <p x-show="pct" x-cloak class="mt-1 max-w-md mx-auto text-gray-500 dark:text-neutral-400">Your friends save {{ friend_gets_pct }} on their first purchase, up to {{ friend_cap }}. You earn 10% of what they pay in credits, up to {{ you_cap }}, to spend on your next product.</p>
+          <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-neutral-200" x-text="(fp ? 'Give {{ friend_gets_pct }} off' : 'Give {{ friend_gets }}') + ', get ' + (yp ? '10% back' : '{{ you_get }}')">Give {{ friend_gets }}, get {{ you_get }}</h2>
+          <p class="mt-1 max-w-md mx-auto text-gray-500 dark:text-neutral-400" x-text="(fp ? 'Your friends save {{ friend_gets_pct }} on their first purchase, up to {{ friend_cap }}.' : 'Your friends save {{ friend_gets }} on their first purchase.') + (yp ? ' You earn 10% of what they pay in credits, up to {{ you_cap }}, to spend on your next product.' : ' You earn {{ you_get }} in credits for every friend who buys, to spend on your next product.')">Your friends save {{ friend_gets }} on their first purchase. You earn {{ you_get }} in credits for every friend who buys, to spend on your next product.</p>
 
           <!-- Share actions -->
           <div x-show="canShare" class="mt-6">
@@ -137,7 +139,7 @@ permalink: testpress/refer_and_earn/
         <div x-show="state === 'not_eligible'" x-cloak>
           {% include "./includes/friends_illustration.html" %}
           <h2 class="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-neutral-200">Buy a product to start referring</h2>
-          <p class="mt-1 max-w-md mx-auto text-gray-500 dark:text-neutral-400">Once you've bought any product, you get a link to share. <span x-text="pct ? 'Friends save {{ friend_gets_pct }}, and you earn 10% of what they pay in credits.' : 'Friends save {{ friend_gets }}, and you earn {{ you_get }} in credits for each friend who buys.'"></span></p>
+          <p class="mt-1 max-w-md mx-auto text-gray-500 dark:text-neutral-400">Once you've bought any product, you get a link to share. <span x-text="(fp ? 'Friends save {{ friend_gets_pct }}' : 'Friends save {{ friend_gets }}') + (yp ? ', and you earn 10% of what they pay in credits.' : ', and you earn {{ you_get }} in credits for each friend who buys.')"></span></p>
           <div class="mt-6">
             {{ button(text="Browse products", variant="primary", icon="arrow-right", icon_position="right", href="/testpress/store/") }}
           </div>
@@ -147,14 +149,14 @@ permalink: testpress/refer_and_earn/
       <!-- Right: how it works (first time) -->
       <div x-show="!hasActivity">
         <h3 class="mb-4 text-xs font-medium uppercase text-gray-500 dark:text-neutral-400">How it works</h3>
-        {% for step in steps %}
+        {% for step in steps %}{% set sv = 'yp' if loop.index == 3 else 'fp' %}
         <div class="flex gap-x-5 ms-1">
           <div class="relative {% if not loop.last %}after:absolute after:top-8 after:bottom-0 after:start-4 after:-translate-x-[0.5px] after:border-s after:border-gray-200 dark:after:border-neutral-700{% endif %}">
             <span class="relative z-10 flex shrink-0 justify-center items-center size-8 border border-gray-200 text-primary-600 font-semibold text-xs rounded-full bg-white dark:bg-neutral-800 dark:border-neutral-700 dark:text-primary-500">{{ loop.index }}</span>
           </div>
           <div class="grow pt-0.5 {% if not loop.last %}pb-6{% endif %}">
-            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="pct ? '{{ step[2] }}' : '{{ step[0] }}'">{{ step[0] }}</p>
-            <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400" x-text="pct ? '{{ step[3] }}' : '{{ step[1] }}'">{{ step[1] }}</p>
+            <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="{{ sv }} ? '{{ step[2] }}' : '{{ step[0] }}'">{{ step[0] }}</p>
+            <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400" x-text="{{ sv }} ? '{{ step[3] }}' : '{{ step[1] }}'">{{ step[1] }}</p>
           </div>
         </div>
         {% endfor %}
@@ -176,7 +178,7 @@ permalink: testpress/refer_and_earn/
         <div class="mt-5 flex flex-wrap items-center gap-y-2 gap-x-8">
           <div class="inline-flex items-center gap-x-1.5 text-sm text-gray-500 dark:text-neutral-400">
             <i data-lucide="clock" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500"></i>
-            <span class="font-semibold text-base text-gray-800 dark:text-neutral-200" x-text="pct ? '₹450' : '₹400'">₹400</span> on the way
+            <span class="font-semibold text-base text-gray-800 dark:text-neutral-200" x-text="yp ? '₹450' : '₹400'">₹400</span> on the way
           </div>
           <div class="inline-flex items-center gap-x-1.5 text-sm text-gray-500 dark:text-neutral-400">
             <i data-lucide="shopping-bag" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500"></i>
@@ -219,7 +221,7 @@ permalink: testpress/refer_and_earn/
             <p class="font-medium text-gray-800 dark:text-neutral-200 truncate">{{ f.name }}</p>
             <p class="text-sm text-gray-500 dark:text-neutral-400 truncate">{{ f.line }}</p>
           </div>
-          {% if f.amount %}<p class="shrink-0 whitespace-nowrap font-medium sm:text-lg {% if f.struck %}text-gray-400 line-through dark:text-neutral-500{% else %}text-gray-800 dark:text-neutral-200{% endif %}" x-text="pct ? '{{ f.pamount }}' : '{{ f.amount }}'">{{ f.amount }}</p>{% endif %}
+          {% if f.amount %}<p class="shrink-0 whitespace-nowrap font-medium sm:text-lg {% if f.struck %}text-gray-400 line-through dark:text-neutral-500{% else %}text-gray-800 dark:text-neutral-200{% endif %}" x-text="yp ? '{{ f.pamount }}' : '{{ f.amount }}'">{{ f.amount }}</p>{% endif %}
         </div>
         {% endfor %}
       </div>
@@ -238,7 +240,7 @@ permalink: testpress/refer_and_earn/
             <p class="font-medium text-gray-800 dark:text-neutral-200 truncate">{{ h.title }}</p>
             <p class="text-sm text-gray-500 dark:text-neutral-400 truncate">{{ h.date }}</p>
           </div>
-          <p class="shrink-0 whitespace-nowrap font-medium sm:text-lg {% if h.kind == 'cancelled' %}text-gray-400 line-through dark:text-neutral-500{% elif h.kind == 'added' %}text-green-600 dark:text-green-500{% else %}text-gray-800 dark:text-neutral-200{% endif %}" x-text="pct ? '{{ h.pamount or h.amount }}' : '{{ h.amount }}'">{{ h.amount }}</p>
+          <p class="shrink-0 whitespace-nowrap font-medium sm:text-lg {% if h.kind == 'cancelled' %}text-gray-400 line-through dark:text-neutral-500{% elif h.kind == 'added' %}text-green-600 dark:text-green-500{% else %}text-gray-800 dark:text-neutral-200{% endif %}" x-text="yp ? '{{ h.pamount or h.amount }}' : '{{ h.amount }}'">{{ h.amount }}</p>
         </div>
         {% endfor %}{% endfor %}
       </div>
@@ -279,12 +281,12 @@ permalink: testpress/refer_and_earn/
           </button>
         </div>
       </div>
-      <p class="mt-2 text-xs text-gray-500 dark:text-neutral-400">Friends who sign up with this link get <span x-text="pct ? '{{ friend_gets_pct }} off their first purchase, up to {{ friend_cap }}.' : '{{ friend_gets }} off their first purchase.'"></span></p>
+      <p class="mt-2 text-xs text-gray-500 dark:text-neutral-400">Friends who sign up with this link get <span x-text="fp ? '{{ friend_gets_pct }} off their first purchase, up to {{ friend_cap }}.' : '{{ friend_gets }} off their first purchase.'"></span></p>
 
       <p class="mt-6 mb-3 text-sm font-medium text-gray-800 dark:text-neutral-200">Share via</p>
       <div class="grid grid-cols-5 gap-1">
         {% for app in share_apps %}
-        <a href="{{ app.url }}" :href="pct ? '{{ app.purl }}' : '{{ app.url }}'" target="_blank" rel="noopener"
+        <a href="{{ app.url }}" :href="fp ? '{{ app.purl }}' : '{{ app.url }}'" target="_blank" rel="noopener"
            class="group flex flex-col items-center gap-y-2 py-2 rounded-xl hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:hover:bg-neutral-700/50 dark:focus:bg-neutral-700/50">
           <span class="flex justify-center items-center size-12 bg-white border border-gray-200 rounded-full shadow-2xs dark:bg-neutral-900 dark:border-neutral-700">
             {% if app.logo %}
@@ -296,7 +298,7 @@ permalink: testpress/refer_and_earn/
           <span class="text-xs text-gray-700 dark:text-neutral-300">{{ app.label }}</span>
         </a>
         {% endfor %}
-        <a x-show="isPhone" x-cloak href="sms:?&body={{ share_text | urlencode }}" :href="pct ? 'sms:?&body={{ share_text_pct | urlencode }}' : 'sms:?&body={{ share_text | urlencode }}'"
+        <a x-show="isPhone" x-cloak href="sms:?&body={{ share_text | urlencode }}" :href="fp ? 'sms:?&body={{ share_text_pct | urlencode }}' : 'sms:?&body={{ share_text | urlencode }}'"
            class="flex flex-col items-center gap-y-2 py-2 rounded-xl hover:bg-gray-50 focus:outline-hidden focus:bg-gray-50 dark:hover:bg-neutral-700/50">
           <span class="flex justify-center items-center size-12 bg-white border border-gray-200 rounded-full shadow-2xs dark:bg-neutral-900 dark:border-neutral-700">
             <i data-lucide="message-square" class="size-5 text-gray-600 dark:text-neutral-300"></i>
@@ -318,12 +320,12 @@ permalink: testpress/refer_and_earn/
   <!-- ============ How it works + rules (modal) ============ -->
   {% call modal(id="refer-how", title="How Refer & Earn works", size="md", show_cancel=false, confirm_text="Got it") %}
     <ol class="space-y-4">
-      {% for step in steps %}
+      {% for step in steps %}{% set sv = 'yp' if loop.index == 3 else 'fp' %}
       <li class="flex gap-x-3">
         <span class="shrink-0 flex justify-center items-center size-7 text-xs font-semibold text-primary-600 border border-gray-200 rounded-full dark:border-neutral-700 dark:text-primary-500">{{ loop.index }}</span>
         <div>
-          <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="pct ? '{{ step[2] }}' : '{{ step[0] }}'">{{ step[0] }}</p>
-          <p class="text-sm text-gray-500 dark:text-neutral-400" x-text="pct ? '{{ step[3] }}' : '{{ step[1] }}'">{{ step[1] }}</p>
+          <p class="text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="{{ sv }} ? '{{ step[2] }}' : '{{ step[0] }}'">{{ step[0] }}</p>
+          <p class="text-sm text-gray-500 dark:text-neutral-400" x-text="{{ sv }} ? '{{ step[3] }}' : '{{ step[1] }}'">{{ step[1] }}</p>
         </div>
       </li>
       {% endfor %}
@@ -348,8 +350,8 @@ permalink: testpress/refer_and_earn/
       { name: 'Can refer', states: [['new', 'No referrals yet'], ['active', 'Has referrals and credits'], ['limit', 'All spots used']] },
       { name: 'Can\'t refer', states: [['not_eligible', 'Hasn\'t bought a product'], ['paused', 'Institute paused the program']] },
       // The institute's offer type, kept in ?offer= (PRD FR-8: fixed amount or percentage)
-      { name: 'Offer type', param: 'offer', initial: new URLSearchParams(location.search).get('offer') === 'percent' ? 'percent' : 'amount',
-        states: [['amount', 'Fixed: ₹300 off, ₹200 credits'], ['percent', 'Percentage: 10% off, 10% credits']] }
+      { name: 'Offer type', param: 'offer', initial: (v => ['percent', 'mixed'].includes(v) ? v : 'amount')(new URLSearchParams(location.search).get('offer')),
+        states: [['amount', 'Both fixed: ₹300 off, ₹200 credits'], ['percent', 'Both percentage: 10% off, 10% credits'], ['mixed', 'Mixed: 10% off, ₹200 credits']] }
     ]
   };
   // Shareable links: ?state=active opens that prototype state (the switcher keeps the URL in sync)
