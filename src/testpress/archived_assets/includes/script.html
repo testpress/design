@@ -1,0 +1,127 @@
+<script>
+  document.addEventListener('alpine:init', () => {
+    const ITEMS = {{ items | dump | safe }};
+    const byId = Object.fromEntries(ITEMS.map(i => [i.id, i]));
+    const groupOf = i => (i.kind === 'course' || i.kind === 'chapter') ? i.kind : 'content';
+    const leftLabel = h => h < 1 ? Math.round(h * 60) + ' min' : Math.floor(h) + 'h';
+    const toast = detail => window.dispatchEvent(new CustomEvent('toast', { detail: Object.assign({ position: 'bottom-right' }, detail) }));
+
+    Alpine.data('archivedAssets', () => ({
+      tab: 'all',
+      q: '',
+      sort: 'recent',
+      selected: [],
+      gone: [],          // restored or permanently deleted
+      pending: [],       // ids waiting on the delete-permanently modal
+      page: 1,
+      perPage: 20,
+
+      init() {
+        // items: the normal list · many: plus a 56-item clean-up (pagination) · empty: nothing deleted
+        const apply = s => {
+          this.gone = s === 'empty' ? ITEMS.map(i => i.id) : (s === 'many' ? [] : ITEMS.filter(i => i.extra).map(i => i.id));
+          this.selected = []; this.page = 1;
+        };
+        apply(window.REFER_STATES.initial);
+        window.addEventListener('refer-state', e => apply(e.detail));
+        // A new search, type or sort starts again from page 1
+        ['q', 'tab', 'sort'].forEach(k => this.$watch(k, () => { this.page = 1; }));
+      },
+
+      live(id) { return !this.gone.includes(id); },
+      titleOf(id) { return byId[id] ? byId[id].title : ''; },
+      leftOf(id) { return byId[id] ? leftLabel(byId[id].left) : ''; },
+      blocked(id) { const p = byId[id].blockedBy; return !!p && this.live(p); },
+
+      lossOf(id) {
+        const i = byId[id];
+        if (i.kind === 'course') return 'Its ' + i.summary + ', and every student’s attempts and progress in it, will be deleted too.';
+        if (i.kind === 'chapter') return 'Its ' + i.summary + ' and students’ attempts and progress in them will be deleted too.';
+        return 'Students’ attempts and progress for it will be deleted too.';
+      },
+
+      get counts() {
+        const c = { all: 0, course: 0, chapter: 0, content: 0 };
+        ITEMS.forEach(i => { if (this.live(i.id) && !this.blocked(i.id)) { c.all++; c[groupOf(i)]++; } });
+        return c;
+      },
+      matches(id) {
+        const i = byId[id];
+        if (!this.live(id)) return false;
+        if (this.blocked(id)) return false;   // its course is deleted: hidden until the course is restored
+        if (this.tab !== 'all' && groupOf(i) !== this.tab) return false;
+        const q = this.q.trim().toLowerCase();
+        return !q || (i.title + ' ' + i.path).toLowerCase().includes(q);
+      },
+      // Matching items in sort order, across all pages
+      get list() {
+        return ITEMS.filter(i => this.matches(i.id)).sort((a, b) => this.sort === 'recent' ? a.ago - b.ago : a.left - b.left);
+      },
+      get shown() { return this.list.length; },
+      rank(id) { return this.list.findIndex(i => i.id === id); },
+
+      // Pagination: 20 per page; hidden when everything fits on one page
+      get pageCount() { return Math.max(1, Math.ceil(this.shown / this.perPage)); },
+      get currentPage() { return Math.min(this.page, this.pageCount); },
+      onPage(id) {
+        const r = this.rank(id);
+        return r >= (this.currentPage - 1) * this.perPage && r < this.currentPage * this.perPage;
+      },
+      get pageItems() {
+        const n = this.pageCount, c = this.currentPage;
+        if (n <= 7) return Array.from({ length: n }, (_, i) => i + 1);
+        if (c <= 4) return [1, 2, 3, 4, 5, '...', n];
+        if (c >= n - 3) return [1, '...', n - 4, n - 3, n - 2, n - 1, n];
+        return [1, '...', c - 1, c, c + 1, '...', n];
+      },
+      goPage(n) {
+        if (n === '...' || n < 1 || n > this.pageCount) return;
+        this.page = n;
+        this.$nextTick(() => document.getElementById('archived-list').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      },
+      typeLabel(t) { return { all: 'All types', course: 'Courses', chapter: 'Chapters', content: 'Contents' }[t]; },
+      tabNoun() { return { course: 'courses', chapter: 'chapters', content: 'contents' }[this.tab] || 'items'; },
+      selectedLive() { return this.selected.filter(id => this.live(id)); },
+
+
+      restore(id) {
+        if (this.blocked(id)) return;
+        const i = byId[id];
+        this.gone.push(id);
+        this.selected = this.selected.filter(s => s !== id);
+        const where = i.path ? 'Back in ' + i.path + ', in its old place.' : 'Back in your courses list, with everything in it.';
+        toast({
+          variant: 'success',
+          title: i.title + ' restored',
+          description: where,
+          actionLabel: i.kind === 'course' ? 'Open course' : 'View in course',
+          duration: 7000,
+        });
+      },
+
+      // Parents first, so a selected child whose parent is also selected can follow it
+      restoreSelected() {
+        let todo = this.selectedLive().filter(id => !this.blocked(id)), done = [], progress = true;
+        while (progress) {
+          progress = false;
+          todo.forEach(id => { if (!done.includes(id) && !this.blocked(id)) { this.gone.push(id); done.push(id); progress = true; } });
+        }
+        const left = todo.filter(id => !done.includes(id));
+        this.selected = left;
+        if (done.length) toast({ variant: 'success', title: done.length === 1 ? this.titleOf(done[0]) + ' restored' : done.length + ' items restored', description: 'They’re back in their courses, in their old places.' });
+        if (left.length) toast({ variant: 'warning', title: left.length + (left.length === 1 ? ' item wasn’t' : ' items weren’t') + ' restored', description: 'Restore its course first: ' + this.titleOf(byId[left[0]].blockedBy) + '.', duration: 8000 });
+      },
+
+      askDelete(ids) { this.pending = ids; this.$dispatch('open-modal-delete-forever'); },
+      confirmDelete() {
+        const ids = this.pending;
+        // Deleting a course also removes what was deleted on its own inside it
+        const inside = ITEMS.filter(x => ids.includes(x.blockedBy)).map(x => x.id);
+        this.gone.push(...ids, ...inside);
+        this.selected = this.selected.filter(s => !ids.includes(s) && !inside.includes(s));
+        toast({ variant: 'neutral', icon: 'trash-2', title: ids.length === 1 ? this.titleOf(ids[0]) + ' deleted permanently' : ids.length + ' items deleted permanently' });
+        this.pending = [];
+      },
+    }));
+  });
+</script>

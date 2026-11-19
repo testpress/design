@@ -1,0 +1,164 @@
+---
+tags: testpress
+title: Archived assets
+permalink: testpress/archived_assets/
+---
+
+{# Archived assets (PRD: Chapter and Content Archive/Restore, PR 7). Replaces the old courses-only page.
+   One list for deleted courses, chapters and contents, newest first, with search, a type filter with counts and a sort. Each row says
+   where it came from, who deleted it and how long is left; Restore sits on the row. Items deleted together with
+   a parent are not listed on their own (they come back with the parent). An item whose parent is still deleted
+   can't be restored yet: the row says so and links to the parent.
+   Prototype states: bottom-right switcher or ?state=. #}
+{% extends "layouts/admin_base.html" %}
+{% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../ui-system/components/pagination.html" import pagination %}
+{% from "../../ui-system/components/toast.html" import toast_provider %}
+
+{# Now = Thu 19 Nov, 3:00 PM. ago / left are hours; ends = when it is deleted for good. #}
+{% set items = [
+  { id: "c5", kind: "video", title: "Laws of motion – Lecture 3", path: "JEE Main Physics › Unit 2 · Mechanics", by: "Priya S", agoLabel: "12 min ago", ago: 0.2, left: 47.8, ends: "Sat 21 Nov, 2:48 PM" },
+  { id: "h2", kind: "chapter", title: "Unit 4 · Thermodynamics", path: "JEE Main Physics", by: "Priya S", agoLabel: "2h ago", ago: 2, left: 46, ends: "Sat 21 Nov, 1:00 PM",
+    summary: "2 chapters · 18 contents",
+    children: [
+      { kind: "chapter", title: "Laws of thermodynamics", meta: "9 contents" },
+      { kind: "chapter", title: "Heat engines", meta: "7 contents" },
+      { kind: "notes", title: "Unit 4 summary" },
+      { kind: "exam", title: "Unit 4 test" }
+    ] },
+  { id: "c6", kind: "exam", title: "Weekly test 6", path: "Class 10 Maths › Algebra", by: "Arun M", agoLabel: "5h ago", ago: 5, left: 43, ends: "Sat 21 Nov, 10:00 AM" },
+  { id: "c7", kind: "attachment", title: "Organic chemistry formula sheet", path: "NEET Chemistry › Organic chemistry", by: "Priya S", agoLabel: "20h ago", ago: 20, left: 28, ends: "Tomorrow, 7:00 PM" },
+  { id: "c10", kind: "notes", title: "Cell structure notes", path: "NEET Biology › Cell biology", by: "you", agoLabel: "Yesterday, 1:00 PM", ago: 26, left: 22, ends: "Tomorrow, 1:00 PM" },
+  { id: "k1", kind: "course", title: "NEET 2025 Crash Course", path: "", by: "Ramesh K", agoLabel: "Yesterday, 9:00 AM", ago: 30, left: 18, ends: "Tomorrow, 9:00 AM",
+    summary: "8 chapters · 146 contents",
+    children: [
+      { kind: "chapter", title: "Physics", meta: "38 contents" },
+      { kind: "chapter", title: "Chemistry", meta: "35 contents" },
+      { kind: "chapter", title: "Biology", meta: "41 contents" },
+      { kind: "chapter", title: "Mock tests", meta: "14 contents" },
+      { kind: "more", title: "and 4 more chapters" }
+    ] },
+  { id: "h3", kind: "chapter", title: "Previous year papers", path: "NEET 2025 Crash Course", by: "Ramesh K", agoLabel: "17 Nov, 11:00 PM", ago: 40, left: 8, ends: "Today, 11:00 PM", blockedBy: "k1",
+    summary: "12 contents",
+    children: [
+      { kind: "exam", title: "NEET 2024 paper" },
+      { kind: "exam", title: "NEET 2023 paper" },
+      { kind: "more", title: "and 10 more contents" }
+    ] },
+  { id: "c9", kind: "exam", title: "Mock test 2", path: "NEET 2025 Crash Course › Mock tests", by: "Ramesh K", agoLabel: "17 Nov, 9:00 PM", ago: 42, left: 6, ends: "Today, 9:00 PM", blockedBy: "k1" },
+  { id: "h4", kind: "chapter", title: "Revision notes", path: "Class 10 Maths › Algebra", by: "Arun M", agoLabel: "17 Nov, 6:30 PM", ago: 44.5, left: 3.5, ends: "Today, 6:30 PM",
+    summary: "6 contents",
+    children: [
+      { kind: "notes", title: "Linear equations – quick revision" },
+      { kind: "notes", title: "Quadratic equations – formulas" },
+      { kind: "more", title: "and 4 more contents" }
+    ] },
+  { id: "c8", kind: "live", title: "Doubt clearing session – 14 Nov", path: "JEE Main Physics › Live classes", by: "Arun M", agoLabel: "17 Nov, 3:36 PM", ago: 47.4, left: 0.6, ends: "Today, 3:36 PM" }
+] %}
+
+{# "Many deleted items" state only: a clean-up of an old batch yesterday, 56 contents deleted one by one.
+   Hidden in the other states (extra: true). #}
+{% set cleanupChapters = ["Motion", "Force and laws of motion", "Gravitation", "Work and energy", "Sound", "Atoms and molecules", "Structure of the atom", "Tissues"] %}
+{% set cleanupKinds = ["video", "notes", "exam", "video", "attachment", "video", "notes"] %}
+{% set cleanupSuffix = { video: "Lecture", notes: "Notes", exam: "Practice test", attachment: "Worksheet" } %}
+{% for n in range(1, 57) %}
+  {% set ch = cleanupChapters[(n - 1) % 8] %}
+  {% set kd = cleanupKinds[(n - 1) % 7] %}
+  {% set mins = 59 - n %}
+  {% set _ = items.push({
+    id: "x" ~ n, kind: kd, extra: true,
+    title: ch ~ " – " ~ cleanupSuffix[kd] ~ " " ~ (((n - 1) / 8) | int + 1),
+    path: "Class 9 Science (2024 batch) › " ~ ch, by: "Ramesh K",
+    agoLabel: "Yesterday, 1:" ~ ("0" if mins < 10 else "") ~ mins ~ " PM",
+    ago: 25 + n / 60, left: 23 - n / 60,
+    ends: "Tomorrow, 1:" ~ ("0" if mins < 10 else "") ~ mins ~ " PM"
+  }) %}
+{% endfor %}
+
+{% set kinds = {
+  course: { icon: "book-open", label: "Course" },
+  chapter: { icon: "folder", label: "Chapter" },
+  video: { icon: "circle-play", label: "Video" },
+  exam: { icon: "clipboard-check", label: "Exam" },
+  attachment: { icon: "paperclip", label: "Attachment" },
+  notes: { icon: "file-text", label: "Notes" },
+  live: { icon: "radio", label: "Live class" },
+  more: { icon: "ellipsis", label: "" }
+} %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-100 dark:bg-neutral-900{% endblock body_class %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28" x-data="archivedAssets" x-cloak
+     @modal-confirmed-delete-forever.window="confirmDelete()">
+
+  {{ breadcrumb({ items: [ { label: "Courses", href: "#" }, { label: "Archived assets" } ] }) }}
+
+  <div class="mt-2">
+    {{ page_header(title="Archived assets", description="Deleted courses, chapters and contents stay here for 48 hours. After that they're deleted for good.") }}
+  </div>
+
+  {# Toolbar: search on the left, type filter (with counts) and sort on the right #}
+  <div class="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-2" x-show="counts.all > 0">
+    <div class="relative sm:w-80">
+      <div class="absolute inset-y-0 start-0 flex items-center pointer-events-none ps-3">
+        <i data-lucide="search" class="shrink-0 size-4 text-gray-400 dark:text-neutral-500"></i>
+      </div>
+      <input type="text" x-model="q" x-ref="search" placeholder="Search course, chapter or content" aria-label="Search course, chapter or content" @keydown.escape="q = ''"
+             class="py-2 ps-9 pe-9 block w-full bg-white border border-gray-200 rounded-lg text-sm text-gray-800 placeholder:text-gray-500 focus:border-primary-600 focus:ring-primary-600 dark:bg-neutral-800 dark:border-neutral-700 dark:text-white dark:placeholder:text-neutral-400">
+      {# Clear: grey, only while there is text (Preline search input pattern) #}
+      <div class="absolute inset-y-0 end-0 flex items-center pe-1.5" x-show="q !== ''">
+        <button type="button" @click="q = ''; $refs.search.focus()" aria-label="Clear search"
+                class="inline-flex shrink-0 justify-center items-center size-6 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-500 dark:hover:text-neutral-300 dark:hover:bg-neutral-700">
+          <i data-lucide="x" class="shrink-0 size-3.5"></i>
+        </button>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      {% include "./includes/type_filter.html" %}
+      {% include "./includes/sort.html" %}
+    </div>
+  </div>
+
+  {# List: each item its own card #}
+  <div id="archived-list" class="mt-3 flex flex-col gap-2 scroll-mt-6" x-show="shown > 0">
+    {% for it in items %}
+      {% include "./includes/row.html" %}
+    {% endfor %}
+  </div>
+
+  {# Pagination: only when there are more than 20 #}
+  <div class="mt-3 py-3 px-4 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700" x-show="shown > perPage">
+    {{ pagination(show_go_to=true, x_items="pageItems", x_current="currentPage", x_last="pageCount", x_go="goPage") }}
+  </div>
+
+  {# Nothing in this tab / no search match #}
+  {% for t in [["course", "courses", "book-open"], ["chapter", "chapters", "folder"], ["content", "contents", "file-text"]] %}
+    <div class="mt-3" x-show="counts.all > 0 && shown === 0 && q.trim() === '' && tab === '{{ t[0] }}'">
+      {{ empty_state(title="No " ~ t[1] ~ " deleted in the last 48 hours", description="Pick All types to see everything that was deleted.", icon=t[2], secondary_action_text="Show all types", secondary_action_attrs="@click=\"tab = 'all'\"") }}
+    </div>
+  {% endfor %}
+  <div class="mt-3" x-show="counts.all > 0 && shown === 0 && q.trim() !== ''">
+    {{ empty_state(title="No matching items", description="Nothing deleted in the last 48 hours matches your search. Check the spelling or try another word.", icon="search-x", secondary_action_text="Clear search", secondary_action_attrs="@click=\"q = ''\"") }}
+  </div>
+
+  {# Nothing deleted at all #}
+  <div class="mt-6" x-show="counts.all === 0">
+    {{ empty_state(title="Nothing deleted in the last 48 hours", description="When someone deletes a course, chapter or content, it stays here for 48 hours so you can restore it.", icon="archive-restore") }}
+  </div>
+
+  {% include "./includes/bulk_bar.html" %}
+  {% include "./includes/delete_modal.html" %}
+</div>
+
+{{ toast_provider() }}
+{% include "./includes/script.html" %}
+<script>
+  window.REFER_STATES = {
+    initial: new URLSearchParams(location.search).get('state') || 'items',
+    groups: [{ name: 'Archived assets', states: [['items', 'Items to restore'], ['many', 'Many deleted items (64)'], ['empty', 'Nothing deleted']] }],
+  };
+</script>
+{% include "../refer_and_earn/includes/prototype.html" %}
+{% endblock content %}

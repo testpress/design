@@ -1,0 +1,70 @@
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/dropdown.html" import dropdown %}
+{# One deleted item. Rendered for every item; Alpine hides restored / filtered rows and orders them by the sort. #}
+{% set k = kinds[it.kind] %}
+{% set group = "content" if it.kind not in ["course", "chapter"] else it.kind %}
+{# Time left sits in the meta line: grey normally, amber under 6h, red under 1h #}
+{% set urgency = "font-medium text-red-600 dark:text-red-500" if it.left < 1 else ("font-medium text-amber-600 dark:text-amber-500" if it.left < 6 else "") %}
+{% set leftLabel = (((it.left * 60) | round) ~ " min left") if it.left < 1 else ((it.left | int) ~ "h left") %}
+
+<div id="row-{{ it.id }}"
+     x-show="matches('{{ it.id }}') && onPage('{{ it.id }}')"
+     :style="{ order: rank('{{ it.id }}') }"
+     class="flex flex-wrap sm:flex-nowrap items-start gap-x-3 gap-y-3 p-4 bg-white border border-gray-200 rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+
+  {# Select #}
+  <div class="flex h-9 items-center">
+    <input type="checkbox" value="{{ it.id }}" x-model="selected" aria-label="Select {{ it.title }}"
+           class="shrink-0 size-4 border-gray-300 rounded-sm text-primary-600 focus:ring-0 focus:ring-offset-0 checked:bg-primary-600 checked:border-primary-600 dark:bg-neutral-800 dark:border-neutral-600 dark:checked:bg-primary-500 dark:checked:border-primary-500">
+  </div>
+
+  {# Type icon #}
+  <div class="flex shrink-0 justify-center items-center size-9 rounded-lg bg-gray-100 text-gray-500 dark:bg-neutral-700 dark:text-neutral-400">
+    <i data-lucide="{{ k.icon }}" class="size-4"></i>
+  </div>
+
+  {# What, where, who #}
+  <div class="min-w-0 flex-1 basis-[calc(100%-5.5rem)] sm:basis-auto">
+    <p class="flex flex-wrap items-baseline gap-x-2">
+      <span class="font-medium text-sm text-gray-800 dark:text-neutral-200">{{ it.title }}</span>
+      <span class="text-xs text-gray-500 dark:text-neutral-500">{{ k.label }}</span>
+    </p>
+    <p class="mt-0.5 text-[13px] text-gray-500 dark:text-neutral-400">
+      {% if it.path %}<span class="text-gray-600 dark:text-neutral-300">{{ it.path }}</span> · {% endif %}Deleted by {{ it.by }}, {{ it.agoLabel }} · <span class="whitespace-nowrap {{ urgency }}">{{ leftLabel }}</span>
+    </p>
+
+    {% if it.children %}
+      <div x-data="{ open: false }" class="mt-2">
+        <button type="button" @click="open = !open" :aria-expanded="open"
+                class="inline-flex items-start gap-x-1 text-start text-[13px] text-gray-600 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200">
+          <i data-lucide="chevron-right" class="shrink-0 size-3.5 mt-0.5 transition-transform" :class="open && 'rotate-90'"></i>
+          Includes {{ it.summary }}
+        </button>
+        <ul x-show="open" class="mt-2 ms-1.5 ps-4 border-s border-gray-200 space-y-1.5 dark:border-neutral-700">
+          {% for ch in it.children %}
+            <li class="flex items-center gap-x-2 text-[13px] {{ 'text-gray-500 dark:text-neutral-500' if ch.kind == 'more' else 'text-gray-700 dark:text-neutral-300' }}">
+              {% if ch.kind != "more" %}<i data-lucide="{{ kinds[ch.kind].icon }}" class="shrink-0 size-3.5 text-gray-400 dark:text-neutral-500"></i>{% endif %}
+              <span>{{ ch.title }}</span>
+              {% if ch.meta %}<span class="text-gray-400 dark:text-neutral-500">· {{ ch.meta }}</span>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {# Items inside a deleted course that were deleted on their own earlier are hidden until the course is restored;
+       then they appear as their own rows. Not called out in the UI for now. #}
+  </div>
+
+  {# Actions #}
+  <div class="flex items-center w-full sm:w-auto ps-[5.25rem] sm:ps-0 sm:h-9 shrink-0">
+    <div class="flex items-center gap-x-1">
+      <span :title="blocked('{{ it.id }}') ? 'Restore its course first' : ''">
+        {{ button(text="Restore", variant="secondary", size="sm", icon="rotate-ccw", extra_attrs=":disabled=\"blocked('" ~ it.id ~ "')\" @click=\"restore('" ~ it.id ~ "')\"") }}
+      </span>
+      {{ dropdown(trigger="ellipsis-horizontal", width="large", items=[
+        { label: "Delete permanently", icon: "trash-2", variant: "danger", x_on: "@click=\"open = false; askDelete(['" ~ it.id ~ "'])\"" }
+      ]) }}
+    </div>
+  </div>
+</div>
