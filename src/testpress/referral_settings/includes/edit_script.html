@@ -1,0 +1,96 @@
+<script>
+  // Prototype states (bottom-right switcher, and shareable as ?state=). Opens on first-time setup.
+  window.REFER_STATES = {
+    initial: 'setup',
+    groups: [
+      { name: 'First time', states: [['setup', 'Setting up']] },
+      { name: 'Editing', states: [['edit', 'Fixed amounts'], ['edit_percent', 'Percentages'], ['edit_error', 'Fields with errors']] }
+    ]
+  };
+  (function () {
+    const v = new URLSearchParams(location.search).get('state');
+    if (window.REFER_STATES.groups.flatMap(g => g.states.map(s => s[0])).includes(v)) window.REFER_STATES.initial = v;
+  })();
+
+  document.addEventListener('alpine:init', () => {
+    // Offer (PRD FR-8, FR-9): each side is a fixed amount (₹) or a percentage with an optional maximum (₹).
+    // minPurchase: empty = any price (PRD default ₹0). Time to buy and wait default to 30 days (FR-5, FR-6).
+    const FIXED = { friendType: 'amount', friendValue: 300, friendMax: '', studentType: 'amount', studentValue: 200, studentMax: '', minPurchase: '' };
+    const PERCENT = { friendType: 'percent', friendValue: 10, friendMax: 500, studentType: 'percent', studentValue: 10, studentMax: 300, minPurchase: 999 };
+    const RULES = { whoCanInvite: 'buyers', perStudent: 10, buyDays: 30, waitDays: 30 };
+    const SIDES = ['friend', 'student'];
+    const empty = (v) => v === '' || v === null || v === undefined;
+
+    Alpine.data('referralEdit', () => ({
+      state: 'setup',
+      draft: {},
+      start: '',
+      errors: {},
+
+      init() {
+        this.apply(window.REFER_STATES.initial);
+        window.addEventListener('refer-state', (e) => this.apply(e.detail));
+      },
+      apply(state) {
+        this.state = state;
+        this.draft = { ...(state === 'edit_percent' ? PERCENT : FIXED), ...RULES };
+        this.start = JSON.stringify(this.draft);
+        this.errors = {};
+        if (state === 'edit_error') {
+          Object.assign(this.draft, { friendType: 'percent', friendValue: 120, studentValue: '' });
+          this.validate();
+        }
+      },
+
+      get isSetup() { return this.state === 'setup'; },
+      get dirty() { return JSON.stringify(this.draft) !== this.start; },
+      get hasErrors() { return Object.keys(this.errors).length > 0; },
+      // Back to the overview in the matching state
+      get backUrl() { return '{{ "/testpress/referral_settings/" | url }}' + (this.isSetup ? '?state=setup' : (this.state === 'edit_percent' ? '?state=on_percent' : '?state=on')); },
+      // One line in the save bar: what friends and students will get
+      get summary() {
+        const d = this.draft, v = (s) => d[s + 'Type'] === 'percent' ? (d[s + 'Value'] || 0) + '%' : this.money(d[s + 'Value'] || 0);
+        return 'Friend gets ' + v('friend') + ' off · Student earns ' + v('student') + (d.studentType === 'percent' ? ' in credits' : ' credits');
+      },
+
+      money(n) { return '₹' + Number(n).toLocaleString('en-IN'); },
+
+      // Worked example under each offer block, on a ₹5,000 course; empty while the number isn't valid yet
+      example(side) {
+        const d = this.draft;
+        const v = Number(d[side + 'Value']), pct = d[side + 'Type'] === 'percent', max = Number(d[side + 'Max']) || Infinity;
+        if (!(v > 0) || (pct && v > 100)) return '';
+        if (!pct) return side === 'friend' ? 'On a ₹5,000 course, the friend pays ₹' + (5000 - Math.min(v, 5000)).toLocaleString('en-IN') + '.' : 'Every friend who buys gets the student ' + this.money(v) + ' in credits.';
+        const got = Math.min(Math.round(5000 * v / 100), max);
+        return side === 'friend' ? 'On a ₹5,000 course, the friend saves ' + this.money(got) + '.' : 'If a friend pays ₹5,000, the student gets ' + this.money(got) + ' in credits.';
+      },
+
+      // Fills this.errors; true when valid (PRD FR-12: no negatives, no more than 100%, days of 1 or more)
+      validate() {
+        const e = {}, d = this.draft;
+        for (const s of SIDES) {
+          const v = Number(d[s + 'Value']), pct = d[s + 'Type'] === 'percent';
+          if (empty(d[s + 'Value']) || !(v > 0)) e[s + 'Value'] = pct ? 'Enter a percentage more than 0.' : 'Enter an amount more than ₹0.';
+          else if (pct && v > 100) e[s + 'Value'] = 'Enter 100% or less.';
+          if (pct && !empty(d[s + 'Max']) && !(Number(d[s + 'Max']) > 0)) e[s + 'Max'] = 'Enter an amount more than ₹0, or leave it empty.';
+        }
+        if (!empty(d.minPurchase) && !(Number(d.minPurchase) >= 0)) e.minPurchase = 'Enter ₹0 or more, or leave it empty.';
+        for (const k of ['perStudent', 'buyDays', 'waitDays']) if (empty(d[k]) || !(Number(d[k]) >= 1)) e[k] = 'Enter a whole number of 1 or more.';
+        this.errors = e;
+        return !this.hasErrors;
+      },
+
+      discard() { this.draft = JSON.parse(this.start); this.errors = {}; },
+      // Prototype: back to the overview, which shows the saved state and a toast
+      save() {
+        if (!this.validate()) {
+          const first = document.getElementById('edit-' + Object.keys(this.errors)[0]);
+          if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        const pct = this.draft.friendType === 'percent' || this.draft.studentType === 'percent';
+        location.href = '{{ "/testpress/referral_settings/" | url }}?state=' + (pct ? 'on_percent' : 'on') + '&saved=' + (this.isSetup ? 'setup' : 'edit');
+      },
+    }));
+  });
+</script>
