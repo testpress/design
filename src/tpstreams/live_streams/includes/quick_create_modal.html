@@ -1,0 +1,309 @@
+{#
+  Quick create: the Go Live Now and Schedule buttons open this one modal. Include it inside an element with
+  x-data="liveStreamQuickCreate()", and open it with startCreate('now') or startCreate('schedule').
+
+  Option rules match the streams app:
+  - Interactive needs Fermion enabled for the organization; otherwise its card is disabled.
+  - Live DRM isn't available with low latency.
+  - MP4 downloads aren't available when either DRM option is on.
+#}
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/button.html" import button %}
+{% from "../../../ui-system/components/input.html" import input %}
+{% from "../../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../../ui-system/components/option-card.html" import option_card %}
+{% from "../../../ui-system/components/switch-list.html" import switch_list, switch_list_item %}
+
+{% include "src/ui-system/scripts/date_picker_script.html" %}
+
+<script>
+  function liveStreamQuickCreate() {
+    const lastTypeKey = 'tpstreams.liveStreamType';
+    const lastType = () => { try { return localStorage.getItem(lastTypeKey); } catch (e) { return null; } };
+
+    return {
+      // Prototype only: add ?fermion=off to the URL to see an organization without interactive live.
+      fermionEnabled: new URLSearchParams(window.location.search).get('fermion') !== 'off',
+      when: 'now',
+      title: '',
+      titleEdited: false,
+      start: '',
+      streamType: 'broadcast',
+      showSettings: false,
+      titleError: '',
+      startError: '',
+
+      latency: '0',
+      drmForRecording: true,
+      drmForLive: false,
+      mp4Downloads: false,
+      interactiveDrm: true,
+      everyoneOnStage: true,
+      skipJoinScreen: true,
+
+      init() {
+        this.$watch('fermionEnabled', (enabled) => { if (!enabled) this.streamType = 'broadcast'; });
+        this.$watch('latency', (value) => { if (value === '1') this.drmForLive = false; });
+        this.$watch('drmForRecording', (on) => { if (on) this.mp4Downloads = false; });
+        this.$watch('drmForLive', (on) => { if (on) this.mp4Downloads = false; });
+        this.$watch('start', () => {
+          this.startError = '';
+          if (!this.titleEdited) this.title = this.defaultTitle();
+        });
+      },
+
+      startCreate(when) {
+        this.when = when;
+        this.titleEdited = false;
+        this.titleError = '';
+        this.startError = '';
+        this.showSettings = false;
+        this.streamType = lastType() === 'interactive' && this.fermionEnabled ? 'interactive' : 'broadcast';
+        this.title = this.defaultTitle();
+        this.$dispatch('open-modal-new-live-stream');
+        // After the modal's own focus handling, so typing replaces the suggested title
+        setTimeout(() => {
+          const field = document.getElementById('id_quick_title');
+          field.focus();
+          field.select();
+        }, 80);
+      },
+
+      get isSchedule() { return this.when === 'schedule'; },
+      get isInteractive() { return this.streamType === 'interactive'; },
+      get isLowLatency() { return this.latency === '1'; },
+      get hasBroadcastDrm() { return this.drmForRecording || this.drmForLive; },
+
+      defaultTitle() {
+        if (this.isSchedule) {
+          // "Nov 6, 2026 6:00 PM" from the date picker
+          return this.start ? 'Live stream, ' + this.start.replace(/^(\w+ \d+), \d{4} /, '$1, ') : 'Live stream';
+        }
+        const now = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        return 'Live stream, ' + now.replace(/ /g, ' ');
+      },
+
+      get submitLabel() {
+        if (this.isSchedule) return 'Schedule';
+        return this.isInteractive ? 'Enter studio' : 'Get stream key';
+      },
+
+      get settingsSummary() {
+        if (this.isInteractive) {
+          return [
+            this.interactiveDrm ? 'DRM on' : 'No DRM',
+            this.everyoneOnStage ? 'everyone on stage' : 'viewers join off stage',
+          ].join(', ');
+        }
+        const drm = this.drmForRecording && this.drmForLive ? 'DRM on live and recording'
+          : this.drmForRecording ? 'DRM on recording'
+          : this.drmForLive ? 'DRM on live'
+          : 'no DRM';
+        return [this.isLowLatency ? 'Low latency' : 'Normal latency', drm, this.mp4Downloads ? 'MP4 downloads' : '']
+          .filter(Boolean).join(', ');
+      },
+
+      submit(event) {
+        this.titleError = this.title.trim() ? '' : 'Enter a title.';
+        this.startError = '';
+        if (this.isSchedule) {
+          if (!this.start) this.startError = 'Choose a start date and time.';
+          else if (new Date(this.start) <= new Date()) this.startError = 'Choose a time in the future.';
+        }
+        if (this.titleError || this.startError) {
+          event.preventDefault();
+          return;
+        }
+        try { localStorage.setItem(lastTypeKey, this.streamType); } catch (e) {}
+      },
+    };
+  }
+</script>
+
+{% call modal(
+  id="new-live-stream",
+  title="Go live now",
+  x_title="isSchedule ? 'Schedule live stream' : 'Go live now'",
+  confirm_text="",
+  cancel_text=""
+) %}
+  <form
+    novalidate
+    @submit="submit($event)"
+    action="{{ '/tpstreams/live_streams/detail/'|url }}"
+    class="space-y-5">
+
+    {{ input(
+      name="title",
+      id="id_quick_title",
+      label="Title",
+      required=true,
+      x_model="title",
+      x_error="titleError",
+      extra_attrs='maxlength="254" autocomplete="off" @input="titleEdited = true; titleError = \'\'"'
+    ) }}
+
+    <div x-show="isSchedule" x-cloak>
+      {{ date_picker(
+        name="start",
+        id="id_quick_start",
+        label="Start date & time",
+        placeholder="Select date and time",
+        required=true,
+        datetime=true,
+        min_date="today",
+        x_effect="start = inputValue"
+      ) }}
+      <p x-show="startError" x-text="startError" class="mt-1.5 text-xs text-red-500"></p>
+    </div>
+
+    <fieldset>
+      <legend class="mb-2 text-sm font-medium text-gray-800 dark:text-neutral-200">Stream type</legend>
+      <div class="grid sm:grid-cols-2 gap-3">
+        {{ option_card(
+          name="type",
+          value="broadcast",
+          id="quick-type-broadcast",
+          title="Broadcast",
+          description="From OBS or any encoder",
+          icon="radio-tower",
+          x_model="streamType"
+        ) }}
+        {{ option_card(
+          name="type",
+          value="interactive",
+          id="quick-type-interactive",
+          title="Interactive",
+          description="From your browser, no encoder",
+          icon="users",
+          x_model="streamType",
+          x_disabled="!fermionEnabled",
+          disabled_note="Not enabled.",
+          disabled_action_label="Contact us",
+          disabled_action_href="#"
+        ) }}
+      </div>
+    </fieldset>
+
+    <div>
+      <div class="flex items-center justify-between gap-x-3">
+        <p class="min-w-0 text-sm text-gray-500 dark:text-neutral-400" x-text="settingsSummary"></p>
+        {{ button(
+          text='<span x-text="showSettings ? \'Hide settings\' : \'Change\'"></span>',
+          variant="link",
+          size="sm",
+          extra_attrs='@click="showSettings = !showSettings" :aria-expanded="showSettings"'
+        ) }}
+      </div>
+
+      <div x-show="showSettings" x-cloak class="mt-3">
+        <div x-show="!isInteractive" class="space-y-3">
+          <fieldset>
+            <legend class="sr-only">Latency</legend>
+            <div class="grid sm:grid-cols-2 gap-3">
+              {{ option_card(
+                name="latency",
+                id="quick-latency-normal",
+                value="0",
+                title="Normal latency",
+                description="Smoothest playback",
+                x_model="latency"
+              ) }}
+              {{ option_card(
+                name="latency",
+                id="quick-latency-low",
+                value="1",
+                title="Low latency",
+                tag="Beta",
+                description="Shorter delay for live Q&A",
+                x_model="latency"
+              ) }}
+            </div>
+          </fieldset>
+          {% call switch_list() %}
+            {{ switch_list_item(
+              id="id_quick_drm_recording",
+              name="enable_drm_for_recording",
+              label="DRM for recording",
+              x_model="drmForRecording"
+            ) }}
+            {{ switch_list_item(
+              id="id_quick_drm_live",
+              name="enable_drm",
+              label="DRM for live stream",
+              badge="Beta",
+              x_model="drmForLive",
+              x_disabled="isLowLatency",
+              x_reason="'Not available with low latency.'"
+            ) }}
+            {{ switch_list_item(
+              id="id_quick_mp4",
+              name="enable_static_mp4_renditions",
+              label="MP4 downloads",
+              badge="Beta",
+              x_model="mp4Downloads",
+              x_disabled="hasBroadcastDrm",
+              x_reason="'Not available with DRM.'"
+            ) }}
+          {% endcall %}
+        </div>
+
+        <div x-show="isInteractive" x-cloak>
+          {% call switch_list() %}
+            {{ switch_list_item(
+              id="id_quick_interactive_drm",
+              name="enable_drm",
+              label="DRM",
+              x_model="interactiveDrm"
+            ) }}
+            {{ switch_list_item(
+              id="id_quick_on_stage",
+              name="add_everyone_on_stage",
+              label="Add everyone on stage",
+              description="Viewers can share audio and video as soon as they join.",
+              x_model="everyoneOnStage"
+            ) }}
+            {{ switch_list_item(
+              id="id_quick_skip_join",
+              name="skip_join_screen",
+              label="Skip join screen",
+              description="Viewers join without the camera and mic check.",
+              x_model="skipJoinScreen"
+            ) }}
+          {% endcall %}
+        </div>
+      </div>
+    </div>
+
+    {# Sticky so the button stays in view when settings make the body scroll #}
+    <div class="sticky -bottom-5 -mx-5 !-mb-5 px-5 pt-2 pb-4 flex justify-end gap-x-2 bg-white dark:bg-neutral-800">
+      {{ button(text="Cancel", variant="secondary", extra_attrs='@click="$dispatch(\'close-modal-new-live-stream\')"') }}
+      {{ button(text='<span x-text="submitLabel"></span>', variant="primary", type="submit") }}
+    </div>
+  </form>
+{% endcall %}
+
+{# Prototype only: state switcher, bottom right. Same style as the custom domain prototype. #}
+<div
+  x-data="{ switcherOpen: false }"
+  class="fixed bottom-3 end-3 md:bottom-4 md:end-4 z-[60]"
+  @click.outside="switcherOpen = false"
+  @keydown.escape="switcherOpen = false">
+  <div x-show="switcherOpen" x-transition.opacity x-cloak
+       class="absolute bottom-full end-0 mb-2 w-64 p-1 bg-white border border-gray-200 rounded-xl shadow-lg dark:bg-neutral-900 dark:border-neutral-700">
+    <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Prototype state</p>
+    <template x-for="s in [[true, 'Interactive live enabled'], [false, 'Interactive live not enabled']]" :key="s[1]">
+      <button type="button" @click="fermionEnabled = s[0]"
+              class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-start hover:bg-gray-100 dark:hover:bg-neutral-800"
+              :class="fermionEnabled === s[0] ? 'text-primary-700 font-medium dark:text-primary-400' : 'text-gray-800 dark:text-neutral-200'">
+        <span x-text="s[1]"></span>
+        <svg x-show="fermionEnabled === s[0]" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      </button>
+    </template>
+  </div>
+  <button type="button" @click="switcherOpen = !switcherOpen" :aria-expanded="switcherOpen"
+          class="inline-flex items-center gap-x-1.5 py-1.5 px-3 rounded-full bg-gray-900 text-white text-xs font-medium shadow-lg opacity-90 hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-900 transition dark:bg-white dark:text-gray-900">
+    <svg class="size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4h-7M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg>
+    Prototype states
+  </button>
+</div>
