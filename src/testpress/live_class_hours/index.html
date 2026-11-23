@@ -1,0 +1,310 @@
+---
+title: Live Class Hours
+tags: testpress
+date: 2026-11-23
+view: "admin Live Class Hours"
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+{% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../ui-system/components/page-header.html" import page_header %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/date-picker.html" import date_picker %}
+{% from "../../ui-system/components/stats-card.html" import stats_card %}
+{% from "../../ui-system/components/table.html" import table %}
+{% from "../../ui-system/components/pagination.html" import pagination %}
+{% from "../../ui-system/components/empty-state.html" import empty_state %}
+{% from "../../ui-system/components/skeleton.html" import skeleton %}
+{% from "../../ui-system/components/drawer.html" import drawer %}
+{% from "../../ui-system/components/tooltip.html" import tooltip %}
+
+<div x-data="liveClassHours" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-5">
+    <div class="space-y-2">
+        {{ breadcrumb({ items: [ { label: "Live Classes", href: "/live_classes/" | url }, { label: "Live class hours" } ] }) }}
+
+        {% set header_actions %}
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- ui-system date picker, range mode with quick ranges (as on WhatsApp usage). Defaults to this month. -->
+                <div class="shrink-0 [&>div]:space-y-0" id="th-range">
+                    {{ date_picker(name="th-range", range=true, button_trigger=true, dropdown_align="right", max_date=live_class_hours.today, today=live_class_hours.today, presets=true, placeholder="Pick dates", padding_class="py-2 px-3") }}
+                </div>
+                {{ button(text="Export", variant="secondary", icon="download") }}
+            </div>
+        {% endset %}
+        {{ page_header(title="Live class hours", description="Actual time each host spent on live classes.", actions=header_actions) }}
+    </div>
+
+    <!-- Loading -->
+    <div x-show="view === 'loading'" x-cloak class="space-y-5">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            {% for i in range(4) %}
+            <div class="p-4 bg-white border border-gray-200 rounded-xl space-y-3 dark:bg-neutral-800 dark:border-neutral-700">
+                {{ skeleton(width="w-24", height="h-3") }}
+                {{ skeleton(width="w-16", height="h-5") }}
+            </div>
+            {% endfor %}
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 space-y-5 dark:bg-neutral-800 dark:border-neutral-700">
+            {% for i in range(6) %}
+            <div class="flex items-center gap-4">
+                {{ skeleton(width="size-8 shrink-0", height="h-8") }}
+                {{ skeleton(width="w-40", height="h-3") }}
+                <div class="grow"></div>
+                {{ skeleton(width="w-16", height="h-3") }}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Nothing to show -->
+    <div x-show="view === 'empty'" x-cloak>
+        {{ empty_state(title="No classes in this period", description="Hours appear here once a class ends.", icon="calendar-x") }}
+    </div>
+    <div x-show="view === 'today'" x-cloak>
+        {{ empty_state(title="Today's hours are added tomorrow", description="Hours are counted once a day, for the day before.", icon="calendar-clock") }}
+    </div>
+
+    <!-- Report -->
+    <div x-show="view === 'data'" class="space-y-5">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+            {{ stats_card(title="Live class hours", value='<span x-text="fmt(sum.minutes)"></span>', icon="clock", compact=true) }}
+            {{ stats_card(title="Classes", value='<span x-text="sum.classes"></span>', icon="video", compact=true) }}
+            {{ stats_card(title="Hosts", value='<span x-text="list.length"></span>', icon="users", compact=true) }}
+            {% set pending_info %}<i data-lucide="info" class="size-3.5 text-gray-400 hover:text-gray-600 cursor-help dark:text-neutral-500"></i>{% endset %}
+            {{ stats_card(title="Awaiting timings", value='<span x-text="pending"></span>', icon="hourglass", compact=true,
+                title_extra=tooltip(trigger=pending_info, content="Ended classes waiting for times from the provider", placement="top", width="w-auto", id="pending-info")) }}
+        </div>
+
+        {# Sortable header cells: ui-system table_th(sortable) markup, with a click handler and direction arrow #}
+        {% set cols = [['name', 'Host', ''], ['minutes', 'Total hours', 'justify-end'], ['classes', 'Classes', 'justify-end'], ['zoom', 'Zoom', 'justify-end'], ['tpstreams', 'TPStreams', 'justify-end'], ['fermion', 'Fermion', 'justify-end']] %}
+        {% set head %}
+            {% for c in cols %}
+            <th scope="col" class="p-0">
+                <button type="button" @click="sortBy('{{ c[0] }}')" class="w-full flex items-center {{ c[2] }} gap-x-1 px-5 py-2.5 text-sm font-normal whitespace-nowrap text-gray-500 hover:bg-gray-100 focus:outline-none focus:bg-gray-100 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                        :class="sort.key === '{{ c[0] }}' && 'text-gray-800 dark:text-neutral-200'">
+                    {{ c[1] }}
+                    <svg x-show="sort.key !== '{{ c[0] }}'" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>
+                    <svg x-show="sort.key === '{{ c[0] }}'" x-cloak :class="sort.dir === 'asc' && 'rotate-180'" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
+                </button>
+            </th>
+            {% endfor %}
+        {% endset %}
+        {% set pager %}{{ pagination(x_items="pageItems", x_current="page", x_last="pageCount", x_go="goPage", show_go_to=true) }}{% endset %}
+        {% call table(search_enabled=true, search_placeholder="Search host", search_x_model="q", table_header=head, hoverable=true, pagination=pager) %}
+            <template x-for="r in pageRows" :key="r.name">
+                <tr @click="open(r)" class="cursor-pointer">
+                    <td class="px-5 py-3 whitespace-nowrap text-sm">
+                        <div class="flex items-center gap-x-3">
+                            <img :src="r.avatar" alt="" class="shrink-0 size-9 rounded-full object-cover">
+                            <div>
+                                <p class="font-medium text-gray-800 dark:text-neutral-200" x-text="r.name"></p>
+                                <p class="text-xs text-gray-500 dark:text-neutral-500" x-text="r.email"></p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-5 py-3 whitespace-nowrap text-sm text-end font-semibold text-gray-800 dark:text-neutral-200" x-text="fmt(r.minutes)"></td>
+                    <td class="px-5 py-3 whitespace-nowrap text-sm text-end text-gray-600 dark:text-neutral-400" x-text="r.classes"></td>
+                    <td class="px-5 py-3 whitespace-nowrap text-sm text-end text-gray-600 dark:text-neutral-400" x-text="fmt(r.zoom)"></td>
+                    <td class="px-5 py-3 whitespace-nowrap text-sm text-end text-gray-600 dark:text-neutral-400" x-text="fmt(r.tpstreams)"></td>
+                    <td class="px-5 py-3 whitespace-nowrap text-sm text-end text-gray-600 dark:text-neutral-400" x-text="fmt(r.fermion)"></td>
+                </tr>
+            </template>
+            <tr x-show="!filtered.length" x-cloak>
+                <td colspan="6" class="px-5 py-10 text-center text-sm text-gray-500 dark:text-neutral-500">No host matches "<span x-text="q"></span>"</td>
+            </tr>
+        {% endcall %}
+    </div>
+
+    <!-- One host's classes in the period (Preline payments "Transactions" list: grouped by date) -->
+    {# Summary (photo, total, provider chips) stays fixed; only the class list scrolls. No borders in drawers. #}
+    {% call drawer(id="th-classes", title="Classes", size="md") %}
+        <!-- Summary: photo, name and period on the left, total on the right, provider chips below -->
+        <div class="shrink-0 px-6 pt-6 pb-2">
+            <div class="flex items-center gap-x-4">
+                <img :src="sel.avatar" alt="" class="shrink-0 size-12 rounded-full object-cover">
+                <div class="grow">
+                    <p class="font-medium text-gray-800 dark:text-neutral-200" x-text="sel.name"></p>
+                    <p class="text-sm text-gray-500 dark:text-neutral-500" x-text="periodLabel"></p>
+                </div>
+                <div class="text-end">
+                    <p class="text-xl font-semibold text-gray-800 dark:text-neutral-200" x-text="fmt(sel.minutes)"></p>
+                    <p class="text-sm text-gray-500 dark:text-neutral-500" x-text="sel.classes + ' classes'"></p>
+                </div>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+                <template x-for="p in providers(sel)" :key="p[0]">
+                    <span class="inline-flex items-center gap-x-1.5 py-1 px-2.5 rounded-lg bg-gray-100 text-xs text-gray-700 dark:bg-neutral-700 dark:text-neutral-300">
+                        <span x-text="p[0]"></span><span class="font-medium text-gray-800 dark:text-neutral-200" x-text="fmt(p[1])"></span>
+                    </span>
+                </template>
+            </div>
+        </div>
+
+        <!-- Only the class list scrolls -->
+        <div class="grow overflow-y-auto px-6 pt-2 pb-6">
+            <ul class="w-full flex flex-col">
+                <template x-for="c in classes" :key="c.date + c.time">
+                    <li>
+                        <a :href="detailUrl(c)" class="-mx-3 px-3 py-2.5 flex items-center justify-between gap-x-4 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm text-gray-800 dark:text-neutral-200" x-text="c.title"></span>
+                                <span class="block text-xs text-gray-500 dark:text-neutral-500" x-text="c.date + ', ' + c.time.split(' – ')[0].replace(/^0/, '') + ' · ' + c.provider"></span>
+                            </span>
+                            <span class="shrink-0 text-sm font-medium text-gray-800 dark:text-neutral-200" x-text="fmt(c.minutes)"></span>
+                        </a>
+                    </li>
+                </template>
+            </ul>
+        </div>
+    {% endcall %}
+</div>
+
+{% include "../../ui-system/scripts/date_picker_script.html" %}
+<script>
+  // Live class hours per host for a date range (this month by default). Sample data stands in for the API:
+  // it holds 1–22 Nov 2026; other ranges scale it by their length. Hours are counted once a day for the day
+  // before, so a range is cut at yesterday and "today" alone has nothing yet.
+  const TH = {{ live_class_hours | dump | safe }};
+  const TH_TODAY = new Date(2026, 10, 23);
+  const TH_YESTERDAY = new Date(2026, 10, 22);
+  const thDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const thPickerText = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const TH_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const thShort = (d) => `${d.getDate()} ${TH_MON[d.getMonth()]}`;
+
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('liveClassHours', () => ({
+      start: new Date(2026, 10, 1),
+      end: TH_TODAY,
+      view: 'data',
+      q: '',
+      sort: { key: 'minutes', dir: 'desc' },
+      page: 1,
+      perPage: 10,
+      pending: TH.pending,
+      sel: TH.rows[0],
+
+      init() {
+        this.$nextTick(() => this.bindRange());
+        this.$watch('q', () => (this.page = 1));
+        window.addEventListener('th-state', (e) => this.apply(e.detail));
+        this.$nextTick(() => this.apply(window.thState()));
+      },
+      // The ui-system date picker keeps its own state: read each pick, and push ours when it changes
+      bindRange() {
+        const el = document.querySelector('#th-range [x-data]');
+        const dp = el && el._x_dataStack && el._x_dataStack[0];
+        if (!dp) return;
+        let last = '';
+        const key = (s, e) => +thDay(s) + '-' + +thDay(e);
+        Alpine.effect(() => {
+          if (!dp.selectedDate || !dp.selectedEndDate) return;
+          const k = key(dp.selectedDate, dp.selectedEndDate);
+          if (k !== last) { last = k; this.start = thDay(dp.selectedDate); this.end = thDay(dp.selectedEndDate); this.page = 1; this.refresh(); }
+        });
+        Alpine.effect(() => {
+          const k = key(this.start, this.end);
+          if (k !== last) { last = k; dp.parseAndSetValue(thPickerText(this.start) + ' → ' + thPickerText(this.end)); }
+        });
+      },
+      refresh() { if (['data', 'today'].includes(this.view)) this.view = this.countedDays ? 'data' : 'today'; },
+      // Days in the range that have been counted (up to yesterday)
+      get countedDays() {
+        const e = this.end > TH_YESTERDAY ? TH_YESTERDAY : this.end;
+        return Math.max(0, Math.round((thDay(e) - thDay(this.start)) / 864e5) + 1);
+      },
+      get periodLabel() {
+        const s = this.start, e = this.end;
+        if (+s === +e) return thShort(s) + ' ' + s.getFullYear();
+        const wholeMonth = s.getDate() === 1 && e.getMonth() === s.getMonth() && (+e === +new Date(s.getFullYear(), s.getMonth() + 1, 0) || +e === +TH_TODAY);
+        if (wholeMonth) return s.toLocaleString('en-IN', { month: 'long', year: 'numeric' });
+        return thShort(s) + ' – ' + thShort(e) + ' ' + e.getFullYear();
+      },
+      // Sample rows scaled to the range; 5-minute steps keep the numbers believable
+      get list() {
+        const f = this.countedDays / 22, r5 = (m) => Math.round((m * f) / 5) * 5;
+        return TH.rows.map((r) => {
+          const z = r5(r.zoom), t = r5(r.tpstreams), fe = r5(r.fermion);
+          return { ...r, zoom: z, tpstreams: t, fermion: fe, minutes: z + t + fe, classes: Math.max(1, Math.round(r.classes * f)) };
+        }).filter((r) => r.minutes > 0);
+      },
+      get sum() { return this.list.reduce((a, r) => ({ minutes: a.minutes + r.minutes, classes: a.classes + r.classes }), { minutes: 0, classes: 0 }); },
+      get filtered() {
+        const q = this.q.trim().toLowerCase(), { key, dir } = this.sort;
+        return this.list.filter((r) => !q || r.name.toLowerCase().includes(q) || r.email.includes(q))
+          .sort((a, b) => (key === 'name' ? a.name.localeCompare(b.name) : a[key] - b[key]) * (dir === 'asc' ? 1 : -1));
+      },
+      sortBy(k) { this.sort = { key: k, dir: this.sort.key === k && this.sort.dir === 'desc' ? 'asc' : (this.sort.key === k ? 'desc' : (k === 'name' ? 'asc' : 'desc')) }; this.page = 1; },
+      get pageCount() { return Math.max(1, Math.ceil(this.filtered.length / this.perPage)); },
+      get pageRows() { return this.filtered.slice((this.page - 1) * this.perPage, this.page * this.perPage); },
+      get pageItems() { return Array.from({ length: this.pageCount }, (_, i) => i + 1); },
+      goPage(n) { this.page = Math.min(Math.max(1, n), this.pageCount); },
+      fmt(m) {
+        if (!m) return '—';
+        const h = Math.floor(m / 60), mm = m % 60;
+        return [h ? h + ' h' : '', mm ? mm + ' m' : ''].filter(Boolean).join(' ');
+      },
+      providers(r) { return [['Zoom', r.zoom], ['TPStreams', r.tpstreams], ['Fermion', r.fermion]].filter((p) => p[1]); },
+      // Sample classes for the open host, built from their own totals so the list adds up to the row
+      get classes() { return this.groups.flatMap((g) => g.items.map((c) => ({ ...c, date: g.date }))); },
+      get groups() {
+        const r = this.sel, titles = TH.titles, starts = ['08:00 AM', '10:00 AM', '11:30 AM', '02:00 PM', '04:00 PM', '06:00 PM'];
+        const parts = this.providers(r).map((p) => ({ name: p[0], minutes: p[1], n: Math.max(1, Math.round(r.classes * p[1] / r.minutes)) }));
+        let items = [];
+        parts.forEach((p) => {
+          // Uneven lengths (classes rarely match), the last one takes what is left so the provider total holds
+          const vary = [1.2, 0.8, 1.05, 0.9, 1.15, 0.85];
+          let left = p.minutes;
+          for (let i = 0; i < p.n; i++) {
+            const m = i === p.n - 1 ? left : Math.min(left - 30 * (p.n - 1 - i), Math.round(p.minutes / p.n * vary[i % vary.length] / 5) * 5);
+            left -= m; items.push({ provider: p.name, minutes: m, k: i + parts.indexOf(p) * 0.5 });
+          }
+        });
+        items = items.sort((a, b) => a.k - b.k).slice(0, r.classes);
+        const days = Math.max(1, this.countedDays), last = this.end > TH_YESTERDAY ? TH_YESTERDAY : this.end;
+        const out = [];
+        items.forEach((c, i) => {
+          // A couple of days with two classes, so the start time is what tells them apart
+          const back = [0, 0].includes(i) || i === 1 ? 0 : (i === 4 ? Math.floor(3 * days / items.length) : Math.floor(i * days / items.length));
+          const d = new Date(last); d.setDate(d.getDate() - back);
+          const st = starts[(i * 5) % starts.length], [hh, rest] = st.split(':'), [mm, ap] = rest.split(' ');
+          const t0 = (+hh % 12 + (ap === 'PM' ? 12 : 0)) * 60 + +mm + (i % 4), t1 = t0 + c.minutes;
+          const clock = (t) => { const h = Math.floor(t / 60) % 24; return `${String(h % 12 || 12).padStart(2, '0')}:${String(t % 60).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; };
+          const row = { ...c, t0, title: titles[(i + r.name.length) % titles.length], time: clock(t0) + ' – ' + clock(t1), state: i === 0 && c.provider === 'Zoom' ? 'restarted' : 'recording' };
+          const label = thShort(d), g = out.find((x) => x.date === label);
+          g ? g.items.push(row) : out.push({ date: label, items: [row] });
+        });
+        out.forEach((g) => g.items.sort((a, b) => b.t0 - a.t0));
+        return out;
+      },
+      detailUrl(c) { return '{{ "/live_classes/detail/" | url }}?state=' + c.state; },
+      open(r) { this.sel = r; window.dispatchEvent(new CustomEvent('open-drawer-th-classes')); },
+
+      // ---- prototype only ----
+      apply(id) {
+        window.dispatchEvent(new CustomEvent('close-drawer-th-classes'));
+        this.q = ''; this.page = 1;
+        if (id === 'empty' || id === 'loading') { this.view = id; return; }
+        this.view = 'data';
+        if (id === 'today') { this.start = TH_TODAY; this.end = TH_TODAY; this.refresh(); return; }
+        if (id === 'day') { this.start = TH_YESTERDAY; this.end = TH_YESTERDAY; return; }
+        this.start = new Date(2026, 10, 1); this.end = TH_TODAY;
+        if (id === 'drawer') this.$nextTick(() => this.open(this.filtered.find((r) => r.name === 'Priya Nair') || this.filtered[0]));
+      },
+    }));
+  });
+</script>
+
+{% set proto_groups = [
+    { name: 'Report', states: [['month', 'This month'], ['day', 'One day (yesterday)'], ['drawer', "A host's classes"]] },
+    { name: 'Other states', states: [['today', 'Today (not counted yet)'], ['empty', 'No classes in the period'], ['loading', 'Loading']] }
+] %}
+{% set proto_default = 'month' %}
+{% set proto_event = 'th-state' %}
+{% set proto_fn = 'thState' %}
+{% include "../includes/prototype_states.html" %}
+{% endblock content %}
