@@ -10,6 +10,90 @@ document.addEventListener('alpine:init', () => {
     showNewAnnouncement: false,
     searchQuery: '',
     sidebarSearchQuery: '',
+    replyingTo: null,
+    editing: null,
+    deleting: null,
+    highlightId: null,
+    msgById(id) {
+      return this.activeChat.messages.find(m => m.id === id);
+    },
+    canEdit(msg) {
+      return msg.from === 'staff' && !msg.isNote && !msg.isOffer && !msg.deleted;
+    },
+    canDelete(msg) {
+      return msg.from === 'staff' && !msg.isNote && !msg.deleted;
+    },
+    canReply(msg) {
+      return !msg.isNote && !msg.deleted;
+    },
+    senderName(msg) {
+      if (!msg) return '';
+      return msg.from === 'student' ? this.activeChat.name : (msg.author?.name || 'You');
+    },
+    scrollToEnd() {
+      this.$nextTick(() => {
+        const c = document.getElementById('chat-scroll-container');
+        if (c) c.scrollTop = c.scrollHeight;
+      });
+    },
+    syncPreview(msg) {
+      const chat = this.activeChat;
+      if (chat.messages[chat.messages.length - 1] === msg) {
+        chat.lastMessage = msg.deleted ? 'You deleted this message' : msg.text;
+      }
+    },
+    focusComposer() {
+      this.$nextTick(() => document.getElementById('chat-textarea-' + this.activeChatId)?.focus());
+    },
+    startReply(msg) {
+      this.editing = null;
+      this.replyingTo = msg.id;
+      window.dispatchEvent(new CustomEvent('composer-set', { detail: { tab: 'message' } }));
+      this.focusComposer();
+    },
+    startEdit(msg) {
+      this.replyingTo = null;
+      this.editing = msg.id;
+      window.dispatchEvent(new CustomEvent('composer-set', { detail: { tab: 'message', text: msg.text } }));
+      this.focusComposer();
+    },
+    cancelCompose() {
+      if (this.editing) window.dispatchEvent(new CustomEvent('composer-set', { detail: { text: '' } }));
+      this.replyingTo = null;
+      this.editing = null;
+    },
+    askDelete(msg) {
+      this.deleting = msg.id;
+      this.$dispatch('open-modal-delete-message');
+    },
+    confirmDelete() {
+      const msg = this.msgById(this.deleting);
+      if (msg) { msg.deleted = true; msg.text = ''; msg.product = null; msg.isOffer = false; this.syncPreview(msg); }
+      if (this.replyingTo === this.deleting) this.replyingTo = null;
+      if (this.editing === this.deleting) this.cancelCompose();
+      this.deleting = null;
+    },
+    jumpTo(id) {
+      const el = document.getElementById('msg-' + id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.highlightId = id;
+      setTimeout(() => { if (this.highlightId === id) this.highlightId = null; }, 1600);
+    },
+    markUnread() {
+      this.activeChat.markedUnread = true;
+    },
+    openChat(chat) {
+      if (chat.id !== this.activeChatId) window.dispatchEvent(new CustomEvent('composer-set', { detail: { text: '' } }));
+      chat.markedUnread = false;
+      chat.unread = 0;
+      this.replyingTo = null;
+      this.editing = null;
+      this.activeChatId = chat.id;
+      this.showChatList = false;
+      this.scrollToEnd();
+      this.$nextTick(() => { document.getElementById('chat-textarea-' + chat.id)?.focus() });
+    },
     init() {
       // Check for onboarding state via URL parameter
       const urlParams = new URLSearchParams(window.location.search);
@@ -96,6 +180,7 @@ document.addEventListener('alpine:init', () => {
       this.$nextTick(() => {
         document.getElementById('chat-textarea-' + this.activeChatId)?.focus();
       });
+      this.scrollToEnd();
     },
     getAvatarColor(id) {
       const colors = ['bg-orange-500', 'bg-blue-500', 'bg-indigo-500', 'bg-teal-500', 'bg-pink-500'];
@@ -131,12 +216,24 @@ document.addEventListener('alpine:init', () => {
     handleSendMessage(type, text) {
       if (!text || text.trim() === '') return;
       const chat = this.chats.find(c => c.id === this.activeChatId);
+      if (chat && this.editing) {
+        const msg = this.msgById(this.editing);
+        if (msg && msg.text !== text.trim()) { msg.text = text.trim(); msg.edited = true; this.syncPreview(msg); }
+        this.editing = null;
+        return;
+      }
       if(chat) {
+        chat.markedUnread = false;
+        chat.lastMessage = type === 'note' ? chat.lastMessage : text;
+        chat.lastTime = type === 'note' ? chat.lastTime : 'Now';
+        const replyTo = type === 'note' ? null : this.replyingTo;
+        this.replyingTo = null;
         chat.messages.push({
           id: Date.now(),
           from: 'staff',
           text: text,
           time: 'Just now',
+          replyTo: replyTo,
           isNote: type === 'note',
           author: { name: 'You', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' }
         });
@@ -176,7 +273,7 @@ document.addEventListener('alpine:init', () => {
         initials: 'R',
         online: true,
         lastSeen: 'Online',
-        lastMessage: 'Yes! The recording has been uploaded.',
+        lastMessage: 'Yes, both EMI options have no interest.',
         lastTime: '1m',
         unread: 0,
         sentByStaff: true,
@@ -190,7 +287,10 @@ document.addEventListener('alpine:init', () => {
         messages: [
           { id: 1, from: 'student', text: 'Hi, is there an EMI option for this? Also when does the next batch start?', time: '11:27', product: { name: 'BrahMos (All SSC Exams - 2027)', price: '₹3,299', url: 'https://learn.siddhiprep.com/products/ssc_2027_course/', thumbnail: 'https://d2yj96qm4w0va1.cloudfront.net/institute/siddhiprep/product_images/17/96de8af09eb04e0db08245eee9c12809.png' } },
           { id: 2, from: 'staff', text: 'Hi Rahul! Yes, we have 3 and 6 month EMI options. The next batch starts October 5th.', time: '12:44', author: { name: 'You', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
-          { id: 3, from: 'staff', text: 'You can enroll now and get early bird access to study material!', time: '12:45', author: { name: 'You', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } }
+          { id: 3, from: 'staff', text: 'You can enroll now and get early bird access to study material!', time: '12:45', edited: true, author: { name: 'You', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 4, from: 'staff', text: '', deleted: true, time: '12:46', author: { name: 'You', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } },
+          { id: 5, from: 'student', text: 'Is the 6 month EMI without interest?', time: '12:52', replyTo: 2 },
+          { id: 6, from: 'staff', text: 'Yes, both EMI options have no interest.', time: '12:55', replyTo: 5, author: { name: 'You', avatar: 'https://images.unsplash.com/photo-1659482633369-9fe69af50bfb?ixlib=rb-4.0.3&auto=format&fit=facearea&facepad=3&w=320&h=320&q=80' } }
         ]
       },
       {
@@ -455,7 +555,7 @@ document.addEventListener('alpine:init', () => {
       return this.chats.find(c => c.id === this.activeChatId) || this.chats[0];
     },
     get filteredChats() {
-      if (this.selectedFilter === 'unread') return this.chats.filter(c => c.unread > 0);
+      if (this.selectedFilter === 'unread') return this.chats.filter(c => c.unread > 0 || c.markedUnread);
       if (this.selectedFilter === 'followup') return this.chats.filter(c => c.followupDue);
       return this.chats;
     },

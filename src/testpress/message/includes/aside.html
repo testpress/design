@@ -75,7 +75,7 @@
                 class="py-1 px-2.5 inline-flex items-center gap-x-1 text-xs rounded-md border border-gray-200 dark:border-neutral-700 cursor-pointer transition-colors"
                 :class="selectedFilter === 'unread' ? 'bg-primary-50 text-primary-600 dark:bg-primary-800/30 dark:text-primary-500' : 'bg-white text-gray-800 hover:bg-gray-50 dark:bg-neutral-800 dark:text-neutral-200 dark:hover:bg-neutral-700'">
                 <span class="font-medium">Unread</span>
-                <span class="opacity-70" x-text="chats.filter(c => c.unread > 0).length"></span>
+                <span class="opacity-70" x-text="chats.filter(c => c.unread > 0 || c.markedUnread).length"></span>
               </button>
               <button type="button" @click="selectedFilter = 'followup'"
                 class="py-1 px-2.5 inline-flex items-center gap-x-1 text-xs rounded-md border border-gray-200 dark:border-neutral-700 cursor-pointer transition-colors"
@@ -125,7 +125,7 @@
                   <div
                     class="relative cursor-pointer bg-white dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 transition-colors"
                     :class="activeChatId === chat.id ? 'bg-gray-100 dark:bg-neutral-700' : ''"
-                    @click="activeChatId = chat.id; showChatList = false; $nextTick(() => { document.getElementById('chat-textarea-' + chat.id)?.focus() })"
+                    @click="openChat(chat)"
                     role="button"
                     :aria-selected="activeChatId === chat.id">
                     <div class="py-4 px-5 flex items-center gap-x-3">
@@ -159,10 +159,10 @@
                           </div>
                         </div>
                         <div class="truncate mr-5 mt-0.5">
-                          <template x-if="chat.unread > 0">
+                          <template x-if="chat.unread > 0 || chat.markedUnread">
                             <p class="truncate font-semibold text-gray-800 dark:text-neutral-200 text-xs" x-text="chat.lastMessage"></p>
                           </template>
-                          <template x-if="chat.unread === 0">
+                          <template x-if="chat.unread === 0 && !chat.markedUnread">
                             <p class="truncate text-gray-500 dark:text-neutral-400 text-xs" x-text="chat.lastMessage"></p>
                           </template>
                         </div>
@@ -171,6 +171,12 @@
                     </div>
   
                     <!-- Unread Badge -->
+                    <!-- Marked as unread: dot, no count -->
+                    <template x-if="chat.markedUnread && !chat.unread">
+                      <div class="absolute bottom-[1.2rem] right-3.5">
+                        <span class="block size-2.5 rounded-full bg-primary-600 dark:bg-primary-500"></span>
+                      </div>
+                    </template>
                     <template x-if="chat.unread > 0 && activeChatId !== chat.id">
                       <div class="absolute bottom-3.5 right-2.5">
                         <span class="relative min-w-[1.125rem] min-h-[1.125rem] inline-flex justify-center items-center text-[10px] bg-primary-600 dark:bg-primary-500 text-white rounded-full px-1" x-text="chat.unread"></span>
@@ -202,7 +208,7 @@
                     <div class="block text-xs font-medium text-gray-500 dark:text-neutral-400 mb-1 px-5">Messages</div>
                     <div role="list">
                       <template x-for="chat in sidebarSearchChats" :key="chat.id">
-                        <div class="relative cursor-pointer bg-white dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 transition-colors" :class="activeChatId === chat.id ? 'bg-gray-100 dark:bg-neutral-700' : ''" @click="activeChatId = chat.id; showChatList = false; sidebarSearchQuery = ''; $nextTick(() => { document.getElementById('chat-textarea-' + chat.id)?.focus() })" role="button" :aria-selected="activeChatId === chat.id">
+                        <div class="relative cursor-pointer bg-white dark:bg-neutral-800 hover:bg-gray-100 dark:hover:bg-neutral-700 focus:outline-hidden focus:bg-gray-100 dark:focus:bg-neutral-700 transition-colors" :class="activeChatId === chat.id ? 'bg-gray-100 dark:bg-neutral-700' : ''" @click="sidebarSearchQuery = ''; openChat(chat)" role="button" :aria-selected="activeChatId === chat.id">
                           <div class="py-3 px-5 flex items-center gap-x-3">
                             <!-- Avatar -->
                             <div class="shrink-0">

@@ -1,5 +1,22 @@
 {% from '../../../ui-system/components/dropdown.html' import dropdown %}
 {% from '../../../ui-system/components/button.html' import button %}
+{% set icon_reply %}<svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>{% endset %}
+{% set icon_edit %}<svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>{% endset %}
+{% set icon_delete %}<svg class="shrink-0 size-4 text-red-500" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>{% endset %}
+{% set icon_unread %}<svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>{% endset %}
+
+{# Quoted message shown at the top of a bubble that replies to another message (Preline link-preview style) #}
+{% macro reply_quote(bg) %}
+<template x-if="msg.replyTo && msgById(msg.replyTo)">
+  <button type="button" @click="jumpTo(msg.replyTo)"
+    class="mb-1.5 block w-full min-w-40 text-start py-1.5 pe-2.5 ps-3 relative {{ bg }} rounded-lg overflow-hidden before:absolute before:inset-y-0 before:start-0 before:w-1 before:bg-primary-600 dark:before:bg-primary-500 focus:outline-hidden">
+    <span class="block font-medium text-xs text-primary-600 dark:text-primary-500" x-text="senderName(msgById(msg.replyTo))"></span>
+    <span class="block text-xs text-gray-600 dark:text-neutral-400 line-clamp-2"
+      :class="msgById(msg.replyTo)?.deleted ? 'italic' : ''"
+      x-text="msgById(msg.replyTo)?.deleted ? 'Deleted message' : msgById(msg.replyTo)?.text"></span>
+  </button>
+</template>
+{% endmacro %}
 <main id="content" class="flex-1 flex flex-col h-full overflow-hidden transition-all duration-300 min-w-0 bg-gray-50 dark:bg-neutral-900">
 
   <div class="relative flex-1 flex flex-col overflow-hidden">
@@ -43,6 +60,18 @@
         </span>
       </button>
 
+      <!-- Chat menu -->
+      <div class="ml-auto shrink-0">
+        {{ dropdown(
+          trigger="⋮",
+          placement="bottom-end",
+          width="medium",
+          items=[
+            { 'label': 'Mark as unread', 'icon': icon_unread, 'x_on': '@click="markUnread(); open = false"' }
+          ]
+        ) }}
+      </div>
+
     </header>
     <!-- End Header -->
 
@@ -59,7 +88,8 @@
         <div class="w-full space-y-5">
           <template x-for="msg in activeChat.messages" :key="msg.id">
             <!-- Single root div required by Alpine x-for -->
-            <div>
+            <div :id="'msg-' + msg.id" class="-mx-2 px-2 py-1 rounded-xl transition-colors duration-500"
+              :class="highlightId === msg.id ? 'bg-primary-50 dark:bg-primary-500/10' : ''">
 
               <!-- Student message (incoming) -->
               <div x-show="msg.from === 'student'" class="max-w-md flex gap-x-2">
@@ -77,6 +107,7 @@
                   <p class="mb-1.5 pl-2.5 text-xs text-gray-400 dark:text-neutral-500" x-text="activeChat.name"></p>
                   <div class="group flex justify-start gap-x-2" style="word-break: break-word;">
                     <div class="order-1 bg-white dark:bg-neutral-800 shadow-2xs inline-block rounded-xl pt-2 pb-1.5 px-2.5 max-w-xs">
+                      {{ reply_quote('bg-gray-100 dark:bg-neutral-700/60') }}
 
                       <!-- Product card (shown when message has product context) -->
                       <div x-show="msg.product" class="mb-2">
@@ -107,8 +138,21 @@
                       <!-- Message text -->
                       <div class="text-sm text-gray-800 dark:text-neutral-200">
                         <span x-text="msg.text"></span>
+                        <span x-show="msg.edited" class="ml-1.5 text-[11px] text-gray-400 dark:text-neutral-500">Edited</span>
                         <span class="ml-1.5 text-[11px] text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
                       </div>
+                    </div>
+
+                    <!-- Message menu -->
+                    <div class="order-2 self-center lg:opacity-0 lg:group-hover:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+                      {{ dropdown(
+                        trigger="⋮",
+                        placement="bottom-start",
+                        width="small",
+                        items=[
+                          { 'label': 'Reply', 'icon': icon_reply, 'x_on': '@click="startReply(msg); open = false"' }
+                        ]
+                      ) }}
                     </div>
                   </div>
                 </div>
@@ -136,10 +180,12 @@
                       </template>
                       
                       <!-- Regular Message -->
-                      <template x-if="!msg.isNote && !msg.isOffer">
-                        <div class="order-2 text-start bg-primary-100 shadow-2xs dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5">
+                      <template x-if="!msg.isNote && !msg.isOffer && !msg.deleted">
+                        <div class="order-2 text-start bg-primary-100 shadow-2xs dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5 max-w-xs">
+                          {{ reply_quote('bg-white/70 dark:bg-neutral-800/60') }}
                           <div class="text-sm text-gray-800 dark:text-neutral-200">
                             <span x-text="msg.text"></span>
+                            <span x-show="msg.edited" class="ml-1.5 text-[11px] text-gray-500 dark:text-neutral-400">Edited</span>
                             <span class="ml-1.5 text-[11px] text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
                             <svg class="inline-block shrink-0 size-4 text-gray-400 dark:text-neutral-500 ml-0.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 7 17l-5-5"/><path d="m22 10-7.5 7.5L13 16"/></svg>
                           </div>
@@ -188,6 +234,29 @@
                         </div>
                       </template>
 
+                      <!-- Deleted for everyone -->
+                      <template x-if="msg.deleted">
+                        <div class="order-2 inline-flex items-center gap-x-1.5 rounded-xl py-1.5 px-2.5 border border-dashed border-gray-300 dark:border-neutral-600 text-sm italic text-gray-500 dark:text-neutral-400">
+                          <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
+                          You deleted this message
+                          <span class="text-[11px] text-gray-400 dark:text-neutral-500" x-text="msg.time"></span>
+                        </div>
+                      </template>
+
+                      <!-- Message menu -->
+                      <div x-show="canReply(msg)" class="order-1 self-center lg:opacity-0 lg:group-hover:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+                        {{ dropdown(
+                          trigger="⋮",
+                          placement="bottom-end",
+                          width="medium",
+                          items=[
+                            { 'label': 'Reply', 'icon': icon_reply, 'x_on': '@click="startReply(msg); open = false"' },
+                            { 'label': 'Edit', 'icon': icon_edit, 'attrs': 'x-show="canEdit(msg)"', 'x_on': '@click="startEdit(msg); open = false"' },
+                            { 'label': 'Delete for everyone', 'icon': icon_delete, 'variant': 'danger', 'attrs': 'x-show="canDelete(msg)"', 'x_on': '@click="askDelete(msg); open = false"' }
+                          ]
+                        ) }}
+                      </div>
+
                     </div>
                   </div>
                 </div>
@@ -207,7 +276,9 @@
     <!-- End Chat Messages -->
 
     <!-- Reply Box -->
-    <footer x-data="{ tab: 'message', textInput: '' }" class="shrink-0 z-10 bg-white dark:bg-neutral-800">
+    <footer x-data="{ tab: 'message', textInput: '' }"
+      @composer-set.window="if ($event.detail.tab) tab = $event.detail.tab; if ($event.detail.text !== undefined) textInput = $event.detail.text"
+      class="shrink-0 z-10 bg-white dark:bg-neutral-800">
       <!-- Tab Navigation (Message vs Note) -->
       <div class="px-4 pt-2">
         <nav class="flex gap-1 relative" aria-label="Tabs" role="tablist" aria-orientation="horizontal">
@@ -224,11 +295,26 @@
         </nav>
       </div>
 
+      <!-- Replying to / editing a message -->
+      <template x-if="tab === 'message' && (replyingTo || editing) && msgById(replyingTo || editing)">
+        <div class="mx-4 mt-1 flex items-center gap-x-3 py-2 pe-2 ps-3 relative bg-gray-100 dark:bg-neutral-700/60 rounded-lg overflow-hidden before:absolute before:inset-y-0 before:start-0 before:w-1 before:bg-primary-600 dark:before:bg-primary-500">
+          <span class="shrink-0 text-gray-500 dark:text-neutral-400"><span x-show="!editing"><svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></span><span x-show="editing"><svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></span></span>
+          <div class="grow min-w-0">
+            <p class="text-xs font-medium text-primary-600 dark:text-primary-500" x-text="editing ? 'Edit message' : 'Replying to ' + senderName(msgById(replyingTo))"></p>
+            <p class="text-xs text-gray-600 dark:text-neutral-400 truncate" x-text="msgById(replyingTo || editing)?.text"></p>
+          </div>
+          <button type="button" @click="cancelCompose(); focusComposer()" class="shrink-0 size-7 inline-flex justify-center items-center rounded-full text-gray-500 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-600 focus:outline-hidden" aria-label="Cancel">
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </template>
+
       <label :for="'chat-textarea-' + activeChatId" class="sr-only">Message</label>
       <div class="pb-2 pl-2">
         <textarea
           x-model="textInput"
           @keydown.enter.prevent="if (! $event.shiftKey) { handleSendMessage(tab, textInput); textInput = ''; }"
+          @keydown.escape="cancelCompose()"
           :id="'chat-textarea-' + activeChatId"
           class="min-h-[67px] max-h-36 pt-4 pb-2 pl-2 pr-4 block w-full bg-white dark:bg-neutral-800 border-transparent rounded-0 md:text-sm leading-4 resize-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-hidden focus:border-transparent focus:ring-transparent disabled:opacity-50 disabled:pointer-events-none [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500"
           :placeholder="tab === 'note' ? 'Write an internal note for your team...' : 'Message ' + activeChat.name"
@@ -248,7 +334,7 @@
               text='<svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2H2v10l9.29 9.29c.94.94 2.48.94 3.42 0l6.58-6.58c.94-.94.94-2.48 0-3.42L12 2Z"/><path d="M7 7h.01"/></svg><span class="hidden sm:inline">Send offer</span>',
               variant="secondary",
               size="sm",
-              extra_attrs='x-show="tab !== \'note\'" @click="$dispatch(\'open-modal-send-offer\')"'
+              extra_attrs='x-show="tab !== \'note\' && !editing" @click="$dispatch(\'open-modal-send-offer\')"'
             ) }}
 
             <!-- Schedule followup -->
@@ -256,7 +342,7 @@
               text='<i x-show="!activeChat.followupDue" data-lucide="calendar-days" class="shrink-0 size-3.5"></i><i x-show="activeChat.followupDue" style="display: none;" data-lucide="calendar-check" class="shrink-0 size-3.5"></i><span class="hidden sm:inline" x-show="!activeChat.followupDue">Schedule followup</span><span x-show="activeChat.followupDue" style="display: none;"><span class="hidden sm:inline">Followup on </span><span x-text="activeChat.followupTime || \'Tomorrow 10:00 AM\'"></span></span>',
               variant="secondary",
               size="sm",
-              extra_attrs='x-show="tab !== \'note\'" @click="$dispatch(activeChat.followupDue ? \'open-modal-view-followup\' : \'open-modal-schedule-followup\')"'
+              extra_attrs='x-show="tab !== \'note\' && !editing" @click="$dispatch(activeChat.followupDue ? \'open-modal-view-followup\' : \'open-modal-schedule-followup\')"'
             ) }}
           </div>
 
@@ -264,7 +350,7 @@
           <div class="flex items-center gap-x-1">
             <!-- Send -->
             {{ button(
-              text='<span class="hidden sm:inline" x-text="tab === \'note\' ? \'Add Note\' : \'Send\'"></span><svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>',
+              text='<span class="hidden sm:inline" x-text="tab === \'note\' ? \'Add Note\' : (editing ? \'Save\' : \'Send\')"></span><svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>',
               variant="primary",
               size="sm",
               extra_attrs='@click="handleSendMessage(tab, textInput); textInput = \'\'"'

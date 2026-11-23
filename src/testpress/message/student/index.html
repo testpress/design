@@ -1,0 +1,187 @@
+---
+title: Messages
+tags: testpress
+student_view: Messages
+new_student_page: true
+permalink: "/messages/student/"
+date: 2026-11-23
+---
+
+{% extends "src/testpress/layout/student_layout.html" %}
+{% from "src/ui-system/components/drawer.html" import drawer %}
+{% from "src/ui-system/components/dropdown.html" import dropdown %}
+{% from "src/ui-system/components/button.html" import button %}
+
+{% block main_content %}
+<div x-data x-init="setTimeout(() => $dispatch('open-drawer-student-chat-drawer'), 50)"></div>
+{% endblock main_content %}
+
+{% block chat_drawer %}
+<script>
+  window.studentChat = () => ({
+    draft: '',
+    replyingTo: null,
+    highlightId: null,
+    messages: [
+      { id: 1, from: 'student', product: 'BrahMos (All SSC Exams - 2027)', text: 'Hi, is there an EMI option for this? Also when does the next batch start?', time: '11:27' },
+      { id: 2, from: 'staff', text: 'Hi Rahul! Yes, we have 3 and 6 month EMI options. The next batch starts October 5th.', time: '12:44' },
+      { id: 3, from: 'staff', text: 'You can enroll now and get early bird access to study material!', time: '12:45', edited: true },
+      { id: 4, from: 'staff', text: '', deleted: true, time: '12:46' },
+      { id: 5, from: 'student', text: 'Is the 6 month EMI without interest?', time: '12:52', replyTo: 2 },
+      { id: 6, from: 'staff', text: 'Yes, both EMI options have no interest.', time: '12:55', replyTo: 5 }
+    ],
+    byId(id) { return this.messages.find(m => m.id === id); },
+    init() {
+      window.addEventListener('open-drawer-student-chat-drawer', () => setTimeout(() => { this.$refs.chatBody.scrollTop = this.$refs.chatBody.scrollHeight; }, 60));
+    },
+    nameOf(msg) { if (!msg) return ''; return msg.from === 'student' ? 'You' : 'Siddhi Prep'; },
+    startReply(msg) {
+      this.replyingTo = msg.id;
+      this.$nextTick(() => this.$refs.input.focus());
+    },
+    jumpTo(id) {
+      const el = document.getElementById('smsg-' + id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      this.highlightId = id;
+      setTimeout(() => { if (this.highlightId === id) this.highlightId = null; }, 1600);
+    },
+    send() {
+      const text = this.draft.trim();
+      if (!text) return;
+      this.messages.push({ id: Date.now(), from: 'student', text, time: 'Just now', replyTo: this.replyingTo });
+      this.draft = '';
+      this.replyingTo = null;
+      this.$nextTick(() => { this.$refs.chatBody.scrollTop = this.$refs.chatBody.scrollHeight; });
+    }
+  });
+</script>
+{% set icon_reply %}<svg class="shrink-0 size-4 text-gray-500 dark:text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>{% endset %}
+
+{# Quoted message at the top of a bubble that replies to another message #}
+{% macro reply_quote(bg) %}
+<template x-if="msg.replyTo && byId(msg.replyTo)">
+  <button type="button" @click="jumpTo(msg.replyTo)"
+    class="mb-1.5 block w-full min-w-40 text-start py-1.5 pe-2.5 ps-3 relative {{ bg }} rounded-lg overflow-hidden before:absolute before:inset-y-0 before:start-0 before:w-1 before:bg-primary-600 dark:before:bg-primary-500 focus:outline-hidden">
+    <span class="block font-medium text-xs text-primary-600 dark:text-primary-500" x-text="nameOf(byId(msg.replyTo))"></span>
+    <span class="block text-xs text-gray-600 dark:text-neutral-400 line-clamp-2"
+      :class="byId(msg.replyTo)?.deleted ? 'italic' : ''"
+      x-text="byId(msg.replyTo)?.deleted ? 'Deleted message' : byId(msg.replyTo)?.text"></span>
+  </button>
+</template>
+{% endmacro %}
+
+{% call drawer(id="student-chat-drawer", placement="right", size="md", title="Chat with us") %}
+<div class="flex-1 flex flex-col h-full bg-white dark:bg-neutral-900" x-data="studentChat()">
+
+  <!-- Conversation -->
+  <div x-ref="chatBody" class="flex-1 overflow-y-auto bg-gray-50 dark:bg-neutral-900 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-none [&::-webkit-scrollbar-track]:bg-gray-100 dark:[&::-webkit-scrollbar-track]:bg-neutral-700 [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-neutral-500">
+    <div class="p-4 space-y-3">
+
+      <div class="text-center">
+        <span class="py-0.5 px-1.5 bg-gray-100 dark:bg-neutral-800 text-xs text-gray-500 dark:text-neutral-400 rounded-full">Today</span>
+      </div>
+
+      <template x-for="msg in messages" :key="msg.id">
+        <div :id="'smsg-' + msg.id" class="-mx-2 px-2 py-1 rounded-xl transition-colors duration-500"
+          :class="highlightId === msg.id ? 'bg-primary-50 dark:bg-primary-500/10' : ''">
+
+          <!-- Institute (incoming) -->
+          <div x-show="msg.from === 'staff'" class="max-w-sm flex gap-x-2">
+            <div class="shrink-0 mt-auto">
+              <span class="flex justify-center items-center size-8 text-xs font-semibold text-white bg-primary-600 rounded-full">SP</span>
+            </div>
+            <div>
+              <p class="mb-1.5 ps-2.5 text-xs text-gray-400 dark:text-neutral-500">Siddhi Prep</p>
+              <div class="group flex justify-start gap-x-1" style="word-break: break-word;">
+                <template x-if="!msg.deleted">
+                  <div class="order-1 bg-white dark:bg-neutral-800 shadow-sm inline-block rounded-xl pt-2 pb-1.5 px-2.5 max-w-xs">
+                    {{ reply_quote('bg-gray-100 dark:bg-neutral-700/60') }}
+                    <div class="text-sm text-gray-800 dark:text-neutral-200">
+                      <span x-text="msg.text"></span>
+                      <span x-show="msg.edited" class="ms-1.5 text-[11px] text-gray-400 dark:text-neutral-500">Edited</span>
+                      <span class="ms-1.5 text-[11px] text-gray-400 dark:text-neutral-500 italic" x-text="msg.time"></span>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="msg.deleted">
+                  <div class="order-1 inline-flex items-center gap-x-1.5 rounded-xl py-1.5 px-2.5 border border-dashed border-gray-300 dark:border-neutral-600 text-sm italic text-gray-500 dark:text-neutral-400">
+                    <svg class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></svg>
+                    This message was deleted
+                    <span class="text-[11px] text-gray-400 dark:text-neutral-500" x-text="msg.time"></span>
+                  </div>
+                </template>
+                <div x-show="!msg.deleted" class="order-2 self-center lg:opacity-0 lg:group-hover:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+                  {{ dropdown(trigger="⋮", placement="bottom-start", width="small", items=[
+                    { 'label': 'Reply', 'icon': icon_reply, 'x_on': '@click="startReply(msg); open = false"' }
+                  ]) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Student (outgoing) -->
+          <div x-show="msg.from === 'student'" class="max-w-sm ms-auto flex justify-end">
+            <div class="group flex justify-end gap-x-1" style="word-break: break-word;">
+              <div class="order-2 text-start bg-primary-100 dark:bg-primary-500/20 inline-block rounded-xl pt-2 pb-1.5 px-2.5 max-w-xs">
+                <!-- Product the question is about -->
+                <template x-if="msg.product">
+                  <div class="mb-1.5 py-1.5 pe-2.5 ps-3 relative bg-white/70 dark:bg-neutral-800/60 rounded-lg overflow-hidden before:absolute before:inset-y-0 before:start-0 before:w-1 before:bg-primary-600 dark:before:bg-primary-500">
+                    <span class="block font-medium text-xs text-gray-800 dark:text-neutral-200" x-text="msg.product"></span>
+                    <span class="block text-xs text-gray-500 dark:text-neutral-400">₹3,299</span>
+                  </div>
+                </template>
+                {{ reply_quote('bg-white/70 dark:bg-neutral-800/60') }}
+                <div class="text-sm text-gray-800 dark:text-neutral-200">
+                  <span x-text="msg.text" style="white-space: pre-wrap;"></span>
+                  <span class="ms-1.5 text-[11px] text-gray-500 dark:text-neutral-400 italic" x-text="msg.time"></span>
+                </div>
+              </div>
+              <div class="order-1 self-center lg:opacity-0 lg:group-hover:opacity-100 has-[[aria-expanded=true]]:opacity-100">
+                {{ dropdown(trigger="⋮", placement="bottom-end", width="small", items=[
+                  { 'label': 'Reply', 'icon': icon_reply, 'x_on': '@click="startReply(msg); open = false"' }
+                ]) }}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Composer -->
+  <footer class="shrink-0 bg-white dark:bg-neutral-800 border-t border-gray-200 dark:border-neutral-700">
+    <template x-if="replyingTo && byId(replyingTo)">
+        <div class="mx-3 mt-3 flex items-center gap-x-3 py-2 pe-2 ps-3 relative bg-gray-100 dark:bg-neutral-700/60 rounded-lg overflow-hidden before:absolute before:inset-y-0 before:start-0 before:w-1 before:bg-primary-600 dark:before:bg-primary-500">
+          <span class="shrink-0 text-gray-500 dark:text-neutral-400"><svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></span>
+          <div class="grow min-w-0">
+            <p class="text-xs font-medium text-primary-600 dark:text-primary-500" x-text="'Replying to ' + nameOf(byId(replyingTo))"></p>
+            <p class="text-xs text-gray-600 dark:text-neutral-400 truncate" x-text="byId(replyingTo)?.text"></p>
+          </div>
+          <button type="button" @click="replyingTo = null; $refs.input.focus()" class="shrink-0 size-7 inline-flex justify-center items-center rounded-full text-gray-500 dark:text-neutral-400 hover:bg-gray-200 dark:hover:bg-neutral-600 focus:outline-hidden" aria-label="Cancel">
+            <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </template>
+    <div class="pb-2 ps-2 pt-2">
+      <label for="student-chat-input" class="sr-only">Message</label>
+      <textarea id="student-chat-input" x-ref="input" x-model="draft"
+        @keydown.enter.prevent="if (!$event.shiftKey) send()"
+        @keydown.escape.stop="replyingTo = null"
+        class="max-h-36 pt-2 pb-2 ps-2 pe-4 block w-full bg-transparent border-transparent rounded-0 text-sm leading-4 resize-none text-gray-800 dark:text-neutral-200 placeholder:text-gray-500 dark:placeholder:text-neutral-400 focus:outline-none focus:border-transparent focus:ring-transparent"
+        placeholder="Type a message" rows="2"></textarea>
+      <div class="pe-3 flex justify-between items-center gap-x-1 mt-1">
+        <button type="button" class="flex justify-center items-center size-8 text-sm text-gray-500 dark:text-neutral-400 hover:bg-gray-100 dark:hover:bg-neutral-700 rounded-full focus:outline-none focus:bg-gray-100 dark:focus:bg-neutral-700">
+          <svg class="shrink-0 size-4" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          <span class="sr-only">Attach file</span>
+        </button>
+        {{ button(text="Send", variant="primary", size="sm", icon="send", icon_position="right", extra_attrs="@click=\"send()\" :disabled=\"!draft.trim()\"") }}
+      </div>
+    </div>
+  </footer>
+</div>
+{% endcall %}
+
+
+{% endblock chat_drawer %}
