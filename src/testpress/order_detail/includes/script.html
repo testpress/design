@@ -12,7 +12,7 @@
     paid: '₹4,999.00',
     pay: { kind: 'gateway', gateway: 'Razorpay', method: 'UPI', id: 'pay_PH4x9KQe2LmR7a', on: '2 Sep 2026, 12:53 pm', own: false, collector: 'testpress' },
     payout: { fees: '−₹499.90', earning: '₹4,499.10', status: 'pending', date: '30 Nov' },
-    refund: 'yes',          // yes | mark (cash collected by you) | no (free, voucher, collected by Testpress offline) | unsupported (gateway)
+    refund: 'yes',          // yes | mark (cash collected by you) | no (free, voucher, collected by Testpress offline) 
     refundAmount: '₹4,999.00',
     note: '',
   };
@@ -49,7 +49,7 @@
     }),
     own_gateway: S({ pay: { own: true, collector: 'you' }, payout: null }),
     own_payu: S({ pay: { gateway: 'PayU', method: 'Net banking · HDFC', id: '403993715531077182', own: true, collector: 'you' }, payout: null }),
-    stripe: S({ pay: { gateway: 'Stripe', method: 'Card', id: 'pi_3TTj7xQ1EDQsiXjw0Uglypcb', own: true, collector: 'you' }, payout: null, refund: 'unsupported' }),
+    stripe: S({ pay: { gateway: 'Stripe', method: 'Card', id: 'pi_3TTj7xQ1EDQsiXjw0Uglypcb', own: true, collector: 'you' }, payout: null, refund: 'mark' }),
     cash: S({ pay: { kind: 'cash', gateway: 'Cash payment', method: 'Note: Paid at the front office', id: '', collector: 'you' }, payout: null, refund: 'mark' }),
     cash_testpress: S({ pay: { kind: 'cash', gateway: 'Cash payment', method: 'Note: Bank transfer to Testpress, UTR 412566981032', id: '', collector: 'testpress' }, refund: 'no' }),
     voucher: S({ lines: [{ label: 'Price', amount: '₹4,999.00' }], price: '₹4,999.00', pay: { kind: 'voucher', gateway: 'Testpress voucher', method: 'Code TPV-8K2M-91QX', id: '', collector: 'testpress' }, payout: null, refund: 'no' }),
@@ -58,6 +58,7 @@
     confirm: S({}), refunding: S({}),
     refunded: S({ payout: { status: 'paid', date: '15 Sep' } }),
     checking: S({}), rejected: S({}),
+    marked: S({ pay: { gateway: 'Stripe', method: 'Card', id: 'pi_3TTj7xQ1EDQsiXjw0Uglypcb', own: true, collector: 'you' }, payout: null, refund: 'mark' }),
   };
 
   document.addEventListener('alpine:init', () => {
@@ -65,6 +66,7 @@
       state: window.odState(),
       typed: '',
       processing: false,
+      outcome: null,   // null | refunded | checking | rejected | marked
 
       init() {
         window.addEventListener('od-state', (e) => this.setState(e.detail));
@@ -73,6 +75,7 @@
 
       setState(s) {
         this.state = s;
+        this.outcome = ['refunded', 'checking', 'rejected', 'marked'].includes(s) ? s : null;
         this.processing = s === 'refunding';
         this.typed = s === 'refunding' ? 'refund' : '';
         if (s === 'confirm' || s === 'refunding') this.$dispatch('open-modal-refund-modal');
@@ -81,13 +84,13 @@
       },
 
       get d() { return window.ORDER_CASES[this.state] || window.ORDER_CASES.paid; },
-      get refundState() { return ['refunded', 'checking', 'rejected'].includes(this.state) ? this.state : 'none'; },
+      get refundState() { return this.outcome || 'none'; },
       get isOwner() { return this.state !== 'not_owner'; },
       get canStart() { return this.refundState === 'none' && ['yes', 'mark'].includes(this.d.refund); },
-      get accessRemoved() { return this.state === 'refunded'; },
+      get accessRemoved() { return ['refunded', 'marked'].includes(this.outcome); },
       get status() {
-        if (this.state === 'refunded') return 'refunded';
-        if (this.state === 'checking') return 'pending';
+        if (['refunded', 'marked'].includes(this.outcome)) return 'refunded';
+        if (this.outcome === 'checking') return 'pending';
         if (this.d.pay.kind === 'free') return 'free';
         return 'paid';
       },
@@ -109,7 +112,7 @@
         setTimeout(() => {
           this.processing = false;
           this.$dispatch('close-modal-refund-modal');
-          window.dispatchEvent(new CustomEvent('od-state', { detail: 'refunded' }));
+          this.outcome = this.d.refund === 'mark' ? 'marked' : 'refunded';
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }, 1600);
       },
