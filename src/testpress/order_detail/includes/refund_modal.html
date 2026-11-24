@@ -1,0 +1,52 @@
+{% from "../../../ui-system/components/modal.html" import modal %}
+{% from "../../../ui-system/components/input.html" import input %}
+
+{# Refund confirmation, left-aligned like Razorpay's and Stripe's refund dialogs:
+   what is refunded and where it goes as rows, one line on what happens next, the typed confirmation (PRD), then the action.
+   Text adapts to the order: Testpress gateway, institute's own gateway, cash (mark as refunded). #}
+{% call modal(id="refund-modal", title="Refund payment", size="md", confirm_text="", show_cancel=false) %}
+  <div class="space-y-6">
+    <dl class="grid grid-cols-3 gap-x-4 gap-y-4 text-sm">
+      <dt class="text-gray-500 dark:text-neutral-400">Refund amount</dt>
+      <dd class="col-span-2 text-gray-800 dark:text-neutral-200">
+        <span class="font-semibold" x-text="d.refundAmount"></span>
+        <span class="text-gray-500 dark:text-neutral-400">· Full refund</span>
+      </dd>
+
+      <dt class="text-gray-500 dark:text-neutral-400">Refund to</dt>
+      <dd class="col-span-2 text-gray-800 dark:text-neutral-200"
+          x-text="d.pay.kind === 'cash' ? 'Paid in cash' : (d.pay.gateway + ' · ' + d.pay.method)"></dd>
+
+      <dt class="text-gray-500 dark:text-neutral-400">Student</dt>
+      <dd class="col-span-2 text-gray-800 dark:text-neutral-200">Deva Raj</dd>
+
+      <dt class="text-gray-500 dark:text-neutral-400">Course</dt>
+      <dd class="col-span-2 text-gray-800 dark:text-neutral-200" x-text="d.product"></dd>
+    </dl>
+
+    <p class="text-sm text-gray-800 dark:text-neutral-200">
+      <span x-show="d.pay.kind === 'gateway' && !d.pay.own">The money reaches Deva in 3–5 days.</span>
+      <span x-show="d.pay.own" x-cloak>The money goes from your <span x-text="d.pay.gateway"></span> account and reaches Deva in 3–5 days.</span>
+      <span x-show="d.pay.kind === 'cash'" x-cloak>Give the cash back to Deva yourself. Testpress doesn't move cash.</span>
+      Access ends now and Deva gets an email.
+    </p>
+
+    <div>
+      <label for="refund_confirm" class="block mb-2 text-sm text-gray-800 dark:text-neutral-200">
+        Type <span class="font-mono font-semibold">refund</span> to confirm. You can't undo this.
+      </label>
+      {{ input(name="refund_confirm", x_model="typed",
+               extra_attrs='autocomplete="off" autocapitalize="off" spellcheck="false" autofocus :disabled="processing" @keydown.enter.prevent="confirmRefund()"') }}
+    </div>
+
+    <div class="flex justify-end gap-x-2">
+      <button type="button" @click="closeRefund()" :disabled="processing"
+              class="py-2 px-3 inline-flex justify-center items-center text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">Cancel</button>
+      <button type="button" @click="confirmRefund()" :disabled="!typedOk || processing"
+              class="py-2 px-3 inline-flex justify-center items-center gap-x-1.5 text-sm font-medium rounded-lg bg-red-500 border border-transparent text-white hover:bg-red-600 focus:outline-none focus:bg-red-600 disabled:opacity-50 disabled:pointer-events-none">
+        <i data-lucide="loader-2" class="size-3.5 animate-spin" x-show="processing" x-cloak></i>
+        <span x-text="processing ? 'Refunding…' : (d.refund === 'mark' ? 'Mark as refunded' : 'Refund ' + d.refundAmount)"></span>
+      </button>
+    </div>
+  </div>
+{% endcall %}

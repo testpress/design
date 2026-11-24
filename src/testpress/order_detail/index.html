@@ -1,0 +1,274 @@
+---
+title: Order Detail (Refund)
+tags: testpress
+date: 2026-11-24
+view: "admin Order Detail"
+---
+
+{% extends "layouts/admin_base.html" %}
+
+{% block body_class %}overflow-y-scroll min-h-screen bg-gray-50 dark:bg-neutral-900{% endblock body_class %}
+
+{% block content %}
+{% from "../../ui-system/components/breadcrumbs.html" import breadcrumb %}
+{% from "../../ui-system/components/button.html" import button %}
+{% from "../../ui-system/components/badge.html" import badge %}
+{% from "../../ui-system/components/dropdown.html" import dropdown %}
+
+{# Layout: Preline Pro ecommerce/admin/order-details.html. Font: Preline's system sans stack.
+   All order data comes from window.ORDER_CASES (includes/script.html), one entry per prototype state. #}
+
+{% set student = { name: "Deva Raj", email: "deva.raj@gmail.com", phone: "+91 98765 43210",
+  avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=facearea&facepad=3&w=320&h=320&q=80" } %}
+
+{# Copy: the icon turns into a tick with "Copied" for a moment. value_expr is an Alpine expression. #}
+{% macro copy_text(value_expr, classes="") %}
+  <button type="button" x-data="{ copied: false }"
+          @click="navigator.clipboard?.writeText({{ value_expr }}); copied = true; setTimeout(() => copied = false, 1500)"
+          class="inline-flex items-center gap-x-1.5 {{ classes }}" title="Copy">
+    <span class="font-mono text-[13px]" x-text="{{ value_expr }}"></span>
+    <i data-lucide="copy" class="size-3.5 shrink-0 opacity-60" x-show="!copied"></i>
+    <span x-show="copied" x-cloak class="inline-flex items-center gap-x-1 text-xs font-medium text-primary-600 dark:text-primary-400">
+      <i data-lucide="check" class="size-3.5 shrink-0"></i>Copied
+    </span>
+  </button>
+{% endmacro %}
+
+<div x-data="orderDetail" class="max-w-[85rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4"
+     style="font-family: ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';">
+
+  {{ breadcrumb({ items: [
+    { label: "Store", href: "#" },
+    { label: "PSC Civil Engineering", href: "#" },
+    { label: "Sales", href: "#" },
+    { label: "Order #3137" }
+  ] }) }}
+
+  <div class="grid grid-cols-1 lg:grid-cols-6 gap-5 items-start">
+
+    <!-- Left -->
+    <div class="lg:col-span-4 space-y-5">
+
+      <!-- Order card -->
+      <div class="flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="py-2 px-5 flex justify-between items-center gap-x-3 border-b border-gray-200 dark:border-neutral-700">
+          <h1 class="inline-block font-semibold text-gray-800 dark:text-neutral-200">Order #<span x-text="d.id"></span></h1>
+
+          <div class="flex justify-end items-center gap-x-2">
+            <span x-show="canStart && !isOwner" x-cloak class="hidden sm:inline text-xs text-gray-500 dark:text-neutral-400">Only the institute owner can refund</span>
+            <span x-show="canStart" x-cloak>
+              <button type="button" @click="openRefund()" :disabled="!isOwner"
+                      class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">
+                <i data-lucide="undo-2" class="size-3.5"></i>
+                <span x-text="d.refund === 'mark' ? 'Mark as refunded' : 'Refund'"></span>
+              </button>
+            </span>
+            {% set more_trigger %}
+              <span role="button" aria-label="More actions" class="size-[34px] inline-flex justify-center items-center rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">
+                <i data-lucide="ellipsis" class="size-4"></i>
+              </span>
+            {% endset %}
+            {{ dropdown(trigger=more_trigger, width="large", items=[
+              { label: "Update validity", url: "#", icon: "calendar-clock" },
+              { label: "Print shipping label", url: "#", icon: "printer" },
+              { label: "Recheck payment", url: "#", icon: "refresh-cw" }
+            ]) }}
+          </div>
+        </div>
+
+        <div class="p-5 flex flex-col">
+          <!-- Placed + status -->
+          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-4">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-800 dark:text-neutral-200">
+              <span>Order placed: <span x-text="d.placed"></span></span>
+              {{ copy_text("d.txn", "text-gray-500 hover:text-gray-800 dark:text-neutral-400 dark:hover:text-neutral-200") }}
+            </div>
+            <div class="inline-flex items-center gap-x-2">
+              <span x-show="status === 'paid'">{{ badge(text="Paid", variant="success", size="xs") }}</span>
+              <span x-show="status === 'free'" x-cloak>{{ badge(text="Free", variant="neutral", size="xs") }}</span>
+              <span x-show="status === 'refunded'" x-cloak>{{ badge(text="Refunded", variant="neutral", size="xs") }}</span>
+              <span x-show="status === 'pending'" x-cloak>{{ badge(text="Refund pending", variant="warning", size="xs") }}</span>
+            </div>
+          </div>
+
+          {% include "./includes/refund_status.html" %}
+
+          <!-- Item -->
+          <div class="pt-5 mt-5 border-t border-gray-200 dark:border-neutral-700">
+            <div class="grid grid-cols-1 sm:grid-cols-4 md:grid-cols-11 items-center gap-5">
+              <div class="col-span-full sm:col-span-1 md:col-span-2">
+                <img class="w-full max-w-[200px] aspect-video object-cover rounded-md bg-gray-100 dark:bg-neutral-700" :src="d.img" :alt="d.product">
+              </div>
+              <div class="col-span-1 md:col-span-3">
+                <div class="grid grid-cols-2 sm:grid-cols-1 gap-5">
+                  <div>
+                    <p class="mb-1 text-xs text-gray-500 dark:text-neutral-400">Item</p>
+                    <a href="#" class="text-sm font-medium text-gray-800 hover:text-primary-600 dark:text-neutral-200 dark:hover:text-primary-400" x-text="d.product"></a>
+                  </div>
+                  <div>
+                    <p class="mb-1 text-xs text-gray-500 dark:text-neutral-400">Includes</p>
+                    <p class="text-sm text-gray-800 dark:text-neutral-200" x-text="d.includes"></p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-span-1 md:col-span-3">
+                <div class="grid grid-cols-2 sm:grid-cols-1 gap-5">
+                  <div>
+                    <p class="mb-1 text-xs text-gray-500 dark:text-neutral-400">Plan</p>
+                    <p class="text-sm text-gray-800 dark:text-neutral-200" x-text="d.plan"></p>
+                  </div>
+                  <div>
+                    <p class="mb-1 text-xs text-gray-500 dark:text-neutral-400">Price</p>
+                    <p class="text-sm text-gray-800 dark:text-neutral-200" x-text="d.price"></p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-span-1 md:col-span-3">
+                <div class="grid grid-cols-2 sm:grid-cols-1 gap-5">
+                  <div>
+                    <p class="mb-1 text-xs text-gray-500 dark:text-neutral-400">Access</p>
+                    <p x-show="!accessRemoved" class="text-sm text-gray-800 dark:text-neutral-200" x-text="d.access"></p>
+                    <p x-show="accessRemoved" x-cloak class="text-sm text-red-600 dark:text-red-400">Removed 24 Nov 2026</p>
+                  </div>
+                  <div>
+                    <p class="mb-1 text-xs text-gray-500 dark:text-neutral-400">Bought from</p>
+                    <p class="text-sm text-gray-800 dark:text-neutral-200" x-text="d.from"></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Summary -->
+          <div class="pt-5 mt-5 border-t border-gray-200 dark:border-neutral-700">
+            <div class="grid sm:grid-cols-11 gap-5">
+              <div class="col-span-full sm:col-span-5" >
+                <p x-show="d.note" x-cloak class="flex items-start gap-x-2 text-sm text-gray-500 dark:text-neutral-400">
+                  <i data-lucide="calendar-clock" class="size-4 mt-0.5 shrink-0"></i><span x-text="d.note"></span>
+                </p>
+              </div>
+              <div class="col-span-full sm:col-span-6">
+                <dl class="grid grid-cols-12 gap-y-2.5 pe-1 text-sm">
+                  <template x-for="line in d.lines" :key="line.label">
+                    <div class="contents">
+                      <dt class="col-span-8 text-gray-500 dark:text-neutral-400">
+                        <span x-text="line.label"></span>
+                        <span x-show="line.code" class="ms-1 py-0.5 px-1.5 rounded bg-gray-100 font-mono text-xs uppercase text-gray-700 dark:bg-neutral-700 dark:text-neutral-300" x-text="line.code"></span>
+                        <span x-show="line.sub" class="block text-xs text-gray-400 dark:text-neutral-500" x-text="line.sub"></span>
+                      </dt>
+                      <dd class="col-span-4 text-end text-gray-800 dark:text-neutral-200" x-text="line.amount"></dd>
+                    </div>
+                  </template>
+                  <dt class="col-span-8 pt-2.5 border-t border-gray-200 font-medium text-gray-800 dark:border-neutral-700 dark:text-neutral-200">Paid</dt>
+                  <dd class="col-span-4 pt-2.5 border-t border-gray-200 text-end font-semibold text-gray-800 dark:border-neutral-700 dark:text-neutral-200" x-text="d.paid"></dd>
+                  <dt x-show="state === 'refunded'" x-cloak class="col-span-8 text-gray-500 dark:text-neutral-400">Refunded</dt>
+                  <dd x-show="state === 'refunded'" x-cloak class="col-span-4 text-end text-gray-800 dark:text-neutral-200" x-text="'−' + d.refundAmount"></dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="py-2 px-5 border-t border-gray-200 dark:border-neutral-700">
+          <div class="flex justify-between items-center gap-x-2">
+            <a href="#" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs rounded-lg text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700"><i data-lucide="chevron-left" class="size-3.5"></i>Prev</a>
+            <span class="text-xs text-gray-500 dark:text-neutral-400">Order 1 of 22</span>
+            <a href="#" class="py-2 px-2.5 inline-flex items-center gap-x-1.5 text-xs rounded-lg text-gray-800 hover:bg-gray-100 dark:text-neutral-200 dark:hover:bg-neutral-700">Next<i data-lucide="chevron-right" class="size-3.5"></i></a>
+          </div>
+        </div>
+      </div>
+
+      {% include "./includes/activity.html" %}
+    </div>
+
+    <!-- Right: sticky -->
+    <div class="lg:col-span-2 lg:sticky lg:top-5">
+      <div class="flex flex-col bg-white border border-gray-200 shadow-sm rounded-xl dark:bg-neutral-800 dark:border-neutral-700">
+        <div class="py-3 px-5 border-b border-gray-200 dark:border-neutral-700">
+          <h2 class="inline-block font-semibold text-gray-800 dark:text-neutral-200">Student</h2>
+        </div>
+        <div class="pt-2 pb-5 px-5 flex flex-col">
+          <div>
+            <a class="-mx-3 py-2 px-3 flex items-center gap-x-3 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700" href="#">
+              <img class="shrink-0 size-10 rounded-full object-cover" src="{{ student.avatar }}" alt="{{ student.name }}">
+              <div class="grow flex justify-between items-center gap-x-3">
+                <span class="font-medium text-sm text-gray-800 dark:text-neutral-200">{{ student.name }}</span>
+                <i data-lucide="chevron-right" class="shrink-0 size-4 text-gray-500"></i>
+              </div>
+            </a>
+          </div>
+          <div class="pt-2 mt-2 border-t border-gray-200 dark:border-neutral-700">
+            <a class="-mx-3 py-2 px-3 flex items-center gap-x-3 rounded-lg hover:bg-gray-100 dark:hover:bg-neutral-700" href="#">
+              <span class="flex justify-center items-center size-10 bg-white border border-gray-200 text-gray-800 rounded-full shadow-sm dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-200">
+                <i data-lucide="shopping-basket" class="shrink-0 size-5"></i>
+              </span>
+              <div class="grow flex justify-between items-center gap-x-3">
+                <span class="font-medium text-sm text-gray-800 dark:text-neutral-200">3 orders</span>
+                <i data-lucide="chevron-right" class="shrink-0 size-4 text-gray-500"></i>
+              </div>
+            </a>
+          </div>
+
+          <div class="pt-5 mt-2 border-t border-gray-200 dark:border-neutral-700">
+            <p class="mb-3 font-semibold text-sm text-gray-800 dark:text-neutral-200">Contact info</p>
+            <ul class="space-y-2.5">
+              <li class="flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400"><i data-lucide="mail" class="shrink-0 size-3.5"></i>{{ student.email }}</li>
+              <li class="flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400"><i data-lucide="phone" class="shrink-0 size-3.5"></i>{{ student.phone }}</li>
+            </ul>
+          </div>
+
+          <!-- Payment, in the place of Preline's billing section -->
+          <div class="pt-5 mt-5 border-t border-gray-200 dark:border-neutral-700" x-show="d.pay.kind !== 'free'">
+            <p class="mb-3 font-semibold text-sm text-gray-800 dark:text-neutral-200">
+              <span x-text="d.pay.gateway"></span>
+            </p>
+            <ul class="space-y-2.5">
+              <li class="flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400"><i data-lucide="wallet" class="shrink-0 size-3.5"></i><span x-text="d.pay.method"></span></li>
+              <li class="flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400"><i data-lucide="calendar" class="shrink-0 size-3.5"></i><span x-text="'Paid ' + d.pay.on"></span></li>
+              <li class="flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400"><i data-lucide="landmark" class="shrink-0 size-3.5"></i><span x-text="d.pay.collector === 'testpress' ? 'Collected by Testpress' : (d.pay.kind === 'gateway' ? 'Collected in your ' + d.pay.gateway + ' account' : 'Collected by you')"></span></li>
+              <li x-show="d.pay.id" class="flex items-center gap-x-2 text-sm text-gray-500 dark:text-neutral-400"><i data-lucide="hash" class="shrink-0 size-3.5"></i>{{ copy_text("d.pay.id", "hover:text-gray-800 dark:hover:text-neutral-200") }}</li>
+            </ul>
+          </div>
+          <div class="pt-5 mt-5 border-t border-gray-200 dark:border-neutral-700" x-show="d.pay.kind === 'free'" x-cloak>
+            <p class="font-semibold text-sm text-gray-800 dark:text-neutral-200">No payment</p>
+            <p class="mt-1 text-sm text-gray-500 dark:text-neutral-400">The coupon covered the full price.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% include "./includes/refund_modal.html" %}
+</div>
+
+{% set proto_groups = [
+  { name: "Before refund", states: [
+    ["paid", "Paid with coupon (default)"],
+    ["no_discount", "No discount"],
+    ["offer_coupon", "Automatic offer + coupon"],
+    ["payu_fee", "PayU card + processing fee"],
+    ["subscription", "Subscription plan"],
+    ["installment", "Installment payment"],
+    ["own_gateway", "Institute's own Razorpay"],
+    ["own_payu", "Institute's own PayU"],
+    ["stripe", "Own Stripe / PayPal / CCAvenue (not supported)"],
+    ["cash", "Cash, collected by institute (Credit)"],
+    ["cash_testpress", "Bank transfer, collected by Testpress (Debit)"],
+    ["voucher", "Paid with Testpress voucher"],
+    ["free", "Free order (₹0)"],
+    ["not_owner", "Admin who isn't the owner"]
+  ] },
+  { name: "Refund dialog", states: [["confirm", "Confirm refund"], ["refunding", "Refunding"]] },
+  { name: "After refund", states: [
+    ["refunded", "Refunded"],
+    ["checking", "Waiting for Razorpay"],
+    ["rejected", "Rejected by Razorpay"]
+  ] }
+] %}
+{% set proto_default = "paid" %}
+{% set proto_event = "od-state" %}
+{% set proto_fn = "odState" %}
+{% include "../includes/prototype_states.html" %}
+
+{% include "./includes/script.html" %}
+{% endblock content %}
