@@ -40,7 +40,7 @@
       ],
     },
     {
-      id: 'wheatstone', title: 'Equivalent resistance of a Wheatstone bridge', group: 'Today',
+      id: 'wheatstone', questionLinked: true, title: 'Equivalent resistance of a Wheatstone bridge', group: 'Today',
       messages: [
         { role: 'user', text: 'Find the equivalent resistance between A and B', images: [AI_CHAT_IMG.wheatstone] },
         { role: 'ai', html: `
@@ -181,6 +181,14 @@
     { label: 'Study tips', prompt: 'How should I revise ', d: 'M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5M9 18h6M10 22h4' },
   ];
 
+  const AI_CHAT_QUESTION_STARTERS = [
+    { ...AI_CHAT_STARTERS[1], label: 'Explain the solution', prompt: 'Explain the solution to this question step by step.' },
+    { ...AI_CHAT_STARTERS[2], label: 'Why is my answer wrong?', prompt: 'I chose ' },
+    { ...AI_CHAT_STARTERS[0], label: 'Explain the concept', prompt: 'Explain the concept this question tests.' },
+  ];
+  const AI_CHAT_REVIEW_URL = '../exam_review/answers/';
+  const AI_CHAT_EXAM_LABEL = 'Real CAT 2025 - Take Home Mock Test 01';
+
   const AI_CHAT_LIMITS = { maxChars: 4000, counterFrom: 3500, maxImages: 4 };
   const AI_CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -214,10 +222,22 @@
       pressTimer: null,
       pressedOpen: false,
       camera: { shot: null, error: false, stream: null },
-      starters: AI_CHAT_STARTERS,
+      questionDraft: false,
+      questionExamLabel: AI_CHAT_EXAM_LABEL,
+      questionBackUrl: null,
+      get starters() { return this.questionDraft ? AI_CHAT_QUESTION_STARTERS : AI_CHAT_STARTERS; },
       limits: AI_CHAT_LIMITS,
 
       init() {
+        const params = new URLSearchParams(location.search);
+        if (params.has('question')) {
+          const reviewParams = new URLSearchParams({
+            section: params.get('section') || '0',
+            question: params.get('question'),
+          });
+          this.questionBackUrl = AI_CHAT_REVIEW_URL + '?' + reviewParams;
+          this.questionDraft = true;
+        }
         this.chats = JSON.parse(JSON.stringify(AI_CHAT_SEED));
         // The app header (which normally applies the saved theme) isn't on this page, so apply it here.
         const theme = localStorage.getItem('hs_theme') || 'default';
@@ -303,6 +323,7 @@
 
       // ----- Chats -----
       openChat(id) {
+        this.questionDraft = false;
         this.activeId = id;
         this.block = null;
         this.sidebarOpen = false;
@@ -311,6 +332,7 @@
         if (!this.isTouch) this.focusInput();
       },
       newChat() {
+        this.questionDraft = false;
         this.activeId = null;
         this.draft = '';
         this.attachments = [];
@@ -441,7 +463,8 @@
           // Provisional title for launch: the first message, shortened. Image-only chats get a generic title.
           const base = text || 'Image question';
           const title = base.length > 48 ? base.slice(0, 47).trimEnd() + '…' : base;
-          this.chats.unshift({ id: 'c' + Date.now(), title, group: 'Today', messages: [] });
+          this.chats.unshift({ id: 'c' + Date.now(), title, group: 'Today', questionLinked: this.questionDraft, messages: [] });
+          this.questionDraft = false;
           this.activeId = this.chats[0].id;
           this.typeTitle(this.chats[0]);
         } else {
@@ -509,7 +532,7 @@
       // Prototype only: puts the page into one of the listed states.
       applyState(p) {
         Object.assign(this, {
-          activeId: null, draft: '', expandComposer: false, attachments: [], attachError: '', status: 'idle', block: null, loading: false,
+          activeId: null, questionDraft: false, questionBackUrl: null, draft: '', expandComposer: false, attachments: [], attachError: '', status: 'idle', block: null, loading: false,
           sidebarOpen: false, collapsed: false, menuFor: null, plusOpen: false, renamingId: null, deleteTarget: null, lightbox: null,
         });
         this.chats = JSON.parse(JSON.stringify(AI_CHAT_SEED));
@@ -520,6 +543,11 @@
         const mobile = !window.matchMedia('(min-width: 768px)').matches;
         const stuck = 'I’m stuck at the last step. How do I finish this?';
         switch (p) {
+          case 'question_draft':
+            this.questionDraft = true;
+            this.questionBackUrl = AI_CHAT_REVIEW_URL;
+            break;
+          case 'question_chat': this.activeId = 'wheatstone'; break;
           case 'history': this.sidebarOpen = true; break;
           case 'loading': this.loading = true; this.sidebarOpen = true; break;
           case 'collapsed': this.collapsed = true; openSn(); break;
@@ -579,6 +607,10 @@
           ['collapsed', 'Sidebar collapsed'],
           ['first_use', 'First use'],
           ['typing', 'Typing a question'],
+        ] },
+        { name: 'Question chat', states: [
+          ['question_draft', 'Ask AI draft'],
+          ['question_chat', 'Saved question chat'],
         ] },
         { name: 'Conversation', states: [
           ['conversation', 'Reopened conversation'],
