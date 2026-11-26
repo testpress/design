@@ -1,8 +1,12 @@
 <script>
+  // Per-student flags, set from Members (⋮ → AI Chat access). chatOff = chat_access_disabled, imagesOff = attachments_disabled.
+  // The two are independent: Anita has both, so giving her AI Chat back leaves her on text only.
   const AI_ADMIN_STUDENTS = [
-    { id: 3, name: 'Anita Sharma', email: 'anita@gmail.com', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', offOn: '18 Oct 2026', offBy: 'Priya Narayanan' },
-    { id: 5, name: 'Sanjay Verma', email: 'sanjay@gmail.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', offOn: '9 Oct 2026', offBy: 'Rahul Menon' },
-    { id: 8, name: 'Kavya Iyer', email: 'kavya.iyer@gmail.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', offOn: '2 Oct 2026', offBy: 'Priya Narayanan' },
+    { id: 3, name: 'Anita Sharma', email: 'anita@gmail.com', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', chatOff: true, imagesOff: true, offOn: '18 Oct 2026', offBy: 'Priya Narayanan' },
+    { id: 5, name: 'Sanjay Verma', email: 'sanjay@gmail.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', chatOff: true, imagesOff: false, offOn: '9 Oct 2026', offBy: 'Rahul Menon' },
+    { id: 6, name: 'Meena Joshi', email: 'meena@gmail.com', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', chatOff: false, imagesOff: true, offOn: '24 Nov 2026', offBy: 'Priya Narayanan' },
+    { id: 4, name: 'Vikas Singh', email: 'vikas@gmail.com', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', chatOff: false, imagesOff: true, offOn: '20 Nov 2026', offBy: 'Rahul Menon' },
+    { id: 8, name: 'Kavya Iyer', email: 'kavya.iyer@gmail.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=facearea&facepad=3&w=160&h=160&q=80', chatOff: false, imagesOff: true, offOn: '2 Oct 2026', offBy: 'Priya Narayanan' },
   ];
 
   const AI_ADMIN_PROVIDERS = [
@@ -51,10 +55,11 @@
         setTimeout(() => { this.loading = false; }, 700);
         this.syncShared();
         window.addEventListener('ai-admin-state', (e) => this.applyState(e.detail));
+        window.addEventListener('ai-access-saved', (e) => this.onAccessSaved(e.detail));
         window.addEventListener('beforeunload', (e) => { if (this.editing && this.limitsChanged) { e.preventDefault(); e.returnValue = ''; } });
       },
-      // Members page reads this to explain that off-for-everyone wins (prototype only).
-      syncShared() { try { localStorage.setItem('ai_chat_admin_enabled', this.saved.enabled ? '1' : '0'); } catch (e) {} },
+      // Members page reads these to explain that off-for-everyone wins (prototype only).
+      syncShared() { try { localStorage.setItem('ai_chat_admin_enabled', this.saved.enabled ? '1' : '0'); localStorage.setItem('ai_chat_admin_images', this.saved.images ? '1' : '0'); } catch (e) {} },
 
       // ----- Toggles: saved on change -----
       toggleSetting(key) {
@@ -139,21 +144,36 @@
         }, 1400);
       },
 
-      // ----- Students turned off -----
-      openStudents() { this.search = ''; window.dispatchEvent(new CustomEvent('open-drawer-ai-students')); },
-      get filteredRestricted() {
-        const q = this.search.trim().toLowerCase();
-        return q ? this.restricted.filter((s) => (s.name + ' ' + s.email).toLowerCase().includes(q)) : this.restricted;
+      // ----- Students with limited access: two independent restrictions -----
+      openStudents() { this.search = ''; this.expanded = {}; window.dispatchEvent(new CustomEvent('open-drawer-ai-students')); },
+      expanded: {},             // group → showing all
+      shown(list, key) { return this.expanded[key] || this.search.trim() ? list : list.slice(0, 10); },
+      matches(s) { const q = this.search.trim().toLowerCase(); return !q || (s.name + ' ' + s.email).toLowerCase().includes(q); },
+      get noChat() { return this.restricted.filter((s) => s.chatOff); },
+      get textOnly() { return this.restricted.filter((s) => !s.chatOff && s.imagesOff); },
+      get filteredNoChat() { return this.noChat.filter((s) => this.matches(s)); },
+      get filteredTextOnly() { return this.textOnly.filter((s) => this.matches(s)); },
+      get accessSummary() {
+        const parts = [];
+        if (this.noChat.length) parts.push(this.noChat.length + ' can’t use AI Chat');
+        if (this.textOnly.length) parts.push(this.textOnly.length + ' can’t upload images');
+        return parts.join(' · ');
       },
-      restore(s) {
-        this.restoring = s.id;
-        setTimeout(() => {
-          this.restoring = null;
-          if (this.fail.restore) { this.fail.restore = false; this.toast('Couldn’t enable AI Chat for ' + s.name, 'Please try again.', 'error'); return; }
-          this.restricted = this.restricted.filter((x) => x.id !== s.id);
-          this.toast('AI Chat enabled for ' + s.name,
-            this.saved.enabled ? 'They can use AI Chat again.' : 'They can use it once you enable AI Chat.');
-        }, 900);
+      // Rows open the shared AI Chat access modal (Members), seeded with this student's flags and the institute settings.
+      openAccess(s) {
+        const st = Alpine.store('aiChatAccess');
+        st.chatOff = { ...st.chatOff, [s.id]: s.chatOff };
+        st.imagesOff = { ...st.imagesOff, [s.id]: s.imagesOff };
+        st.instituteOn = this.saved.enabled;
+        st.instituteImagesOn = this.saved.images;
+        st.failNext = !!this.fail.restore; this.fail.restore = false;
+        st.ask({ id: s.id, name: s.name, email: s.email, avatar: s.avatar });
+      },
+      onAccessSaved({ id, chatOff, imagesOff }) {
+        const s = this.restricted.find((x) => x.id === id);
+        if (!s) return;
+        Object.assign(s, { chatOff, imagesOff, offBy: 'you', offOn: '26 Nov 2026' });
+        this.restricted = this.restricted.filter((x) => x.chatOff || x.imagesOff);
       },
 
       // Status card: what students get right now
@@ -174,7 +194,7 @@
           loading: false, readOnly: false, provider: aiCopy(AI_ADMIN_PROVIDER), saved: aiCopy(AI_ADMIN_SAVED),
           pending: null, editing: false, saveState: 'idle', fail: {}, restricted: aiCopy(AI_ADMIN_STUDENTS), search: '', restoring: null,
         });
-        ['ai-provider', 'ai-turn-off', 'ai-limits'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
+        ['ai-provider', 'ai-turn-off', 'ai-limits', 'ai-chat-access'].forEach((m) => window.dispatchEvent(new CustomEvent('close-modal-' + m)));
         ['ai-students'].forEach((d) => window.dispatchEvent(new CustomEvent('close-drawer-' + d)));
         const unlimited = { perChat: null, perHour: null, perDay: null, maxChars: null };
         switch (id) {
@@ -195,7 +215,22 @@
           case 'fail_next_save': this.fail.limits = true; this.startEdit(); this.draft.perHour = '30'; break;
           case 'students': this.$nextTick(() => this.openStudents()); break;
           case 'students_off': this.saved.enabled = false; this.$nextTick(() => this.openStudents()); break;
+          case 'students_images_off': this.saved.images = false; this.$nextTick(() => this.openStudents()); break;
+          case 'students_chat_only': this.restricted = this.restricted.filter((x) => x.chatOff).map((x) => ({ ...x, imagesOff: false })); this.$nextTick(() => this.openStudents()); break;
           case 'students_none': this.restricted = []; break;
+          case 'students_many': {
+            const first = ['Arjun', 'Divya', 'Rohan', 'Sneha', 'Karan', 'Pooja', 'Aditya', 'Nisha', 'Varun', 'Isha', 'Manoj', 'Lakshmi', 'Siddharth', 'Ritika', 'Naveen', 'Swathi', 'Harish', 'Deepa', 'Ganesh', 'Bhavana'];
+            const last = ['Reddy', 'Nair', 'Gupta', 'Iyer', 'Patel', 'Rao', 'Menon', 'Das', 'Shah', 'Pillai'];
+            const extra = Array.from({ length: 46 }, (_, i) => {
+              const name = first[i % first.length] + ' ' + last[(i * 3) % last.length];
+              return { id: 100 + i, name, email: name.toLowerCase().replace(' ', '.') + '@gmail.com',
+                avatar: AI_ADMIN_STUDENTS[i % AI_ADMIN_STUDENTS.length].avatar,
+                chatOff: i % 3 === 0, imagesOff: i % 3 !== 0, offOn: (1 + (i % 25)) + ' Nov 2026', offBy: i % 2 ? 'Rahul Menon' : 'Priya Narayanan' };
+            });
+            this.restricted = [...this.restricted, ...extra];
+            this.$nextTick(() => this.openStudents());
+            break;
+          }
           case 'restore_fails': this.fail.restore = true; this.$nextTick(() => this.openStudents()); break;
           case 'read_only': this.readOnly = true; break;
         }
@@ -211,12 +246,20 @@
         { name: 'Setup and on/off', states: [['first_time', 'First time: not set up'], ['provider_setup', 'Connecting provider'], ['just_connected', 'Connected, still disabled'], ['off', 'Disabled'], ['turn_off_confirm', 'Disabling: confirm'], ['toggle_fails', 'Next switch fails']] },
         { name: 'AI provider', states: [['key_invalid', 'Saved key stopped working'], ['provider_invalid_key', 'Key rejected on save'], ['provider_unavailable', 'Service unreachable']] },
         { name: 'Usage limits', states: [['editing', 'Editing'], ['invalid', 'Field errors'], ['saving', 'Saving'], ['save_failed', 'Save failed'], ['fail_next_save', 'Next save fails']] },
-        { name: 'Students without access', states: [['students', 'Manage list'], ['students_off', 'List while disabled for all'], ['students_none', 'Everyone has access'], ['restore_fails', 'Enabling fails']] },
+        { name: 'Student access', states: [['students', 'No AI Chat + text only'], ['students_chat_only', 'Only students without AI Chat'], ['students_off', 'AI Chat disabled for all'], ['students_images_off', 'Image uploads disabled for all'], ['students_many', 'Many students (50+)'], ['students_none', 'Everyone has full access'], ['restore_fails', 'Next save fails']] },
       ],
+      // Shareable links: ?state=<id> opens the page in that state; picking a state updates the address bar.
+      init() {
+        const id = new URLSearchParams(location.search).get('state');
+        if (id && this.groups.some((g) => g.states.some((x) => x[0] === id))) setTimeout(() => this.pick(id), 800);
+      },
       pick(id) {
         this.state = id;
         this.open = false;
         window.dispatchEvent(new CustomEvent('ai-admin-state', { detail: id }));
+        const url = new URL(location.href);
+        if (id === 'normal') url.searchParams.delete('state'); else url.searchParams.set('state', id);
+        history.replaceState(null, '', url);
       },
     }));
   });

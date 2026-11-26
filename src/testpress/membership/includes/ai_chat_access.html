@@ -1,10 +1,13 @@
 {#
-  Remove (or give back) one student's AI Chat access, from the row ⋮ menu.
-  They can't use AI Chat; their chat history, account and courses stay as they are.
-  AI Chat being disabled for everyone (AI Chat settings) always wins over this.
+  AI Chat access for one student, from the row ⋮ menu → AI Chat access.
+  A switch turns AI Chat on or off (chat_access_disabled). While it's on, a radio pair sets what they can send
+  (attachments_disabled): Text and images, or Text only. The two are stored independently, so the hidden choice
+  is kept while AI Chat is off and comes back when it's turned on. Nothing changes until Save.
+  Institute settings always win: a student can't get AI Chat or images that are disabled for everyone.
 #}
 {% from "../../../ui-system/components/modal.html" import modal %}
 {% from "../../../ui-system/components/alert.html" import alert %}
+{% from "../../../ui-system/components/radio.html" import radio %}
 
 {% call modal(id="ai-chat-access", title="AI Chat access", size="sm", confirm_text="", cancel_text="") %}
   <template x-if="$store.aiChatAccess.target">
@@ -18,37 +21,45 @@
         </div>
       </div>
 
-
-      <!-- Removing access -->
-      <template x-if="!$store.aiChatAccess.wasOff">
-        <p class="mt-4">
-          <span x-text="$store.aiChatAccess.target.name"></span> won’t be able to use AI Chat.
-        </p>
-      </template>
-
-      <!-- Giving access back -->
-      <template x-if="$store.aiChatAccess.wasOff">
-        <div class="mt-4 space-y-3">
-          <p x-show="$store.aiChatAccess.instituteOn"><span x-text="$store.aiChatAccess.target.name"></span> will be able to use AI Chat again.</p>
-          <div x-show="!$store.aiChatAccess.instituteOn">
-            {{ alert(variant="warning", style="soft", size="sm", description="AI Chat is disabled for all students, so this student can use it only after you enable it in AI Chat settings.") }}
-          </div>
+      <!-- Access: the switch controls everything below it -->
+      <div class="mt-6 flex items-center justify-between gap-x-4">
+        <div>
+          <p id="ai-access-chat" class="text-sm font-medium text-gray-800 dark:text-neutral-200">AI Chat access</p>
+          <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400">Allow this student to access AI Chat.</p>
         </div>
-      </template>
+        <button type="button" role="switch" :aria-checked="$store.aiChatAccess.draft.chat" aria-labelledby="ai-access-chat"
+                @click="$store.aiChatAccess.draft.chat = !$store.aiChatAccess.draft.chat; $store.aiChatAccess.failed = false" :disabled="$store.aiChatAccess.saving"
+                class="relative shrink-0 inline-flex w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 disabled:opacity-50"
+                :class="$store.aiChatAccess.draft.chat ? 'bg-primary-600' : 'bg-gray-200 dark:bg-neutral-700'">
+          <span class="absolute top-0.5 start-0.5 size-5 bg-white rounded-full shadow-sm transition-transform duration-200" :class="$store.aiChatAccess.draft.chat && 'translate-x-5'"></span>
+        </button>
+      </div>
 
-      <!-- Save failed -->
-      <div x-show="$store.aiChatAccess.failed" class="mt-4">
-        {{ alert(variant="danger", style="soft", size="sm", description="Couldn’t save. Please try again.") }}
+      <!-- Allow usage: only while AI Chat is on -->
+      <div x-show="$store.aiChatAccess.draft.chat" class="mt-6">
+        <p id="ai-access-usage" class="text-sm font-medium text-gray-800 dark:text-neutral-200">Allow usage</p>
+        <p class="mt-0.5 text-sm text-gray-500 dark:text-neutral-400">Choose what this student can do in AI Chat.</p>
+        <fieldset aria-labelledby="ai-access-usage" class="mt-3 space-y-3" :disabled="$store.aiChatAccess.saving">
+          {{ radio(name="ai-access-send", value="full", label="Text and images", description="Can type questions and add images or photos.", x_model="$store.aiChatAccess.draft.send") }}
+          {{ radio(name="ai-access-send", value="text", label="Text only", description="Can type questions but can’t add images.", x_model="$store.aiChatAccess.draft.send") }}
+        </fieldset>
+      </div>
+
+      <!-- An institute-wide setting that still blocks what's chosen -->
+      <div class="mt-5" x-show="$store.aiChatAccess.draft.chat && !$store.aiChatAccess.instituteOn">
+        {{ alert(variant="warning", style="soft", size="sm", description="AI Chat is disabled for all students, so this student can use it only after you enable it in AI Chat settings.") }}
+      </div>
+      <div class="mt-5" x-show="$store.aiChatAccess.draft.chat && $store.aiChatAccess.instituteOn && $store.aiChatAccess.draft.send === 'full' && !$store.aiChatAccess.instituteImagesOn">
+        {{ alert(variant="warning", style="soft", size="sm", description="Image uploads are disabled for all students, so this student can send text only until you enable them in AI Chat settings.") }}
       </div>
 
       <div class="mt-6 flex justify-end gap-x-2">
         <button type="button" @click="open = false" :disabled="$store.aiChatAccess.saving"
                 class="py-2 px-3 inline-flex items-center text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none dark:bg-neutral-800 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-700">Cancel</button>
-        <button type="button" @click="$store.aiChatAccess.confirm()" :disabled="$store.aiChatAccess.saving"
-                class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent text-white focus:outline-none disabled:opacity-70 disabled:pointer-events-none"
-                :class="$store.aiChatAccess.wasOff ? 'bg-primary-600 hover:bg-primary-700 focus:bg-primary-700' : 'bg-red-600 hover:bg-red-700 focus:bg-red-700'">
+        <button type="button" @click="$store.aiChatAccess.save()" :disabled="$store.aiChatAccess.saving || !$store.aiChatAccess.changed"
+                class="py-2 px-3 inline-flex items-center gap-x-2 text-sm font-medium rounded-lg border border-transparent bg-primary-600 text-white hover:bg-primary-700 focus:outline-none focus:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none">
           <span x-show="$store.aiChatAccess.saving" class="animate-spin inline-block size-3.5 border-2 border-current border-t-transparent rounded-full" aria-hidden="true"></span>
-          <span x-text="$store.aiChatAccess.saving ? 'Saving…' : $store.aiChatAccess.failed ? 'Try again' : $store.aiChatAccess.wasOff ? 'Enable AI Chat' : 'Disable AI Chat'"></span>
+          <span x-text="$store.aiChatAccess.saving ? 'Saving…' : 'Save'"></span>
         </button>
       </div>
     </div>
@@ -57,39 +68,68 @@
 
 <script>
   document.addEventListener('alpine:init', () => {
-    let instituteOn = true;
-    try { instituteOn = localStorage.getItem('ai_chat_admin_enabled') !== '0'; } catch (e) {}
+    let instituteOn = true, instituteImagesOn = true;
+    try {
+      instituteOn = localStorage.getItem('ai_chat_admin_enabled') !== '0';
+      instituteImagesOn = localStorage.getItem('ai_chat_admin_images') !== '0';
+    } catch (e) {}
 
     Alpine.store('aiChatAccess', {
-      off: { 3: true, 5: true },  // same students as the list on the AI Chat settings page
+      // Same students as the lists on the AI Chat settings page. Anita has both flags set.
+      chatOff: { 3: true, 5: true },
+      imagesOff: { 3: true, 4: true, 6: true },
       instituteOn,
+      instituteImagesOn,
       target: null,
-      wasOff: false,
+      draft: { chat: true, send: 'full' },
       saving: false,
       failed: false,
       failNext: false,             // prototype
-      isOff(id) { return !!this.off[id]; },
+
+      // Row label under the name
+      label(id) { return this.chatOff[id] ? 'AI Chat disabled' : this.imagesOff[id] ? 'AI Chat text only' : ''; },
+      savedOf(id) { return { chat: !this.chatOff[id], send: this.imagesOff[id] ? 'text' : 'full' }; },
+      get changed() {
+        if (!this.target) return false;
+        const s = this.savedOf(this.target.id);
+        // While off, the hidden choice doesn't count as a change
+        return s.chat !== this.draft.chat || (this.draft.chat && s.send !== this.draft.send);
+      },
+
       ask(student) {
         this.target = student;
-        this.wasOff = this.isOff(student.id);
+        this.draft = this.savedOf(student.id);
         this.saving = this.failed = false;
         window.dispatchEvent(new CustomEvent('open-modal-ai-chat-access'));
       },
-      confirm() {
+      save() {
         this.saving = true;
         this.failed = false;
         setTimeout(() => {
           this.saving = false;
-          if (this.failNext) { this.failNext = false; this.failed = true; return; }
+          // Failed: an error toast; the modal stays open with the choices, so Save tries again
+          if (this.failNext) {
+            this.failNext = false;
+            window.dispatchEvent(new CustomEvent('toast', { detail: { variant: 'error', title: 'Couldn’t save AI Chat access', description: 'Please try again.' } }));
+            return;
+          }
           const { id, name } = this.target;
-          if (this.wasOff) delete this.off[id]; else this.off[id] = true;
-          this.off = { ...this.off };
+          const first = name.split(' ')[0];
+          const before = this.savedOf(id);
+          const d = this.draft;
+          this.chatOff = { ...this.chatOff, [id]: !d.chat };
+          if (d.chat) this.imagesOff = { ...this.imagesOff, [id]: d.send === 'text' };   // kept as it was while off
           window.dispatchEvent(new CustomEvent('close-modal-ai-chat-access'));
-          window.dispatchEvent(new CustomEvent('toast', { detail: {
-            variant: 'success',
-            title: this.wasOff ? 'AI Chat enabled for ' + name : 'AI Chat disabled for ' + name,
-            description: this.wasOff && !this.instituteOn ? 'They can use it once AI Chat is enabled.' : '',
-          } }));
+          // Other pages showing this student (AI Chat settings drawer) update from this
+          window.dispatchEvent(new CustomEvent('ai-access-saved', { detail: { id, chatOff: !!this.chatOff[id], imagesOff: !!this.imagesOff[id] } }));
+          const title = !d.chat ? 'AI Chat disabled for ' + name
+            : !before.chat ? 'AI Chat enabled for ' + name + (d.send === 'text' ? ', text only' : '')
+            : d.send === 'text' ? name + ' can send text only' : 'Image uploads allowed for ' + name;
+          const description = !d.chat ? ''
+            : !this.instituteOn ? first + ' can use it once AI Chat is enabled for all students.'
+            : d.send === 'full' && !this.instituteImagesOn ? first + ' can upload images once image uploads are enabled for all students.'
+            : '';
+          window.dispatchEvent(new CustomEvent('toast', { detail: { variant: 'success', title, description } }));
         }, 900);
       },
     });

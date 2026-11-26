@@ -1,17 +1,49 @@
 {% from "../../../ui-system/components/drawer.html" import drawer %}
 {% from "../../../ui-system/components/empty-state.html" import empty_state %}
-{% from "../../../ui-system/components/alert.html" import alert %}
-{% set btn_secondary = "py-2 px-3 inline-flex items-center justify-center text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:opacity-50 disabled:pointer-events-none" %}
 
+{#
+  Students with limited access, in two groups: AI Chat disabled, and AI Chat text only.
+  Each row opens the same AI Chat access modal as Members (membership/includes/ai_chat_access.html),
+  so access is changed one way everywhere. Saving there updates this list (ai-access-saved event).
+#}
+{% macro info_note(show, text) %}
+  <div x-show="{{ show }}" class="mx-6 mt-5 py-2.5 px-3 flex gap-x-2 rounded-lg bg-gray-50 text-sm text-gray-600" role="status">
+    <svg class="shrink-0 size-4 mt-0.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <p>{{ text }}</p>
+  </div>
+{% endmacro %}
 
-<!-- ===== Students without AI Chat: giving access back saves straight away ===== -->
-{% call drawer(id="ai-students", title="Students without AI Chat", subtitle="These students can’t use AI Chat.", size="md") %}
+{% macro student_rows(list, key) %}
+  <ul>
+    <template x-for="s in shown({{ list }}, '{{ key }}')" :key="s.id">
+      <li>
+        <button type="button" @click="openAccess(s)" :disabled="readOnly"
+                class="group -mx-2 w-[calc(100%+1rem)] py-2.5 px-2 flex items-center gap-x-3 rounded-lg text-start hover:bg-gray-50 focus:outline-none focus-visible:bg-gray-50 disabled:pointer-events-none">
+          <img :src="s.avatar" alt="" class="shrink-0 size-9 rounded-full object-cover">
+          <span class="flex-1 min-w-0">
+            <span class="block text-sm font-medium text-gray-800 truncate" x-text="s.name"></span>
+            <span class="block mt-0.5 text-[13px] text-gray-500 truncate" x-text="'Changed by ' + s.offBy + ' on ' + s.offOn"></span>
+          </span>
+          <svg x-show="!readOnly" class="shrink-0 size-4 text-gray-400 group-hover:text-gray-700" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          <span class="sr-only">Change AI Chat access</span>
+        </button>
+      </li>
+    </template>
+  </ul>
+  <!-- Long groups show 10 at first; in the product this loads the next page -->
+  <button type="button" x-show="{{ list }}.length > shown({{ list }}, '{{ key }}').length" @click="expanded['{{ key }}'] = true"
+          class="mt-1 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 focus:outline-none focus-visible:underline"
+          x-text="'Show all ' + {{ list }}.length"></button>
+{% endmacro %}
+
+{% call drawer(id="ai-students", title="Students with limited access", size="md") %}
   <div class="flex-1 overflow-y-auto">
-    <div x-show="!saved.enabled" class="mx-6 mt-5 py-2.5 px-3 flex gap-x-2 rounded-lg bg-gray-50 text-sm text-gray-600" role="status">
-      <svg class="shrink-0 size-4 mt-0.5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-      <p>AI Chat is disabled for all students. Students you give access to can use it once you enable it.</p>
-    </div>
-    <div x-show="restricted.length" class="px-6 pt-5 pb-2">
+    <!-- Institute-wide settings apply to everyone listed, so they sit at the top -->
+    {{ info_note("restricted.length && !saved.enabled", "AI Chat is disabled for all students, so no one on this list can use it until you enable it.") }}
+    {{ info_note("restricted.length && saved.enabled && !saved.images", "Image uploads are disabled for all students, so everyone has text only until you enable them.") }}
+
+    <!-- Stays on top while the list scrolls -->
+    <div x-show="restricted.length" class="sticky top-0 z-10 px-6 pt-5 pb-1 bg-white">
       <label for="ai-off-search" class="sr-only">Search students</label>
       <div class="relative">
         <svg class="absolute inset-y-0 start-3 my-auto size-4 text-gray-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -19,32 +51,26 @@
                class="py-2 ps-9 pe-3 block w-full bg-gray-100 border-transparent rounded-lg text-sm text-gray-800 placeholder:text-gray-500 focus:bg-white focus:border-primary-700 focus:ring-primary-700">
       </div>
     </div>
-    <ul class="px-6 pb-2">
-      <template x-for="s in filteredRestricted" :key="s.id">
-        <li class="py-3 flex items-center gap-x-3">
-          <img :src="s.avatar" alt="" class="shrink-0 size-9 rounded-full object-cover">
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-800 truncate" x-text="s.name"></p>
-            <p class="mt-0.5 text-[13px] text-gray-600" x-text="'Disabled by ' + s.offBy + ', ' + s.offOn"></p>
-          </div>
-          <button type="button" x-show="!readOnly" @click="restore(s)" :disabled="restoring === s.id"
-                  class="shrink-0 relative w-20 py-1.5 inline-flex justify-center items-center text-[13px] font-medium rounded-lg bg-white border border-gray-200 text-gray-800 shadow-sm hover:bg-gray-50 focus:outline-none focus:bg-gray-50 disabled:pointer-events-none">
-            <!-- Same width while saving: the label gives way to a spinner, so the row doesn't shift -->
-            <span :class="restoring === s.id && 'invisible'">Enable</span>
-            <span x-show="restoring === s.id" class="absolute animate-spin size-3.5 border-2 border-gray-400 border-t-transparent rounded-full" aria-hidden="true"></span>
-            <span class="sr-only" x-text="'AI Chat for ' + s.name"></span>
-          </button>
-        </li>
-      </template>
-    </ul>
+
+    <section x-show="filteredNoChat.length" class="px-6 pt-4" aria-labelledby="ai-nochat-title">
+      <h3 id="ai-nochat-title" class="sticky top-[4.25rem] z-[5] -mx-6 px-6 py-2 bg-white text-xs font-medium text-gray-500">AI Chat disabled <span class="ms-1 tabular-nums text-gray-400" x-text="noChat.length"></span></h3>
+      {{ student_rows("filteredNoChat", "noChat") }}
+    </section>
+
+    <section x-show="filteredTextOnly.length" class="px-6 pt-4" aria-labelledby="ai-textonly-title">
+      <h3 id="ai-textonly-title" class="sticky top-[4.25rem] z-[5] -mx-6 px-6 py-2 bg-white text-xs font-medium text-gray-500">AI Chat text only <span class="ms-1 tabular-nums text-gray-400" x-text="textOnly.length"></span></h3>
+      {{ student_rows("filteredTextOnly", "textOnly") }}
+    </section>
+
     <!-- Empty states (ui-system) -->
-    <div x-show="restricted.length && !filteredRestricted.length">
+    <div x-show="restricted.length && !filteredNoChat.length && !filteredTextOnly.length">
       {{ empty_state(title="No matching students", description="Try a different name or email.", icon="search-x", compact=true, wrap_card=false) }}
     </div>
     <div x-show="!restricted.length">
-      {{ empty_state(title="Every student has AI Chat", description="Students you disable AI Chat for in Members will show up here.", icon="user-check", compact=true, wrap_card=false) }}
+      {{ empty_state(title="Every student has full access", description="Students you limit in Members will show up here.", icon="user-check", compact=true, wrap_card=false) }}
     </div>
+    <div class="h-4"></div>
   </div>
   <!-- Pinned to the bottom of the panel -->
-  <p class="shrink-0 py-4 px-6 border-t border-gray-200 text-sm text-gray-500">You can disable a student’s AI Chat in <a href="{{ '/membership/' | url }}" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline">Members</a>, from the student’s action menu.</p>
+  <p class="shrink-0 py-4 px-6 border-t border-gray-200 text-sm text-gray-500">To limit a student’s access, open <span class="font-medium text-gray-700">AI Chat access</span> from their action menu in <a href="{{ '/membership/' | url }}" class="font-medium text-primary-600 hover:underline focus:outline-none focus:underline">Members</a>.</p>
 {% endcall %}

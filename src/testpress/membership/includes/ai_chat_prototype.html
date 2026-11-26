@@ -1,15 +1,63 @@
-{# Prototype only: states for the AI Chat access dialog (off-for-everyone is also picked up from the AI Chat settings page). #}
-<div x-data="{ open: false }" class="fixed bottom-0.5 end-0.5 md:bottom-2 md:end-2 z-[85]" @click.outside="open = false" @keydown.escape="open = false">
+{# Prototype only: AI Chat access states for Members. ?state=<id> opens one directly; picking one updates the address bar. #}
+<script>
+  const AI_ACCESS_MEMBERS = {
+    {% for m in members %}{{ m.id }}: { id: {{ m.id }}, name: '{{ m.display_name }}', email: '{{ m.user_name }}', avatar: '{{ m.image_url }}' },
+    {% endfor %}
+  };
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('aiAccessPrototype', () => ({
+      open: false,
+      state: null,
+      states: [
+        ['access_text_images', 'Text and images (Suresh)'],
+        ['access_text_only', 'Text only (Vikas)'],
+        ['access_disabled', 'Disabled (Anita)'],
+        ['access_turning_off', 'Turning off, not saved'],
+        ['access_save_fails', 'Save failed'],
+        ['access_ai_off_all', 'AI Chat off for all students'],
+        ['access_images_off_all', 'Images off for all students'],
+      ],
+      init() {
+        const id = new URLSearchParams(location.search).get('state');
+        if (id && this.states.some((s) => s[0] === id)) setTimeout(() => this.pick(id), 500);
+      },
+      pick(id) {
+        this.state = id;
+        this.open = false;
+        const st = Alpine.store('aiChatAccess');
+        st.instituteOn = true; st.instituteImagesOn = true; st.failNext = false;
+        const who = { access_text_only: 4, access_disabled: 3, access_ai_off_all: 4 }[id] || 1;
+        if (id === 'access_ai_off_all') st.instituteOn = false;
+        if (id === 'access_images_off_all') st.instituteImagesOn = false;
+        st.ask(AI_ACCESS_MEMBERS[who]);
+        if (id === 'access_turning_off') st.draft.chat = false;
+        if (id === 'access_save_fails') { st.draft.chat = false; st.failNext = true; setTimeout(() => st.save(), 400); }
+        const url = new URL(location.href);
+        url.searchParams.set('state', id);
+        history.replaceState(null, '', url);
+      },
+    }));
+  });
+</script>
+<div x-data="aiAccessPrototype" class="fixed bottom-0.5 end-0.5 md:bottom-2 md:end-2 z-[85]" @click.outside="open = false" @keydown.escape="open = false">
   <div x-show="open" x-transition.opacity x-cloak class="absolute bottom-full end-0 mb-2 w-64 p-1 bg-white border border-gray-200 rounded-xl shadow-lg">
     <p class="px-2 pt-1 pb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400">Prototype: AI Chat access</p>
-    <template x-for="o in [['instituteOn', 'AI Chat enabled'], ['failNext', 'Next change fails']]" :key="o[0]">
-      <button type="button" @click="$store.aiChatAccess[o[0]] = !$store.aiChatAccess[o[0]]" class="w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100">
-        <span x-text="o[1]"></span>
-        <span class="relative inline-block w-7 h-4 rounded-full transition-colors" :class="$store.aiChatAccess[o[0]] ? 'bg-primary-600' : 'bg-gray-300'">
-          <span class="absolute top-0.5 start-0.5 size-3 rounded-full bg-white transition-transform" :class="$store.aiChatAccess[o[0]] && 'translate-x-3'"></span>
-        </span>
+    <template x-for="s in states" :key="s[0]">
+      <button type="button" @click="pick(s[0])"
+              class="w-full flex items-center justify-between gap-x-3 py-1.5 px-2 rounded-lg text-[13px] text-start hover:bg-gray-100"
+              :class="state === s[0] ? 'text-primary-700 font-medium' : 'text-gray-800'">
+        <span x-text="s[1]"></span>
+        <svg x-show="state === s[0]" class="shrink-0 size-3.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
       </button>
     </template>
+    <div class="mt-1 pt-1 border-t border-gray-200">
+      <button type="button" @click="$store.aiChatAccess.failNext = !$store.aiChatAccess.failNext" class="w-full flex items-center justify-between py-1.5 px-2 rounded-lg text-[13px] text-gray-800 hover:bg-gray-100">
+        Next save fails
+        <span class="relative inline-block w-7 h-4 rounded-full transition-colors" :class="$store.aiChatAccess.failNext ? 'bg-primary-600' : 'bg-gray-300'">
+          <span class="absolute top-0.5 start-0.5 size-3 rounded-full bg-white transition-transform" :class="$store.aiChatAccess.failNext && 'translate-x-3'"></span>
+        </span>
+      </button>
+    </div>
   </div>
   <button type="button" @click="open = !open" :aria-expanded="open" aria-label="Prototype states"
           class="size-6 md:size-8 inline-flex justify-center items-center rounded-full border border-gray-200 bg-white text-gray-500 shadow-sm opacity-60 hover:opacity-100 focus:opacity-100 focus:outline-none transition">

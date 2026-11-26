@@ -191,6 +191,9 @@
       draft: '',
       attachments: [],         // { id, src, name, progress, status: 'uploading' | 'done' }
       attachError: '',
+      // Image uploads off (Members → AI Chat access → Text only, or AI Chat settings for everyone): the + is hidden and
+      // dropped/pasted images are ignored, without telling the student. The server still rejects images it doesn't allow.
+      imagesAllowed: true,
       dragging: false,
       expandComposer: false,   // set once the text wraps; cleared when the box is empty
       status: 'idle',          // idle | thinking | streaming
@@ -369,9 +372,10 @@
 
       // ----- Images -----
       useStarter(s) { this.draft = s.prompt; this.$nextTick(() => { const el = document.getElementById('ai-chat-input'); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }); },
-      pickImages() { this.plusOpen = false; document.getElementById('ai-chat-file').click(); },
+      pickImages() { if (!this.imagesAllowed) return; this.plusOpen = false; document.getElementById('ai-chat-file').click(); },
       // Phones open the camera app directly; desktops get a live camera preview.
       takePhoto() {
+        if (!this.imagesAllowed) return;
         this.plusOpen = false;
         if (this.isTouch) document.getElementById('ai-chat-camera').click();
         else window.dispatchEvent(new CustomEvent('open-modal-ai-chat-camera'));
@@ -412,6 +416,7 @@
       onDrop(e) { this.dragging = false; this.addFiles([...e.dataTransfer.files]); },
       addFiles(files) {
         this.attachError = '';
+        if (!this.imagesAllowed) return;
         for (const f of files) {
           if (!AI_CHAT_IMAGE_TYPES.includes(f.type)) { this.attachError = 'Only JPG, PNG and WebP images can be added.'; continue; }
           if (this.attachments.length >= this.limits.maxImages) { this.attachError = `You can add up to ${this.limits.maxImages} images in one message.`; break; }
@@ -509,7 +514,7 @@
       // Prototype only: puts the page into one of the listed states.
       applyState(p) {
         Object.assign(this, {
-          activeId: null, draft: '', expandComposer: false, attachments: [], attachError: '', status: 'idle', block: null, loading: false,
+          activeId: null, draft: '', expandComposer: false, attachments: [], attachError: '', imagesAllowed: true, status: 'idle', block: null, loading: false,
           sidebarOpen: false, collapsed: false, menuFor: null, plusOpen: false, renamingId: null, deleteTarget: null, lightbox: null,
         });
         this.chats = JSON.parse(JSON.stringify(AI_CHAT_SEED));
@@ -539,6 +544,7 @@
             break;
           case 'image_ready': this.draft = stuck; this.addAttachment(AI_CHAT_IMG.integral.src, AI_CHAT_IMG.integral.name, 100); break;
           case 'image_sent': this.activeId = 'wheatstone'; break;
+          case 'images_off': openSn(); this.imagesAllowed = false; break;
           case 'image_error':
             this.addAttachment(AI_CHAT_IMG.integral.src, AI_CHAT_IMG.integral.name, 100);
             this.attachError = 'Only JPG, PNG and WebP images can be added.';
@@ -594,6 +600,9 @@
           ['image_error', 'Unsupported file'],
           ['camera', 'Take a photo (desktop camera)'],
         ] },
+        { name: 'Image uploads off', states: [
+          ['images_off', 'Image uploads off (no +)'],
+        ] },
         { name: 'Manage chats', states: [
           ['new_title', 'New chat title typing in'],
           ['rename', 'Rename a chat'],
@@ -613,10 +622,18 @@
           ['other_device', 'Reply on another device'],
         ] },
       ],
+      // Shareable links: ?state=<id> opens the page in that state; picking a state updates the address bar.
+      init() {
+        const id = new URLSearchParams(location.search).get('state');
+        if (id && this.groups.some((g) => g.states.some((x) => x[0] === id))) setTimeout(() => this.pick(id), 300);
+      },
       pick(id) {
         this.state = id;
         this.open = false;
         window.dispatchEvent(new CustomEvent('ai-chat-state', { detail: id }));
+        const url = new URL(location.href);
+        if (id === 'live') url.searchParams.delete('state'); else url.searchParams.set('state', id);
+        history.replaceState(null, '', url);
       },
       toggleDark() {
         this.dark = !this.dark;
