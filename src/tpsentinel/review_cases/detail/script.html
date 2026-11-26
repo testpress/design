@@ -402,6 +402,21 @@
           this.openEvidence(d.request.what === 'snapshots' ? 'periodic' : 'recordings');
           this.$nextTick(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
         },
+        // ---------- Evidence export: size and export for every Session in this workspace ----------
+        exportState: 'idle', // idle | preparing | ready
+        get evidenceTotals() {
+          const snaps = d.sessions.reduce((t, s) => t + s.coverage.snapshots.got, 0);
+          const recs = d.sessionMedia.filter(m => m.kind === 'recording');
+          const clips = d.events.reduce((t, e) => t + e.artifacts.length, 0);
+          // Rough sizes: snapshot ~0.3 MB, recording ~2.5 MB a minute, clip ~4 MB
+          const mb = snaps * 0.3 + recs.reduce((t, r) => t + r.length / 60000 * 2.5, 0) + clips * 4;
+          return { files: snaps + recs.length + clips, size: mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb.toFixed(1)} MB` };
+        },
+        exportEvidence() {
+          this.exportState = 'preparing';
+          setTimeout(() => { this.exportState = 'ready'; }, 2500);
+        },
+
         get enrolledOn() {
           const t = d.sessions[0].start - d.profile.enrolledDaysBefore * DAY;
           const dt = new Date(t);
