@@ -341,7 +341,7 @@
           if (d.request) return d.request.urgency;
           return d.concernType === 'evidence' ? 'Set from how much required evidence is missing' : 'Set from the severity of what AI found';
         },
-        relative, waited, exact, day, dayTime, dur, span, mmss,
+        relative, waited, exact, day, dayTime, dur, span, mmss, time: ts => clock(new Date(ts)),
         clockAt: ts => clock(new Date(ts)),
 
         // ---------- queue: Previous / Next follow the list the case was opened from ----------
@@ -497,8 +497,17 @@
           if (row.status === 'Partial' || row.status === 'Missing') return 'text-amber-700 dark:text-amber-500';
           return 'text-muted-foreground-1';
         },
-        get recentMedia() {
-          return [...d.sessionMedia].filter(m => m.kind === 'periodic' || m.kind === 'recording').sort((a, b) => b.at - a.at).slice(0, 4);
+        // ---------- Evidence summary: previews for the session picked on the session card ----------
+        get sessionEvidence() {
+          const s = this.session, n = String(s.n);
+          const snaps = this.periodicSnapshots.filter(a => a.session === s.n).sort((a, b) => a.at - b.at);
+          const screen = this.sessionRecordings.filter(a => a.session === s.n && a.source === 'screen');
+          return [
+            { key: 'periodic', label: 'Periodic snapshots', items: snaps, view: 'periodic', filter: { session: n },
+              empty: `No periodic snapshots were taken in Session ${s.n}.` },
+            { key: 'screen', label: 'Screen recordings', items: screen, view: 'recordings', filter: { session: n, source: 'screen' },
+              empty: s.coverage.screen.status === 'not_required' ? `Screen recording was off for Session ${s.n}.` : `No screen recording was saved for Session ${s.n}.` },
+          ];
         },
 
         // ---------- Evidence tab: one view per kind of media ----------
