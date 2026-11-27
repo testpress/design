@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cortex · Custom exam history</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ---------- Preview page (not part of the app) ---------- */
+  * { box-sizing:border-box; }
+  html,body { margin:0; }
+  body { background:#f1f4f8; color:#0f172a; font:14px/1.5 Inter,system-ui,sans-serif; }
+  .stage { display:flex; gap:32px; justify-content:center; align-items:flex-start; padding:32px 24px 64px; flex-wrap:wrap; }
+  .panel { width:260px; }
+  .panel h1 { font-size:18px; line-height:1.3; margin:0 0 4px; }
+  .panel h2 { font-size:12px; font-weight:600; color:#475569; margin:20px 0 8px; }
+  .seg { display:flex; flex-direction:column; gap:2px; padding:3px; background:#e2e8f0; border-radius:10px; }
+  .seg.row { flex-direction:row; }
+  .seg button { flex:1; min-height:32px; border:0; border-radius:8px; background:transparent; color:#475569; font:500 13px Inter,system-ui,sans-serif; cursor:pointer; text-align:left; padding:0 10px; }
+  .seg.row button { text-align:center; }
+  .seg button[aria-pressed=true] { background:#fff; color:#0f172a; font-weight:600; box-shadow:0 1px 2px rgba(15,23,42,.15); }
+
+  .device { background:#0b0f19; padding:8px; border-radius:32px; box-shadow:0 20px 50px rgba(15,23,42,.25); }
+  .statusbar { flex:none; height:32px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; background:var(--card); color:var(--textPrimary); font-size:12px; font-weight:600; position:relative; z-index:6; }
+  .statusbar i { position:absolute; left:50%; top:10px; width:12px; height:12px; border-radius:50%; background:#000; transform:translateX(-50%); }
+  .sys { display:inline-flex; gap:4px; align-items:center; }
+  .sys span { display:block; width:18px; height:10px; border-radius:3px; background:currentColor; opacity:.85; }
+  .sys span:first-child { width:12px; opacity:.5; }
+  .homebar { position:absolute; left:0; right:0; bottom:0; height:24px; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:60; }
+  .homebar::after { content:""; width:110px; height:4px; border-radius:2px; background:var(--textPrimary); opacity:.7; }
+
+  /* ---------- The app. Each colour variable is named after its Cortex DesignColors token. ---------- */
+  .app[data-theme=light] {
+    --primary:#6366F1; --onPrimary:#fff; --primaryContainer:#E0E7FF; --onPrimaryContainer:#1E1B4B;
+    --surface:#E9EEF4; --card:#FFFFFF; --border:#DEE5ED; --divider:#DEE5ED; --surfaceVariant:#DEE5ED; --progressBackground:#DEE5ED;
+    --textPrimary:#0F172A; --textSecondary:#64748B; --textTertiary:#94A3B8; --warning:#EA580C; --error:#EF4444;
+    --skeleton:#CBD5E1; --accent2:#2563EB; --textInverse:#FFFFFF; --overlay:rgba(0,0,0,.54); --shadow:rgba(15,23,42,.06);
+  }
+  .app[data-theme=dark] {
+    --primary:#818CF8; --onPrimary:#fff; --primaryContainer:#1E1B4B; --onPrimaryContainer:#E0E7FF;
+    --surface:#18181B; --card:#27272A; --border:#3F3F46; --divider:#3F3F46; --surfaceVariant:#3F3F46; --progressBackground:#3F3F46;
+    --textPrimary:#FAFAFA; --textSecondary:#D4D4D8; --textTertiary:#A1A1AA; --warning:#F59E0B; --error:#F87171;
+    --skeleton:#3F3F46; --accent2:#3B82F6; --textInverse:#09090B; --overlay:rgba(0,0,0,.6); --shadow:rgba(0,0,0,.3);
+  }
+  .app { width:360px; height:800px; border-radius:24px; position:relative; display:flex; flex-direction:column; overflow:hidden; background:var(--surface); color:var(--textPrimary); font-family:Inter,system-ui,Roboto,sans-serif; font-size:14px; line-height:1.4; -webkit-font-smoothing:antialiased; }
+  :where(.app button) { font:inherit; color:inherit; background:none; border:0; padding:0; margin:0; text-align:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .app button:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  .ico { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; display:block; flex:none; }
+  .ico16 { width:16px; height:16px; }
+  .ico24 { width:24px; height:24px; }
+  .ico32 { width:32px; height:32px; } /* iconSize.xl */
+  .pressable { position:relative; overflow:hidden; }
+  .pressable::after { content:""; position:absolute; inset:0; background:currentColor; opacity:0; transition:opacity 150ms ease-out; pointer-events:none; border-radius:inherit; }
+  .pressable:active::after { opacity:.08; }
+
+  .screen { position:absolute; inset:32px 0 0 0; display:flex; flex-direction:column; background:var(--surface); transition:transform 250ms cubic-bezier(.2,0,0,1); }
+  .screen[hidden] { display:none; }
+
+  /* App bar — matches Cortex builder header: back, headline 20/600, bottom border */
+  .appbar { flex:none; display:flex; align-items:center; gap:4px; height:64px; padding:0 4px; background:var(--card); border-bottom:1px solid var(--border); }
+  .appbar h1 { flex:1; margin:0 0 0 4px; font-size:20px; font-weight:600; letter-spacing:-.25px; } /* headline */
+  .iconbtn { width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:var(--textPrimary); flex:none; }
+  .iconbtn.sm { width:40px; height:40px; color:var(--textSecondary); }
+
+  .scroll { flex:1; min-height:0; overflow-y:auto; scrollbar-width:none; padding:0 16px 40px; }
+  .scroll::-webkit-scrollbar { display:none; }
+
+  /* Buttons — Cortex AppButton has only primary (filled) and secondary (outlined); radius.button 12 */
+  .btn { min-height:48px; padding:0 24px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:8px; } /* AppButton: spacing.lg, radius.button */
+  .btn-primary { background:var(--primary); color:var(--onPrimary); }
+  .btn-secondary { border:1px solid var(--border); color:var(--textSecondary); }
+  .btn-sm { min-height:40px; padding:0 16px; }
+  .btn-text { color:var(--primary); min-height:40px; padding:0 16px; }
+
+  /* ---------- History list ---------- */
+  .group { font-size:14px; font-weight:600; line-height:1.4; color:var(--textSecondary); margin:24px 4px 8px; } /* subtitle; spacing.lg above, spacing.sm below */
+  .list { display:flex; flex-direction:column; gap:16px; } /* spacing.itemGap */
+  .att { display:block; width:100%; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px 8px 16px 16px; }
+  .att-top { display:flex; align-items:flex-start; gap:8px; }
+  .att-title { flex:1; min-width:0; }
+  .att-title b { display:block; font-size:16px; font-weight:600; line-height:1.5; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } /* body at w600 */
+  .att-meta { font-size:14px; font-weight:500; line-height:1.4; color:var(--textSecondary); } /* bodySmall, textSecondary; no extra gap — body line height already spaces it */
+  .att .iconbtn.sm { margin:-8px 0; }
+  .stats { display:flex; align-items:flex-end; gap:24px; margin-top:16px; padding-right:8px; }
+  .stat b { display:block; font-size:18px; font-weight:600; line-height:1.2; font-variant-numeric:tabular-nums; } /* title */
+  .stat b small { font-size:14px; font-weight:500; line-height:1.2; color:var(--textTertiary); } /* label, textTertiary */
+  .stat span { font-size:12px; font-weight:400; line-height:1.4; color:var(--textSecondary); } /* caption */
+  .att-date { margin-left:auto; font-size:12px; font-weight:400; line-height:1.4; color:var(--textTertiary); white-space:nowrap; } /* caption, textTertiary */
+
+  /* Running attempt footer: time left + started, Resume on the right */
+  .run-row { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:16px; padding-right:8px; }
+  .run-row .left { display:block; font-size:12px; font-weight:600; line-height:1.1; color:var(--warning); } /* labelSmall, warning */
+  .run-row .started { display:block; font-size:12px; font-weight:400; line-height:1.4; color:var(--textTertiary); margin-top:4px; } /* caption, textTertiary */
+
+  .btn[disabled] { opacity:.4; pointer-events:none; }
+
+  .endnote { text-align:center; font-size:12px; line-height:1.4; color:var(--textTertiary); margin:24px 0 0; } /* caption */
+
+  /* Empty, error */
+  .state { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; min-height:100%; padding:0 24px 48px; } /* centred in the space below the app bar */
+  .state .bubble { width:80px; height:80px; border-radius:50%; background:var(--surfaceVariant); color:var(--textSecondary); display:flex; align-items:center; justify-content:center; margin-bottom:16px; } /* like builder empty state: spacing.lg around iconSize.xl */
+  .state b { font-size:18px; font-weight:600; }
+  .state p { font-size:14px; font-weight:500; line-height:1.4; color:var(--textSecondary); margin:4px 0 24px; max-width:260px; } /* bodySmall */
+
+  /* Skeleton */
+  .sk { background:var(--skeleton); border-radius:4px; animation:pulse 1.4s ease-in-out infinite; } /* radius.sm */
+  @keyframes pulse { 50% { opacity:.5; } }
+
+  /* Bottom sheet — Cortex AppBottomSheet */
+  .scrim { position:absolute; inset:0; background:var(--overlay); opacity:0; pointer-events:none; transition:opacity 200ms; z-index:40; }
+  .scrim.open { opacity:1; pointer-events:auto; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:var(--card); border-radius:24px 24px 0 0; padding:8px 0 32px; transform:translateY(100%); transition:transform 250ms cubic-bezier(.2,0,0,1); z-index:41; }
+  .sheet.open { transform:none; }
+  .handle { width:32px; height:4px; border-radius:2px; background:var(--textTertiary); opacity:.5; margin:4px auto 16px; }
+  .sheet-head { padding:0 24px 8px; }
+  .sheet-head b { font-size:18px; font-weight:600; display:block; }
+  .sheet-head span { display:block; margin-top:4px; font-size:14px; font-weight:500; line-height:1.4; color:var(--textSecondary); } /* bodySmall */
+  .sheet-item { display:flex; align-items:center; gap:16px; width:100%; min-height:56px; padding:0 24px; font-size:16px; line-height:1.5; } /* body */
+  .sheet-item svg { color:var(--textSecondary); }
+  .sheet-body { padding:0 24px; font-size:14px; font-weight:500; line-height:1.4; color:var(--textSecondary); } /* bodySmall */
+  .sheet-actions { display:flex; justify-content:flex-end; gap:8px; padding:24px 24px 0; }
+
+  /* ---------- Dialogs, copied from Cortex ---------- */
+  .dlg-layer { position:absolute; inset:0; z-index:45; display:flex; align-items:center; justify-content:center; opacity:0; pointer-events:none; transition:opacity 150ms; }
+  .dlg-layer.open { opacity:1; pointer-events:auto; }
+  .dlg-box { width:100%; }
+  .dlg-box b.dlg-title { display:block; font-size:18px; font-weight:600; color:var(--textPrimary); } /* AppText.title */
+
+  /* Retake — showConfirmationDialog: barrier colors.shadow at 60%, margin xl, padding lg, colors.surface, radius.card, border in dark */
+  .dlg-layer.confirm { background:rgba(0,0,0,.12); padding:32px; }
+  .app[data-theme=dark] .dlg-layer.confirm { background:rgba(0,0,0,.24); }
+  .confirm .dlg-box { max-width:480px; background:var(--surface); border-radius:16px; padding:24px; box-shadow:0 8px 20px rgba(0,0,0,.1); }
+  .app[data-theme=dark] .confirm .dlg-box { border:1px solid var(--border); box-shadow:0 8px 20px rgba(0,0,0,.4); }
+  .confirm p { margin:8px 0 16px; font-size:16px; line-height:1.5; color:var(--textSecondary); } /* AppText.body, textSecondary */
+  .confirm .dlg-actions { display:flex; justify-content:flex-end; gap:8px; }
+  .confirm .btn { padding:8px 16px; }
+  .btn-outline { border:1.5px solid rgba(148,163,184,.5); color:var(--textPrimary); } /* AppButton.secondary, textTertiary 50% (light) */
+  .app[data-theme=dark] .btn-outline { border-color:var(--border); } /* colors.border (dark) */
+
+  /* Rename — CreateFolderDialog (bookmark folder rename): barrier colors.overlay, padding lg, maxWidth 360, colors.card, radius.xl, 1px border */
+  .dlg-layer.rename { background:var(--overlay); padding:24px; }
+  .rename .dlg-box { max-width:360px; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:24px; }
+  .field-label { display:block; margin:16px 0 4px; font-size:14px; font-weight:500; line-height:1.2; color:var(--textPrimary); } /* AppTextField label: AppText.label, spacing.xs */
+  .field { display:block; width:100%; padding:16px; border:1px solid var(--border); border-radius:12px; background:var(--card); color:var(--textPrimary); font:inherit; font-size:16px; outline:none; } /* AppTextField: colors.card, radius.lg, padding md */
+  .field::placeholder { color:var(--textTertiary); }
+  .field:focus { border-color:var(--primary); }
+  .rename .dlg-actions { display:flex; gap:16px; margin-top:24px; }
+  .rename .dlg-actions .btn { flex:1; }
+  .btn-muted { background:var(--surfaceVariant); color:var(--textPrimary); } /* AppButton.primary with surfaceVariant / textPrimary */
+  .btn-save { background:var(--accent2); color:var(--textInverse); } /* AppButton.primary with accent2 / textInverse */
+  .btn[disabled] { opacity:.5; pointer-events:none; }
+
+  .snack { position:absolute; left:16px; right:16px; bottom:32px; background:var(--textPrimary); color:var(--card); padding:16px; border-radius:8px; font-size:14px; z-index:50; opacity:0; transform:translateY(8px); transition:opacity 150ms,transform 150ms; pointer-events:none; }
+  .snack.show { opacity:1; transform:none; }
+
+  /* ---------- On a real phone: the app fills the screen; the panel becomes a floating "Prototype" menu ---------- */
+  .proto-pill { display:none; }
+  @media (max-width: 600px) {
+    body { background:#000; }
+    .stage { display:block; padding:0; }
+    .device { padding:0; border-radius:0; box-shadow:none; background:none; }
+    .app { width:100vw; height:100vh; height:100dvh; border-radius:0; }
+    .statusbar, .homebar { display:none; }
+    .screen { inset:0; }
+    .scroll { padding-bottom:calc(40px + env(safe-area-inset-bottom)); }
+    .sheet { padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
+    .panel { display:none; position:fixed; right:12px; bottom:64px; z-index:100; width:240px; max-height:70vh; overflow:auto; background:#fff; border-radius:16px; padding:12px 16px 16px; box-shadow:0 12px 32px rgba(0,0,0,.3); }
+    .panel.open { display:block; }
+    .panel h1 { font-size:15px; }
+    .panel h2 { margin-top:14px; }
+    .proto-pill { display:inline-flex; position:fixed; right:12px; bottom:calc(16px + env(safe-area-inset-bottom)); z-index:100; align-items:center; gap:6px; padding:8px 14px; border:0; border-radius:999px; background:#0f172a; color:#fff; font:600 12px Inter,system-ui,sans-serif; box-shadow:0 4px 12px rgba(0,0,0,.3); border:1px solid rgba(255,255,255,.25); opacity:.9; cursor:pointer; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></symbol>
+  <symbol id="i-retake" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.17 6.81a1 1 0 0 0-3.99-3.99L3.84 16.17a2 2 0 0 0-.5.83l-1.32 4.35a.5.5 0 0 0 .62.62l4.35-1.32a2 2 0 0 0 .83-.5z"/><path d="m15 5 4 4"/></symbol>
+  <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="m2 2 20 20"/><path d="M5.78 5.78A7 7 0 0 0 9 19h8.5a4.5 4.5 0 0 0 1.31-.2"/><path d="M21.53 16.85A4.5 4.5 0 0 0 17.5 10h-1.79A7 7 0 0 0 9.5 5.06"/></symbol>
+</svg>
+
+<div class="stage">
+  <button class="proto-pill" id="proto-pill" aria-expanded="false" aria-controls="proto-panel">Prototype</button>
+  <div class="panel" id="proto-panel">
+    <h1>Custom exam history</h1>
+    <div style="color:#475569;font-size:13px">Cortex · Android · 360 × 800</div>
+
+    <h2>Theme</h2>
+    <div class="seg row" data-ctl="theme">
+      <button aria-pressed="true" data-v="light">Light</button>
+      <button aria-pressed="false" data-v="dark">Dark</button>
+    </div>
+
+
+    <h2>History state</h2>
+    <div class="seg" data-ctl="state">
+      <button aria-pressed="true" data-v="data">With attempts</button>
+      <button aria-pressed="false" data-v="empty">No attempts yet</button>
+      <button aria-pressed="false" data-v="loading">Loading</button>
+      <button aria-pressed="false" data-v="error">Couldn't load</button>
+    </div>
+  </div>
+
+  <div class="device">
+    <div class="app" id="app" data-theme="light">
+      <div class="statusbar"><span>9:41</span><i></i><span class="sys"><span></span><span></span></span></div>
+
+
+      <!-- History -->
+      <section class="screen" id="s-history">
+        <header class="appbar">
+          <button class="iconbtn pressable" aria-label="Go back" data-toast="Goes back to Custom Exam"><svg class="ico ico24"><use href="#i-back"/></svg></button>
+          <h1>Custom exam history</h1>
+        </header>
+        <div class="scroll" id="history-body"></div>
+      </section>
+
+      <div class="scrim" id="scrim"></div>
+      <div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+      <div class="dlg-layer" id="dlg" role="dialog" aria-modal="true"></div>
+      <div class="snack" id="snack"></div>
+      <div class="homebar"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* Sample data shaped like GET /api/v3/courses/<course_id>/custom-test/
+   title (backend default "Nov 26, 2026 C", or the learner's own name after Rename), date, state,
+   remaining_time (Running only), score (Completed only), total_questions, correct_count, incorrect_count,
+   questionnaires [{ no_of_questions, difficulty_level, question_types }] */
+let data = [
+  { id:1, title:'Physics revision', state:'Running', remaining_time:'18:32', date:'Today, 3:40 PM', group:'In progress',
+    questionnaires:[{ no_of_questions:20, difficulty_level:['Easy','Medium'], question_types:['MCQ'] }, { no_of_questions:10, difficulty_level:['Easy'], question_types:['MCQ'] }] },
+  { id:2, title:'Nov 26, 2026 C', state:'Running', remaining_time:'42:10', date:'Yesterday, 7:15 PM', group:'In progress',
+    questionnaires:[{ no_of_questions:15, difficulty_level:['Hard'], question_types:['MCQ','Short Answer'] }] },
+
+  { id:3, title:'Nov 25, 2026 B', state:'Completed', score:'12.50', correct_count:9, incorrect_count:4, date:'25 Nov', group:'This week',
+    questionnaires:[{ no_of_questions:15, difficulty_level:['Medium'], question_types:['MCQ'] }] },
+  { id:4, title:'Organic chemistry practice', state:'Completed', score:'18.00', correct_count:18, incorrect_count:5, date:'24 Nov', group:'This week',
+    questionnaires:[{ no_of_questions:25, difficulty_level:['Easy','Medium'], question_types:['MCQ'] }] },
+  { id:5, title:'Nov 23, 2026 A', state:'Completed', score:'3.00', correct_count:5, incorrect_count:8, date:'23 Nov', group:'This week',
+    questionnaires:[{ no_of_questions:15, difficulty_level:['Hard'], question_types:['MCQ','Short Answer'] }] },
+
+  { id:6, title:'Full syllabus mock', state:'Completed', score:'96.00', correct_count:30, incorrect_count:12, date:'14 Nov', group:'Earlier in November',
+    questionnaires:[{ no_of_questions:30, difficulty_level:['Easy','Medium'], question_types:['MCQ'] }, { no_of_questions:20, difficulty_level:['Hard'], question_types:['Short Answer'] }] },
+  { id:7, title:'Nov 9, 2026 A', state:'Completed', score:'6.00', correct_count:6, incorrect_count:2, date:'9 Nov', group:'Earlier in November',
+    questionnaires:[{ no_of_questions:10, difficulty_level:['Easy'], question_types:['MCQ'] }] },
+
+  { id:8, title:'Kinematics drill', state:'Completed', score:'14.00', correct_count:14, incorrect_count:3, date:'28 Oct', group:'October 2026',
+    questionnaires:[{ no_of_questions:20, difficulty_level:['Medium'], question_types:['MCQ'] }] },
+];
+
+const ico = (id, cls='ico') => `<svg class="${cls}"><use href="#i-${id}"/></svg>`;
+const esc = t => String(t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uniq = arr => [...new Set(arr)];
+/* Config summary from questionnaires: total questions · difficulty levels (· question types, in the ⋮ sheet only) */
+function meta(a, withTypes){
+  const q = a.questionnaires;
+  const n = q.reduce((s, x) => s + x.no_of_questions, 0);
+  const order = ['Easy','Medium','Hard'];
+  const d = uniq(q.flatMap(x => x.difficulty_level)).sort((x, y) => order.indexOf(x) - order.indexOf(y));
+  const t = uniq(q.flatMap(x => x.question_types));
+  return `${n} questions · ${d.join(', ')}` + (withTypes ? ` · ${t.join(', ')}` : '');
+}
+const total = a => a.questionnaires.reduce((s, x) => s + x.no_of_questions, 0);
+/* Accuracy, worked out in the app: correct ÷ attempted (correct + incorrect). "–" when nothing was attempted. */
+function accuracy(a){ const att = a.correct_count + a.incorrect_count; return att ? Math.round(a.correct_count / att * 100) + '%' : '–'; }
+
+function runningCard(a){
+  return `<div class="att">
+    <div class="att-top">
+      <div class="att-title"><b>${esc(a.title)}</b><div class="att-meta">${meta(a)}</div></div>
+      <button class="iconbtn sm pressable" aria-label="More options" data-more="${a.id}">${ico('more')}</button>
+    </div>
+    <div class="run-row">
+      <div><span class="left">${a.remaining_time} left</span><span class="started">Started ${a.date.replace(/^Today/, 'today').replace(/^Yesterday/, 'yesterday')}</span></div>
+      <button class="btn btn-primary btn-sm pressable" data-toast="Resuming where you left off">Resume</button>
+    </div>
+  </div>`;
+}
+function doneCard(a){
+  return `<div class="att pressable" role="button" tabindex="0" data-toast="Opens the review for this attempt">
+    <div class="att-top">
+      <div class="att-title"><b>${esc(a.title)}</b><div class="att-meta">${meta(a)}</div></div>
+      <button class="iconbtn sm pressable" aria-label="More options" data-more="${a.id}">${ico('more')}</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${accuracy(a)}</b><span>Accuracy</span></div>
+      <div class="stat"><b>${a.correct_count}<small> / ${total(a)}</small></b><span>Correct</span></div>
+      <span class="att-date">${a.date}</span>
+    </div>
+  </div>`;
+}
+function skeletonCard(){
+  return `<div class="att" aria-hidden="true">
+    <div class="sk" style="width:60%;height:18px"></div>
+    <div class="sk" style="width:80%;height:14px;margin-top:10px"></div>
+    <div style="display:flex;gap:24px;margin-top:20px"><div class="sk" style="width:48px;height:28px"></div><div class="sk" style="width:56px;height:28px"></div></div>
+  </div>`;
+}
+
+const body = document.getElementById('history-body');
+let current = 'data';
+function renderHistory(state){
+  current = state;
+  if (state === 'loading'){
+    body.innerHTML = `<div class="group"><span class="sk" style="display:inline-block;width:90px;height:14px"></span></div><div class="list">${skeletonCard().repeat(4)}</div>`;
+    body.setAttribute('aria-busy','true'); return;
+  }
+  body.removeAttribute('aria-busy');
+  if (state === 'empty'){
+    body.innerHTML = `<div class="state"><div class="bubble">${ico('clipboard','ico ico32')}</div>
+      <b>No custom exams yet</b><p>Custom exams you take in this course will show up here.</p>
+      <button class="btn btn-primary pressable" data-toast="Opens Custom Exam">Create custom exam</button></div>`; return;
+  }
+  if (state === 'error'){
+    // Same look as the empty state: neutral icon in a surfaceVariant circle (not AppErrorView's red icon), AppButton.primary "Retry"
+    body.innerHTML = `<div class="state"><div class="bubble">${ico('cloud-off','ico ico32')}</div>
+      <b>Couldn't load your attempts</b><p>Check your internet connection and try again.</p>
+      <button class="btn btn-primary pressable" data-toast="Trying again…">Retry</button></div>`; return;
+  }
+  let h = '';
+  uniq(data.map(a => a.group)).forEach(g => {
+    const items = data.filter(a => a.group === g);
+    h += `<div class="group">${g}</div><div class="list">${items.map(a => a.state === 'Running' ? runningCard(a) : doneCard(a)).join('')}</div>`;
+  });
+  h += `<p class="endnote">That's all your custom exams</p>`;
+  body.innerHTML = h;
+}
+
+/* Sheets */
+const sheet = document.getElementById('sheet'), scrim = document.getElementById('scrim');
+const find = id => data.find(a => a.id == id);
+function openSheet(html){ sheet.innerHTML = `<div class="handle"></div>${html}`; sheet.classList.add('open'); scrim.classList.add('open'); }
+function closeSheet(){ sheet.classList.remove('open'); scrim.classList.remove('open'); }
+function moreSheet(a){
+  const items = a.state === 'Running'
+    ? `<button class="sheet-item pressable" data-toast="Resuming where you left off">${ico('play')}Resume</button>`
+    : `<button class="sheet-item pressable" data-toast="Opens the review for this attempt">${ico('eye')}Review</button>
+       <button class="sheet-item pressable" data-retake="${a.id}">${ico('retake')}Retake</button>`;
+  openSheet(`<div class="sheet-head"><b>${esc(a.title)}</b><span>${a.date} · ${meta(a, true)}</span></div>
+    ${items}
+    <button class="sheet-item pressable" data-rename="${a.id}">${ico('pencil')}Rename</button>`);
+}
+const dlg = document.getElementById('dlg');
+function openDialog(kind, html){ closeSheet(); dlg.className = 'dlg-layer ' + kind + ' open'; dlg.innerHTML = `<div class="dlg-box">${html}</div>`; }
+function closeDialog(){ dlg.classList.remove('open'); }
+function retakeSheet(a){
+  openDialog('confirm', `<b class="dlg-title">Retake this exam?</b><p>This starts a new attempt of “${esc(a.title)}”.</p>
+    <div class="dlg-actions"><button class="btn btn-outline pressable" data-dclose>Cancel</button><button class="btn btn-primary pressable" data-toast="Starting retake">Retake</button></div>`);
+}
+function renameSheet(a){
+  openDialog('rename', `<b class="dlg-title">Rename exam</b>
+    <label class="field-label" for="rename-input">Exam name</label>
+    <input class="field" id="rename-input" type="text" maxlength="60" placeholder="e.g. Physics revision" value="${esc(a.title)}">
+    <div class="dlg-actions"><button class="btn btn-muted pressable" data-dclose>Cancel</button><button class="btn btn-save pressable" id="rename-save" data-save="${a.id}">Save</button></div>`);
+  const input = document.getElementById('rename-input'), save = document.getElementById('rename-save');
+  setTimeout(() => { input.focus(); input.select(); }, 200);
+  input.addEventListener('input', () => { save.disabled = !input.value.trim(); });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter' && input.value.trim()) save.click(); });
+}
+
+/* Toast */
+const snack = document.getElementById('snack'); let st;
+function toast(t){ closeSheet(); closeDialog(); snack.textContent = t; snack.classList.add('show'); clearTimeout(st); st = setTimeout(() => snack.classList.remove('show'), 1800); }
+
+/* Navigation & controls */
+const app = document.getElementById('app');
+app.addEventListener('click', e => {
+  if (e.target === scrim) return closeSheet();
+  const t = e.target.closest('[data-more],[data-retake],[data-rename],[data-save],[data-toast],[data-close],[data-dclose]');
+  if (!t) return;
+  e.stopPropagation();
+  if (t.dataset.more) return moreSheet(find(t.dataset.more));
+  if (t.dataset.retake) return retakeSheet(find(t.dataset.retake));
+  if (t.dataset.rename) return renameSheet(find(t.dataset.rename));
+  if (t.dataset.save) {
+    const v = document.getElementById('rename-input').value.trim();
+    if (!v) return;
+    find(t.dataset.save).title = v; renderHistory(current); return toast('Exam renamed');
+  }
+  if (t.hasAttribute('data-close')) return closeSheet();
+  if (t.hasAttribute('data-dclose')) return closeDialog();
+  if (t.dataset.toast) return toast(t.dataset.toast);
+});
+document.querySelectorAll('.seg').forEach(seg => seg.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  seg.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  const ctl = seg.dataset.ctl, v = b.dataset.v;
+  if (ctl === 'theme') app.dataset.theme = v;
+  if (ctl === 'state') { renderHistory(v); closeSheet(); closeDialog(); }
+}));
+renderHistory('data');
+
+/* Phone: open/close the prototype menu */
+const pill = document.getElementById('proto-pill'), panel = document.getElementById('proto-panel');
+pill.addEventListener('click', () => { const o = panel.classList.toggle('open'); pill.setAttribute('aria-expanded', o); });
+document.addEventListener('click', e => { if (!panel.contains(e.target) && e.target !== pill) { panel.classList.remove('open'); pill.setAttribute('aria-expanded', false); } });
+/* Start in the phone's own theme */
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.querySelector('[data-ctl=theme] [data-v=dark]').click();
+</script>
+</body>
+</html>
